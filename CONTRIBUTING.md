@@ -1,23 +1,23 @@
-# Contributing to Walrus
+# Contributing to Ferret
 
-Thank you for considering contributing to Walrus! Your support will help make this language better for everyone.
+Thank you for considering contributing to ferret! Your support will help make this language better for everyone.
 
 ## Ways to Contribute
 
 ### 1. Report Issues
-- Found a bug or an unexpected behavior? Please [open an issue](https://github.com/itsfuad/walrus/issues).
+- Found a bug or an unexpected behavior? Please [open an issue](https://github.com/itsfuad/ferret/issues).
 - When reporting an issue, include:
   - Clear steps to reproduce the issue.
-  - The version of Walrus or commit hash.
+  - The version of ferret or commit hash.
   - Relevant code snippets, if applicable.
 
 ### 2. Suggest Features
-- Have an idea to improve Walrus? Feel free to [submit a feature request](https://github.com/itsfuad/walrus/issues).
+- Have an idea to improve ferret? Feel free to [submit a feature request](https://github.com/itsfuad/ferret/issues).
 - Be as descriptive as possible and explain the motivation behind the feature.
 
 ### 3. Submit Pull Requests
 - Contributions are welcome for bug fixes, new features, documentation updates, and more.
-- Make sure your changes align with the project's [design principles](https://github.com/itsfuad/walrus#language-design-principles).
+- Make sure your changes align with the project's [design principles](https://github.com/itsfuad/ferret#language-design-principles).
 
 #### Steps to Submit a Pull Request:
 1. Fork the repository and clone it locally.
@@ -67,8 +67,8 @@ Thank you for considering contributing to Walrus! Your support will help make th
 1. Install [Go](https://golang.org/dl/) and ensure it is properly configured.
 2. Clone the repository:
    ```bash
-   git clone https://github.com/itsfuad/walrus.git
-   cd walrus
+   git clone https://github.com/itsfuad/ferret.git
+   cd ferret
    ```
 3. Test the project setup:
    ```bash
@@ -80,7 +80,7 @@ Thank you for considering contributing to Walrus! Your support will help make th
    ```
 
 ## Communication
-- For questions and discussions, feel free to [start a discussion](https://github.com/itsfuad/walrus/discussions).
+- For questions and discussions, feel free to [start a discussion](https://github.com/itsfuad/ferret/discussions).
 - For urgent matters, contact the maintainers via email (add contact info here).
 
-We appreciate your contributions and look forward to building Walrus together!
+We appreciate your contributions and look forward to building ferret together!
