@@ -1,9 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"ferret/compiler/internal/lexer"
 )
 
 func main() {
-	fmt.Println("Hello, Ferret!")
+
+	filename := "./../code/start.fer"
+
+	lexer.Tokenize(filename, true)
 }

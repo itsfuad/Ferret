@@ -16,15 +16,12 @@ const (
 	ELSE_TOKEN       builtins.TOKEN_KIND = "else"
 	FOR_TOKEN        builtins.TOKEN_KIND = "for"
 	FOREACH_TOKEN    builtins.TOKEN_KIND = "foreach"
+	WHILE_TOKEN      builtins.TOKEN_KIND = "while"
+	DO_TOKEN         builtins.TOKEN_KIND = "do"
 	IDENTIFIER_TOKEN builtins.TOKEN_KIND = "identifier"
 	PRIVATE_TOKEN    builtins.TOKEN_KIND = "priv"
 	IMPL_TOKEN       builtins.TOKEN_KIND = "impl"
 	RETURN_TOKEN     builtins.TOKEN_KIND = "ret"
-	IN_TOKEN         builtins.TOKEN_KIND = "in"
-	AT_TOKEN         builtins.TOKEN_KIND = "@"
-	DOLLAR_TOKEN     builtins.TOKEN_KIND = "$"
-	AS_TOKEN         builtins.TOKEN_KIND = "as"
-	TYPEOF_TOKEN     builtins.TOKEN_KIND = "typeof"
 	//data types
 	INT8_TOKEN      builtins.TOKEN_KIND = builtins.INT8
 	INT16_TOKEN     builtins.TOKEN_KIND = builtins.INT16
@@ -73,7 +70,6 @@ const (
 	NOT_EQUAL_TOKEN     builtins.TOKEN_KIND = "!="
 	DOUBLE_EQUAL_TOKEN  builtins.TOKEN_KIND = "=="
 	//assignment
-	ferret_TOKEN       builtins.TOKEN_KIND = ":="
 	COLON_TOKEN        builtins.TOKEN_KIND = ":"
 	EQUALS_TOKEN       builtins.TOKEN_KIND = "="
 	PLUS_EQUALS_TOKEN  builtins.TOKEN_KIND = "+="
@@ -94,7 +90,7 @@ const (
 	SEMI_COLON_TOKEN builtins.TOKEN_KIND = ";"
 	ARROW_TOKEN      builtins.TOKEN_KIND = "->"
 	FAT_ARROW_TOKEN  builtins.TOKEN_KIND = "=>"
-	EOF_TOKEN        builtins.TOKEN_KIND = "eof"
+	EOF_TOKEN        builtins.TOKEN_KIND = "end_of_file"
 )
 
 var keyWordsMap map[string]builtins.TOKEN_KIND = map[string]builtins.TOKEN_KIND{
@@ -104,8 +100,9 @@ var keyWordsMap map[string]builtins.TOKEN_KIND = map[string]builtins.TOKEN_KIND{
 	"else":      ELSE_TOKEN,
 	"for":       FOR_TOKEN,
 	"foreach":   FOREACH_TOKEN,
+	"while":     WHILE_TOKEN,
+	"do":        DO_TOKEN,
 	"type":      TYPE_TOKEN,
-	"typeof":    TYPEOF_TOKEN,
 	"priv":      PRIVATE_TOKEN,
 	"interface": INTERFACE_TOKEN,
 	"impl":      IMPL_TOKEN,
@@ -113,8 +110,6 @@ var keyWordsMap map[string]builtins.TOKEN_KIND = map[string]builtins.TOKEN_KIND{
 	"fn":        FUNCTION_TOKEN,
 	"map":       MAP_TOKEN,
 	"ret":       RETURN_TOKEN,
-	"in":        IN_TOKEN,
-	"as":        AS_TOKEN,
 }
 
 func IsKeyword(token string) bool {

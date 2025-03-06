@@ -1,0 +1,14 @@
+//single variable with type inference
+let x = 10;
+
+//single variable with type
+let x: i32 = 10;
+
+//multiple variables with type inference
+let x, y = 10, 20;
+
+//multiple variables with type
+let x: i32, y: i32 = 10, 20;
+
+//multiple variables with type inference and type
+let x, y = 10, 20;
