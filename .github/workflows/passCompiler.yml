@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        id: gomod-cache
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install Dependencies
+        run: |
+          cd compiler && go mod tidy
+
+      - name: Lint
+        run: |
+          go install golang.org/x/lint/golint@latest
+          cd compiler && golint ./...
+
+      - name: Format Check
+        run: |
+          check_format() {
+            unformatted=$(go fmt ./...)
+            if [ -n "$unformatted" ]; then
+              echo "The following files are not formatted in $1:"
+              echo "$unformatted"
+              return 1
+            fi
+            echo "Code is formatted in $1."
+            return 0
+          }
+          
+          cd compiler && check_format "compiler"
+
+      - name: Vet
+        run: |
+          cd compiler && go vet ./...
+
+      - name: Build
+        run: |
+          cd compiler && go build -v ./...
+
+      - name: Test
+        run: |
+          cd compiler && go test -v ./...
