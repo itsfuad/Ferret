@@ -168,7 +168,7 @@ func parseType(p *Parser) ast.DataType {
 		return parseByteType(p)
 	case string(types.BOOL):
 		return parseBoolType(p)
-	case string(types.ARRAY):
+	case "[":
 		return parseArrayType(p)
 	}
 	return nil

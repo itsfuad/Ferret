@@ -2,6 +2,17 @@ package ast
 
 import "ferret/compiler/internal/lexer"
 
+type AssignmentExpr struct {
+	Left  ExpressionList
+	Right ExpressionList
+	Location
+}
+
+func (a *AssignmentExpr) INode()                   {} // INode is a marker interface for all nodes
+func (a *AssignmentExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (a *AssignmentExpr) StartPos() lexer.Position { return a.Start }
+func (a *AssignmentExpr) EndPos() lexer.Position   { return a.End }
+
 // Basic expression nodes
 type BinaryExpr struct {
 	Left     Expression
