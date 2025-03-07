@@ -4,11 +4,8 @@ import (
 	//Standard packages
 	"os"
 	"regexp"
-	"strings"
-
 	//ferret packages
 	"ferret/compiler/colors"
-	"ferret/compiler/internal/builtins"
 )
 
 type regexHandler func(lex *Lexer, regex *regexp.Regexp)
@@ -54,6 +51,7 @@ func createLexer(filePath *string) *Lexer {
 		panic(err)
 	}
 
+	//create the lexer
 	lex := &Lexer{
 		sourceCode: fileText,
 		Tokens:     make([]Token, 0),
@@ -72,46 +70,46 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`'[^']'`), byteHandler},                       // byte literals
 			{regexp.MustCompile(`[0-9]+(?:\.[0-9]+)?`), numberHandler},        // decimal numbers
 			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
-			{regexp.MustCompile(`\+\+`), defaultHandler(PLUS_PLUS_TOKEN, "++")},
-			{regexp.MustCompile(`\-\-`), defaultHandler(MINUS_MINUS_TOKEN, "--")},
-			{regexp.MustCompile(`\->`), defaultHandler(ARROW_TOKEN, "->")},
-			{regexp.MustCompile(`\=>`), defaultHandler(FAT_ARROW_TOKEN, "=>")},
-			{regexp.MustCompile(`!=`), defaultHandler(NOT_EQUAL_TOKEN, "!=")},
-			{regexp.MustCompile(`\+=`), defaultHandler(PLUS_EQUALS_TOKEN, "+=")},
-			{regexp.MustCompile(`-=`), defaultHandler(MINUS_EQUALS_TOKEN, "-=")},
-			{regexp.MustCompile(`\*=`), defaultHandler(MUL_EQUALS_TOKEN, "*=")},
-			{regexp.MustCompile(`/=`), defaultHandler(DIV_EQUALS_TOKEN, "/=")},
-			{regexp.MustCompile(`%=`), defaultHandler(MOD_EQUALS_TOKEN, "%=")},
-			{regexp.MustCompile(`\^=`), defaultHandler(EXP_EQUALS_TOKEN, "^=")},
-			{regexp.MustCompile(`\*\*`), defaultHandler(EXP_TOKEN, "**")},
-			{regexp.MustCompile(`\.\.`), defaultHandler(RANGE_TOKEN, "..")},
-			{regexp.MustCompile(`&&`), defaultHandler(AND_TOKEN, "&&")},
-			{regexp.MustCompile(`\|\|`), defaultHandler(OR_TOKEN, "||")},
-			{regexp.MustCompile(`&`), defaultHandler(BIT_AND_TOKEN, "&")},
-			{regexp.MustCompile(`\|`), defaultHandler(BIT_OR_TOKEN, "|")},
-			{regexp.MustCompile(`\^`), defaultHandler(BIT_XOR_TOKEN, "^")},
-			{regexp.MustCompile(`!`), defaultHandler(NOT_TOKEN, "!")},
-			{regexp.MustCompile(`\-`), defaultHandler(MINUS_TOKEN, "-")},
-			{regexp.MustCompile(`\+`), defaultHandler(PLUS_TOKEN, "+")},
-			{regexp.MustCompile(`\*`), defaultHandler(MUL_TOKEN, "*")},
-			{regexp.MustCompile(`/`), defaultHandler(DIV_TOKEN, "/")},
-			{regexp.MustCompile(`%`), defaultHandler(MOD_TOKEN, "%")},
-			{regexp.MustCompile(`<`), defaultHandler(LESS_EQUAL_TOKEN, "<=")},
-			{regexp.MustCompile(`<`), defaultHandler(LESS_TOKEN, "<")},
-			{regexp.MustCompile(`>=`), defaultHandler(GREATER_EQUAL_TOKEN, ">=")},
-			{regexp.MustCompile(`>`), defaultHandler(GREATER_TOKEN, ">")},
-			{regexp.MustCompile(`==`), defaultHandler(DOUBLE_EQUAL_TOKEN, "==")},
-			{regexp.MustCompile(`=`), defaultHandler(EQUALS_TOKEN, "=")},
-			{regexp.MustCompile(`:`), defaultHandler(COLON_TOKEN, ":")},
-			{regexp.MustCompile(`;`), defaultHandler(SEMI_COLON_TOKEN, ";")},
-			{regexp.MustCompile(`\(`), defaultHandler(OPEN_PAREN, "(")},
-			{regexp.MustCompile(`\)`), defaultHandler(CLOSE_PAREN, ")")},
-			{regexp.MustCompile(`\[`), defaultHandler(OPEN_BRACKET, "[")},
-			{regexp.MustCompile(`\]`), defaultHandler(CLOSE_BRACKET, "]")},
-			{regexp.MustCompile(`\{`), defaultHandler(OPEN_CURLY, "{")},
-			{regexp.MustCompile(`\}`), defaultHandler(CLOSE_CURLY, "}")},
-			{regexp.MustCompile(","), defaultHandler(COMMA_TOKEN, ",")},
-			{regexp.MustCompile(`\.`), defaultHandler(DOT_TOKEN, ".")},
+			{regexp.MustCompile(`\+\+`), defaultHandler(PLUS_PLUS_TOKEN)},
+			{regexp.MustCompile(`\-\-`), defaultHandler(MINUS_MINUS_TOKEN)},
+			{regexp.MustCompile(`\->`), defaultHandler(ARROW_TOKEN)},
+			{regexp.MustCompile(`\=>`), defaultHandler(FAT_ARROW_TOKEN)},
+			{regexp.MustCompile(`!=`), defaultHandler(NOT_EQUAL_TOKEN)},
+			{regexp.MustCompile(`\+=`), defaultHandler(PLUS_EQUALS_TOKEN)},
+			{regexp.MustCompile(`-=`), defaultHandler(MINUS_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\*=`), defaultHandler(MUL_EQUALS_TOKEN)},
+			{regexp.MustCompile(`/=`), defaultHandler(DIV_EQUALS_TOKEN)},
+			{regexp.MustCompile(`%=`), defaultHandler(MOD_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\^=`), defaultHandler(EXP_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\*\*`), defaultHandler(EXP_TOKEN)},
+			{regexp.MustCompile(`\.\.`), defaultHandler(RANGE_TOKEN)},
+			{regexp.MustCompile(`&&`), defaultHandler(AND_TOKEN)},
+			{regexp.MustCompile(`\|\|`), defaultHandler(OR_TOKEN)},
+			{regexp.MustCompile(`&`), defaultHandler(BIT_AND_TOKEN)},
+			{regexp.MustCompile(`\|`), defaultHandler(BIT_OR_TOKEN)},
+			{regexp.MustCompile(`\^`), defaultHandler(BIT_XOR_TOKEN)},
+			{regexp.MustCompile(`!`), defaultHandler(NOT_TOKEN)},
+			{regexp.MustCompile(`\-`), defaultHandler(MINUS_TOKEN)},
+			{regexp.MustCompile(`\+`), defaultHandler(PLUS_TOKEN)},
+			{regexp.MustCompile(`\*`), defaultHandler(MUL_TOKEN)},
+			{regexp.MustCompile(`/`), defaultHandler(DIV_TOKEN)},
+			{regexp.MustCompile(`%`), defaultHandler(MOD_TOKEN)},
+			{regexp.MustCompile(`<`), defaultHandler(LESS_EQUAL_TOKEN)},
+			{regexp.MustCompile(`<`), defaultHandler(LESS_TOKEN)},
+			{regexp.MustCompile(`>=`), defaultHandler(GREATER_EQUAL_TOKEN)},
+			{regexp.MustCompile(`>`), defaultHandler(GREATER_TOKEN)},
+			{regexp.MustCompile(`==`), defaultHandler(DOUBLE_EQUAL_TOKEN)},
+			{regexp.MustCompile(`=`), defaultHandler(EQUALS_TOKEN)},
+			{regexp.MustCompile(`:`), defaultHandler(COLON_TOKEN)},
+			{regexp.MustCompile(`;`), defaultHandler(SEMI_COLON_TOKEN)},
+			{regexp.MustCompile(`\(`), defaultHandler(OPEN_PAREN)},
+			{regexp.MustCompile(`\)`), defaultHandler(CLOSE_PAREN)},
+			{regexp.MustCompile(`\[`), defaultHandler(OPEN_BRACKET)},
+			{regexp.MustCompile(`\]`), defaultHandler(CLOSE_BRACKET)},
+			{regexp.MustCompile(`\{`), defaultHandler(OPEN_CURLY)},
+			{regexp.MustCompile(`\}`), defaultHandler(CLOSE_CURLY)},
+			{regexp.MustCompile(","), defaultHandler(COMMA_TOKEN)},
+			{regexp.MustCompile(`\.`), defaultHandler(DOT_TOKEN)},
 		},
 	}
 	return lex
@@ -127,15 +125,15 @@ func createLexer(filePath *string) *Lexer {
 //
 // Returns:
 // - A regexHandler function that processes the token and updates the lexer state.
-func defaultHandler(kind builtins.TOKEN_KIND, value string) regexHandler {
+func defaultHandler(token TOKEN) regexHandler {
 
 	return func(lex *Lexer, _ *regexp.Regexp) {
 
 		start := lex.Position
-		lex.advance(value)
+		lex.advance(string(token))
 		end := lex.Position
 
-		lex.push(NewToken(kind, value, start, end))
+		lex.push(NewToken(token, string(token), start, end))
 	}
 }
 
@@ -154,7 +152,7 @@ func identifierHandler(lex *Lexer, regex *regexp.Regexp) {
 	lex.advance(identifier)
 	end := lex.Position
 	if IsKeyword(identifier) {
-		lex.push((NewToken(builtins.TOKEN_KIND(identifier), identifier, start, end)))
+		lex.push(NewToken(KEYWORD_TOKEN, identifier, start, end))
 	} else {
 		lex.push(NewToken(IDENTIFIER_TOKEN, identifier, start, end))
 	}
@@ -175,11 +173,7 @@ func numberHandler(lex *Lexer, regex *regexp.Regexp) {
 	lex.advance(match)
 	end := lex.Position
 	//find the number is a float or an integer
-	if strings.Contains(match, ".") {
-		lex.push(NewToken(FLOAT32_TOKEN, match, start, end))
-	} else {
-		lex.push(NewToken(INT32_TOKEN, match, start, end))
-	}
+	lex.push(NewToken(NUMBER_TOKEN, match, start, end))
 }
 
 // stringHandler processes a string literal in the lexer, using the provided regular expression to match the string.
@@ -196,7 +190,7 @@ func stringHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
-	lex.push(NewToken(STR_TOKEN, stringLiteral, start, end))
+	lex.push(NewToken(STRING_TOKEN, stringLiteral, start, end))
 }
 
 // byteHandler processes a byte literal in the lexer.
@@ -215,7 +209,7 @@ func byteHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
-	lex.push(NewToken(UINT8_TOKEN, byteLiteral, start, end))
+	lex.push(NewToken(BYTE_TOKEN, byteLiteral, start, end))
 }
 
 // skipHandler processes a token that should be skipped by the lexer.

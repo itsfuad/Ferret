@@ -3,7 +3,6 @@ package parser
 import (
 	"errors"
 	"ferret/compiler/internal/ast"
-	"ferret/compiler/internal/builtins"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/report"
 )
@@ -43,14 +42,14 @@ func (p *Parser) advance() lexer.Token {
 	return p.previous()
 }
 
-func (p *Parser) check(kind builtins.TOKEN_KIND) bool {
+func (p *Parser) check(kind lexer.TOKEN) bool {
 	if p.isAtEnd() {
 		return false
 	}
 	return p.peek().Kind == kind
 }
 
-func (p *Parser) match(kinds ...builtins.TOKEN_KIND) bool {
+func (p *Parser) match(kinds ...lexer.TOKEN) bool {
 	for _, kind := range kinds {
 		if p.check(kind) {
 			p.advance()
@@ -60,7 +59,7 @@ func (p *Parser) match(kinds ...builtins.TOKEN_KIND) bool {
 	return false
 }
 
-func (p *Parser) consume(kind builtins.TOKEN_KIND, message string) (lexer.Token, error) {
+func (p *Parser) consume(kind lexer.TOKEN, message string) (lexer.Token, error) {
 	if p.check(kind) {
 		return p.advance(), nil
 	}
@@ -75,44 +74,7 @@ func (p *Parser) consume(kind builtins.TOKEN_KIND, message string) (lexer.Token,
 func (p *Parser) Parse() []ast.Node {
 	var nodes []ast.Node
 
-	for !p.isAtEnd() {
-		if dec := p.declaration(); dec != nil {
-			nodes = append(nodes, dec)
-		}
-
-		// Error recovery - if we fail to parse a declaration,
-		// skip tokens until we find a synchronization point
-		if p.peek().Kind == lexer.SEMI_COLON_TOKEN {
-			p.advance() // Skip the semicolon
-			continue
-		}
-		p.synchronize()
-	}
+	
 
 	return nodes
-}
-
-// Error recovery
-func (p *Parser) synchronize() {
-	p.advance()
-
-	for !p.isAtEnd() {
-		if p.previous().Kind == lexer.SEMI_COLON_TOKEN {
-			return
-		}
-
-		switch p.peek().Kind {
-		case lexer.LET_TOKEN,
-			lexer.CONST_TOKEN,
-			lexer.FUNCTION_TOKEN,
-			lexer.STRUCT_TOKEN,
-			lexer.IF_TOKEN,
-			lexer.WHILE_TOKEN,
-			lexer.FOR_TOKEN,
-			lexer.RETURN_TOKEN:
-			return
-		}
-
-		p.advance()
-	}
 }

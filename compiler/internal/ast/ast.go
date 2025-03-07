@@ -28,11 +28,11 @@ const (
 // Expression represents any node that produces a value
 type Expression interface {
 	Node
-	isExpr()
+	Expr()
 }
 
 // Statement represents any node that doesn't produce a value
 type Statement interface {
 	Node
-	isStmt()
+	Stmt()
 }

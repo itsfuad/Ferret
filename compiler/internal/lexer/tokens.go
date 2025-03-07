@@ -4,123 +4,116 @@ import (
 	"fmt"
 
 	"ferret/compiler/colors"
-	"ferret/compiler/internal/builtins"
+	"ferret/compiler/internal/types"
 )
+
+type TOKEN string
 
 const (
 	//keywords
-	LET_TOKEN        builtins.TOKEN_KIND = "let"
-	CONST_TOKEN      builtins.TOKEN_KIND = "const"
-	TYPE_TOKEN       builtins.TOKEN_KIND = "type"
-	IF_TOKEN         builtins.TOKEN_KIND = "if"
-	ELSE_TOKEN       builtins.TOKEN_KIND = "else"
-	FOR_TOKEN        builtins.TOKEN_KIND = "for"
-	FOREACH_TOKEN    builtins.TOKEN_KIND = "foreach"
-	WHILE_TOKEN      builtins.TOKEN_KIND = "while"
-	DO_TOKEN         builtins.TOKEN_KIND = "do"
-	IDENTIFIER_TOKEN builtins.TOKEN_KIND = "identifier"
-	PRIVATE_TOKEN    builtins.TOKEN_KIND = "priv"
-	IMPL_TOKEN       builtins.TOKEN_KIND = "impl"
-	RETURN_TOKEN     builtins.TOKEN_KIND = "ret"
+	LET_TOKEN        TOKEN = "let"
+	CONST_TOKEN      TOKEN = "const"
+	TYPE_TOKEN       TOKEN = "type"
+	IF_TOKEN         TOKEN = "if"
+	ELSE_TOKEN       TOKEN = "else"
+	FOR_TOKEN        TOKEN = "for"
+	FOREACH_TOKEN    TOKEN = "foreach"
+	WHILE_TOKEN      TOKEN = "while"
+	DO_TOKEN         TOKEN = "do"
+	KEYWORD_TOKEN    TOKEN = "keyword"
+	IDENTIFIER_TOKEN TOKEN = "identifier"
+	PRIVATE_TOKEN    TOKEN = "priv"
+	IMPL_TOKEN       TOKEN = "impl"
+	RETURN_TOKEN     TOKEN = "return"
 	//data types
-	INT8_TOKEN      builtins.TOKEN_KIND = builtins.INT8
-	INT16_TOKEN     builtins.TOKEN_KIND = builtins.INT16
-	INT32_TOKEN     builtins.TOKEN_KIND = builtins.INT32
-	INT64_TOKEN     builtins.TOKEN_KIND = builtins.INT64
-	UINT8_TOKEN     builtins.TOKEN_KIND = builtins.UINT8
-	UINT16_TOKEN    builtins.TOKEN_KIND = builtins.UINT16
-	UINT32_TOKEN    builtins.TOKEN_KIND = builtins.UINT32
-	UINT64_TOKEN    builtins.TOKEN_KIND = builtins.UINT64
-	FLOAT32_TOKEN   builtins.TOKEN_KIND = builtins.FLOAT32
-	FLOAT64_TOKEN   builtins.TOKEN_KIND = builtins.FLOAT64
-	STR_TOKEN       builtins.TOKEN_KIND = builtins.STRING
-	BYTE_TOKEN      builtins.TOKEN_KIND = builtins.BYTE
-	BOOL_TOKEN      builtins.TOKEN_KIND = builtins.BOOL
-	STRUCT_TOKEN    builtins.TOKEN_KIND = builtins.STRUCT
-	FUNCTION_TOKEN  builtins.TOKEN_KIND = builtins.FUNCTION
-	INTERFACE_TOKEN builtins.TOKEN_KIND = builtins.INTERFACE
-	MAP_TOKEN       builtins.TOKEN_KIND = builtins.MAP
+	NUMBER_TOKEN    TOKEN = "numeric literal"
+	STRING_TOKEN    TOKEN = "string literal"
+	BYTE_TOKEN      TOKEN = "byte literal"
+	STRUCT_TOKEN    TOKEN = TOKEN(types.STRUCT)
+	FUNCTION_TOKEN  TOKEN = TOKEN(types.FUNCTION)
+	INTERFACE_TOKEN TOKEN = TOKEN(types.INTERFACE)
+	MAP_TOKEN       TOKEN = TOKEN(types.MAP)
 
 	//array range operator
-	RANGE_TOKEN builtins.TOKEN_KIND = ".."
+	RANGE_TOKEN TOKEN = ".."
 	//increment and decrement
-	PLUS_PLUS_TOKEN   builtins.TOKEN_KIND = "++"
-	MINUS_MINUS_TOKEN builtins.TOKEN_KIND = "--"
+	PLUS_PLUS_TOKEN   TOKEN = "++"
+	MINUS_MINUS_TOKEN TOKEN = "--"
 	//Binary operators
-	AND_TOKEN builtins.TOKEN_KIND = "&&"
-	OR_TOKEN  builtins.TOKEN_KIND = "||"
+	AND_TOKEN TOKEN = "&&"
+	OR_TOKEN  TOKEN = "||"
 	//bitwise operators
-	BIT_AND_TOKEN builtins.TOKEN_KIND = "&"
-	BIT_OR_TOKEN  builtins.TOKEN_KIND = "|"
-	BIT_XOR_TOKEN builtins.TOKEN_KIND = "^"
+	BIT_AND_TOKEN TOKEN = "&"
+	BIT_OR_TOKEN  TOKEN = "|"
+	BIT_XOR_TOKEN TOKEN = "^"
 	//unary operators
-	NOT_TOKEN builtins.TOKEN_KIND = "!"
+	NOT_TOKEN TOKEN = "!"
 	//arithmetic operators
-	EXP_TOKEN   builtins.TOKEN_KIND = "**"
-	MINUS_TOKEN builtins.TOKEN_KIND = "-"
-	PLUS_TOKEN  builtins.TOKEN_KIND = "+"
-	MUL_TOKEN   builtins.TOKEN_KIND = "*"
-	DIV_TOKEN   builtins.TOKEN_KIND = "/"
-	MOD_TOKEN   builtins.TOKEN_KIND = "%"
+	EXP_TOKEN   TOKEN = "**"
+	MINUS_TOKEN TOKEN = "-"
+	PLUS_TOKEN  TOKEN = "+"
+	MUL_TOKEN   TOKEN = "*"
+	DIV_TOKEN   TOKEN = "/"
+	MOD_TOKEN   TOKEN = "%"
 	//logical operators
-	LESS_TOKEN          builtins.TOKEN_KIND = "<"
-	GREATER_TOKEN       builtins.TOKEN_KIND = ">"
-	LESS_EQUAL_TOKEN    builtins.TOKEN_KIND = "<="
-	GREATER_EQUAL_TOKEN builtins.TOKEN_KIND = ">="
-	NOT_EQUAL_TOKEN     builtins.TOKEN_KIND = "!="
-	DOUBLE_EQUAL_TOKEN  builtins.TOKEN_KIND = "=="
+	LESS_TOKEN          TOKEN = "<"
+	GREATER_TOKEN       TOKEN = ">"
+	LESS_EQUAL_TOKEN    TOKEN = "<="
+	GREATER_EQUAL_TOKEN TOKEN = ">="
+	NOT_EQUAL_TOKEN     TOKEN = "!="
+	DOUBLE_EQUAL_TOKEN  TOKEN = "=="
 	//assignment
-	COLON_TOKEN        builtins.TOKEN_KIND = ":"
-	EQUALS_TOKEN       builtins.TOKEN_KIND = "="
-	PLUS_EQUALS_TOKEN  builtins.TOKEN_KIND = "+="
-	MINUS_EQUALS_TOKEN builtins.TOKEN_KIND = "-="
-	MUL_EQUALS_TOKEN   builtins.TOKEN_KIND = "*="
-	DIV_EQUALS_TOKEN   builtins.TOKEN_KIND = "/="
-	MOD_EQUALS_TOKEN   builtins.TOKEN_KIND = "%="
-	EXP_EQUALS_TOKEN   builtins.TOKEN_KIND = "^="
+	COLON_TOKEN        TOKEN = ":"
+	EQUALS_TOKEN       TOKEN = "="
+	PLUS_EQUALS_TOKEN  TOKEN = "+="
+	MINUS_EQUALS_TOKEN TOKEN = "-="
+	MUL_EQUALS_TOKEN   TOKEN = "*="
+	DIV_EQUALS_TOKEN   TOKEN = "/="
+	MOD_EQUALS_TOKEN   TOKEN = "%="
+	EXP_EQUALS_TOKEN   TOKEN = "^="
 	//delimiters
-	OPEN_PAREN       builtins.TOKEN_KIND = "("
-	CLOSE_PAREN      builtins.TOKEN_KIND = ")"
-	OPEN_BRACKET     builtins.TOKEN_KIND = "["
-	CLOSE_BRACKET    builtins.TOKEN_KIND = "]"
-	OPEN_CURLY       builtins.TOKEN_KIND = "{"
-	CLOSE_CURLY      builtins.TOKEN_KIND = "}"
-	COMMA_TOKEN      builtins.TOKEN_KIND = ","
-	DOT_TOKEN        builtins.TOKEN_KIND = "."
-	SEMI_COLON_TOKEN builtins.TOKEN_KIND = ";"
-	ARROW_TOKEN      builtins.TOKEN_KIND = "->"
-	FAT_ARROW_TOKEN  builtins.TOKEN_KIND = "=>"
-	EOF_TOKEN        builtins.TOKEN_KIND = "end_of_file"
+	OPEN_PAREN       TOKEN = "("
+	CLOSE_PAREN      TOKEN = ")"
+	OPEN_BRACKET     TOKEN = "["
+	CLOSE_BRACKET    TOKEN = "]"
+	OPEN_CURLY       TOKEN = "{"
+	CLOSE_CURLY      TOKEN = "}"
+	COMMA_TOKEN      TOKEN = ","
+	DOT_TOKEN        TOKEN = "."
+	SEMI_COLON_TOKEN TOKEN = ";"
+	ARROW_TOKEN      TOKEN = "->"
+	FAT_ARROW_TOKEN  TOKEN = "=>"
+	EOF_TOKEN        TOKEN = "end_of_file"
 )
 
-var keyWordsMap map[string]builtins.TOKEN_KIND = map[string]builtins.TOKEN_KIND{
-	"let":       LET_TOKEN,
-	"const":     CONST_TOKEN,
-	"if":        IF_TOKEN,
-	"else":      ELSE_TOKEN,
-	"for":       FOR_TOKEN,
-	"foreach":   FOREACH_TOKEN,
-	"while":     WHILE_TOKEN,
-	"do":        DO_TOKEN,
-	"type":      TYPE_TOKEN,
-	"priv":      PRIVATE_TOKEN,
-	"interface": INTERFACE_TOKEN,
-	"impl":      IMPL_TOKEN,
-	"struct":    STRUCT_TOKEN,
-	"fn":        FUNCTION_TOKEN,
-	"map":       MAP_TOKEN,
-	"ret":       RETURN_TOKEN,
+var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
+	LET_TOKEN:       true,
+	CONST_TOKEN:     true,
+	IF_TOKEN:        true,
+	ELSE_TOKEN:      true,
+	FOR_TOKEN:       true,
+	FOREACH_TOKEN:   true,
+	WHILE_TOKEN:     true,
+	DO_TOKEN:        true,
+	TYPE_TOKEN:      true,
+	PRIVATE_TOKEN:   true,
+	INTERFACE_TOKEN: true,
+	IMPL_TOKEN:      true,
+	STRUCT_TOKEN:    true,
+	FUNCTION_TOKEN:  true,
+	MAP_TOKEN:       true,
+	RETURN_TOKEN:    true,
 }
 
 func IsKeyword(token string) bool {
-	if _, ok := keyWordsMap[token]; ok {
+	if _, ok := keyWordsMap[TOKEN(token)]; ok {
 		return true
 	}
 	return false
 }
 
 type Token struct {
-	Kind  builtins.TOKEN_KIND
+	Kind  TOKEN
 	Value string
 	Start Position
 	End   Position
@@ -135,7 +128,7 @@ func (t *Token) Debug(filename string) {
 	}
 }
 
-func NewToken(kind builtins.TOKEN_KIND, value string, start Position, end Position) Token {
+func NewToken(kind TOKEN, value string, start Position, end Position) Token {
 	return Token{
 		Kind:  kind,
 		Value: value,
