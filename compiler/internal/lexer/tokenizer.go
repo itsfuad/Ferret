@@ -152,7 +152,7 @@ func identifierHandler(lex *Lexer, regex *regexp.Regexp) {
 	lex.advance(identifier)
 	end := lex.Position
 	if IsKeyword(identifier) {
-		lex.push(NewToken(KEYWORD_TOKEN, identifier, start, end))
+		lex.push(NewToken(TOKEN(identifier), identifier, start, end))
 	} else {
 		lex.push(NewToken(IDENTIFIER_TOKEN, identifier, start, end))
 	}

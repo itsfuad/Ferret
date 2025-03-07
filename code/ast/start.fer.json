@@ -1,1 +1,284 @@
-null
+[
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 2,
+                        "Column": 5,
+                        "Index": 43
+                    },
+                    "End": {
+                        "Line": 2,
+                        "Column": 6,
+                        "Index": 44
+                    }
+                },
+                "Type": null,
+                "Initializer": {
+                    "Value": "10",
+                    "Start": {
+                        "Line": 2,
+                        "Column": 9,
+                        "Index": 47
+                    },
+                    "End": {
+                        "Line": 2,
+                        "Column": 11,
+                        "Index": 49
+                    }
+                },
+                "Start": {
+                    "Line": 2,
+                    "Column": 5,
+                    "Index": 43
+                },
+                "End": {
+                    "Line": 2,
+                    "Column": 6,
+                    "Index": 44
+                }
+            }
+        ],
+        "Start": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        },
+        "End": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "y",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 5,
+                        "Index": 56
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 6,
+                        "Index": 57
+                    }
+                },
+                "Type": {
+                    "BitSize": 32,
+                    "TypeName": "f32",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 8,
+                        "Index": 59
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 11,
+                        "Index": 62
+                    }
+                },
+                "Initializer": null,
+                "Start": {
+                    "Line": 3,
+                    "Column": 5,
+                    "Index": 56
+                },
+                "End": {
+                    "Line": 3,
+                    "Column": 6,
+                    "Index": 57
+                }
+            }
+        ],
+        "Start": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        },
+        "End": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "p",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 5,
+                        "Index": 69
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 6,
+                        "Index": 70
+                    }
+                },
+                "Type": {
+                    "BitSize": 32,
+                    "Unsigned": true,
+                    "TypeName": "i32",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 14,
+                        "Index": 78
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 17,
+                        "Index": 81
+                    }
+                },
+                "Initializer": {
+                    "Value": "10",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 30,
+                        "Index": 94
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 32,
+                        "Index": 96
+                    }
+                },
+                "Start": {
+                    "Line": 4,
+                    "Column": 5,
+                    "Index": 69
+                },
+                "End": {
+                    "Line": 4,
+                    "Column": 6,
+                    "Index": 70
+                }
+            },
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "q",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 8,
+                        "Index": 72
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 9,
+                        "Index": 73
+                    }
+                },
+                "Type": {
+                    "BitSize": 32,
+                    "TypeName": "f32",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 19,
+                        "Index": 83
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 22,
+                        "Index": 86
+                    }
+                },
+                "Initializer": {
+                    "Value": "10",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 30,
+                        "Index": 94
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 32,
+                        "Index": 96
+                    }
+                },
+                "Start": {
+                    "Line": 4,
+                    "Column": 8,
+                    "Index": 72
+                },
+                "End": {
+                    "Line": 4,
+                    "Column": 9,
+                    "Index": 73
+                }
+            },
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "r",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 11,
+                        "Index": 75
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 12,
+                        "Index": 76
+                    }
+                },
+                "Type": {
+                    "TypeName": "str",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 24,
+                        "Index": 88
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 27,
+                        "Index": 91
+                    }
+                },
+                "Initializer": {
+                    "Value": "10",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 30,
+                        "Index": 94
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 32,
+                        "Index": 96
+                    }
+                },
+                "Start": {
+                    "Line": 4,
+                    "Column": 11,
+                    "Index": 75
+                },
+                "End": {
+                    "Line": 4,
+                    "Column": 12,
+                    "Index": 76
+                }
+            }
+        ],
+        "Start": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        },
+        "End": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        }
+    }
+]

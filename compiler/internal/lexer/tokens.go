@@ -20,7 +20,6 @@ const (
 	FOREACH_TOKEN    TOKEN = "foreach"
 	WHILE_TOKEN      TOKEN = "while"
 	DO_TOKEN         TOKEN = "do"
-	KEYWORD_TOKEN    TOKEN = "keyword"
 	IDENTIFIER_TOKEN TOKEN = "identifier"
 	PRIVATE_TOKEN    TOKEN = "priv"
 	IMPL_TOKEN       TOKEN = "impl"
@@ -29,10 +28,8 @@ const (
 	NUMBER_TOKEN    TOKEN = "numeric literal"
 	STRING_TOKEN    TOKEN = "string literal"
 	BYTE_TOKEN      TOKEN = "byte literal"
-	STRUCT_TOKEN    TOKEN = TOKEN(types.STRUCT)
 	FUNCTION_TOKEN  TOKEN = TOKEN(types.FUNCTION)
 	INTERFACE_TOKEN TOKEN = TOKEN(types.INTERFACE)
-	MAP_TOKEN       TOKEN = TOKEN(types.MAP)
 
 	//array range operator
 	RANGE_TOKEN TOKEN = ".."
@@ -99,9 +96,7 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	PRIVATE_TOKEN:   true,
 	INTERFACE_TOKEN: true,
 	IMPL_TOKEN:      true,
-	STRUCT_TOKEN:    true,
 	FUNCTION_TOKEN:  true,
-	MAP_TOKEN:       true,
 	RETURN_TOKEN:    true,
 }
 
