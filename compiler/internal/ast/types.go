@@ -33,10 +33,10 @@ func (t *IntType) EndPos() lexer.Position {
 
 // Float type
 type FloatType struct {
-	BitSize int
+	BitSize  int
 	TypeName types.TYPE_NAME
-	Start   lexer.Position
-	End     lexer.Position
+	Start    lexer.Position
+	End      lexer.Position
 }
 
 func (t *FloatType) Type() types.TYPE_NAME {
@@ -52,8 +52,8 @@ func (t *FloatType) EndPos() lexer.Position {
 // String type
 type StringType struct {
 	TypeName types.TYPE_NAME
-	Start lexer.Position
-	End   lexer.Position
+	Start    lexer.Position
+	End      lexer.Position
 }
 
 func (t *StringType) Type() types.TYPE_NAME {
@@ -86,8 +86,8 @@ func (t *ByteType) EndPos() lexer.Position {
 // Boolean type
 type BoolType struct {
 	TypeName types.TYPE_NAME
-	Start lexer.Position
-	End   lexer.Position
+	Start    lexer.Position
+	End      lexer.Position
 }
 
 func (t *BoolType) Type() types.TYPE_NAME {

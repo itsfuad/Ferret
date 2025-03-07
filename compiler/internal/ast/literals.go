@@ -6,6 +6,7 @@ type IntLiteral struct {
 	Value string
 	Location
 }
+
 func (i *IntLiteral) INode()                   {} // INode is a marker interface for all nodes
 func (i *IntLiteral) Expr()                    {} // Expr is a marker interface for all expressions
 func (i *IntLiteral) StartPos() lexer.Position { return i.Start }
@@ -15,8 +16,8 @@ type FloatLiteral struct {
 	Value string
 	Location
 }
+
 func (f *FloatLiteral) INode()                   {} // INode is a marker interface for all nodes
 func (f *FloatLiteral) Expr()                    {} // Expr is a marker interface for all expressions
 func (f *FloatLiteral) StartPos() lexer.Position { return f.Start }
 func (f *FloatLiteral) EndPos() lexer.Position   { return f.End }
-

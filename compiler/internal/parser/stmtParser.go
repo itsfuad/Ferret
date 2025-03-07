@@ -111,7 +111,6 @@ func parseVarDecl(p *Parser) ast.Node {
 	}
 }
 
-
 func parseExpression(p *Parser) ast.Expression {
 	switch p.peek().Kind {
 	case lexer.OPEN_BRACKET:
