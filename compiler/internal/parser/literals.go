@@ -9,7 +9,7 @@ import (
 )
 
 func parseNumberLiteral(p *Parser) ast.Expression {
-	number := p.consume(lexer.NUMBER_TOKEN, "Expected number")
+	number := p.consume(lexer.NUMBER_TOKEN, report.EXPECTED_NUMBER)
 	raw := number.Value
 	value := strings.ReplaceAll(raw, "_", "") // Remove underscores
 	loc := ast.Location{
@@ -79,7 +79,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	if types.ValidateFloat(value) {
 		floatVal, err := types.ParseFloat(value)
 		if err != nil {
-			report.Add(p.filePath, number.Start.Line, number.End.Line, number.Start.Column, number.End.Column, "Float value out of range").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, number.Start.Line, number.End.Line, number.Start.Column, number.End.Column, report.FLOAT_OUT_OF_RANGE).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -91,12 +91,12 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	}
 
 	// If neither, it's an invalid number format
-	report.Add(p.filePath, number.Start.Line, number.End.Line, number.Start.Column, number.End.Column, "Invalid number format").SetLevel(report.SYNTAX_ERROR)
+	report.Add(p.filePath, number.Start.Line, number.End.Line, number.Start.Column, number.End.Column, report.INVALID_NUMBER).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }
 
 func parseStringLiteral(p *Parser) ast.Expression {
-	stringLiteral := p.consume(lexer.STRING_TOKEN, "Expected string")
+	stringLiteral := p.consume(lexer.STRING_TOKEN, report.EXPECTED_STRING)
 	loc := ast.Location{
 		Start: stringLiteral.Start,
 		End:   stringLiteral.End,
@@ -115,7 +115,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 	// Must have at least one element
 	expr := parseExpression(p)
 	if expr == nil {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Array literal must have at least one value").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.ARRAY_EMPTY).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 	elements = append(elements, expr)
@@ -126,7 +126,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 
 		// Check for trailing comma
 		if p.peek().Kind == lexer.CLOSE_BRACKET {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Trailing comma not allowed in array literal").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.ARRAY_TRAILING_COMMA).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -137,7 +137,7 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 		elements = append(elements, expr)
 	}
 
-	end := p.consume(lexer.CLOSE_BRACKET, "Expected ']' after array elements")
+	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
 
 	return &ast.ArrayLiteralExpr{
 		Elements: elements,
