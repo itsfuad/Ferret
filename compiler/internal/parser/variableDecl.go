@@ -50,7 +50,7 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 	for {
 		typeNode := parseType(p)
 		if typeNode == nil {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected type after ':'").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		types = append(types, typeNode)
@@ -102,7 +102,7 @@ func assignTypes(p *Parser, variables []*ast.VariableDecl, types []ast.DataType,
 		}
 		return true
 	}
-	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISMATCHED_VARIABLE_AND_TYPE_COUNT).SetLevel(report.SYNTAX_ERROR)
+	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISMATCHED_VARIABLE_AND_TYPE_COUNT+fmt.Sprintf(": Expected %d types, got %d", varCount, len(types))).SetLevel(report.SYNTAX_ERROR)
 	return false
 }
 

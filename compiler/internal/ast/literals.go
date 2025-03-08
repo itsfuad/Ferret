@@ -1,6 +1,9 @@
 package ast
 
-import "ferret/compiler/internal/lexer"
+import (
+	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/types"
+)
 
 type IntLiteral struct {
 	Value int64  // Actual numeric value
@@ -45,3 +48,34 @@ func (i *IndexableExpr) INode()                   {} // INode is a marker interf
 func (i *IndexableExpr) Expr()                    {} // Expr is a marker interface for all expressions
 func (i *IndexableExpr) StartPos() lexer.Position { return i.Start }
 func (i *IndexableExpr) EndPos() lexer.Position   { return i.End }
+
+// ObjectField represents a field in an object type or literal
+type ObjectField struct {
+	Name  string
+	Type  DataType   // nil for object literals
+	Value Expression // nil for object types
+	Location
+}
+
+// ObjectType represents an object type definition
+type ObjectType struct {
+	Fields   []ObjectField
+	TypeName types.TYPE_NAME
+	Location
+}
+
+func (o *ObjectType) INode()                   {} // INode is a marker interface for all nodes
+func (o *ObjectType) Type() types.TYPE_NAME    { return o.TypeName }
+func (o *ObjectType) StartPos() lexer.Position { return o.Start }
+func (o *ObjectType) EndPos() lexer.Position   { return o.End }
+
+// ObjectLiteralExpr represents an object literal expression
+type ObjectLiteralExpr struct {
+	Fields []ObjectField
+	Location
+}
+
+func (o *ObjectLiteralExpr) INode()                   {} // INode is a marker interface for all nodes
+func (o *ObjectLiteralExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (o *ObjectLiteralExpr) StartPos() lexer.Position { return o.Start }
+func (o *ObjectLiteralExpr) EndPos() lexer.Position   { return o.End }

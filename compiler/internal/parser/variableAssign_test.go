@@ -1,8 +1,6 @@
-package parser_test
+package parser
 
 import (
-	"ferret/compiler/internal/parser"
-	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -26,18 +24,7 @@ func TestParseAssignment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
-			p := parser.New(filePath, false)
-
-			defer func() {
-				if r := recover(); r != nil {
-					if tt.isValid {
-						t.Errorf("%s: expected no panic, got %v", tt.desc, r)
-					}
-				}
-			}()
-
-			nodes := p.Parse()
+			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid {
 				t.Errorf("%s: expected nodes, got none", tt.desc)

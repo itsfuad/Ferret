@@ -2,7 +2,9 @@ package parser
 
 import (
 	"ferret/compiler/internal/ast"
+	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/report"
 )
 
 func parseIntegerType(p *Parser) ast.DataType {
@@ -86,6 +88,17 @@ func parseIntegerType(p *Parser) ast.DataType {
 	}
 }
 
+// user defined types are defined by the type keyword
+// type NewType OldType;
+func parseUserDefinedType(p *Parser) ast.DataType {
+	token := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
+	return &ast.UserDefinedType{
+		TypeName: types.TYPE_NAME(token.Value),
+		Start:    token.Start,
+		End:      token.End,
+	}
+}
+
 func parseFloatType(p *Parser) ast.DataType {
 	token := p.peek()
 
@@ -142,10 +155,16 @@ func parseArrayType(p *Parser) ast.DataType {
 	//consume the '[' token
 	start := p.advance().Start
 	// consume the ']' token
-	p.advance()
+	p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
 
 	//parse the type
 	elementType := parseType(p)
+	if elementType == nil {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
+			p.peek().Start.Column, p.peek().End.Column,
+			report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
 
 	return &ast.ArrayType{
 		ElementType: elementType,
@@ -170,6 +189,42 @@ func parseType(p *Parser) ast.DataType {
 		return parseBoolType(p)
 	case "[":
 		return parseArrayType(p)
+	case "{":
+		return parseObjectType(p)
+	default:
+		return parseUserDefinedType(p)
 	}
-	return nil
+}
+
+// parseTypeDecl parses type declarations like "type Integer i32;"
+func parseTypeDecl(p *Parser) ast.Node {
+
+	start := p.advance() // consume the 'type' token
+
+	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
+	// Parse the underlying type
+	underlyingType := parseType(p)
+	if underlyingType == nil {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
+			p.peek().Start.Column, p.peek().End.Column,
+			report.EXPECTED_TYPE).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+
+	// Expect semicolon
+	end := p.consume(lexer.SEMI_COLON_TOKEN, report.EXPECTED_SEMI_COLON)
+	return &ast.TypeDeclStmt{
+		Alias: &ast.IdentifierExpr{
+			Name: typeName.Value,
+			Location: ast.Location{
+				Start: typeName.Start,
+				End:   typeName.End,
+			},
+		},
+		BaseType: underlyingType,
+		Location: ast.Location{
+			Start: start.Start,
+			End:   end.End,
+		},
+	}
 }

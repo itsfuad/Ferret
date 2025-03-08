@@ -35,21 +35,32 @@ arr1[0];
 arr1[0] = 10;
 a = arr1[0];
 
-// //single variable with type
-// let x: i32 = 10; //explicit type and value
+//single variable with type
+let x: i32 = 10; //explicit type and value
 
-// //multiple variables with type inference
-// let x, y = 10, 20; //infer from values
+//multiple variables with type inference
+let x, y = 10, 20; //infer from values
 
-// //multiple variables with type
-// let x, y, z: i32 = 10, 20, 3; // same type
-// let p, q, r: i32, f32, str = 10, 20.0, "Hello"; // different types
+//multiple variables with type
+let x, y, z: i32 = 10, 20, 3; // same type
+let p, q, r: i32, f32, str = 10, 20.0, "Hello"; // different types
 
-// //multiple variables with type inference and type
-// let x, y = 10, 20;
+//multiple variables with type inference and type
+let x, y = 10, 20;
 
-// let arr: []i32 = [1, 2, 3];
-// let arr2d: [][]i32 = [[1, 2, 3], [4, 5, 6]];
+let arr, other: []i32, e = [1, 2, 3], 3;
+let arr2d: [][]i32 = [[1, 2], [4, 5, 6]];
+
+//user defined types
+type Integer i32;
+
+const user: {
+    name: str,
+    age: i32
+} = {
+    name: "John",
+    age: 20
+};
 
 // //Objects
 // type Point {

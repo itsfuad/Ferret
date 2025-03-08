@@ -4,7 +4,6 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/report"
-	"fmt"
 )
 
 type Parser struct {
@@ -53,7 +52,7 @@ func (p *Parser) check(kind lexer.TOKEN) bool {
 	return p.peek().Kind == kind
 }
 
-// consume the current token if it is of the given kind
+// matches the current token with any of the given kinds
 func (p *Parser) match(kinds ...lexer.TOKEN) bool {
 	if p.isAtEnd() {
 		return false
@@ -85,24 +84,40 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 // Parse is the entry point for parsing
 func (p *Parser) Parse() []ast.Node {
 
-	fmt.Println("Parsing program")
-
 	var nodes []ast.Node
 
 	for !p.isAtEnd() {
+		var node ast.Node
 		if p.match(lexer.LET_TOKEN, lexer.CONST_TOKEN) {
-			nodes = append(nodes, parseVarDecl(p))
+			node = parseVarDecl(p)
+		} else if p.match(lexer.TYPE_TOKEN) {
+			node = parseTypeDecl(p)
 		} else if p.match(lexer.IDENTIFIER_TOKEN) {
-			iden := parseIdentifier(p)
-			if p.match(lexer.COMMA_TOKEN, lexer.EQUALS_TOKEN) {
-				nodes = append(nodes, parseAssignment(p, iden))
-			} else {
-				nodes = append(nodes, iden)
-			}
+			node = handleIdentifierPath(p)
 		} else {
 			p.advance()
+		}
+
+		// if the node is not nil, add it to the nodes list
+		if node != nil {
+			nodes = append(nodes, node)
 		}
 	}
 
 	return nodes
+}
+
+// handleIdentifierPath parses either a standalone identifier or an assignment
+func handleIdentifierPath(p *Parser) ast.Node {
+	iden := parseIdentifier(p)
+
+	// if the identifier is nil, return nil
+	if iden == nil {
+		return nil
+	}
+
+	if p.match(lexer.COMMA_TOKEN, lexer.EQUALS_TOKEN) {
+		return parseAssignment(p, iden)
+	}
+	return iden
 }

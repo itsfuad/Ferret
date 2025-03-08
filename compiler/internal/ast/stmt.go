@@ -36,3 +36,15 @@ func (a *AssignmentStmt) INode()                   {} // INode is a marker inter
 func (a *AssignmentStmt) Stmt()                    {} // Stmt is a marker interface for all statements
 func (a *AssignmentStmt) StartPos() lexer.Position { return a.Start }
 func (a *AssignmentStmt) EndPos() lexer.Position   { return a.End }
+
+// TypeDeclStmt represents a type declaration statement
+type TypeDeclStmt struct {
+	Alias    *IdentifierExpr // The name of the type
+	BaseType DataType        // The underlying type
+	Location
+}
+
+func (t *TypeDeclStmt) INode()                   {} // INode is a marker interface for all nodes
+func (t *TypeDeclStmt) Stmt()                    {} // Stmt is a marker interface for all statements
+func (t *TypeDeclStmt) StartPos() lexer.Position { return t.Start }
+func (t *TypeDeclStmt) EndPos() lexer.Position   { return t.End }

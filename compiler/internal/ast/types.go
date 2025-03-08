@@ -12,6 +12,23 @@ type DataType interface {
 	EndPos() lexer.Position
 }
 
+// User defined type
+type UserDefinedType struct {
+	TypeName types.TYPE_NAME
+	Start    lexer.Position
+	End      lexer.Position
+}
+
+func (t *UserDefinedType) Type() types.TYPE_NAME {
+	return t.TypeName
+}
+func (t *UserDefinedType) StartPos() lexer.Position {
+	return t.Start
+}
+func (t *UserDefinedType) EndPos() lexer.Position {
+	return t.End
+}
+
 // Integer type
 type IntType struct {
 	BitSize  int

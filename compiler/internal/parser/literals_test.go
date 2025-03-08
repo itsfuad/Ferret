@@ -1,8 +1,6 @@
-package parser_test
+package parser
 
 import (
-	"ferret/compiler/internal/parser"
-	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -64,18 +62,43 @@ func TestLiteralParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
-			p := parser.New(filePath, false)
+			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
-			defer func() {
-				if r := recover(); r != nil {
-					if tt.isValid {
-						t.Errorf("%s: expected no panic, got %v", tt.desc, r)
-					}
-				}
-			}()
+			if len(nodes) == 0 && tt.isValid {
+				t.Errorf("%s: expected nodes, got none", tt.desc)
+			}
+		})
+	}
+}
 
-			nodes := p.Parse()
+func TestObjectLiteralParsing(t *testing.T) {
+	tests := []struct {
+		input   string
+		isValid bool
+		desc    string
+	}{
+		// Valid cases
+		{`let x = { name: "John", age: 20 };`, true, "Basic object literal"},
+		{`let x = { name: "John", age: 20, scores: [1, 2, 3] };`, true, "Object with array field"},
+		{`let x = { user: { name: "John", age: 20 } };`, true, "Nested object literal"},
+		{`let x = { single: 42 };`, true, "Single field object"},
+		{`let x = { name: "John", };`, true, "Object with trailing comma"},
+
+		// Invalid cases
+		{`let x = { };`, false, "Empty object not allowed"},
+		{`let x = { name };`, false, "Missing field value"},
+		{`let x = { name: };`, false, "Missing value after colon"},
+		{`let x = { : "John" };`, false, "Missing field name"},
+		{`let x = { name: "John" age: 20 };`, false, "Missing comma between fields"},
+		{`let x = { name: "John", };`, false, "Object with trailing comma"},
+		{`let x = { name: "John", name: "Jane" };`, false, "Duplicate field names"},
+		{`let x = { "name": "John" };`, false, "Non-identifier field name"},
+		{`let x = { name: "John" };`, false, "Missing semicolon"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid {
 				t.Errorf("%s: expected nodes, got none", tt.desc)

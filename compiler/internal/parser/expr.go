@@ -259,16 +259,32 @@ func parsePostfix(p *Parser) ast.Expression {
 	return expr
 }
 
+// parseGrouping handles parenthesized expressions
+func parseGrouping(p *Parser) ast.Expression {
+	p.advance() // consume '('
+	expr := parseExpression(p)
+	p.consume(lexer.CLOSE_PAREN, "Expected ')' after expression")
+	return expr
+}
+
 // parsePrimary handles literals, identifiers, and parenthesized expressions
 func parsePrimary(p *Parser) ast.Expression {
 	switch p.peek().Kind {
 	case lexer.OPEN_PAREN:
-		p.advance() // consume '('
-		expr := parseExpression(p)
-		p.consume(lexer.CLOSE_PAREN, "Expected ')' after expression")
-		return expr
+		return parseGrouping(p)
 	case lexer.OPEN_BRACKET:
 		return parseArrayLiteral(p)
+	case lexer.OPEN_CURLY:
+		// Only parse as object literal if it's in an expression context
+		// For example: after '=', in array literal, as function argument, etc.
+		if isExpressionContext(p) {
+			return parseObjectLiteral(p)
+		}
+		// Report error for unexpected curly brace
+		token := p.peek()
+		report.Add(p.filePath, token.Start.Line, token.End.Line,
+			token.Start.Column, token.End.Column,
+			report.UNEXPECTED_CURLY_BRACE).SetLevel(report.SYNTAX_ERROR)
 	case lexer.NUMBER_TOKEN:
 		return parseNumberLiteral(p)
 	case lexer.STRING_TOKEN:
@@ -277,4 +293,20 @@ func parsePrimary(p *Parser) ast.Expression {
 		return parseIdentifier(p)
 	}
 	return nil
+}
+
+// isExpressionContext returns true if we're in a context where an expression is expected
+func isExpressionContext(p *Parser) bool {
+	// Look at previous non-whitespace token
+	prev := p.previous().Kind
+
+	// Object literals can appear:
+	// - After '=' (assignment or initialization)
+	// - After ':' (in another object literal)
+	// - After ',' (in array or argument list)
+	// - After 'return'
+	return prev == lexer.EQUALS_TOKEN ||
+		prev == lexer.COLON_TOKEN ||
+		prev == lexer.COMMA_TOKEN ||
+		prev == lexer.RETURN_TOKEN
 }
