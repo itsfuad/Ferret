@@ -2,32 +2,30 @@ package types
 
 import "fmt"
 
-type COMMON_TYPE string
+type TYPE_NAME string
 
 const (
-	INT8         COMMON_TYPE = "i8"
-	INT16        COMMON_TYPE = "i16"
-	INT32        COMMON_TYPE = "i32"
-	INT64        COMMON_TYPE = "i64"
-	UINT8        COMMON_TYPE = "u8"
-	UINT16       COMMON_TYPE = "u16"
-	UINT32       COMMON_TYPE = "u32"
-	UINT64       COMMON_TYPE = "u64"
-	FLOAT32      COMMON_TYPE = "f32"
-	FLOAT64      COMMON_TYPE = "f64"
-	STRING       COMMON_TYPE = "str"
-	BYTE         COMMON_TYPE = "byte"
-	BOOL         COMMON_TYPE = "bool"
-	FUNCTION     COMMON_TYPE = "fn"
-	STRUCT       COMMON_TYPE = "struct"
-	INTERFACE    COMMON_TYPE = "interface"
-	ARRAY        COMMON_TYPE = "array"
-	MAP          COMMON_TYPE = "map"
-	VOID         COMMON_TYPE = "void"
-	USER_DEFINED COMMON_TYPE = "user_defined"
+	INT8         TYPE_NAME = "i8"
+	INT16        TYPE_NAME = "i16"
+	INT32        TYPE_NAME = "i32"
+	INT64        TYPE_NAME = "i64"
+	UINT8        TYPE_NAME = "u8"
+	UINT16       TYPE_NAME = "u16"
+	UINT32       TYPE_NAME = "u32"
+	UINT64       TYPE_NAME = "u64"
+	FLOAT32      TYPE_NAME = "f32"
+	FLOAT64      TYPE_NAME = "f64"
+	STRING       TYPE_NAME = "str"
+	BYTE         TYPE_NAME = "byte"
+	BOOL         TYPE_NAME = "bool"
+	FUNCTION     TYPE_NAME = "fn"
+	ARRAY        TYPE_NAME = "array"
+	INTERFACE    TYPE_NAME = "interface"
+	VOID         TYPE_NAME = "void"
+	USER_DEFINED TYPE_NAME = "user_defined"
 )
 
-func GetBitSize(kind COMMON_TYPE) (uint8, error) {
+func GetBitSize(kind TYPE_NAME) (uint8, error) {
 	switch kind {
 	case INT8, UINT8, BYTE:
 		return 8, nil
@@ -42,7 +40,7 @@ func GetBitSize(kind COMMON_TYPE) (uint8, error) {
 	}
 }
 
-func IsSigned(kind COMMON_TYPE) bool {
+func IsSigned(kind TYPE_NAME) bool {
 	switch kind {
 	case INT8, INT16, INT32, INT64:
 		return true
@@ -51,7 +49,7 @@ func IsSigned(kind COMMON_TYPE) bool {
 	}
 }
 
-func IsUnsigned(kind COMMON_TYPE) bool {
+func IsUnsigned(kind TYPE_NAME) bool {
 	switch kind {
 	case UINT8, UINT16, UINT32, UINT64, BYTE:
 		return true

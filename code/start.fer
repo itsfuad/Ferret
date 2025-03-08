@@ -1,18 +1,69 @@
 //single variable with type inference
 let x = 10;
-
-//single variable with type
-let x: i32 = 10;
-
-//multiple variables with type inference
-let x, y = 10, 20;
+let y: f32;
+let myname: str = "John";
 
 //multiple variables with type
-let x, y, z : i32 = 10, 20, 3;
+let p, q, r: i32, f32, str = 10, 20.0, "hello";
+let p, q: i32, str = 10, "hello";
 
-//multiple variables with type inference and type
-let x, y = 10, 20;
+//multiple variables with type inference
+let p, q, r = 10, 20.0, "hello";
+let p, q = 10, "hello";
 
-fn add(x: i32, y: f32) -> i32, str {
-    return x+y, "Hello";
-}
+// assignments: single variable
+x = 15;
+
+// assignments: multiple variables
+p, q = 10, "hello";
+p, q, r = 10, 20.0, "hello";
+
+a; // single expression
+
+// array
+let arr1: []i32;
+let arr2: []str = ["hello", "world"];
+
+// //single variable with type
+// let x: i32 = 10; //explicit type and value
+
+// //multiple variables with type inference
+// let x, y = 10, 20; //infer from values
+
+// //multiple variables with type
+// let x, y, z: i32 = 10, 20, 3; // same type
+// let p, q, r: i32, f32, str = 10, 20.0, "Hello"; // different types
+
+// //multiple variables with type inference and type
+// let x, y = 10, 20;
+
+// let arr: []i32 = [1, 2, 3];
+// let arr2d: [][]i32 = [[1, 2, 3], [4, 5, 6]];
+
+// //Objects
+// type Point {
+//     x: i32,
+//     y: i32
+// }
+
+// type Map {str => i32};
+
+// let point: Point = {x: 10, y: 20};
+// let employeeSalaries : Map = {
+//     "John" => 50000,
+//     "Jane" => 60000,
+//     "Jim" => 55000
+// };
+
+// //or use without creating a type
+// let employeeSalaries2 = {
+//     "John" => 50000,
+//     "Jane" => 60000,
+//     "Jim" => 55000
+// };
+
+// let point3 = {
+//     x: 10,
+//     y: 20,
+//     z: 30
+// };

@@ -31,6 +31,23 @@ type Expression interface {
 	Expr()
 }
 
+type LValue interface {
+	Node
+	LValue()
+}
+
+type ExpressionList []Expression
+
+func (el ExpressionList) StartPos() lexer.Position {
+	return el[0].StartPos()
+}
+
+func (el ExpressionList) EndPos() lexer.Position {
+	return el[len(el)-1].EndPos()
+}
+
+func (el ExpressionList) INode() {} // INode is a marker interface for all nodes
+
 // Statement represents any node that doesn't produce a value
 type Statement interface {
 	Node

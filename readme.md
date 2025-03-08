@@ -10,11 +10,11 @@ Key Features
 
 
 ## Roadmap
-- [ ] Basic syntax
-- [ ] Tokenizer
-- [ ] Parser
-- [ ] Variable declaration and assignment
-- [ ] Expressions
+- [x] Basic syntax
+- [x] Tokenizer
+- [x] Parser
+- [x] Variable declaration and assignment
+- [-] Expressions
 - [ ] Data structures
 - [ ] Conditionals
 - [ ] Functions
