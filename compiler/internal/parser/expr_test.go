@@ -63,3 +63,31 @@ func TestExpressionParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestOnlyExpression(t *testing.T) {
+	tests := []struct {
+		input   string
+		isValid bool
+		desc    string
+	}{
+		{"a;", true, "Single expression"},
+		{"a, b;", false, "Multiple expressions"},
+		{"a = b;", true, "Assignment"},
+		{"a = b + c;", true, "Assignment with expression"},
+		{"a, b = c, d;", true, "Multiple assignments"},
+		{"a = b = c;", false, "Chained assignment"},
+		{"a = b + c = d;", false, "Invalid chained assignment"},
+		{"a = b +;", false, "Missing right operand"},
+		{"a = ;", false, "Missing left operand"},
+		{"a = b + + c;", false, "Invalid consecutive operators"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
+			if len(nodes) == 0 && tt.isValid {
+				t.Errorf("%s: expected nodes, got none", tt.desc)
+			}
+		})
+	}
+}
