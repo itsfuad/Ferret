@@ -30,6 +30,11 @@ a = x--;
 a = ++x;
 a = --x;
 
+//array access
+arr1[0];
+arr1[0] = 10;
+a = arr1[0];
+
 // //single variable with type
 // let x: i32 = 10; //explicit type and value
 

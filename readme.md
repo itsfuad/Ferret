@@ -14,19 +14,19 @@ Key Features
 - [x] Tokenizer
 - [x] Parser
 - [x] Variable declaration and assignment
-- [-] Expressions
+- [x] Expressions
 - [ ] Data structures
 - [ ] Conditionals
 - [ ] Functions
 - [ ] User-defined types
 - [ ] Structs
 - [ ] Interfaces
-- [ ] Unary operators
-- [ ] Increment/Decrement operators
-- [ ] Assignment operators
-- [ ] Grouping
+- [x] Unary operators
+- [x] Increment/Decrement operators
+- [x] Assignment operators
+- [x] Grouping
 - [ ] Type casting
-- [ ] Array
+- [x] Array
 - [ ] Map
 - [ ] Range
 - [ ] Rich error reporting

@@ -34,3 +34,14 @@ func (s *StringLiteral) INode()                   {} // INode is a marker interf
 func (s *StringLiteral) Expr()                    {} // Expr is a marker interface for all expressions
 func (s *StringLiteral) StartPos() lexer.Position { return s.Start }
 func (s *StringLiteral) EndPos() lexer.Position   { return s.End }
+
+type IndexableExpr struct {
+	Indexable Expression // The expression being indexed (array, map, etc.)
+	Index     Expression // The index expression
+	Location
+}
+
+func (i *IndexableExpr) INode()                   {} // INode is a marker interface for all nodes
+func (i *IndexableExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (i *IndexableExpr) StartPos() lexer.Position { return i.Start }
+func (i *IndexableExpr) EndPos() lexer.Position   { return i.End }

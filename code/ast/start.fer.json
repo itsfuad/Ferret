@@ -1497,5 +1497,98 @@
             "Column": 9,
             "Index": 600
         }
+    },
+    {
+        "Name": "arr1",
+        "Start": {
+            "Line": 34,
+            "Column": 1,
+            "Index": 620
+        },
+        "End": {
+            "Line": 34,
+            "Column": 5,
+            "Index": 624
+        }
+    },
+    {
+        "Name": "arr1",
+        "Start": {
+            "Line": 35,
+            "Column": 1,
+            "Index": 630
+        },
+        "End": {
+            "Line": 35,
+            "Column": 5,
+            "Index": 634
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 36,
+                    "Column": 1,
+                    "Index": 645
+                },
+                "End": {
+                    "Line": 36,
+                    "Column": 2,
+                    "Index": 646
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Indexable": {
+                    "Name": "arr1",
+                    "Start": {
+                        "Line": 36,
+                        "Column": 5,
+                        "Index": 649
+                    },
+                    "End": {
+                        "Line": 36,
+                        "Column": 9,
+                        "Index": 653
+                    }
+                },
+                "Index": {
+                    "Value": "ff",
+                    "Start": {
+                        "Line": 36,
+                        "Column": 10,
+                        "Index": 654
+                    },
+                    "End": {
+                        "Line": 36,
+                        "Column": 14,
+                        "Index": 658
+                    }
+                },
+                "Start": {
+                    "Line": 36,
+                    "Column": 5,
+                    "Index": 649
+                },
+                "End": {
+                    "Line": 36,
+                    "Column": 15,
+                    "Index": 659
+                }
+            }
+        ],
+        "Start": {
+            "Line": 36,
+            "Column": 1,
+            "Index": 645
+        },
+        "End": {
+            "Line": 36,
+            "Column": 16,
+            "Index": 660
+        }
     }
 ]

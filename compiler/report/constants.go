@@ -57,3 +57,9 @@ const (
 	INVALID_MIX_OF_INCREMENT      = "Invalid mix of prefix and postfix increment operators"
 	INVALID_MIX_OF_DECREMENT      = "Invalid mix of prefix and postfix decrement operators"
 )
+
+// Error messages for array operations
+const (
+	MISSING_INDEX_EXPRESSION = "Missing array index expression"
+	INVALID_INDEX_EXPRESSION = "Invalid array index expression"
+)

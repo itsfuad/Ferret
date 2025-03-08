@@ -186,33 +186,74 @@ func parseUnary(p *Parser) ast.Expression {
 	return parsePostfix(p)
 }
 
-// parsePostfix handles postfix operators (++, --)
+// parseIndexing handles array/map indexing operations
+func parseIndexing(p *Parser, expr ast.Expression) ast.Expression {
+	start := expr.StartPos()
+	p.advance() // consume '['
+
+	index := parseExpression(p)
+	if index == nil {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_INDEX_EXPRESSION).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+
+	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
+	return &ast.IndexableExpr{
+		Indexable: expr,
+		Index:     index,
+		Location: ast.Location{
+			Start: start,
+			End:   end.End,
+		},
+	}
+}
+
+// parseIncDec handles postfix increment/decrement
+func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
+	operator := p.advance()
+	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+		errMsg := report.INVALID_CONSECUTIVE_INCREMENT
+		if operator.Kind == lexer.MINUS_MINUS_TOKEN {
+			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+		}
+		report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+	return &ast.PostfixExpr{
+		Operand:  expr,
+		Operator: operator,
+		Location: ast.Location{
+			Start: expr.StartPos(),
+			End:   operator.End,
+		},
+	}
+}
+
+// parsePostfix handles postfix operators (++, --, [])
 func parsePostfix(p *Parser) ast.Expression {
 	expr := parsePrimary(p)
 	if expr == nil {
 		return nil
 	}
 
-	// Handle postfix operators (++, --)
-	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-		operator := p.advance()
-		// Check for consecutive operators
-		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-			errMsg := report.INVALID_CONSECUTIVE_INCREMENT
-			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
-				errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+	for {
+		if p.match(lexer.OPEN_BRACKET) {
+			if result := parseIndexing(p, expr); result != nil {
+				expr = result
+				continue
 			}
-			report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
-		return &ast.PostfixExpr{
-			Operand:  expr,
-			Operator: operator,
-			Location: ast.Location{
-				Start: expr.StartPos(),
-				End:   operator.End,
-			},
+
+		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+			if result := parseIncDec(p, expr); result != nil {
+				expr = result
+				continue
+			}
+			return nil
 		}
+
+		break
 	}
 
 	return expr

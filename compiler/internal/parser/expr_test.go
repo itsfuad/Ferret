@@ -43,6 +43,16 @@ func TestExpressionParsing(t *testing.T) {
 		{"let x = --a--;", false, "Invalid mix of prefix and postfix decrement"},
 		{"let x = ++;", false, "Missing operand for prefix increment"},
 		{"let x = --;", false, "Missing operand for prefix decrement"},
+		{"let x = arr[0];", true, "Simple array indexing"},
+		{"let x = arr[i + 1];", true, "Array indexing with expression"},
+		{"let x = arr[arr[i]];", true, "Nested array indexing"},
+		{"let x = arr[i][j];", true, "Multiple array indexing"},
+		{"let x = arr[];", false, "Missing index expression"},
+		{"let x = arr[;", false, "Unclosed array index"},
+		{"let x = arr[1 + ];", false, "Invalid index expression"},
+		{"arr[0] = 42;", true, "Array element assignment"},
+		{"arr[i + 1] = x;", true, "Array assignment with expression index"},
+		{"arr[0][1] = 42;", true, "Nested array element assignment"},
 	}
 
 	for _, tt := range tests {
