@@ -25,3 +25,14 @@ func (v *VariableDecl) INode()                   {} // INode is a marker interfa
 func (v *VariableDecl) Expr()                    {} // Expr is a marker interface for all expressions
 func (v *VariableDecl) StartPos() lexer.Position { return v.Start }
 func (v *VariableDecl) EndPos() lexer.Position   { return v.End }
+
+type AssignmentStmt struct {
+	Left  ExpressionList
+	Right ExpressionList
+	Location
+}
+
+func (a *AssignmentStmt) INode()                   {} // INode is a marker interface for all nodes
+func (a *AssignmentStmt) Stmt()                    {} // Stmt is a marker interface for all statements
+func (a *AssignmentStmt) StartPos() lexer.Position { return a.Start }
+func (a *AssignmentStmt) EndPos() lexer.Position   { return a.End }

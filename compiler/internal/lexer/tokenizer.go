@@ -4,6 +4,7 @@ import (
 	//Standard packages
 	"os"
 	"regexp"
+
 	//ferret packages
 	"ferret/compiler/colors"
 )
@@ -63,12 +64,12 @@ func createLexer(filePath *string) *Lexer {
 
 		patterns: []regexPattern{
 			//{regexp.MustCompile(`\n`), skipHandler}, // newlines
-			{regexp.MustCompile(`\s+`), skipHandler},                          // whitespace
-			{regexp.MustCompile(`\/\/.*`), skipHandler},                       // single line comments
-			{regexp.MustCompile(`\/\*[\s\S]*?\*\/`), skipHandler},             // multi line comments
-			{regexp.MustCompile(`"[^"]*"`), stringHandler},                    // string literals
-			{regexp.MustCompile(`'[^']'`), byteHandler},                       // byte literals
-			{regexp.MustCompile(`[0-9]+(?:\.[0-9]+)?`), numberHandler},        // decimal numbers
+			{regexp.MustCompile(`\s+`), skipHandler},              // whitespace
+			{regexp.MustCompile(`\/\/.*`), skipHandler},           // single line comments
+			{regexp.MustCompile(`\/\*[\s\S]*?\*\/`), skipHandler}, // multi line comments
+			{regexp.MustCompile(`"[^"]*"`), stringHandler},        // string literals
+			{regexp.MustCompile(`'[^']'`), byteHandler},           // byte literals
+			{regexp.MustCompile(`-?(?:0[xX][0-9a-fA-F](?:[0-9a-fA-F]|_[0-9a-fA-F])*|0[oO][0-7](?:[0-7]|_[0-7])*|0[bB][01](?:[01]|_[01])*|[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?(?:[eE][+-]?[0-9](?:[0-9]|_[0-9])*)?)`), numberHandler}, // all number formats
 			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
 			{regexp.MustCompile(`\+\+`), defaultHandler(PLUS_PLUS_TOKEN)},
 			{regexp.MustCompile(`\-\-`), defaultHandler(MINUS_MINUS_TOKEN)},

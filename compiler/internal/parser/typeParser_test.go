@@ -4,6 +4,7 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -76,7 +77,7 @@ func TestParseIntegerType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := createTestFile(t)
+			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
 			p := New(filePath, false)
 			p.tokens = []lexer.Token{
 				{Kind: lexer.IDENTIFIER_TOKEN, Value: tt.input},
@@ -105,7 +106,7 @@ func TestParseFloatType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := createTestFile(t)
+			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
 			p := New(filePath, false)
 			p.tokens = []lexer.Token{
 				{Kind: lexer.IDENTIFIER_TOKEN, Value: tt.input},
@@ -141,7 +142,7 @@ func TestParseArrayType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := createTestFile(t)
+			filePath := testUtils.CreateTestFile(t)
 			p := New(filePath, false)
 			p.tokens = tt.input
 
@@ -196,7 +197,7 @@ func TestParseType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filePath := createTestFile(t)
+			filePath := testUtils.CreateTestFile(t)
 			p := New(filePath, false)
 			p.tokens = tt.input
 

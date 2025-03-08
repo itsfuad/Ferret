@@ -2,19 +2,9 @@ package parser_test
 
 import (
 	"ferret/compiler/internal/parser"
-	"os"
-	"path/filepath"
+	"ferret/compiler/testUtils"
 	"testing"
 )
-
-func createTestFile(t *testing.T, content string) string {
-	dir := t.TempDir()
-	filePath := filepath.Join(dir, "test.fer")
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-	return filePath
-}
 
 func TestParseVarDecl(t *testing.T) {
 	tests := []struct {
@@ -37,7 +27,7 @@ func TestParseVarDecl(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 
-			filePath := createTestFile(t, tt.input)
+			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
 			p := parser.New(filePath, false)
 			defer func() {
 				if r := recover(); r != nil {

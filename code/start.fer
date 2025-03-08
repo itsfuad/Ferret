@@ -22,6 +22,7 @@ a; // single expression
 
 // array
 let arr1: []i32;
+let arr2: []str = ["hello", "world"];
 
 // //single variable with type
 // let x: i32 = 10; //explicit type and value

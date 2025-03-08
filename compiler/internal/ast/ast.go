@@ -31,6 +31,11 @@ type Expression interface {
 	Expr()
 }
 
+type LValue interface {
+	Node
+	LValue()
+}
+
 type ExpressionList []Expression
 
 func (el ExpressionList) StartPos() lexer.Position {

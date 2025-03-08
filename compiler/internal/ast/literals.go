@@ -3,7 +3,9 @@ package ast
 import "ferret/compiler/internal/lexer"
 
 type IntLiteral struct {
-	Value string
+	Value int64  // Actual numeric value
+	Raw   string // Original source text
+	Base  int    // Number base (10, 16, 8, or 2)
 	Location
 }
 
@@ -13,7 +15,8 @@ func (i *IntLiteral) StartPos() lexer.Position { return i.Start }
 func (i *IntLiteral) EndPos() lexer.Position   { return i.End }
 
 type FloatLiteral struct {
-	Value string
+	Value float64 // Actual numeric value
+	Raw   string  // Original source text
 	Location
 }
 

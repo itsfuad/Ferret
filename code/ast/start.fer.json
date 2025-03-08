@@ -980,5 +980,111 @@
             "Column": 0,
             "Index": 0
         }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "arr2",
+                    "Start": {
+                        "Line": 25,
+                        "Column": 5,
+                        "Index": 507
+                    },
+                    "End": {
+                        "Line": 25,
+                        "Column": 9,
+                        "Index": 511
+                    }
+                },
+                "Type": {
+                    "ElementType": {
+                        "TypeName": "str",
+                        "Start": {
+                            "Line": 25,
+                            "Column": 13,
+                            "Index": 515
+                        },
+                        "End": {
+                            "Line": 25,
+                            "Column": 16,
+                            "Index": 518
+                        }
+                    },
+                    "TypeName": "array",
+                    "Start": {
+                        "Line": 25,
+                        "Column": 11,
+                        "Index": 513
+                    },
+                    "End": {
+                        "Line": 25,
+                        "Column": 16,
+                        "Index": 518
+                    }
+                },
+                "Initializer": {
+                    "Elements": [
+                        {
+                            "Value": "hello",
+                            "Start": {
+                                "Line": 25,
+                                "Column": 20,
+                                "Index": 522
+                            },
+                            "End": {
+                                "Line": 25,
+                                "Column": 27,
+                                "Index": 529
+                            }
+                        },
+                        {
+                            "Value": "world",
+                            "Start": {
+                                "Line": 25,
+                                "Column": 29,
+                                "Index": 531
+                            },
+                            "End": {
+                                "Line": 25,
+                                "Column": 36,
+                                "Index": 538
+                            }
+                        }
+                    ],
+                    "Start": {
+                        "Line": 25,
+                        "Column": 19,
+                        "Index": 521
+                    },
+                    "End": {
+                        "Line": 25,
+                        "Column": 37,
+                        "Index": 539
+                    }
+                },
+                "Start": {
+                    "Line": 25,
+                    "Column": 5,
+                    "Index": 507
+                },
+                "End": {
+                    "Line": 25,
+                    "Column": 9,
+                    "Index": 511
+                }
+            }
+        ],
+        "Start": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        },
+        "End": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        }
     }
 ]
