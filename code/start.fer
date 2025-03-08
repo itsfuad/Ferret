@@ -24,6 +24,12 @@ a; // single expression
 let arr1: []i32;
 let arr2: []str = ["hello", "world"];
 
+a = (a + b) * c;
+a = x++;
+a = x--;
+a = ++x;
+a = --x;
+
 // //single variable with type
 // let x: i32 = 10; //explicit type and value
 

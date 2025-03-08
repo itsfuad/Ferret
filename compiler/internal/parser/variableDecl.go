@@ -14,7 +14,7 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableDecl, int) {
 
 	for {
 		if !p.check(lexer.IDENTIFIER_TOKEN) {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected variable name").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, 0
 		}
 		identifierName := p.advance()
@@ -102,7 +102,7 @@ func assignTypes(p *Parser, variables []*ast.VariableDecl, types []ast.DataType,
 		}
 		return true
 	}
-	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Mismatched variable and type count").SetLevel(report.SYNTAX_ERROR)
+	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISMATCHED_VARIABLE_AND_TYPE_COUNT).SetLevel(report.SYNTAX_ERROR)
 	return false
 }
 
@@ -111,7 +111,7 @@ func assignValues(p *Parser, variables []*ast.VariableDecl, values []ast.Express
 		return true
 	}
 	if len(values) == 1 && varCount > 1 {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Single value cannot be assigned to multiple variables").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.SINGLE_VALUE_MULTIPLE_VARIABLES).SetLevel(report.SYNTAX_ERROR)
 		return false
 	}
 	if len(values) != varCount {
@@ -125,7 +125,6 @@ func assignValues(p *Parser, variables []*ast.VariableDecl, values []ast.Express
 }
 
 func parseVarDecl(p *Parser) ast.Node {
-	fmt.Println("Parsing variable declaration")
 	p.advance() // consume let/const
 
 	variables, varCount := parseIdentifiers(p)
@@ -143,7 +142,7 @@ func parseVarDecl(p *Parser) ast.Node {
 		return nil
 	}
 
-	p.consume(lexer.SEMI_COLON_TOKEN, "Expected ';' after variable declaration")
+	p.consume(lexer.SEMI_COLON_TOKEN, report.EXPECTED_SEMI_COLON)
 
 	return &ast.VarDeclStmt{
 		Variables: variables,

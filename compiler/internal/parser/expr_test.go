@@ -31,6 +31,18 @@ func TestExpressionParsing(t *testing.T) {
 		{"let x = * b;", false, "Missing left operand"},
 		{"let x = (a + b;", false, "Unclosed parenthesis"},
 		{"let x = a + + b;", false, "Invalid consecutive operators"},
+		{"let x = a++;", true, "Postfix increment"},
+		{"let x = a--;", true, "Postfix decrement"},
+		{"let x = ++a;", true, "Prefix increment"},
+		{"let x = --a;", true, "Prefix decrement"},
+		{"let x = ++++a;", false, "Invalid consecutive prefix increment"},
+		{"let x = ----a;", false, "Invalid consecutive prefix decrement"},
+		{"let x = a++++b;", false, "Invalid consecutive postfix increment"},
+		{"let x = a----b;", false, "Invalid consecutive postfix decrement"},
+		{"let x = ++a++;", false, "Invalid mix of prefix and postfix increment"},
+		{"let x = --a--;", false, "Invalid mix of prefix and postfix decrement"},
+		{"let x = ++;", false, "Missing operand for prefix increment"},
+		{"let x = --;", false, "Missing operand for prefix decrement"},
 	}
 
 	for _, tt := range tests {

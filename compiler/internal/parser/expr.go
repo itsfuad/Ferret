@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/report"
 )
 
 // parseExpression is the entry point for expression parsing
@@ -136,7 +137,7 @@ func parseMultiplicative(p *Parser) ast.Expression {
 	return expr
 }
 
-// parseUnary handles unary operators (!, -)
+// parseUnary handles unary operators (!, -, ++, --)
 func parseUnary(p *Parser) ast.Expression {
 	if p.match(lexer.NOT_TOKEN, lexer.MINUS_TOKEN) {
 		operator := p.advance()
@@ -151,7 +152,70 @@ func parseUnary(p *Parser) ast.Expression {
 		}
 	}
 
-	return parsePrimary(p)
+	// Handle prefix operators (++, --)
+	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+		operator := p.advance()
+		// Check for consecutive operators
+		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+			errMsg := report.INVALID_CONSECUTIVE_INCREMENT
+			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
+				errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+			}
+			report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		operand := parseUnary(p)
+		if operand == nil {
+			errMsg := report.INVALID_INCREMENT_OPERAND
+			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
+				errMsg = report.INVALID_DECREMENT_OPERAND
+			}
+			report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		return &ast.PrefixExpr{
+			Operator: operator,
+			Operand:  operand,
+			Location: ast.Location{
+				Start: operator.Start,
+				End:   operand.EndPos(),
+			},
+		}
+	}
+
+	return parsePostfix(p)
+}
+
+// parsePostfix handles postfix operators (++, --)
+func parsePostfix(p *Parser) ast.Expression {
+	expr := parsePrimary(p)
+	if expr == nil {
+		return nil
+	}
+
+	// Handle postfix operators (++, --)
+	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+		operator := p.advance()
+		// Check for consecutive operators
+		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+			errMsg := report.INVALID_CONSECUTIVE_INCREMENT
+			if operator.Kind == lexer.MINUS_MINUS_TOKEN {
+				errMsg = report.INVALID_CONSECUTIVE_DECREMENT
+			}
+			report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		return &ast.PostfixExpr{
+			Operand:  expr,
+			Operator: operator,
+			Location: ast.Location{
+				Start: expr.StartPos(),
+				End:   operator.End,
+			},
+		}
+	}
+
+	return expr
 }
 
 // parsePrimary handles literals, identifiers, and parenthesized expressions

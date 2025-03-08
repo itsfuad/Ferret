@@ -18,7 +18,9 @@
                 },
                 "Type": null,
                 "Initializer": {
-                    "Value": "10",
+                    "Value": 10,
+                    "Raw": "10",
+                    "Base": 10,
                     "Start": {
                         "Line": 2,
                         "Column": 9,
@@ -207,7 +209,9 @@
                     }
                 },
                 "Initializer": {
-                    "Value": "10",
+                    "Value": 10,
+                    "Raw": "10",
+                    "Base": 10,
                     "Start": {
                         "Line": 7,
                         "Column": 30,
@@ -260,7 +264,8 @@
                     }
                 },
                 "Initializer": {
-                    "Value": "20.0",
+                    "Value": 20,
+                    "Raw": "20.0",
                     "Start": {
                         "Line": 7,
                         "Column": 34,
@@ -380,7 +385,9 @@
                     }
                 },
                 "Initializer": {
-                    "Value": "10",
+                    "Value": 10,
+                    "Raw": "10",
+                    "Base": 10,
                     "Start": {
                         "Line": 8,
                         "Column": 22,
@@ -486,7 +493,9 @@
                 },
                 "Type": null,
                 "Initializer": {
-                    "Value": "10",
+                    "Value": 10,
+                    "Raw": "10",
+                    "Base": 10,
                     "Start": {
                         "Line": 11,
                         "Column": 15,
@@ -526,7 +535,8 @@
                 },
                 "Type": null,
                 "Initializer": {
-                    "Value": "20.0",
+                    "Value": 20,
+                    "Raw": "20.0",
                     "Start": {
                         "Line": 11,
                         "Column": 19,
@@ -620,7 +630,9 @@
                 },
                 "Type": null,
                 "Initializer": {
-                    "Value": "10",
+                    "Value": 10,
+                    "Raw": "10",
+                    "Base": 10,
                     "Start": {
                         "Line": 12,
                         "Column": 12,
@@ -713,7 +725,9 @@
         ],
         "Right": [
             {
-                "Value": "15",
+                "Value": 15,
+                "Raw": "15",
+                "Base": 10,
                 "Start": {
                     "Line": 15,
                     "Column": 5,
@@ -768,7 +782,9 @@
         ],
         "Right": [
             {
-                "Value": "10",
+                "Value": 10,
+                "Raw": "10",
+                "Base": 10,
                 "Start": {
                     "Line": 18,
                     "Column": 8,
@@ -849,7 +865,9 @@
         ],
         "Right": [
             {
-                "Value": "10",
+                "Value": 10,
+                "Raw": "10",
+                "Base": 10,
                 "Start": {
                     "Line": 19,
                     "Column": 11,
@@ -862,7 +880,8 @@
                 }
             },
             {
-                "Value": "20.0",
+                "Value": 20,
+                "Raw": "20.0",
                 "Start": {
                     "Line": 19,
                     "Column": 15,
@@ -1085,6 +1104,398 @@
             "Line": 0,
             "Column": 0,
             "Index": 0
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 27,
+                    "Column": 1,
+                    "Index": 544
+                },
+                "End": {
+                    "Line": 27,
+                    "Column": 2,
+                    "Index": 545
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Left": {
+                    "Left": {
+                        "Name": "a",
+                        "Start": {
+                            "Line": 27,
+                            "Column": 6,
+                            "Index": 549
+                        },
+                        "End": {
+                            "Line": 27,
+                            "Column": 7,
+                            "Index": 550
+                        }
+                    },
+                    "Operator": {
+                        "Kind": "+",
+                        "Value": "+",
+                        "Start": {
+                            "Line": 27,
+                            "Column": 8,
+                            "Index": 551
+                        },
+                        "End": {
+                            "Line": 27,
+                            "Column": 9,
+                            "Index": 552
+                        }
+                    },
+                    "Right": {
+                        "Name": "b",
+                        "Start": {
+                            "Line": 27,
+                            "Column": 10,
+                            "Index": 553
+                        },
+                        "End": {
+                            "Line": 27,
+                            "Column": 11,
+                            "Index": 554
+                        }
+                    },
+                    "Start": {
+                        "Line": 27,
+                        "Column": 6,
+                        "Index": 549
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 11,
+                        "Index": 554
+                    }
+                },
+                "Operator": {
+                    "Kind": "*",
+                    "Value": "*",
+                    "Start": {
+                        "Line": 27,
+                        "Column": 13,
+                        "Index": 556
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 14,
+                        "Index": 557
+                    }
+                },
+                "Right": {
+                    "Name": "c",
+                    "Start": {
+                        "Line": 27,
+                        "Column": 15,
+                        "Index": 558
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 16,
+                        "Index": 559
+                    }
+                },
+                "Start": {
+                    "Line": 27,
+                    "Column": 6,
+                    "Index": 549
+                },
+                "End": {
+                    "Line": 27,
+                    "Column": 16,
+                    "Index": 559
+                }
+            }
+        ],
+        "Start": {
+            "Line": 27,
+            "Column": 1,
+            "Index": 544
+        },
+        "End": {
+            "Line": 27,
+            "Column": 17,
+            "Index": 560
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 28,
+                    "Column": 1,
+                    "Index": 562
+                },
+                "End": {
+                    "Line": 28,
+                    "Column": 2,
+                    "Index": 563
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Operand": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 28,
+                        "Column": 5,
+                        "Index": 566
+                    },
+                    "End": {
+                        "Line": 28,
+                        "Column": 6,
+                        "Index": 567
+                    }
+                },
+                "Operator": {
+                    "Kind": "++",
+                    "Value": "++",
+                    "Start": {
+                        "Line": 28,
+                        "Column": 6,
+                        "Index": 567
+                    },
+                    "End": {
+                        "Line": 28,
+                        "Column": 8,
+                        "Index": 569
+                    }
+                },
+                "Start": {
+                    "Line": 28,
+                    "Column": 5,
+                    "Index": 566
+                },
+                "End": {
+                    "Line": 28,
+                    "Column": 8,
+                    "Index": 569
+                }
+            }
+        ],
+        "Start": {
+            "Line": 28,
+            "Column": 1,
+            "Index": 562
+        },
+        "End": {
+            "Line": 28,
+            "Column": 9,
+            "Index": 570
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 29,
+                    "Column": 1,
+                    "Index": 572
+                },
+                "End": {
+                    "Line": 29,
+                    "Column": 2,
+                    "Index": 573
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Operand": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 29,
+                        "Column": 5,
+                        "Index": 576
+                    },
+                    "End": {
+                        "Line": 29,
+                        "Column": 6,
+                        "Index": 577
+                    }
+                },
+                "Operator": {
+                    "Kind": "--",
+                    "Value": "--",
+                    "Start": {
+                        "Line": 29,
+                        "Column": 6,
+                        "Index": 577
+                    },
+                    "End": {
+                        "Line": 29,
+                        "Column": 8,
+                        "Index": 579
+                    }
+                },
+                "Start": {
+                    "Line": 29,
+                    "Column": 5,
+                    "Index": 576
+                },
+                "End": {
+                    "Line": 29,
+                    "Column": 8,
+                    "Index": 579
+                }
+            }
+        ],
+        "Start": {
+            "Line": 29,
+            "Column": 1,
+            "Index": 572
+        },
+        "End": {
+            "Line": 29,
+            "Column": 9,
+            "Index": 580
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 30,
+                    "Column": 1,
+                    "Index": 582
+                },
+                "End": {
+                    "Line": 30,
+                    "Column": 2,
+                    "Index": 583
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Operator": {
+                    "Kind": "++",
+                    "Value": "++",
+                    "Start": {
+                        "Line": 30,
+                        "Column": 5,
+                        "Index": 586
+                    },
+                    "End": {
+                        "Line": 30,
+                        "Column": 7,
+                        "Index": 588
+                    }
+                },
+                "Operand": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 30,
+                        "Column": 7,
+                        "Index": 588
+                    },
+                    "End": {
+                        "Line": 30,
+                        "Column": 8,
+                        "Index": 589
+                    }
+                },
+                "Start": {
+                    "Line": 30,
+                    "Column": 5,
+                    "Index": 586
+                },
+                "End": {
+                    "Line": 30,
+                    "Column": 8,
+                    "Index": 589
+                }
+            }
+        ],
+        "Start": {
+            "Line": 30,
+            "Column": 1,
+            "Index": 582
+        },
+        "End": {
+            "Line": 30,
+            "Column": 9,
+            "Index": 590
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 31,
+                    "Column": 1,
+                    "Index": 592
+                },
+                "End": {
+                    "Line": 31,
+                    "Column": 2,
+                    "Index": 593
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Operator": {
+                    "Kind": "--",
+                    "Value": "--",
+                    "Start": {
+                        "Line": 31,
+                        "Column": 5,
+                        "Index": 596
+                    },
+                    "End": {
+                        "Line": 31,
+                        "Column": 7,
+                        "Index": 598
+                    }
+                },
+                "Operand": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 31,
+                        "Column": 7,
+                        "Index": 598
+                    },
+                    "End": {
+                        "Line": 31,
+                        "Column": 8,
+                        "Index": 599
+                    }
+                },
+                "Start": {
+                    "Line": 31,
+                    "Column": 5,
+                    "Index": 596
+                },
+                "End": {
+                    "Line": 31,
+                    "Column": 8,
+                    "Index": 599
+                }
+            }
+        ],
+        "Start": {
+            "Line": 31,
+            "Column": 1,
+            "Index": 592
+        },
+        "End": {
+            "Line": 31,
+            "Column": 9,
+            "Index": 600
         }
     }
 ]

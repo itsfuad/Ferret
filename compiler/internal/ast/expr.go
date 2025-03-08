@@ -26,6 +26,28 @@ func (u *UnaryExpr) Expr()                    {} // Expr is a marker interface f
 func (u *UnaryExpr) StartPos() lexer.Position { return u.Start }
 func (u *UnaryExpr) EndPos() lexer.Position   { return u.End }
 
+type PrefixExpr struct {
+	Operator lexer.Token // The operator token (++, --)
+	Operand  Expression
+	Location
+}
+
+func (p *PrefixExpr) INode()                   {} // INode is a marker interface for all nodes
+func (p *PrefixExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (p *PrefixExpr) StartPos() lexer.Position { return p.Start }
+func (p *PrefixExpr) EndPos() lexer.Position   { return p.End }
+
+type PostfixExpr struct {
+	Operand  Expression
+	Operator lexer.Token // The operator token (++, --)
+	Location
+}
+
+func (p *PostfixExpr) INode()                   {} // INode is a marker interface for all nodes
+func (p *PostfixExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (p *PostfixExpr) StartPos() lexer.Position { return p.Start }
+func (p *PostfixExpr) EndPos() lexer.Position   { return p.End }
+
 type IdentifierExpr struct {
 	Name string
 	Location
