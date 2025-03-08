@@ -62,6 +62,13 @@ const user: {
     age: 20
 };
 
+type Point {
+    x: i32,
+    y: i32
+};
+
+let point: Point = {x: 10, y: 20};
+
 // //Objects
 // type Point {
 //     x: i32,

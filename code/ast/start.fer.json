@@ -2816,5 +2816,228 @@
             "Column": 0,
             "Index": 0
         }
+    },
+    {
+        "Alias": {
+            "Name": "Point",
+            "Start": {
+                "Line": 65,
+                "Column": 6,
+                "Index": 1264
+            },
+            "End": {
+                "Line": 65,
+                "Column": 11,
+                "Index": 1269
+            }
+        },
+        "BaseType": {
+            "Fields": [
+                {
+                    "Name": "x",
+                    "Type": {
+                        "BitSize": 32,
+                        "Unsigned": true,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 66,
+                            "Column": 8,
+                            "Index": 1280
+                        },
+                        "End": {
+                            "Line": 66,
+                            "Column": 11,
+                            "Index": 1283
+                        }
+                    },
+                    "Value": null,
+                    "Start": {
+                        "Line": 66,
+                        "Column": 5,
+                        "Index": 1277
+                    },
+                    "End": {
+                        "Line": 66,
+                        "Column": 11,
+                        "Index": 1283
+                    }
+                },
+                {
+                    "Name": "y",
+                    "Type": {
+                        "BitSize": 32,
+                        "Unsigned": true,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 67,
+                            "Column": 8,
+                            "Index": 1293
+                        },
+                        "End": {
+                            "Line": 67,
+                            "Column": 11,
+                            "Index": 1296
+                        }
+                    },
+                    "Value": null,
+                    "Start": {
+                        "Line": 67,
+                        "Column": 5,
+                        "Index": 1290
+                    },
+                    "End": {
+                        "Line": 67,
+                        "Column": 11,
+                        "Index": 1296
+                    }
+                }
+            ],
+            "TypeName": "object",
+            "Start": {
+                "Line": 65,
+                "Column": 12,
+                "Index": 1270
+            },
+            "End": {
+                "Line": 68,
+                "Column": 2,
+                "Index": 1299
+            }
+        },
+        "Start": {
+            "Line": 65,
+            "Column": 1,
+            "Index": 1259
+        },
+        "End": {
+            "Line": 68,
+            "Column": 3,
+            "Index": 1300
+        }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "point",
+                    "Start": {
+                        "Line": 70,
+                        "Column": 5,
+                        "Index": 1308
+                    },
+                    "End": {
+                        "Line": 70,
+                        "Column": 10,
+                        "Index": 1313
+                    }
+                },
+                "Type": {
+                    "TypeName": "Point",
+                    "Start": {
+                        "Line": 70,
+                        "Column": 12,
+                        "Index": 1315
+                    },
+                    "End": {
+                        "Line": 70,
+                        "Column": 17,
+                        "Index": 1320
+                    }
+                },
+                "Initializer": {
+                    "Fields": [
+                        {
+                            "Name": "x",
+                            "Type": null,
+                            "Value": {
+                                "Value": 10,
+                                "Raw": "10",
+                                "Base": 10,
+                                "Start": {
+                                    "Line": 70,
+                                    "Column": 24,
+                                    "Index": 1327
+                                },
+                                "End": {
+                                    "Line": 70,
+                                    "Column": 26,
+                                    "Index": 1329
+                                }
+                            },
+                            "Start": {
+                                "Line": 70,
+                                "Column": 21,
+                                "Index": 1324
+                            },
+                            "End": {
+                                "Line": 70,
+                                "Column": 26,
+                                "Index": 1329
+                            }
+                        },
+                        {
+                            "Name": "y",
+                            "Type": null,
+                            "Value": {
+                                "Value": 20,
+                                "Raw": "20",
+                                "Base": 10,
+                                "Start": {
+                                    "Line": 70,
+                                    "Column": 31,
+                                    "Index": 1334
+                                },
+                                "End": {
+                                    "Line": 70,
+                                    "Column": 33,
+                                    "Index": 1336
+                                }
+                            },
+                            "Start": {
+                                "Line": 70,
+                                "Column": 28,
+                                "Index": 1331
+                            },
+                            "End": {
+                                "Line": 70,
+                                "Column": 33,
+                                "Index": 1336
+                            }
+                        }
+                    ],
+                    "Start": {
+                        "Line": 70,
+                        "Column": 20,
+                        "Index": 1323
+                    },
+                    "End": {
+                        "Line": 70,
+                        "Column": 34,
+                        "Index": 1337
+                    }
+                },
+                "Start": {
+                    "Line": 70,
+                    "Column": 5,
+                    "Index": 1308
+                },
+                "End": {
+                    "Line": 70,
+                    "Column": 10,
+                    "Index": 1313
+                }
+            }
+        ],
+        "Start": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        },
+        "End": {
+            "Line": 0,
+            "Column": 0,
+            "Index": 0
+        }
     }
 ]
