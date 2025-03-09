@@ -10,8 +10,8 @@ func parseIdentifier(p *Parser) ast.Expression {
 	identifier := &ast.IdentifierExpr{
 		Name: token.Value,
 		Location: ast.Location{
-			Start: token.Start,
-			End:   token.End,
+			Start: &token.Start,
+			End:   &token.End,
 		},
 	}
 

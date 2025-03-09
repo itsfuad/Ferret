@@ -146,7 +146,7 @@ func parseUnary(p *Parser) ast.Expression {
 			Operator: operator,
 			Operand:  right,
 			Location: ast.Location{
-				Start: operator.Start,
+				Start: &operator.Start,
 				End:   right.EndPos(),
 			},
 		}
@@ -173,11 +173,18 @@ func parseUnary(p *Parser) ast.Expression {
 			report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
+
+		// Check if operand already has a postfix operator
+		if _, ok := operand.(*ast.PostfixExpr); ok {
+			report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+
 		return &ast.PrefixExpr{
 			Operator: operator,
 			Operand:  operand,
 			Location: ast.Location{
-				Start: operator.Start,
+				Start: &operator.Start,
 				End:   operand.EndPos(),
 			},
 		}
@@ -203,7 +210,7 @@ func parseIndexing(p *Parser, expr ast.Expression) ast.Expression {
 		Index:     index,
 		Location: ast.Location{
 			Start: start,
-			End:   end.End,
+			End:   &end.End,
 		},
 	}
 }
@@ -224,7 +231,7 @@ func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
 		Operator: operator,
 		Location: ast.Location{
 			Start: expr.StartPos(),
-			End:   operator.End,
+			End:   &operator.End,
 		},
 	}
 }
@@ -246,6 +253,13 @@ func parsePostfix(p *Parser) ast.Expression {
 		}
 
 		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+			// Check if expression already has a prefix operator
+			if _, ok := expr.(*ast.PrefixExpr); ok {
+				current := p.peek()
+				report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
+				return nil
+			}
+
 			if result := parseIncDec(p, expr); result != nil {
 				expr = result
 				continue
@@ -292,6 +306,7 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.IDENTIFIER_TOKEN:
 		return parseIdentifier(p)
 	}
+	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.UNEXPECTED_TOKEN).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }
 

@@ -81,43 +81,81 @@ func (p *Parser) consume(kind lexer.TOKEN, message string) lexer.Token {
 	return p.peek()
 }
 
+// parseExpressionList parses a comma-separated list of expressions
+func (p *Parser) parseExpressionList(first ast.Expression) ast.ExpressionList {
+	exprs := ast.ExpressionList{first}
+	for p.match(lexer.COMMA_TOKEN) {
+		p.advance() // consume comma
+		next := parseExpression(p)
+		if next == nil {
+			report.Add(p.filePath,
+				p.peek().Start.Line, p.peek().End.Line,
+				p.peek().Start.Column, p.peek().End.Column,
+				"Expected expression after comma").SetLevel(report.SYNTAX_ERROR)
+			break
+		}
+		exprs = append(exprs, next)
+	}
+	return exprs
+}
+
+// parseExpressionStatement parses an expression or comma-separated expressions
+func (p *Parser) parseExpressionStatement(first ast.Expression) ast.Node {
+	exprs := p.parseExpressionList(first)
+
+	// Check for assignment
+	if p.match(lexer.EQUALS_TOKEN) {
+		return parseAssignment(p, exprs...)
+	}
+
+	return &ast.ExpressionStmt{
+		Expressions: exprs,
+		Location: ast.Location{
+			Start: first.StartPos(),
+			End:   exprs[len(exprs)-1].EndPos(),
+		},
+	}
+}
+
+// handleUnexpectedToken reports an error for unexpected token and advances
+func (p *Parser) handleUnexpectedToken() {
+	report.Add(p.filePath,
+		p.peek().Start.Line, p.peek().End.Line,
+		p.peek().Start.Column, p.peek().End.Column,
+		"Unexpected token").SetLevel(report.SYNTAX_ERROR)
+	p.advance() // skip the invalid token
+}
+
 // Parse is the entry point for parsing
 func (p *Parser) Parse() []ast.Node {
-
 	var nodes []ast.Node
 
 	for !p.isAtEnd() {
 		var node ast.Node
+
+		// Parse the statement
 		if p.match(lexer.LET_TOKEN, lexer.CONST_TOKEN) {
 			node = parseVarDecl(p)
 		} else if p.match(lexer.TYPE_TOKEN) {
 			node = parseTypeDecl(p)
-		} else if p.match(lexer.IDENTIFIER_TOKEN) {
-			node = handleIdentifierPath(p)
 		} else {
-			p.advance()
+			expr := parseExpression(p)
+			if expr != nil {
+				node = p.parseExpressionStatement(expr)
+			} else {
+				p.handleUnexpectedToken()
+			}
 		}
 
-		// if the node is not nil, add it to the nodes list
+		// Handle statement termination and update locations
 		if node != nil {
+			end := p.consume(lexer.SEMI_COLON_TOKEN, "Expected ';' after statement")
+
+			node.EndPos().Column = end.End.Column
+			node.EndPos().Line = end.End.Line
 			nodes = append(nodes, node)
 		}
 	}
 
 	return nodes
-}
-
-// handleIdentifierPath parses either a standalone identifier or an assignment
-func handleIdentifierPath(p *Parser) ast.Node {
-	iden := parseIdentifier(p)
-
-	// if the identifier is nil, return nil
-	if iden == nil {
-		return nil
-	}
-
-	if p.match(lexer.COMMA_TOKEN, lexer.EQUALS_TOKEN) {
-		return parseAssignment(p, iden)
-	}
-	return iden
 }

@@ -13,8 +13,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	raw := number.Value
 	value := strings.ReplaceAll(raw, "_", "") // Remove underscores
 	loc := ast.Location{
-		Start: number.Start,
-		End:   number.End,
+		Start: &number.Start,
+		End:   &number.End,
 	}
 
 	// Try parsing as integer first
@@ -98,8 +98,8 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 func parseStringLiteral(p *Parser) ast.Expression {
 	stringLiteral := p.consume(lexer.STRING_TOKEN, report.EXPECTED_STRING)
 	loc := ast.Location{
-		Start: stringLiteral.Start,
-		End:   stringLiteral.End,
+		Start: &stringLiteral.Start,
+		End:   &stringLiteral.End,
 	}
 
 	return &ast.StringLiteral{
@@ -142,8 +142,8 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 	return &ast.ArrayLiteralExpr{
 		Elements: elements,
 		Location: ast.Location{
-			Start: start,
-			End:   end.End,
+			Start: &start,
+			End:   &end.End,
 		},
 	}
 }
@@ -193,7 +193,7 @@ func parseObjectType(p *Parser) ast.DataType {
 			Name: fieldName,
 			Type: fieldType,
 			Location: ast.Location{
-				Start: nameToken.Start,
+				Start: &nameToken.Start,
 				End:   fieldType.EndPos(),
 			},
 		})
@@ -212,8 +212,8 @@ func parseObjectType(p *Parser) ast.DataType {
 		Fields:   fields,
 		TypeName: types.OBJECT,
 		Location: ast.Location{
-			Start: start,
-			End:   end,
+			Start: &start,
+			End:   &end,
 		},
 	}
 }
@@ -264,7 +264,7 @@ func parseObjectLiteral(p *Parser) ast.Expression {
 			Name:  fieldName,
 			Value: fieldValue,
 			Location: ast.Location{
-				Start: nameToken.Start,
+				Start: &nameToken.Start,
 				End:   fieldValue.EndPos(),
 			},
 		})
@@ -282,8 +282,8 @@ func parseObjectLiteral(p *Parser) ast.Expression {
 	return &ast.ObjectLiteralExpr{
 		Fields: fields,
 		Location: ast.Location{
-			Start: start,
-			End:   end,
+			Start: &start,
+			End:   &end,
 		},
 	}
 }

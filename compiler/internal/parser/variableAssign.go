@@ -6,20 +6,34 @@ import (
 	"ferret/compiler/report"
 )
 
-func parseAssignment(p *Parser, firstIdent ast.Expression) ast.Statement {
+func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
+	assignees := ast.ExpressionList{}
 
-	assignees := ast.ExpressionList{firstIdent}
+	for _, expr := range left {
+		assignees = append(assignees, expr)
+	}
+
 	expressions := ast.ExpressionList{}
 
 	for p.peek().Kind == lexer.COMMA_TOKEN {
 		p.advance()
-		assignees = append(assignees, parseExpression(p))
+		val := parseExpression(p)
+		if val == nil {
+			current := p.previous()
+			report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Expected expression in assignment").SetLevel(report.SYNTAX_ERROR)
+		}
+		assignees = append(assignees, val)
 	}
 
 	p.consume(lexer.EQUALS_TOKEN, "Expected '=' in assignment")
 
 	for {
-		expressions = append(expressions, parseExpression(p))
+		val := parseExpression(p)
+		if val == nil {
+			current := p.previous()
+			report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Expected expression in assignment").SetLevel(report.SYNTAX_ERROR)
+		}
+		expressions = append(expressions, val)
 		if p.peek().Kind == lexer.COMMA_TOKEN {
 			p.advance()
 		} else {
@@ -27,10 +41,9 @@ func parseAssignment(p *Parser, firstIdent ast.Expression) ast.Statement {
 		}
 	}
 
-	end := p.consume(lexer.SEMI_COLON_TOKEN, "Expected ';' after assignment")
-
-	if len(assignees) != len(expressions) {
-		report.Add(p.filePath, end.Start.Line, end.End.Line, end.Start.Column, end.End.Column, "Mismatched number of variables and values").SetLevel(report.SYNTAX_ERROR)
+	if len(assignees) < len(expressions) {
+		current := p.previous()
+		report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Mismatched number of variables and values").AddHint("Assignee count must be less than or equal to the number of expressions").SetLevel(report.SYNTAX_ERROR)
 	}
 
 	return &ast.AssignmentStmt{
@@ -38,7 +51,7 @@ func parseAssignment(p *Parser, firstIdent ast.Expression) ast.Statement {
 		Right: expressions,
 		Location: ast.Location{
 			Start: assignees[0].StartPos(),
-			End:   end.End,
+			End:   expressions[len(expressions)-1].EndPos(),
 		},
 	}
 }

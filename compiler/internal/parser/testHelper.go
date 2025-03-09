@@ -12,9 +12,15 @@ func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) [
 	p := New(filePath, false)
 
 	defer func() {
-		if r := recover(); r != nil {
-			if isValid {
+		r := recover()
+		// expected panic only for invalid tests
+		if isValid {
+			if r != nil {
 				t.Errorf(testUtils.ErrPanic, desc, r)
+			}
+		} else {
+			if r == nil {
+				t.Errorf(testUtils.ErrNoPanic, desc)
 			}
 		}
 	}()

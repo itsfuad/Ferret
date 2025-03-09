@@ -82,7 +82,7 @@ func TestObjectLiteralParsing(t *testing.T) {
 		{`let x = { name: "John", age: 20, scores: [1, 2, 3] };`, true, "Object with array field"},
 		{`let x = { user: { name: "John", age: 20 } };`, true, "Nested object literal"},
 		{`let x = { single: 42 };`, true, "Single field object"},
-		{`let x = { name: "John", };`, true, "Object with trailing comma"},
+		{`let x = { name: "John" };`, true, "Object with trailing comma"},
 
 		// Invalid cases
 		{`let x = { };`, false, "Empty object not allowed"},
@@ -93,7 +93,7 @@ func TestObjectLiteralParsing(t *testing.T) {
 		{`let x = { name: "John", };`, false, "Object with trailing comma"},
 		{`let x = { name: "John", name: "Jane" };`, false, "Duplicate field names"},
 		{`let x = { "name": "John" };`, false, "Non-identifier field name"},
-		{`let x = { name: "John" };`, false, "Missing semicolon"},
+		{`let x = { name: "John" }`, false, "Missing semicolon"},
 	}
 
 	for _, tt := range tests {
