@@ -269,11 +269,14 @@ func parseObjectLiteral(p *Parser) ast.Expression {
 			},
 		})
 
+		//if closing brace, break
+		if p.match(lexer.CLOSE_CURLY) {
+			break
+		}
+
 		//if not closing brace, expect comma
 		if !p.match(lexer.CLOSE_CURLY) {
 			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
-		} else {
-			break
 		}
 	}
 

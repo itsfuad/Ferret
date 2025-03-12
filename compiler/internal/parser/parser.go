@@ -4,6 +4,7 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/report"
+	"fmt"
 )
 
 type Parser struct {
@@ -31,9 +32,19 @@ func (p *Parser) previous() lexer.Token {
 	return p.tokens[p.current-1]
 }
 
+// next token
+func (p *Parser) next() lexer.Token {
+	return p.tokens[p.current+1]
+}
+
 // is at end of file
 func (p *Parser) isAtEnd() bool {
 	return p.peek().Kind == lexer.EOF_TOKEN
+}
+
+// rollback to N
+func (p *Parser) rollback(n int) {
+	p.current -= n
 }
 
 // consume the current token and return that token
@@ -122,7 +133,7 @@ func (p *Parser) handleUnexpectedToken() {
 	report.Add(p.filePath,
 		p.peek().Start.Line, p.peek().End.Line,
 		p.peek().Start.Column, p.peek().End.Column,
-		"Unexpected token").SetLevel(report.SYNTAX_ERROR)
+		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
 	p.advance() // skip the invalid token
 }
 
@@ -139,10 +150,13 @@ func (p *Parser) Parse() []ast.Node {
 		} else if p.match(lexer.TYPE_TOKEN) {
 			node = parseTypeDecl(p)
 		} else {
+			// first try to parse an expression
 			expr := parseExpression(p)
 			if expr != nil {
+				// if the expression is valid, parse it as an expression statement
 				node = p.parseExpressionStatement(expr)
 			} else {
+				// if the expression is invalid, report an error
 				p.handleUnexpectedToken()
 			}
 		}

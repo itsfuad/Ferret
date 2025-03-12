@@ -115,6 +115,7 @@ func TestParseFloatType(t *testing.T) {
 }
 
 func TestParseArrayType(t *testing.T) {
+
 	tests := []struct {
 		input    string
 		isValid  bool
@@ -123,37 +124,37 @@ func TestParseArrayType(t *testing.T) {
 	}{
 		{
 			desc:     "Basic integer array type",
-			input:    "[]i32",
+			input:    "type Array []i32;",
 			isValid:  true,
 			expected: types.ARRAY,
 		},
 		{
 			desc:     "Basic float array type",
-			input:    "[]f64",
+			input:    "type Array []f64;",
 			isValid:  true,
 			expected: types.ARRAY,
 		},
 		{
 			desc:     "Basic string array type",
-			input:    "[]str",
+			input:    "type Array []str;",
 			isValid:  true,
 			expected: types.ARRAY,
 		},
 		{
 			desc:     "Basic boolean array type",
-			input:    "[]bool",
+			input:    "type Array []bool;",
 			isValid:  true,
 			expected: types.ARRAY,
 		},
 		{
 			desc:     "Basic object array type",
-			input:    "[]User",
+			input:    "type Array []User;",
 			isValid:  true,
 			expected: types.ARRAY,
 		},
 		{
-			desc:     "Invalid array type",
-			input:    "[]",
+			desc:     "Invalid array",
+			input:    "type Array []",
 			isValid:  false,
 			expected: types.ARRAY,
 		},

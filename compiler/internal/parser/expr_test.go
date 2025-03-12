@@ -73,8 +73,8 @@ func TestOnlyExpression(t *testing.T) {
 		// expressions with no use case
 		{"a;", true, "Single expression"},
 		{"a, b;", true, "Multiple expressions"},
-		{"a, b", false, "Multiple expressions cannot end with a semicolon"},
-		{"a b", false, "Invalid expression"},
+		{"a, b", false, "Expected semicolon"},
+		{"a b", false, "Unexpected token b"},
 
 		// binary expressions
 		{"a + b;", true, "Binary addition"},

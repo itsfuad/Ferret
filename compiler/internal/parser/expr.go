@@ -4,6 +4,7 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/report"
+	"fmt"
 )
 
 // parseExpression is the entry point for expression parsing
@@ -306,7 +307,7 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.IDENTIFIER_TOKEN:
 		return parseIdentifier(p)
 	}
-	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.UNEXPECTED_TOKEN).SetLevel(report.SYNTAX_ERROR)
+	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }
 

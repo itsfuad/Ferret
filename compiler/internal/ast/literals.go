@@ -12,8 +12,8 @@ type IntLiteral struct {
 	Location
 }
 
-func (i *IntLiteral) INode()                   {} // INode is a marker interface for all nodes
-func (i *IntLiteral) Expr()                    {} // Expr is a marker interface for all expressions
+func (i *IntLiteral) INode()                    {} // INode is a marker interface for all nodes
+func (i *IntLiteral) Expr()                     {} // Expr is a marker interface for all expressions
 func (i *IntLiteral) StartPos() *lexer.Position { return i.Start }
 func (i *IntLiteral) EndPos() *lexer.Position   { return i.End }
 
@@ -23,8 +23,8 @@ type FloatLiteral struct {
 	Location
 }
 
-func (f *FloatLiteral) INode()                   {} // INode is a marker interface for all nodes
-func (f *FloatLiteral) Expr()                    {} // Expr is a marker interface for all expressions
+func (f *FloatLiteral) INode()                    {} // INode is a marker interface for all nodes
+func (f *FloatLiteral) Expr()                     {} // Expr is a marker interface for all expressions
 func (f *FloatLiteral) StartPos() *lexer.Position { return f.Start }
 func (f *FloatLiteral) EndPos() *lexer.Position   { return f.End }
 
@@ -33,8 +33,8 @@ type StringLiteral struct {
 	Location
 }
 
-func (s *StringLiteral) INode()                   {} // INode is a marker interface for all nodes
-func (s *StringLiteral) Expr()                    {} // Expr is a marker interface for all expressions
+func (s *StringLiteral) INode()                    {} // INode is a marker interface for all nodes
+func (s *StringLiteral) Expr()                     {} // Expr is a marker interface for all expressions
 func (s *StringLiteral) StartPos() *lexer.Position { return s.Start }
 func (s *StringLiteral) EndPos() *lexer.Position   { return s.End }
 
@@ -44,8 +44,8 @@ type IndexableExpr struct {
 	Location
 }
 
-func (i *IndexableExpr) INode()                   {} // INode is a marker interface for all nodes
-func (i *IndexableExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (i *IndexableExpr) INode()                    {} // INode is a marker interface for all nodes
+func (i *IndexableExpr) Expr()                     {} // Expr is a marker interface for all expressions
 func (i *IndexableExpr) StartPos() *lexer.Position { return i.Start }
 func (i *IndexableExpr) EndPos() *lexer.Position   { return i.End }
 
@@ -64,8 +64,8 @@ type ObjectType struct {
 	Location
 }
 
-func (o *ObjectType) INode()                   {} // INode is a marker interface for all nodes
-func (o *ObjectType) Type() types.TYPE_NAME    { return o.TypeName }
+func (o *ObjectType) INode()                    {} // INode is a marker interface for all nodes
+func (o *ObjectType) Type() types.TYPE_NAME     { return o.TypeName }
 func (o *ObjectType) StartPos() *lexer.Position { return o.Start }
 func (o *ObjectType) EndPos() *lexer.Position   { return o.End }
 
@@ -75,7 +75,7 @@ type ObjectLiteralExpr struct {
 	Location
 }
 
-func (o *ObjectLiteralExpr) INode()                   {} // INode is a marker interface for all nodes
-func (o *ObjectLiteralExpr) Expr()                    {} // Expr is a marker interface for all expressions
+func (o *ObjectLiteralExpr) INode()                    {} // INode is a marker interface for all nodes
+func (o *ObjectLiteralExpr) Expr()                     {} // Expr is a marker interface for all expressions
 func (o *ObjectLiteralExpr) StartPos() *lexer.Position { return o.Start }
 func (o *ObjectLiteralExpr) EndPos() *lexer.Position   { return o.End }

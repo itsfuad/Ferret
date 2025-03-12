@@ -315,5 +315,288 @@
             "Column": 12,
             "Index": 51
         }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "arr",
+                    "Start": {
+                        "Line": 14,
+                        "Column": 5,
+                        "Index": 129
+                    },
+                    "End": {
+                        "Line": 14,
+                        "Column": 44,
+                        "Index": 132
+                    }
+                },
+                "Type": {
+                    "ElementType": {
+                        "ElementType": {
+                            "BitSize": 32,
+                            "Unsigned": true,
+                            "TypeName": "i32",
+                            "Start": {
+                                "Line": 14,
+                                "Column": 15,
+                                "Index": 139
+                            },
+                            "End": {
+                                "Line": 14,
+                                "Column": 18,
+                                "Index": 142
+                            }
+                        },
+                        "TypeName": "array",
+                        "Start": {
+                            "Line": 14,
+                            "Column": 13,
+                            "Index": 137
+                        },
+                        "End": {
+                            "Line": 14,
+                            "Column": 18,
+                            "Index": 142
+                        }
+                    },
+                    "TypeName": "array",
+                    "Start": {
+                        "Line": 14,
+                        "Column": 11,
+                        "Index": 135
+                    },
+                    "End": {
+                        "Line": 14,
+                        "Column": 18,
+                        "Index": 142
+                    }
+                },
+                "Initializer": {
+                    "Elements": [
+                        {
+                            "Elements": [
+                                {
+                                    "Value": 1,
+                                    "Raw": "1",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 14,
+                                        "Column": 23,
+                                        "Index": 147
+                                    },
+                                    "End": {
+                                        "Line": 14,
+                                        "Column": 24,
+                                        "Index": 148
+                                    }
+                                },
+                                {
+                                    "Value": 2,
+                                    "Raw": "2",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 14,
+                                        "Column": 26,
+                                        "Index": 150
+                                    },
+                                    "End": {
+                                        "Line": 14,
+                                        "Column": 27,
+                                        "Index": 151
+                                    }
+                                },
+                                {
+                                    "Value": 3,
+                                    "Raw": "3",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 14,
+                                        "Column": 29,
+                                        "Index": 153
+                                    },
+                                    "End": {
+                                        "Line": 14,
+                                        "Column": 30,
+                                        "Index": 154
+                                    }
+                                }
+                            ],
+                            "Start": {
+                                "Line": 14,
+                                "Column": 22,
+                                "Index": 146
+                            },
+                            "End": {
+                                "Line": 14,
+                                "Column": 31,
+                                "Index": 155
+                            }
+                        },
+                        {
+                            "Elements": [
+                                {
+                                    "Value": 4,
+                                    "Raw": "4",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 14,
+                                        "Column": 34,
+                                        "Index": 158
+                                    },
+                                    "End": {
+                                        "Line": 14,
+                                        "Column": 35,
+                                        "Index": 159
+                                    }
+                                },
+                                {
+                                    "Value": 5,
+                                    "Raw": "5",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 14,
+                                        "Column": 37,
+                                        "Index": 161
+                                    },
+                                    "End": {
+                                        "Line": 14,
+                                        "Column": 38,
+                                        "Index": 162
+                                    }
+                                },
+                                {
+                                    "Value": 6,
+                                    "Raw": "6",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 14,
+                                        "Column": 40,
+                                        "Index": 164
+                                    },
+                                    "End": {
+                                        "Line": 14,
+                                        "Column": 41,
+                                        "Index": 165
+                                    }
+                                }
+                            ],
+                            "Start": {
+                                "Line": 14,
+                                "Column": 33,
+                                "Index": 157
+                            },
+                            "End": {
+                                "Line": 14,
+                                "Column": 42,
+                                "Index": 166
+                            }
+                        }
+                    ],
+                    "Start": {
+                        "Line": 14,
+                        "Column": 21,
+                        "Index": 145
+                    },
+                    "End": {
+                        "Line": 14,
+                        "Column": 43,
+                        "Index": 167
+                    }
+                },
+                "Start": {
+                    "Line": 14,
+                    "Column": 5,
+                    "Index": 129
+                },
+                "End": {
+                    "Line": 14,
+                    "Column": 44,
+                    "Index": 132
+                }
+            }
+        ],
+        "Start": {
+            "Line": 14,
+            "Column": 5,
+            "Index": 129
+        },
+        "End": {
+            "Line": 14,
+            "Column": 44,
+            "Index": 132
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "a1",
+                "Start": {
+                    "Line": 16,
+                    "Column": 1,
+                    "Index": 172
+                },
+                "End": {
+                    "Line": 16,
+                    "Column": 3,
+                    "Index": 174
+                }
+            },
+            {
+                "Name": "a2",
+                "Start": {
+                    "Line": 16,
+                    "Column": 5,
+                    "Index": 176
+                },
+                "End": {
+                    "Line": 16,
+                    "Column": 7,
+                    "Index": 178
+                }
+            },
+            {
+                "Name": "a3",
+                "Start": {
+                    "Line": 16,
+                    "Column": 9,
+                    "Index": 180
+                },
+                "End": {
+                    "Line": 16,
+                    "Column": 11,
+                    "Index": 182
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Value": 1,
+                "Raw": "1",
+                "Base": 10,
+                "Start": {
+                    "Line": 16,
+                    "Column": 14,
+                    "Index": 185
+                },
+                "End": {
+                    "Line": 16,
+                    "Column": 16,
+                    "Index": 186
+                }
+            }
+        ],
+        "Start": {
+            "Line": 16,
+            "Column": 1,
+            "Index": 172
+        },
+        "End": {
+            "Line": 16,
+            "Column": 16,
+            "Index": 186
+        }
     }
 ]

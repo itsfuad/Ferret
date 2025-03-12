@@ -7,6 +7,7 @@ import (
 )
 
 type DataType interface {
+	Node
 	Type() types.TYPE_NAME
 	StartPos() *lexer.Position
 	EndPos() *lexer.Position
@@ -18,6 +19,7 @@ type UserDefinedType struct {
 	Location
 }
 
+func (t *UserDefinedType) INode() {} // INode is a marker interface for all nodes
 func (t *UserDefinedType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -36,6 +38,7 @@ type IntType struct {
 	Location
 }
 
+func (t *IntType) INode() {} // INode is a marker interface for all nodes
 func (t *IntType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -53,6 +56,7 @@ type FloatType struct {
 	Location
 }
 
+func (t *FloatType) INode() {} // INode is a marker interface for all nodes
 func (t *FloatType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -69,6 +73,7 @@ type StringType struct {
 	Location
 }
 
+func (t *StringType) INode() {} // INode is a marker interface for all nodes
 func (t *StringType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -85,6 +90,7 @@ type ByteType struct {
 	Location
 }
 
+func (t *ByteType) INode() {} // INode is a marker interface for all nodes
 func (t *ByteType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -101,6 +107,7 @@ type BoolType struct {
 	Location
 }
 
+func (t *BoolType) INode() {} // INode is a marker interface for all nodes
 func (t *BoolType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
@@ -118,6 +125,7 @@ type ArrayType struct {
 	Location
 }
 
+func (t *ArrayType) INode() {} // INode is a marker interface for all nodes
 func (t *ArrayType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
