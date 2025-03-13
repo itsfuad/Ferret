@@ -1,1124 +1,156 @@
 [
     {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 2,
-                        "Column": 5,
-                        "Index": 43
-                    },
-                    "End": {
-                        "Line": 2,
-                        "Column": 6,
-                        "Index": 44
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 2,
-                        "Column": 9,
-                        "Index": 47
-                    },
-                    "End": {
-                        "Line": 2,
-                        "Column": 11,
-                        "Index": 49
-                    }
-                },
-                "Start": {
-                    "Line": 2,
-                    "Column": 5,
-                    "Index": 43
-                },
-                "End": {
-                    "Line": 2,
-                    "Column": 6,
-                    "Index": 44
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "y",
-                    "Start": {
-                        "Line": 3,
-                        "Column": 5,
-                        "Index": 56
-                    },
-                    "End": {
-                        "Line": 3,
-                        "Column": 6,
-                        "Index": 57
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "TypeName": "f32",
-                    "Start": {
-                        "Line": 3,
-                        "Column": 8,
-                        "Index": 59
-                    },
-                    "End": {
-                        "Line": 3,
-                        "Column": 11,
-                        "Index": 62
-                    }
-                },
-                "Initializer": null,
-                "Start": {
-                    "Line": 3,
-                    "Column": 5,
-                    "Index": 56
-                },
-                "End": {
-                    "Line": 3,
-                    "Column": 6,
-                    "Index": 57
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "myname",
-                    "Start": {
-                        "Line": 4,
-                        "Column": 5,
-                        "Index": 69
-                    },
-                    "End": {
-                        "Line": 4,
-                        "Column": 11,
-                        "Index": 75
-                    }
-                },
-                "Type": {
-                    "TypeName": "str",
-                    "Start": {
-                        "Line": 4,
-                        "Column": 13,
-                        "Index": 77
-                    },
-                    "End": {
-                        "Line": 4,
-                        "Column": 16,
-                        "Index": 80
-                    }
-                },
-                "Initializer": {
-                    "Value": "John",
-                    "Start": {
-                        "Line": 4,
-                        "Column": 19,
-                        "Index": 83
-                    },
-                    "End": {
-                        "Line": 4,
-                        "Column": 25,
-                        "Index": 89
-                    }
-                },
-                "Start": {
-                    "Line": 4,
-                    "Column": 5,
-                    "Index": 69
-                },
-                "End": {
-                    "Line": 4,
-                    "Column": 11,
-                    "Index": 75
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "p",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 5,
-                        "Index": 130
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 6,
-                        "Index": 131
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 14,
-                        "Index": 139
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 17,
-                        "Index": 142
-                    }
-                },
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 7,
-                        "Column": 30,
-                        "Index": 155
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 32,
-                        "Index": 157
-                    }
-                },
-                "Start": {
-                    "Line": 7,
-                    "Column": 5,
-                    "Index": 130
-                },
-                "End": {
-                    "Line": 7,
-                    "Column": 6,
-                    "Index": 131
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "q",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 8,
-                        "Index": 133
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 9,
-                        "Index": 134
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "TypeName": "f32",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 19,
-                        "Index": 144
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 22,
-                        "Index": 147
-                    }
-                },
-                "Initializer": {
-                    "Value": 20,
-                    "Raw": "20.0",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 34,
-                        "Index": 159
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 38,
-                        "Index": 163
-                    }
-                },
-                "Start": {
-                    "Line": 7,
-                    "Column": 8,
-                    "Index": 133
-                },
-                "End": {
-                    "Line": 7,
-                    "Column": 9,
-                    "Index": 134
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "r",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 11,
-                        "Index": 136
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 12,
-                        "Index": 137
-                    }
-                },
-                "Type": {
-                    "TypeName": "str",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 24,
-                        "Index": 149
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 27,
-                        "Index": 152
-                    }
-                },
-                "Initializer": {
-                    "Value": "hello",
-                    "Start": {
-                        "Line": 7,
-                        "Column": 40,
-                        "Index": 165
-                    },
-                    "End": {
-                        "Line": 7,
-                        "Column": 47,
-                        "Index": 172
-                    }
-                },
-                "Start": {
-                    "Line": 7,
-                    "Column": 11,
-                    "Index": 136
-                },
-                "End": {
-                    "Line": 7,
-                    "Column": 12,
-                    "Index": 137
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "p",
-                    "Start": {
-                        "Line": 8,
-                        "Column": 5,
-                        "Index": 179
-                    },
-                    "End": {
-                        "Line": 8,
-                        "Column": 6,
-                        "Index": 180
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 8,
-                        "Column": 11,
-                        "Index": 185
-                    },
-                    "End": {
-                        "Line": 8,
-                        "Column": 14,
-                        "Index": 188
-                    }
-                },
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 8,
-                        "Column": 22,
-                        "Index": 196
-                    },
-                    "End": {
-                        "Line": 8,
-                        "Column": 24,
-                        "Index": 198
-                    }
-                },
-                "Start": {
-                    "Line": 8,
-                    "Column": 5,
-                    "Index": 179
-                },
-                "End": {
-                    "Line": 8,
-                    "Column": 6,
-                    "Index": 180
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "q",
-                    "Start": {
-                        "Line": 8,
-                        "Column": 8,
-                        "Index": 182
-                    },
-                    "End": {
-                        "Line": 8,
-                        "Column": 9,
-                        "Index": 183
-                    }
-                },
-                "Type": {
-                    "TypeName": "str",
-                    "Start": {
-                        "Line": 8,
-                        "Column": 16,
-                        "Index": 190
-                    },
-                    "End": {
-                        "Line": 8,
-                        "Column": 19,
-                        "Index": 193
-                    }
-                },
-                "Initializer": {
-                    "Value": "hello",
-                    "Start": {
-                        "Line": 8,
-                        "Column": 26,
-                        "Index": 200
-                    },
-                    "End": {
-                        "Line": 8,
-                        "Column": 33,
-                        "Index": 207
-                    }
-                },
-                "Start": {
-                    "Line": 8,
-                    "Column": 8,
-                    "Index": 182
-                },
-                "End": {
-                    "Line": 8,
-                    "Column": 9,
-                    "Index": 183
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "p",
-                    "Start": {
-                        "Line": 11,
-                        "Column": 5,
-                        "Index": 258
-                    },
-                    "End": {
-                        "Line": 11,
-                        "Column": 6,
-                        "Index": 259
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 11,
-                        "Column": 15,
-                        "Index": 268
-                    },
-                    "End": {
-                        "Line": 11,
-                        "Column": 17,
-                        "Index": 270
-                    }
-                },
-                "Start": {
-                    "Line": 11,
-                    "Column": 5,
-                    "Index": 258
-                },
-                "End": {
-                    "Line": 11,
-                    "Column": 6,
-                    "Index": 259
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "q",
-                    "Start": {
-                        "Line": 11,
-                        "Column": 8,
-                        "Index": 261
-                    },
-                    "End": {
-                        "Line": 11,
-                        "Column": 9,
-                        "Index": 262
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 20,
-                    "Raw": "20.0",
-                    "Start": {
-                        "Line": 11,
-                        "Column": 19,
-                        "Index": 272
-                    },
-                    "End": {
-                        "Line": 11,
-                        "Column": 23,
-                        "Index": 276
-                    }
-                },
-                "Start": {
-                    "Line": 11,
-                    "Column": 8,
-                    "Index": 261
-                },
-                "End": {
-                    "Line": 11,
-                    "Column": 9,
-                    "Index": 262
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "r",
-                    "Start": {
-                        "Line": 11,
-                        "Column": 11,
-                        "Index": 264
-                    },
-                    "End": {
-                        "Line": 11,
-                        "Column": 12,
-                        "Index": 265
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": "hello",
-                    "Start": {
-                        "Line": 11,
-                        "Column": 25,
-                        "Index": 278
-                    },
-                    "End": {
-                        "Line": 11,
-                        "Column": 32,
-                        "Index": 285
-                    }
-                },
-                "Start": {
-                    "Line": 11,
-                    "Column": 11,
-                    "Index": 264
-                },
-                "End": {
-                    "Line": 11,
-                    "Column": 12,
-                    "Index": 265
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "p",
-                    "Start": {
-                        "Line": 12,
-                        "Column": 5,
-                        "Index": 292
-                    },
-                    "End": {
-                        "Line": 12,
-                        "Column": 6,
-                        "Index": 293
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 12,
-                        "Column": 12,
-                        "Index": 299
-                    },
-                    "End": {
-                        "Line": 12,
-                        "Column": 14,
-                        "Index": 301
-                    }
-                },
-                "Start": {
-                    "Line": 12,
-                    "Column": 5,
-                    "Index": 292
-                },
-                "End": {
-                    "Line": 12,
-                    "Column": 6,
-                    "Index": 293
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "q",
-                    "Start": {
-                        "Line": 12,
-                        "Column": 8,
-                        "Index": 295
-                    },
-                    "End": {
-                        "Line": 12,
-                        "Column": 9,
-                        "Index": 296
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": "hello",
-                    "Start": {
-                        "Line": 12,
-                        "Column": 16,
-                        "Index": 303
-                    },
-                    "End": {
-                        "Line": 12,
-                        "Column": 23,
-                        "Index": 310
-                    }
-                },
-                "Start": {
-                    "Line": 12,
-                    "Column": 8,
-                    "Index": 295
-                },
-                "End": {
-                    "Line": 12,
-                    "Column": 9,
-                    "Index": 296
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "x",
-                "Start": {
-                    "Line": 15,
-                    "Column": 1,
-                    "Index": 348
-                },
-                "End": {
-                    "Line": 15,
-                    "Column": 2,
-                    "Index": 349
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Value": 15,
-                "Raw": "15",
-                "Base": 10,
-                "Start": {
-                    "Line": 15,
-                    "Column": 5,
-                    "Index": 352
-                },
-                "End": {
-                    "Line": 15,
-                    "Column": 7,
-                    "Index": 354
-                }
-            }
-        ],
-        "Start": {
-            "Line": 15,
-            "Column": 1,
-            "Index": 348
-        },
-        "End": {
-            "Line": 15,
-            "Column": 8,
-            "Index": 355
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "p",
-                "Start": {
-                    "Line": 18,
-                    "Column": 1,
-                    "Index": 395
-                },
-                "End": {
-                    "Line": 18,
-                    "Column": 2,
-                    "Index": 396
-                }
-            },
-            {
-                "Name": "q",
-                "Start": {
-                    "Line": 18,
-                    "Column": 4,
-                    "Index": 398
-                },
-                "End": {
-                    "Line": 18,
-                    "Column": 5,
-                    "Index": 399
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Value": 10,
-                "Raw": "10",
-                "Base": 10,
-                "Start": {
-                    "Line": 18,
-                    "Column": 8,
-                    "Index": 402
-                },
-                "End": {
-                    "Line": 18,
-                    "Column": 10,
-                    "Index": 404
-                }
-            },
-            {
-                "Value": "hello",
-                "Start": {
-                    "Line": 18,
-                    "Column": 12,
-                    "Index": 406
-                },
-                "End": {
-                    "Line": 18,
-                    "Column": 19,
-                    "Index": 413
-                }
-            }
-        ],
-        "Start": {
-            "Line": 18,
-            "Column": 1,
-            "Index": 395
-        },
-        "End": {
-            "Line": 18,
-            "Column": 20,
-            "Index": 414
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "p",
-                "Start": {
-                    "Line": 19,
-                    "Column": 1,
-                    "Index": 416
-                },
-                "End": {
-                    "Line": 19,
-                    "Column": 2,
-                    "Index": 417
-                }
-            },
-            {
-                "Name": "q",
-                "Start": {
-                    "Line": 19,
-                    "Column": 4,
-                    "Index": 419
-                },
-                "End": {
-                    "Line": 19,
-                    "Column": 5,
-                    "Index": 420
-                }
-            },
-            {
-                "Name": "r",
-                "Start": {
-                    "Line": 19,
-                    "Column": 7,
-                    "Index": 422
-                },
-                "End": {
-                    "Line": 19,
-                    "Column": 8,
-                    "Index": 423
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Value": 10,
-                "Raw": "10",
-                "Base": 10,
-                "Start": {
-                    "Line": 19,
-                    "Column": 11,
-                    "Index": 426
-                },
-                "End": {
-                    "Line": 19,
-                    "Column": 13,
-                    "Index": 428
-                }
-            },
-            {
-                "Value": 20,
-                "Raw": "20.0",
-                "Start": {
-                    "Line": 19,
-                    "Column": 15,
-                    "Index": 430
-                },
-                "End": {
-                    "Line": 19,
-                    "Column": 19,
-                    "Index": 434
-                }
-            },
-            {
-                "Value": "hello",
-                "Start": {
-                    "Line": 19,
-                    "Column": 21,
-                    "Index": 436
-                },
-                "End": {
-                    "Line": 19,
-                    "Column": 28,
-                    "Index": 443
-                }
-            }
-        ],
-        "Start": {
-            "Line": 19,
-            "Column": 1,
-            "Index": 416
-        },
-        "End": {
-            "Line": 19,
-            "Column": 29,
-            "Index": 444
-        }
-    },
-    {
-        "Name": "a",
-        "Start": {
-            "Line": 21,
-            "Column": 1,
-            "Index": 448
-        },
-        "End": {
-            "Line": 21,
-            "Column": 2,
-            "Index": 449
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "arr1",
-                    "Start": {
-                        "Line": 24,
-                        "Column": 5,
-                        "Index": 489
-                    },
-                    "End": {
-                        "Line": 24,
-                        "Column": 9,
-                        "Index": 493
-                    }
-                },
-                "Type": {
-                    "ElementType": {
-                        "BitSize": 32,
-                        "Unsigned": true,
-                        "TypeName": "i32",
-                        "Start": {
-                            "Line": 24,
-                            "Column": 13,
-                            "Index": 497
-                        },
-                        "End": {
-                            "Line": 24,
-                            "Column": 16,
-                            "Index": 500
-                        }
-                    },
-                    "TypeName": "array",
-                    "Start": {
-                        "Line": 24,
-                        "Column": 11,
-                        "Index": 495
-                    },
-                    "End": {
-                        "Line": 24,
-                        "Column": 16,
-                        "Index": 500
-                    }
-                },
-                "Initializer": null,
-                "Start": {
-                    "Line": 24,
-                    "Column": 5,
-                    "Index": 489
-                },
-                "End": {
-                    "Line": 24,
-                    "Column": 9,
-                    "Index": 493
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "arr2",
-                    "Start": {
-                        "Line": 25,
-                        "Column": 5,
-                        "Index": 507
-                    },
-                    "End": {
-                        "Line": 25,
-                        "Column": 9,
-                        "Index": 511
-                    }
-                },
-                "Type": {
-                    "ElementType": {
-                        "TypeName": "str",
-                        "Start": {
-                            "Line": 25,
-                            "Column": 13,
-                            "Index": 515
-                        },
-                        "End": {
-                            "Line": 25,
-                            "Column": 16,
-                            "Index": 518
-                        }
-                    },
-                    "TypeName": "array",
-                    "Start": {
-                        "Line": 25,
-                        "Column": 11,
-                        "Index": 513
-                    },
-                    "End": {
-                        "Line": 25,
-                        "Column": 16,
-                        "Index": 518
-                    }
-                },
-                "Initializer": {
-                    "Elements": [
-                        {
-                            "Value": "hello",
-                            "Start": {
-                                "Line": 25,
-                                "Column": 20,
-                                "Index": 522
-                            },
-                            "End": {
-                                "Line": 25,
-                                "Column": 27,
-                                "Index": 529
-                            }
-                        },
-                        {
-                            "Value": "world",
-                            "Start": {
-                                "Line": 25,
-                                "Column": 29,
-                                "Index": 531
-                            },
-                            "End": {
-                                "Line": 25,
-                                "Column": 36,
-                                "Index": 538
-                            }
-                        }
-                    ],
-                    "Start": {
-                        "Line": 25,
-                        "Column": 19,
-                        "Index": 521
-                    },
-                    "End": {
-                        "Line": 25,
-                        "Column": 37,
-                        "Index": 539
-                    }
-                },
-                "Start": {
-                    "Line": 25,
-                    "Column": 5,
-                    "Index": 507
-                },
-                "End": {
-                    "Line": 25,
-                    "Column": 9,
-                    "Index": 511
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Left": [
+        "Expressions": [
             {
                 "Name": "a",
                 "Start": {
-                    "Line": 27,
+                    "Line": 1,
                     "Column": 1,
-                    "Index": 544
+                    "Index": 0
                 },
                 "End": {
-                    "Line": 27,
+                    "Line": 1,
+                    "Column": 3,
+                    "Index": 1
+                }
+            }
+        ],
+        "Location": {
+            "Start": {
+                "Line": 1,
+                "Column": 1,
+                "Index": 0
+            },
+            "End": {
+                "Line": 1,
+                "Column": 3,
+                "Index": 1
+            }
+        }
+    },
+    {
+        "Expressions": [
+            {
+                "Name": "a",
+                "Start": {
+                    "Line": 2,
+                    "Column": 1,
+                    "Index": 4
+                },
+                "End": {
+                    "Line": 2,
                     "Column": 2,
-                    "Index": 545
+                    "Index": 5
+                }
+            },
+            {
+                "Name": "b",
+                "Start": {
+                    "Line": 2,
+                    "Column": 4,
+                    "Index": 7
+                },
+                "End": {
+                    "Line": 2,
+                    "Column": 6,
+                    "Index": 8
+                }
+            }
+        ],
+        "Location": {
+            "Start": {
+                "Line": 2,
+                "Column": 1,
+                "Index": 4
+            },
+            "End": {
+                "Line": 2,
+                "Column": 6,
+                "Index": 8
+            }
+        }
+    },
+    {
+        "Expressions": [
+            {
+                "Left": {
+                    "Name": "a",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 1,
+                        "Index": 11
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 2,
+                        "Index": 12
+                    }
+                },
+                "Operator": {
+                    "Kind": "+",
+                    "Value": "+",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 3,
+                        "Index": 13
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 4,
+                        "Index": 14
+                    }
+                },
+                "Right": {
+                    "Name": "b",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 5,
+                        "Index": 15
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 7,
+                        "Index": 16
+                    }
+                },
+                "Start": {
+                    "Line": 3,
+                    "Column": 1,
+                    "Index": 11
+                },
+                "End": {
+                    "Line": 3,
+                    "Column": 7,
+                    "Index": 16
+                }
+            }
+        ],
+        "Location": {
+            "Start": {
+                "Line": 3,
+                "Column": 1,
+                "Index": 11
+            },
+            "End": {
+                "Line": 3,
+                "Column": 7,
+                "Index": 16
+            }
+        }
+    },
+    {
+        "Left": [
+            {
+                "Name": "answer",
+                "Start": {
+                    "Line": 4,
+                    "Column": 1,
+                    "Index": 19
+                },
+                "End": {
+                    "Line": 4,
+                    "Column": 7,
+                    "Index": 25
                 }
             }
         ],
@@ -1128,819 +160,104 @@
                     "Left": {
                         "Name": "a",
                         "Start": {
-                            "Line": 27,
-                            "Column": 6,
-                            "Index": 549
+                            "Line": 4,
+                            "Column": 11,
+                            "Index": 29
                         },
                         "End": {
-                            "Line": 27,
-                            "Column": 7,
-                            "Index": 550
+                            "Line": 4,
+                            "Column": 12,
+                            "Index": 30
                         }
                     },
                     "Operator": {
                         "Kind": "+",
                         "Value": "+",
                         "Start": {
-                            "Line": 27,
-                            "Column": 8,
-                            "Index": 551
+                            "Line": 4,
+                            "Column": 13,
+                            "Index": 31
                         },
                         "End": {
-                            "Line": 27,
-                            "Column": 9,
-                            "Index": 552
+                            "Line": 4,
+                            "Column": 14,
+                            "Index": 32
                         }
                     },
                     "Right": {
                         "Name": "b",
                         "Start": {
-                            "Line": 27,
-                            "Column": 10,
-                            "Index": 553
+                            "Line": 4,
+                            "Column": 15,
+                            "Index": 33
                         },
                         "End": {
-                            "Line": 27,
-                            "Column": 11,
-                            "Index": 554
+                            "Line": 4,
+                            "Column": 16,
+                            "Index": 34
                         }
                     },
                     "Start": {
-                        "Line": 27,
-                        "Column": 6,
-                        "Index": 549
+                        "Line": 4,
+                        "Column": 11,
+                        "Index": 29
                     },
                     "End": {
-                        "Line": 27,
-                        "Column": 11,
-                        "Index": 554
+                        "Line": 4,
+                        "Column": 16,
+                        "Index": 34
                     }
                 },
                 "Operator": {
                     "Kind": "*",
                     "Value": "*",
                     "Start": {
-                        "Line": 27,
-                        "Column": 13,
-                        "Index": 556
+                        "Line": 4,
+                        "Column": 18,
+                        "Index": 36
                     },
                     "End": {
-                        "Line": 27,
-                        "Column": 14,
-                        "Index": 557
+                        "Line": 4,
+                        "Column": 19,
+                        "Index": 37
                     }
                 },
                 "Right": {
-                    "Name": "c",
-                    "Start": {
-                        "Line": 27,
-                        "Column": 15,
-                        "Index": 558
-                    },
-                    "End": {
-                        "Line": 27,
-                        "Column": 16,
-                        "Index": 559
-                    }
-                },
-                "Start": {
-                    "Line": 27,
-                    "Column": 6,
-                    "Index": 549
-                },
-                "End": {
-                    "Line": 27,
-                    "Column": 16,
-                    "Index": 559
-                }
-            }
-        ],
-        "Start": {
-            "Line": 27,
-            "Column": 1,
-            "Index": 544
-        },
-        "End": {
-            "Line": 27,
-            "Column": 17,
-            "Index": 560
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "a",
-                "Start": {
-                    "Line": 28,
-                    "Column": 1,
-                    "Index": 562
-                },
-                "End": {
-                    "Line": 28,
-                    "Column": 2,
-                    "Index": 563
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Operand": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 28,
-                        "Column": 5,
-                        "Index": 566
-                    },
-                    "End": {
-                        "Line": 28,
-                        "Column": 6,
-                        "Index": 567
-                    }
-                },
-                "Operator": {
-                    "Kind": "++",
-                    "Value": "++",
-                    "Start": {
-                        "Line": 28,
-                        "Column": 6,
-                        "Index": 567
-                    },
-                    "End": {
-                        "Line": 28,
-                        "Column": 8,
-                        "Index": 569
-                    }
-                },
-                "Start": {
-                    "Line": 28,
-                    "Column": 5,
-                    "Index": 566
-                },
-                "End": {
-                    "Line": 28,
-                    "Column": 8,
-                    "Index": 569
-                }
-            }
-        ],
-        "Start": {
-            "Line": 28,
-            "Column": 1,
-            "Index": 562
-        },
-        "End": {
-            "Line": 28,
-            "Column": 9,
-            "Index": 570
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "a",
-                "Start": {
-                    "Line": 29,
-                    "Column": 1,
-                    "Index": 572
-                },
-                "End": {
-                    "Line": 29,
-                    "Column": 2,
-                    "Index": 573
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Operand": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 29,
-                        "Column": 5,
-                        "Index": 576
-                    },
-                    "End": {
-                        "Line": 29,
-                        "Column": 6,
-                        "Index": 577
-                    }
-                },
-                "Operator": {
-                    "Kind": "--",
-                    "Value": "--",
-                    "Start": {
-                        "Line": 29,
-                        "Column": 6,
-                        "Index": 577
-                    },
-                    "End": {
-                        "Line": 29,
-                        "Column": 8,
-                        "Index": 579
-                    }
-                },
-                "Start": {
-                    "Line": 29,
-                    "Column": 5,
-                    "Index": 576
-                },
-                "End": {
-                    "Line": 29,
-                    "Column": 8,
-                    "Index": 579
-                }
-            }
-        ],
-        "Start": {
-            "Line": 29,
-            "Column": 1,
-            "Index": 572
-        },
-        "End": {
-            "Line": 29,
-            "Column": 9,
-            "Index": 580
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "a",
-                "Start": {
-                    "Line": 30,
-                    "Column": 1,
-                    "Index": 582
-                },
-                "End": {
-                    "Line": 30,
-                    "Column": 2,
-                    "Index": 583
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Operator": {
-                    "Kind": "++",
-                    "Value": "++",
-                    "Start": {
-                        "Line": 30,
-                        "Column": 5,
-                        "Index": 586
-                    },
-                    "End": {
-                        "Line": 30,
-                        "Column": 7,
-                        "Index": 588
-                    }
-                },
-                "Operand": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 30,
-                        "Column": 7,
-                        "Index": 588
-                    },
-                    "End": {
-                        "Line": 30,
-                        "Column": 8,
-                        "Index": 589
-                    }
-                },
-                "Start": {
-                    "Line": 30,
-                    "Column": 5,
-                    "Index": 586
-                },
-                "End": {
-                    "Line": 30,
-                    "Column": 8,
-                    "Index": 589
-                }
-            }
-        ],
-        "Start": {
-            "Line": 30,
-            "Column": 1,
-            "Index": 582
-        },
-        "End": {
-            "Line": 30,
-            "Column": 9,
-            "Index": 590
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "a",
-                "Start": {
-                    "Line": 31,
-                    "Column": 1,
-                    "Index": 592
-                },
-                "End": {
-                    "Line": 31,
-                    "Column": 2,
-                    "Index": 593
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Operator": {
-                    "Kind": "--",
-                    "Value": "--",
-                    "Start": {
-                        "Line": 31,
-                        "Column": 5,
-                        "Index": 596
-                    },
-                    "End": {
-                        "Line": 31,
-                        "Column": 7,
-                        "Index": 598
-                    }
-                },
-                "Operand": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 31,
-                        "Column": 7,
-                        "Index": 598
-                    },
-                    "End": {
-                        "Line": 31,
-                        "Column": 8,
-                        "Index": 599
-                    }
-                },
-                "Start": {
-                    "Line": 31,
-                    "Column": 5,
-                    "Index": 596
-                },
-                "End": {
-                    "Line": 31,
-                    "Column": 8,
-                    "Index": 599
-                }
-            }
-        ],
-        "Start": {
-            "Line": 31,
-            "Column": 1,
-            "Index": 592
-        },
-        "End": {
-            "Line": 31,
-            "Column": 9,
-            "Index": 600
-        }
-    },
-    {
-        "Name": "arr1",
-        "Start": {
-            "Line": 34,
-            "Column": 1,
-            "Index": 620
-        },
-        "End": {
-            "Line": 34,
-            "Column": 5,
-            "Index": 624
-        }
-    },
-    {
-        "Name": "arr1",
-        "Start": {
-            "Line": 35,
-            "Column": 1,
-            "Index": 630
-        },
-        "End": {
-            "Line": 35,
-            "Column": 5,
-            "Index": 634
-        }
-    },
-    {
-        "Left": [
-            {
-                "Name": "a",
-                "Start": {
-                    "Line": 36,
-                    "Column": 1,
-                    "Index": 645
-                },
-                "End": {
-                    "Line": 36,
-                    "Column": 2,
-                    "Index": 646
-                }
-            }
-        ],
-        "Right": [
-            {
-                "Indexable": {
-                    "Name": "arr1",
-                    "Start": {
-                        "Line": 36,
-                        "Column": 5,
-                        "Index": 649
-                    },
-                    "End": {
-                        "Line": 36,
-                        "Column": 9,
-                        "Index": 653
-                    }
-                },
-                "Index": {
-                    "Value": 0,
-                    "Raw": "0",
+                    "Value": 2,
+                    "Raw": "2",
                     "Base": 10,
                     "Start": {
-                        "Line": 36,
-                        "Column": 10,
-                        "Index": 654
-                    },
-                    "End": {
-                        "Line": 36,
-                        "Column": 11,
-                        "Index": 655
-                    }
-                },
-                "Start": {
-                    "Line": 36,
-                    "Column": 5,
-                    "Index": 649
-                },
-                "End": {
-                    "Line": 36,
-                    "Column": 12,
-                    "Index": 656
-                }
-            }
-        ],
-        "Start": {
-            "Line": 36,
-            "Column": 1,
-            "Index": 645
-        },
-        "End": {
-            "Line": 36,
-            "Column": 13,
-            "Index": 657
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 39,
-                        "Column": 5,
-                        "Index": 694
-                    },
-                    "End": {
-                        "Line": 39,
-                        "Column": 6,
-                        "Index": 695
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 39,
-                        "Column": 8,
-                        "Index": 697
-                    },
-                    "End": {
-                        "Line": 39,
-                        "Column": 11,
-                        "Index": 700
-                    }
-                },
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 39,
-                        "Column": 14,
-                        "Index": 703
-                    },
-                    "End": {
-                        "Line": 39,
-                        "Column": 16,
-                        "Index": 705
-                    }
-                },
-                "Start": {
-                    "Line": 39,
-                    "Column": 5,
-                    "Index": 694
-                },
-                "End": {
-                    "Line": 39,
-                    "Column": 6,
-                    "Index": 695
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 42,
-                        "Column": 5,
-                        "Index": 782
-                    },
-                    "End": {
-                        "Line": 42,
-                        "Column": 6,
-                        "Index": 783
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 42,
-                        "Column": 12,
-                        "Index": 789
-                    },
-                    "End": {
-                        "Line": 42,
-                        "Column": 14,
-                        "Index": 791
-                    }
-                },
-                "Start": {
-                    "Line": 42,
-                    "Column": 5,
-                    "Index": 782
-                },
-                "End": {
-                    "Line": 42,
-                    "Column": 6,
-                    "Index": 783
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "y",
-                    "Start": {
-                        "Line": 42,
-                        "Column": 8,
-                        "Index": 785
-                    },
-                    "End": {
-                        "Line": 42,
-                        "Column": 9,
-                        "Index": 786
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 20,
-                    "Raw": "20",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 42,
-                        "Column": 16,
-                        "Index": 793
-                    },
-                    "End": {
-                        "Line": 42,
-                        "Column": 18,
-                        "Index": 795
-                    }
-                },
-                "Start": {
-                    "Line": 42,
-                    "Column": 8,
-                    "Index": 785
-                },
-                "End": {
-                    "Line": 42,
-                    "Column": 9,
-                    "Index": 786
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 45,
-                        "Column": 5,
-                        "Index": 856
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 6,
-                        "Index": 857
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 45,
-                        "Column": 14,
-                        "Index": 865
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 17,
-                        "Index": 868
-                    }
-                },
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 45,
+                        "Line": 4,
                         "Column": 20,
-                        "Index": 871
+                        "Index": 38
                     },
                     "End": {
-                        "Line": 45,
+                        "Line": 4,
                         "Column": 22,
-                        "Index": 873
+                        "Index": 39
                     }
                 },
                 "Start": {
-                    "Line": 45,
-                    "Column": 5,
-                    "Index": 856
-                },
-                "End": {
-                    "Line": 45,
-                    "Column": 6,
-                    "Index": 857
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "y",
-                    "Start": {
-                        "Line": 45,
-                        "Column": 8,
-                        "Index": 859
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 9,
-                        "Index": 860
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 45,
-                        "Column": 14,
-                        "Index": 865
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 17,
-                        "Index": 868
-                    }
-                },
-                "Initializer": {
-                    "Value": 20,
-                    "Raw": "20",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 45,
-                        "Column": 24,
-                        "Index": 875
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 26,
-                        "Index": 877
-                    }
-                },
-                "Start": {
-                    "Line": 45,
-                    "Column": 8,
-                    "Index": 859
-                },
-                "End": {
-                    "Line": 45,
-                    "Column": 9,
-                    "Index": 860
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "z",
-                    "Start": {
-                        "Line": 45,
-                        "Column": 11,
-                        "Index": 862
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 12,
-                        "Index": 863
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 45,
-                        "Column": 14,
-                        "Index": 865
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 17,
-                        "Index": 868
-                    }
-                },
-                "Initializer": {
-                    "Value": 3,
-                    "Raw": "3",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 45,
-                        "Column": 28,
-                        "Index": 879
-                    },
-                    "End": {
-                        "Line": 45,
-                        "Column": 29,
-                        "Index": 880
-                    }
-                },
-                "Start": {
-                    "Line": 45,
+                    "Line": 4,
                     "Column": 11,
-                    "Index": 862
+                    "Index": 29
                 },
                 "End": {
-                    "Line": 45,
-                    "Column": 12,
-                    "Index": 863
+                    "Line": 4,
+                    "Column": 22,
+                    "Index": 39
                 }
             }
         ],
         "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 4,
+            "Column": 1,
+            "Index": 19
         },
         "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 4,
+            "Column": 22,
+            "Index": 39
         }
     },
     {
@@ -1948,192 +265,16 @@
             {
                 "IsConst": false,
                 "Identifier": {
-                    "Name": "p",
+                    "Name": "a",
                     "Start": {
-                        "Line": 46,
+                        "Line": 7,
                         "Column": 5,
-                        "Index": 900
+                        "Index": 50
                     },
                     "End": {
-                        "Line": 46,
-                        "Column": 6,
-                        "Index": 901
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "Unsigned": true,
-                    "TypeName": "i32",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 14,
-                        "Index": 909
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 17,
-                        "Index": 912
-                    }
-                },
-                "Initializer": {
-                    "Value": 10,
-                    "Raw": "10",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 46,
-                        "Column": 30,
-                        "Index": 925
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 32,
-                        "Index": 927
-                    }
-                },
-                "Start": {
-                    "Line": 46,
-                    "Column": 5,
-                    "Index": 900
-                },
-                "End": {
-                    "Line": 46,
-                    "Column": 6,
-                    "Index": 901
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "q",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 8,
-                        "Index": 903
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 9,
-                        "Index": 904
-                    }
-                },
-                "Type": {
-                    "BitSize": 32,
-                    "TypeName": "f32",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 19,
-                        "Index": 914
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 22,
-                        "Index": 917
-                    }
-                },
-                "Initializer": {
-                    "Value": 20,
-                    "Raw": "20.0",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 34,
-                        "Index": 929
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 38,
-                        "Index": 933
-                    }
-                },
-                "Start": {
-                    "Line": 46,
-                    "Column": 8,
-                    "Index": 903
-                },
-                "End": {
-                    "Line": 46,
-                    "Column": 9,
-                    "Index": 904
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "r",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 11,
-                        "Index": 906
-                    },
-                    "End": {
-                        "Line": 46,
+                        "Line": 7,
                         "Column": 12,
-                        "Index": 907
-                    }
-                },
-                "Type": {
-                    "TypeName": "str",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 24,
-                        "Index": 919
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 27,
-                        "Index": 922
-                    }
-                },
-                "Initializer": {
-                    "Value": "Hello",
-                    "Start": {
-                        "Line": 46,
-                        "Column": 40,
-                        "Index": 935
-                    },
-                    "End": {
-                        "Line": 46,
-                        "Column": 47,
-                        "Index": 942
-                    }
-                },
-                "Start": {
-                    "Line": 46,
-                    "Column": 11,
-                    "Index": 906
-                },
-                "End": {
-                    "Line": 46,
-                    "Column": 12,
-                    "Index": 907
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "x",
-                    "Start": {
-                        "Line": 49,
-                        "Column": 5,
-                        "Index": 1021
-                    },
-                    "End": {
-                        "Line": 49,
-                        "Column": 6,
-                        "Index": 1022
+                        "Index": 51
                     }
                 },
                 "Type": null,
@@ -2142,79 +283,37 @@
                     "Raw": "10",
                     "Base": 10,
                     "Start": {
-                        "Line": 49,
-                        "Column": 12,
-                        "Index": 1028
-                    },
-                    "End": {
-                        "Line": 49,
-                        "Column": 14,
-                        "Index": 1030
-                    }
-                },
-                "Start": {
-                    "Line": 49,
-                    "Column": 5,
-                    "Index": 1021
-                },
-                "End": {
-                    "Line": 49,
-                    "Column": 6,
-                    "Index": 1022
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "y",
-                    "Start": {
-                        "Line": 49,
-                        "Column": 8,
-                        "Index": 1024
-                    },
-                    "End": {
-                        "Line": 49,
+                        "Line": 7,
                         "Column": 9,
-                        "Index": 1025
-                    }
-                },
-                "Type": null,
-                "Initializer": {
-                    "Value": 20,
-                    "Raw": "20",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 49,
-                        "Column": 16,
-                        "Index": 1032
+                        "Index": 54
                     },
                     "End": {
-                        "Line": 49,
-                        "Column": 18,
-                        "Index": 1034
+                        "Line": 7,
+                        "Column": 11,
+                        "Index": 56
                     }
                 },
                 "Start": {
-                    "Line": 49,
-                    "Column": 8,
-                    "Index": 1024
+                    "Line": 7,
+                    "Column": 5,
+                    "Index": 50
                 },
                 "End": {
-                    "Line": 49,
-                    "Column": 9,
-                    "Index": 1025
+                    "Line": 7,
+                    "Column": 12,
+                    "Index": 51
                 }
             }
         ],
         "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 7,
+            "Column": 5,
+            "Index": 50
         },
         "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 7,
+            "Column": 12,
+            "Index": 51
         }
     },
     {
@@ -2224,195 +323,14 @@
                 "Identifier": {
                     "Name": "arr",
                     "Start": {
-                        "Line": 51,
+                        "Line": 9,
                         "Column": 5,
-                        "Index": 1043
+                        "Index": 65
                     },
                     "End": {
-                        "Line": 51,
-                        "Column": 8,
-                        "Index": 1046
-                    }
-                },
-                "Type": {
-                    "ElementType": {
-                        "BitSize": 32,
-                        "Unsigned": true,
-                        "TypeName": "i32",
-                        "Start": {
-                            "Line": 51,
-                            "Column": 19,
-                            "Index": 1057
-                        },
-                        "End": {
-                            "Line": 51,
-                            "Column": 22,
-                            "Index": 1060
-                        }
-                    },
-                    "TypeName": "array",
-                    "Start": {
-                        "Line": 51,
-                        "Column": 17,
-                        "Index": 1055
-                    },
-                    "End": {
-                        "Line": 51,
-                        "Column": 22,
-                        "Index": 1060
-                    }
-                },
-                "Initializer": {
-                    "Elements": [
-                        {
-                            "Value": 1,
-                            "Raw": "1",
-                            "Base": 10,
-                            "Start": {
-                                "Line": 51,
-                                "Column": 29,
-                                "Index": 1067
-                            },
-                            "End": {
-                                "Line": 51,
-                                "Column": 30,
-                                "Index": 1068
-                            }
-                        },
-                        {
-                            "Value": 2,
-                            "Raw": "2",
-                            "Base": 10,
-                            "Start": {
-                                "Line": 51,
-                                "Column": 32,
-                                "Index": 1070
-                            },
-                            "End": {
-                                "Line": 51,
-                                "Column": 33,
-                                "Index": 1071
-                            }
-                        },
-                        {
-                            "Value": 3,
-                            "Raw": "3",
-                            "Base": 10,
-                            "Start": {
-                                "Line": 51,
-                                "Column": 35,
-                                "Index": 1073
-                            },
-                            "End": {
-                                "Line": 51,
-                                "Column": 36,
-                                "Index": 1074
-                            }
-                        }
-                    ],
-                    "Start": {
-                        "Line": 51,
-                        "Column": 28,
-                        "Index": 1066
-                    },
-                    "End": {
-                        "Line": 51,
-                        "Column": 37,
-                        "Index": 1075
-                    }
-                },
-                "Start": {
-                    "Line": 51,
-                    "Column": 5,
-                    "Index": 1043
-                },
-                "End": {
-                    "Line": 51,
-                    "Column": 8,
-                    "Index": 1046
-                }
-            },
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "other",
-                    "Start": {
-                        "Line": 51,
-                        "Column": 10,
-                        "Index": 1048
-                    },
-                    "End": {
-                        "Line": 51,
-                        "Column": 15,
-                        "Index": 1053
-                    }
-                },
-                "Type": {
-                    "TypeName": "e",
-                    "Start": {
-                        "Line": 51,
-                        "Column": 24,
-                        "Index": 1062
-                    },
-                    "End": {
-                        "Line": 51,
-                        "Column": 25,
-                        "Index": 1063
-                    }
-                },
-                "Initializer": {
-                    "Value": 3,
-                    "Raw": "3",
-                    "Base": 10,
-                    "Start": {
-                        "Line": 51,
-                        "Column": 39,
-                        "Index": 1077
-                    },
-                    "End": {
-                        "Line": 51,
-                        "Column": 40,
-                        "Index": 1078
-                    }
-                },
-                "Start": {
-                    "Line": 51,
-                    "Column": 10,
-                    "Index": 1048
-                },
-                "End": {
-                    "Line": 51,
-                    "Column": 15,
-                    "Index": 1053
-                }
-            }
-        ],
-        "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        },
-        "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
-        }
-    },
-    {
-        "Variables": [
-            {
-                "IsConst": false,
-                "Identifier": {
-                    "Name": "arr2d",
-                    "Start": {
-                        "Line": 52,
-                        "Column": 5,
-                        "Index": 1085
-                    },
-                    "End": {
-                        "Line": 52,
-                        "Column": 10,
-                        "Index": 1090
+                        "Line": 9,
+                        "Column": 44,
+                        "Index": 68
                     }
                 },
                 "Type": {
@@ -2422,38 +340,38 @@
                             "Unsigned": true,
                             "TypeName": "i32",
                             "Start": {
-                                "Line": 52,
-                                "Column": 16,
-                                "Index": 1096
+                                "Line": 9,
+                                "Column": 15,
+                                "Index": 75
                             },
                             "End": {
-                                "Line": 52,
-                                "Column": 19,
-                                "Index": 1099
+                                "Line": 9,
+                                "Column": 18,
+                                "Index": 78
                             }
                         },
                         "TypeName": "array",
                         "Start": {
-                            "Line": 52,
-                            "Column": 14,
-                            "Index": 1094
+                            "Line": 9,
+                            "Column": 13,
+                            "Index": 73
                         },
                         "End": {
-                            "Line": 52,
-                            "Column": 19,
-                            "Index": 1099
+                            "Line": 9,
+                            "Column": 18,
+                            "Index": 78
                         }
                     },
                     "TypeName": "array",
                     "Start": {
-                        "Line": 52,
-                        "Column": 12,
-                        "Index": 1092
+                        "Line": 9,
+                        "Column": 11,
+                        "Index": 71
                     },
                     "End": {
-                        "Line": 52,
-                        "Column": 19,
-                        "Index": 1099
+                        "Line": 9,
+                        "Column": 18,
+                        "Index": 78
                     }
                 },
                 "Initializer": {
@@ -2465,14 +383,14 @@
                                     "Raw": "1",
                                     "Base": 10,
                                     "Start": {
-                                        "Line": 52,
-                                        "Column": 24,
-                                        "Index": 1104
+                                        "Line": 9,
+                                        "Column": 23,
+                                        "Index": 83
                                     },
                                     "End": {
-                                        "Line": 52,
-                                        "Column": 25,
-                                        "Index": 1105
+                                        "Line": 9,
+                                        "Column": 24,
+                                        "Index": 84
                                     }
                                 },
                                 {
@@ -2480,26 +398,41 @@
                                     "Raw": "2",
                                     "Base": 10,
                                     "Start": {
-                                        "Line": 52,
-                                        "Column": 27,
-                                        "Index": 1107
+                                        "Line": 9,
+                                        "Column": 26,
+                                        "Index": 86
                                     },
                                     "End": {
-                                        "Line": 52,
-                                        "Column": 28,
-                                        "Index": 1108
+                                        "Line": 9,
+                                        "Column": 27,
+                                        "Index": 87
+                                    }
+                                },
+                                {
+                                    "Value": 3,
+                                    "Raw": "3",
+                                    "Base": 10,
+                                    "Start": {
+                                        "Line": 9,
+                                        "Column": 29,
+                                        "Index": 89
+                                    },
+                                    "End": {
+                                        "Line": 9,
+                                        "Column": 30,
+                                        "Index": 90
                                     }
                                 }
                             ],
                             "Start": {
-                                "Line": 52,
-                                "Column": 23,
-                                "Index": 1103
+                                "Line": 9,
+                                "Column": 22,
+                                "Index": 82
                             },
                             "End": {
-                                "Line": 52,
-                                "Column": 29,
-                                "Index": 1109
+                                "Line": 9,
+                                "Column": 31,
+                                "Index": 91
                             }
                         },
                         {
@@ -2509,14 +442,14 @@
                                     "Raw": "4",
                                     "Base": 10,
                                     "Start": {
-                                        "Line": 52,
-                                        "Column": 32,
-                                        "Index": 1112
+                                        "Line": 9,
+                                        "Column": 34,
+                                        "Index": 94
                                     },
                                     "End": {
-                                        "Line": 52,
-                                        "Column": 33,
-                                        "Index": 1113
+                                        "Line": 9,
+                                        "Column": 35,
+                                        "Index": 95
                                     }
                                 },
                                 {
@@ -2524,14 +457,14 @@
                                     "Raw": "5",
                                     "Base": 10,
                                     "Start": {
-                                        "Line": 52,
-                                        "Column": 35,
-                                        "Index": 1115
+                                        "Line": 9,
+                                        "Column": 37,
+                                        "Index": 97
                                     },
                                     "End": {
-                                        "Line": 52,
-                                        "Column": 36,
-                                        "Index": 1116
+                                        "Line": 9,
+                                        "Column": 38,
+                                        "Index": 98
                                     }
                                 },
                                 {
@@ -2539,296 +472,145 @@
                                     "Raw": "6",
                                     "Base": 10,
                                     "Start": {
-                                        "Line": 52,
-                                        "Column": 38,
-                                        "Index": 1118
+                                        "Line": 9,
+                                        "Column": 40,
+                                        "Index": 100
                                     },
                                     "End": {
-                                        "Line": 52,
-                                        "Column": 39,
-                                        "Index": 1119
+                                        "Line": 9,
+                                        "Column": 41,
+                                        "Index": 101
                                     }
                                 }
                             ],
                             "Start": {
-                                "Line": 52,
-                                "Column": 31,
-                                "Index": 1111
+                                "Line": 9,
+                                "Column": 33,
+                                "Index": 93
                             },
                             "End": {
-                                "Line": 52,
-                                "Column": 40,
-                                "Index": 1120
+                                "Line": 9,
+                                "Column": 42,
+                                "Index": 102
                             }
                         }
                     ],
                     "Start": {
-                        "Line": 52,
-                        "Column": 22,
-                        "Index": 1102
+                        "Line": 9,
+                        "Column": 21,
+                        "Index": 81
                     },
                     "End": {
-                        "Line": 52,
-                        "Column": 41,
-                        "Index": 1121
+                        "Line": 9,
+                        "Column": 43,
+                        "Index": 103
                     }
                 },
                 "Start": {
-                    "Line": 52,
+                    "Line": 9,
                     "Column": 5,
-                    "Index": 1085
+                    "Index": 65
                 },
                 "End": {
-                    "Line": 52,
-                    "Column": 10,
-                    "Index": 1090
+                    "Line": 9,
+                    "Column": 44,
+                    "Index": 68
                 }
             }
         ],
         "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 9,
+            "Column": 5,
+            "Index": 65
         },
         "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 9,
+            "Column": 44,
+            "Index": 68
         }
     },
     {
-        "Alias": {
-            "Name": "Integer",
-            "Start": {
-                "Line": 55,
-                "Column": 6,
-                "Index": 1153
-            },
-            "End": {
-                "Line": 55,
-                "Column": 13,
-                "Index": 1160
-            }
-        },
-        "BaseType": {
-            "BitSize": 32,
-            "Unsigned": true,
-            "TypeName": "i32",
-            "Start": {
-                "Line": 55,
-                "Column": 14,
-                "Index": 1161
-            },
-            "End": {
-                "Line": 55,
-                "Column": 17,
-                "Index": 1164
-            }
-        },
-        "Start": {
-            "Line": 55,
-            "Column": 1,
-            "Index": 1148
-        },
-        "End": {
-            "Line": 55,
-            "Column": 18,
-            "Index": 1165
-        }
-    },
-    {
-        "Variables": [
+        "Left": [
             {
-                "IsConst": true,
-                "Identifier": {
-                    "Name": "user",
-                    "Start": {
-                        "Line": 57,
-                        "Column": 7,
-                        "Index": 1175
-                    },
-                    "End": {
-                        "Line": 57,
-                        "Column": 11,
-                        "Index": 1179
-                    }
-                },
-                "Type": {
-                    "Fields": [
-                        {
-                            "Name": "name",
-                            "Type": {
-                                "TypeName": "str",
-                                "Start": {
-                                    "Line": 58,
-                                    "Column": 11,
-                                    "Index": 1194
-                                },
-                                "End": {
-                                    "Line": 58,
-                                    "Column": 14,
-                                    "Index": 1197
-                                }
-                            },
-                            "Value": null,
-                            "Start": {
-                                "Line": 58,
-                                "Column": 5,
-                                "Index": 1188
-                            },
-                            "End": {
-                                "Line": 58,
-                                "Column": 14,
-                                "Index": 1197
-                            }
-                        },
-                        {
-                            "Name": "age",
-                            "Type": {
-                                "BitSize": 32,
-                                "Unsigned": true,
-                                "TypeName": "i32",
-                                "Start": {
-                                    "Line": 59,
-                                    "Column": 10,
-                                    "Index": 1209
-                                },
-                                "End": {
-                                    "Line": 59,
-                                    "Column": 13,
-                                    "Index": 1212
-                                }
-                            },
-                            "Value": null,
-                            "Start": {
-                                "Line": 59,
-                                "Column": 5,
-                                "Index": 1204
-                            },
-                            "End": {
-                                "Line": 59,
-                                "Column": 13,
-                                "Index": 1212
-                            }
-                        }
-                    ],
-                    "TypeName": "object",
-                    "Start": {
-                        "Line": 57,
-                        "Column": 13,
-                        "Index": 1181
-                    },
-                    "End": {
-                        "Line": 60,
-                        "Column": 2,
-                        "Index": 1215
-                    }
-                },
-                "Initializer": {
-                    "Fields": [
-                        {
-                            "Name": "name",
-                            "Type": null,
-                            "Value": {
-                                "Value": "John",
-                                "Start": {
-                                    "Line": 61,
-                                    "Column": 11,
-                                    "Index": 1231
-                                },
-                                "End": {
-                                    "Line": 61,
-                                    "Column": 17,
-                                    "Index": 1237
-                                }
-                            },
-                            "Start": {
-                                "Line": 61,
-                                "Column": 5,
-                                "Index": 1225
-                            },
-                            "End": {
-                                "Line": 61,
-                                "Column": 17,
-                                "Index": 1237
-                            }
-                        },
-                        {
-                            "Name": "age",
-                            "Type": null,
-                            "Value": {
-                                "Value": 20,
-                                "Raw": "20",
-                                "Base": 10,
-                                "Start": {
-                                    "Line": 62,
-                                    "Column": 10,
-                                    "Index": 1249
-                                },
-                                "End": {
-                                    "Line": 62,
-                                    "Column": 12,
-                                    "Index": 1251
-                                }
-                            },
-                            "Start": {
-                                "Line": 62,
-                                "Column": 5,
-                                "Index": 1244
-                            },
-                            "End": {
-                                "Line": 62,
-                                "Column": 12,
-                                "Index": 1251
-                            }
-                        }
-                    ],
-                    "Start": {
-                        "Line": 60,
-                        "Column": 5,
-                        "Index": 1218
-                    },
-                    "End": {
-                        "Line": 63,
-                        "Column": 2,
-                        "Index": 1254
-                    }
-                },
+                "Name": "a1",
                 "Start": {
-                    "Line": 57,
-                    "Column": 7,
-                    "Index": 1175
+                    "Line": 11,
+                    "Column": 1,
+                    "Index": 108
                 },
                 "End": {
-                    "Line": 57,
+                    "Line": 11,
+                    "Column": 3,
+                    "Index": 110
+                }
+            },
+            {
+                "Name": "a2",
+                "Start": {
+                    "Line": 11,
+                    "Column": 5,
+                    "Index": 112
+                },
+                "End": {
+                    "Line": 11,
+                    "Column": 7,
+                    "Index": 114
+                }
+            },
+            {
+                "Name": "a3",
+                "Start": {
+                    "Line": 11,
+                    "Column": 9,
+                    "Index": 116
+                },
+                "End": {
+                    "Line": 11,
                     "Column": 11,
-                    "Index": 1179
+                    "Index": 118
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Value": 1,
+                "Raw": "1",
+                "Base": 10,
+                "Start": {
+                    "Line": 11,
+                    "Column": 14,
+                    "Index": 121
+                },
+                "End": {
+                    "Line": 11,
+                    "Column": 16,
+                    "Index": 122
                 }
             }
         ],
         "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 11,
+            "Column": 1,
+            "Index": 108
         },
         "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 11,
+            "Column": 16,
+            "Index": 122
         }
     },
     {
         "Alias": {
             "Name": "Point",
             "Start": {
-                "Line": 65,
+                "Line": 13,
                 "Column": 6,
-                "Index": 1264
+                "Index": 132
             },
             "End": {
-                "Line": 65,
+                "Line": 13,
                 "Column": 11,
-                "Index": 1269
+                "Index": 137
             }
         },
         "BaseType": {
@@ -2840,26 +622,26 @@
                         "Unsigned": true,
                         "TypeName": "i32",
                         "Start": {
-                            "Line": 66,
+                            "Line": 14,
                             "Column": 8,
-                            "Index": 1280
+                            "Index": 155
                         },
                         "End": {
-                            "Line": 66,
+                            "Line": 14,
                             "Column": 11,
-                            "Index": 1283
+                            "Index": 158
                         }
                     },
                     "Value": null,
                     "Start": {
-                        "Line": 66,
+                        "Line": 14,
                         "Column": 5,
-                        "Index": 1277
+                        "Index": 152
                     },
                     "End": {
-                        "Line": 66,
+                        "Line": 14,
                         "Column": 11,
-                        "Index": 1283
+                        "Index": 158
                     }
                 },
                 {
@@ -2869,50 +651,51 @@
                         "Unsigned": true,
                         "TypeName": "i32",
                         "Start": {
-                            "Line": 67,
+                            "Line": 15,
                             "Column": 8,
-                            "Index": 1293
+                            "Index": 168
                         },
                         "End": {
-                            "Line": 67,
+                            "Line": 15,
                             "Column": 11,
-                            "Index": 1296
+                            "Index": 171
                         }
                     },
                     "Value": null,
                     "Start": {
-                        "Line": 67,
+                        "Line": 15,
                         "Column": 5,
-                        "Index": 1290
+                        "Index": 165
                     },
                     "End": {
-                        "Line": 67,
+                        "Line": 15,
                         "Column": 11,
-                        "Index": 1296
+                        "Index": 171
                     }
                 }
             ],
-            "TypeName": "object",
+            "Methods": null,
+            "TypeName": "struct",
             "Start": {
-                "Line": 65,
+                "Line": 13,
                 "Column": 12,
-                "Index": 1270
+                "Index": 138
             },
             "End": {
-                "Line": 68,
-                "Column": 2,
-                "Index": 1299
+                "Line": 16,
+                "Column": 3,
+                "Index": 174
             }
         },
         "Start": {
-            "Line": 65,
+            "Line": 13,
             "Column": 1,
-            "Index": 1259
+            "Index": 127
         },
         "End": {
-            "Line": 68,
+            "Line": 16,
             "Column": 3,
-            "Index": 1300
+            "Index": 174
         }
     },
     {
@@ -2922,122 +705,413 @@
                 "Identifier": {
                     "Name": "point",
                     "Start": {
-                        "Line": 70,
+                        "Line": 18,
                         "Column": 5,
-                        "Index": 1308
+                        "Index": 183
                     },
                     "End": {
-                        "Line": 70,
-                        "Column": 10,
-                        "Index": 1313
+                        "Line": 18,
+                        "Column": 40,
+                        "Index": 188
                     }
                 },
                 "Type": {
                     "TypeName": "Point",
                     "Start": {
-                        "Line": 70,
+                        "Line": 18,
                         "Column": 12,
-                        "Index": 1315
+                        "Index": 190
                     },
                     "End": {
-                        "Line": 70,
+                        "Line": 18,
                         "Column": 17,
-                        "Index": 1320
+                        "Index": 195
                     }
                 },
                 "Initializer": {
+                    "TypeName": "Point",
                     "Fields": [
                         {
                             "Name": "x",
-                            "Type": null,
                             "Value": {
                                 "Value": 10,
                                 "Raw": "10",
                                 "Base": 10,
                                 "Start": {
-                                    "Line": 70,
-                                    "Column": 24,
-                                    "Index": 1327
+                                    "Line": 18,
+                                    "Column": 29,
+                                    "Index": 207
                                 },
                                 "End": {
-                                    "Line": 70,
-                                    "Column": 26,
-                                    "Index": 1329
+                                    "Line": 18,
+                                    "Column": 31,
+                                    "Index": 209
                                 }
                             },
                             "Start": {
-                                "Line": 70,
-                                "Column": 21,
-                                "Index": 1324
+                                "Line": 18,
+                                "Column": 26,
+                                "Index": 204
                             },
                             "End": {
-                                "Line": 70,
-                                "Column": 26,
-                                "Index": 1329
+                                "Line": 18,
+                                "Column": 31,
+                                "Index": 209
                             }
                         },
                         {
                             "Name": "y",
-                            "Type": null,
                             "Value": {
                                 "Value": 20,
                                 "Raw": "20",
                                 "Base": 10,
                                 "Start": {
-                                    "Line": 70,
-                                    "Column": 31,
-                                    "Index": 1334
+                                    "Line": 18,
+                                    "Column": 36,
+                                    "Index": 214
                                 },
                                 "End": {
-                                    "Line": 70,
-                                    "Column": 33,
-                                    "Index": 1336
+                                    "Line": 18,
+                                    "Column": 38,
+                                    "Index": 216
                                 }
                             },
                             "Start": {
-                                "Line": 70,
-                                "Column": 28,
-                                "Index": 1331
+                                "Line": 18,
+                                "Column": 33,
+                                "Index": 211
                             },
                             "End": {
-                                "Line": 70,
-                                "Column": 33,
-                                "Index": 1336
+                                "Line": 18,
+                                "Column": 38,
+                                "Index": 216
                             }
                         }
                     ],
+                    "IsAnonymous": false,
                     "Start": {
-                        "Line": 70,
-                        "Column": 20,
-                        "Index": 1323
+                        "Line": 18,
+                        "Column": 25,
+                        "Index": 203
                     },
                     "End": {
-                        "Line": 70,
-                        "Column": 34,
-                        "Index": 1337
+                        "Line": 18,
+                        "Column": 39,
+                        "Index": 217
                     }
                 },
                 "Start": {
-                    "Line": 70,
+                    "Line": 18,
                     "Column": 5,
-                    "Index": 1308
+                    "Index": 183
                 },
                 "End": {
-                    "Line": 70,
-                    "Column": 10,
-                    "Index": 1313
+                    "Line": 18,
+                    "Column": 40,
+                    "Index": 188
                 }
             }
         ],
         "Start": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 18,
+            "Column": 5,
+            "Index": 183
         },
         "End": {
-            "Line": 0,
-            "Column": 0,
-            "Index": 0
+            "Line": 18,
+            "Column": 40,
+            "Index": 188
+        }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "p2",
+                    "Start": {
+                        "Line": 38,
+                        "Column": 5,
+                        "Index": 592
+                    },
+                    "End": {
+                        "Line": 41,
+                        "Column": 3,
+                        "Index": 594
+                    }
+                },
+                "Type": null,
+                "Initializer": {
+                    "TypeName": "struct",
+                    "Fields": [
+                        {
+                            "Name": "name",
+                            "Value": {
+                                "Name": "str",
+                                "Start": {
+                                    "Line": 39,
+                                    "Column": 11,
+                                    "Index": 617
+                                },
+                                "End": {
+                                    "Line": 39,
+                                    "Column": 14,
+                                    "Index": 620
+                                }
+                            },
+                            "Start": {
+                                "Line": 39,
+                                "Column": 5,
+                                "Index": 611
+                            },
+                            "End": {
+                                "Line": 39,
+                                "Column": 14,
+                                "Index": 620
+                            }
+                        },
+                        {
+                            "Name": "age",
+                            "Value": {
+                                "Name": "i32",
+                                "Start": {
+                                    "Line": 40,
+                                    "Column": 10,
+                                    "Index": 632
+                                },
+                                "End": {
+                                    "Line": 40,
+                                    "Column": 13,
+                                    "Index": 635
+                                }
+                            },
+                            "Start": {
+                                "Line": 40,
+                                "Column": 5,
+                                "Index": 627
+                            },
+                            "End": {
+                                "Line": 40,
+                                "Column": 13,
+                                "Index": 635
+                            }
+                        }
+                    ],
+                    "IsAnonymous": true,
+                    "Start": {
+                        "Line": 38,
+                        "Column": 17,
+                        "Index": 604
+                    },
+                    "End": {
+                        "Line": 41,
+                        "Column": 2,
+                        "Index": 638
+                    }
+                },
+                "Start": {
+                    "Line": 38,
+                    "Column": 5,
+                    "Index": 592
+                },
+                "End": {
+                    "Line": 41,
+                    "Column": 3,
+                    "Index": 594
+                }
+            }
+        ],
+        "Start": {
+            "Line": 38,
+            "Column": 5,
+            "Index": 592
+        },
+        "End": {
+            "Line": 41,
+            "Column": 3,
+            "Index": 594
+        }
+    },
+    {
+        "Variables": [
+            {
+                "IsConst": false,
+                "Identifier": {
+                    "Name": "p3",
+                    "Start": {
+                        "Line": 43,
+                        "Column": 5,
+                        "Index": 647
+                    },
+                    "End": {
+                        "Line": 46,
+                        "Column": 35,
+                        "Index": 649
+                    }
+                },
+                "Type": {
+                    "Fields": [
+                        {
+                            "Name": "name",
+                            "Type": {
+                                "TypeName": "str",
+                                "Start": {
+                                    "Line": 44,
+                                    "Column": 11,
+                                    "Index": 671
+                                },
+                                "End": {
+                                    "Line": 44,
+                                    "Column": 14,
+                                    "Index": 674
+                                }
+                            },
+                            "Value": null,
+                            "Start": {
+                                "Line": 44,
+                                "Column": 5,
+                                "Index": 665
+                            },
+                            "End": {
+                                "Line": 44,
+                                "Column": 14,
+                                "Index": 674
+                            }
+                        },
+                        {
+                            "Name": "age",
+                            "Type": {
+                                "BitSize": 32,
+                                "Unsigned": true,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 45,
+                                    "Column": 10,
+                                    "Index": 686
+                                },
+                                "End": {
+                                    "Line": 45,
+                                    "Column": 13,
+                                    "Index": 689
+                                }
+                            },
+                            "Value": null,
+                            "Start": {
+                                "Line": 45,
+                                "Column": 5,
+                                "Index": 681
+                            },
+                            "End": {
+                                "Line": 45,
+                                "Column": 13,
+                                "Index": 689
+                            }
+                        }
+                    ],
+                    "Methods": null,
+                    "TypeName": "struct",
+                    "Start": {
+                        "Line": 43,
+                        "Column": 9,
+                        "Index": 651
+                    },
+                    "End": {
+                        "Line": 46,
+                        "Column": 2,
+                        "Index": 692
+                    }
+                },
+                "Initializer": {
+                    "TypeName": "struct",
+                    "Fields": [
+                        {
+                            "Name": "name",
+                            "Value": {
+                                "Value": "John",
+                                "Start": {
+                                    "Line": 46,
+                                    "Column": 18,
+                                    "Index": 708
+                                },
+                                "End": {
+                                    "Line": 46,
+                                    "Column": 24,
+                                    "Index": 714
+                                }
+                            },
+                            "Start": {
+                                "Line": 46,
+                                "Column": 12,
+                                "Index": 702
+                            },
+                            "End": {
+                                "Line": 46,
+                                "Column": 24,
+                                "Index": 714
+                            }
+                        },
+                        {
+                            "Name": "age",
+                            "Value": {
+                                "Value": 20,
+                                "Raw": "20",
+                                "Base": 10,
+                                "Start": {
+                                    "Line": 46,
+                                    "Column": 31,
+                                    "Index": 721
+                                },
+                                "End": {
+                                    "Line": 46,
+                                    "Column": 33,
+                                    "Index": 723
+                                }
+                            },
+                            "Start": {
+                                "Line": 46,
+                                "Column": 26,
+                                "Index": 716
+                            },
+                            "End": {
+                                "Line": 46,
+                                "Column": 33,
+                                "Index": 723
+                            }
+                        }
+                    ],
+                    "IsAnonymous": true,
+                    "Start": {
+                        "Line": 46,
+                        "Column": 11,
+                        "Index": 701
+                    },
+                    "End": {
+                        "Line": 46,
+                        "Column": 34,
+                        "Index": 724
+                    }
+                },
+                "Start": {
+                    "Line": 43,
+                    "Column": 5,
+                    "Index": 647
+                },
+                "End": {
+                    "Line": 46,
+                    "Column": 35,
+                    "Index": 649
+                }
+            }
+        ],
+        "Start": {
+            "Line": 43,
+            "Column": 5,
+            "Index": 647
+        },
+        "End": {
+            "Line": 46,
+            "Column": 35,
+            "Index": 649
         }
     }
 ]

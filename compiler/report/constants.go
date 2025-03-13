@@ -22,10 +22,14 @@ const (
 
 // Error messages for expected tokens
 const (
-	EXPECTED_NUMBER        = "Expected number"
-	EXPECTED_STRING        = "Expected string"
-	EXPECTED_CLOSE_BRACKET = "Expected ']' after array elements"
-	EXPECTED_SEMI_COLON    = "Expected ';' after variable declaration"
+	EXPECTED_NUMBER      = "Expected number"
+	EXPECTED_STRING      = "Expected string"
+	EXPECTED_SEMI_COLON  = "Expected ';'"
+	EXPECTED_COMMA       = "Expected ','"
+	EXPECTED_COLON       = "Expected ':'"
+	EXPECTED_EQUALS      = "Expected '='"
+	EXPECTED_OPEN_BRACE  = "Expected '{'"
+	EXPECTED_CLOSE_BRACE = "Expected '}'"
 )
 
 // Error messages for variable declarations
@@ -74,20 +78,50 @@ const (
 	UNEXPECTED_TOKEN   = "Unexpected token"
 )
 
-// Error messages for object operations
+// Error messages for object/struct operations
 const (
-	EXPECTED_OPEN_BRACE           = "Expected '{' at start of object"
-	EXPECTED_OBJECT_FIELD_NAME    = "Expected field name"
-	EXPECTED_COLON                = "Expected ':' after field name"
+	EXPECTED_FIELD_NAME           = "Expected field name"
 	EXPECTED_FIELD_TYPE           = "Expected field type"
 	EXPECTED_FIELD_VALUE          = "Expected field value"
 	EXPECTED_COMMA_OR_CLOSE_BRACE = "Expected ',' or '}' after field"
-	EXPECTED_CLOSE_BRACE          = "Expected '}' after object fields"
-	DUPLICATE_FIELD_NAME          = "Duplicate field name in object"
-	EMPTY_OBJECT_NOT_ALLOWED      = "Empty objects are not allowed - objects must have at least one field"
+	DUPLICATE_FIELD_NAME          = "Duplicate field name"
+	EMPTY_STRUCT_NOT_ALLOWED      = "Empty structs are not allowed - must have at least one field"
+	EXPECTED_STRUCT_KEYWORD       = "Expected 'struct' keyword"
 )
 
 // Error messages for syntax errors
 const (
 	UNEXPECTED_CURLY_BRACE = "Unexpected '{' - object literals can only appear in expression contexts (after '=', ':', ',', or 'return')"
+)
+
+// Method declaration errors
+const (
+	EXPECTED_FUNCTION_KEYWORD = "Expected 'fn' keyword"
+	EXPECTED_RECEIVER_NAME    = "Expected receiver name"
+	EXPECTED_RECEIVER_TYPE    = "Expected receiver type"
+	EXPECTED_METHOD_NAME      = "Expected method name"
+	EXPECTED_RETURN_TYPE      = "Expected return type"
+	DUPLICATE_METHOD_NAME     = "Duplicate method name"
+	EXPECTED_PARAMETER_NAME   = "Expected parameter name"
+	EXPECTED_PARAMETER_TYPE   = "Expected parameter type"
+)
+
+// bracket errors
+const (
+	EXPECTED_OPEN_BRACKET  = "Expected '['"
+	EXPECTED_CLOSE_BRACKET = "Expected ']'"
+	EXPECTED_OPEN_CURLY    = "Expected '{'"
+	EXPECTED_CLOSE_CURLY   = "Expected '}'"
+	EXPECTED_OPEN_PAREN    = "Expected '('"
+	EXPECTED_CLOSE_PAREN   = "Expected ')'"
+)
+
+// Statement errors
+const (
+	EXPECTED_RETURN_KEYWORD = "Expected 'return' keyword"
+)
+
+// New constant for the new error message
+const (
+	TRAILING_COMMA_NOT_ALLOWED = "Trailing comma not allowed in struct type definition"
 )

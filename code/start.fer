@@ -1,98 +1,46 @@
-//single variable with type inference
-let x = 10;
-let y: f32;
-let myname: str = "John";
+a;
+a, b;
+a + b;
+answer = (a + b) * 2;
 
-//multiple variables with type
-let p, q, r: i32, f32, str = 10, 20.0, "hello";
-let p, q: i32, str = 10, "hello";
 
-//multiple variables with type inference
-let p, q, r = 10, 20.0, "hello";
-let p, q = 10, "hello";
+let a = 10;
 
-// assignments: single variable
-x = 15;
+let arr : [][]i32 = [[1, 2, 3], [4, 5, 6]];
 
-// assignments: multiple variables
-p, q = 10, "hello";
-p, q, r = 10, 20.0, "hello";
+a1, a2, a3 = 1;
 
-a; // single expression
-
-// array
-let arr1: []i32;
-let arr2: []str = ["hello", "world"];
-
-a = (a + b) * c;
-a = x++;
-a = x--;
-a = ++x;
-a = --x;
-
-//array access
-arr1[0];
-arr1[0] = 10;
-a = arr1[0];
-
-//single variable with type
-let x: i32 = 10; //explicit type and value
-
-//multiple variables with type inference
-let x, y = 10, 20; //infer from values
-
-//multiple variables with type
-let x, y, z: i32 = 10, 20, 3; // same type
-let p, q, r: i32, f32, str = 10, 20.0, "Hello"; // different types
-
-//multiple variables with type inference and type
-let x, y = 10, 20;
-
-let arr, other: []i32, e = [1, 2, 3], 3;
-let arr2d: [][]i32 = [[1, 2], [4, 5, 6]];
-
-//user defined types
-type Integer i32;
-
-const user: {
-    name: str,
-    age: i32
-} = {
-    name: "John",
-    age: 20
-};
-
-type Point {
+type Point struct {
     x: i32,
     y: i32
 };
 
-let point: Point = {x: 10, y: 20};
+let point: Point = Point{x: 10, y: 20};
 
-// //Objects
-// type Point {
-//     x: i32,
-//     y: i32
+// future features
+// //point as value
+// fn (p: Point) distanceToOrigin() -> f32 {
+//     return sqrt(p.x * p.x + p.y * p.y);
 // }
 
-// type Map {str => i32};
+// //point as reference
+// fn (p: &Point) translate(dx: i32, dy: i32) {
+//     p.x += dx;
+//     p.y += dy;
+// }
 
-// let point: Point = {x: 10, y: 20};
-// let employeeSalaries : Map = {
-//     "John" => 50000,
-//     "Jane" => 60000,
-//     "Jim" => 55000
-// };
+// let p = Point{x: 10, y: 20};
+// p.x = 100;
+// a = p.y;
+//p.translate(10, 20);
 
-// //or use without creating a type
-// let employeeSalaries2 = {
-//     "John" => 50000,
-//     "Jane" => 60000,
-//     "Jim" => 55000
-// };
+//anonymous struct
+let p2 = struct {
+    name: str,
+    age: i32
+};
 
-// let point3 = {
-//     x: 10,
-//     y: 20,
-//     z: 30
-// };
+let p3: struct {
+    name: str,
+    age: i32
+} = struct{name: "John", age: 20};

@@ -4,9 +4,6 @@ import (
 	//Standard packages
 	"os"
 	"regexp"
-
-	//ferret packages
-	"ferret/compiler/colors"
 )
 
 type regexHandler func(lex *Lexer, regex *regexp.Regexp)
@@ -102,7 +99,7 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`==`), defaultHandler(DOUBLE_EQUAL_TOKEN)},
 			{regexp.MustCompile(`=`), defaultHandler(EQUALS_TOKEN)},
 			{regexp.MustCompile(`:`), defaultHandler(COLON_TOKEN)},
-			{regexp.MustCompile(`;`), defaultHandler(SEMI_COLON_TOKEN)},
+			{regexp.MustCompile(`;`), defaultHandler(SEMICOLON_TOKEN)},
 			{regexp.MustCompile(`\(`), defaultHandler(OPEN_PAREN)},
 			{regexp.MustCompile(`\)`), defaultHandler(CLOSE_PAREN)},
 			{regexp.MustCompile(`\[`), defaultHandler(OPEN_BRACKET)},
@@ -221,7 +218,6 @@ func skipHandler(lex *Lexer, regex *regexp.Regexp) {
 
 // Tokenize reads the source code from the specified file and tokenizes it.
 func Tokenize(filename string, debug bool) []Token {
-	colors.GREEN.Printf("Tokenizing %s\n", filename)
 	lex := createLexer(&filename)
 	lex.FilePath = filename
 
@@ -255,8 +251,6 @@ func Tokenize(filename string, debug bool) []Token {
 			token.Debug(filename)
 		}
 	}
-
-	colors.GREEN.Println("Tokenization complete")
 
 	return lex.Tokens
 }

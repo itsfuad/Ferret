@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -18,8 +19,8 @@ func TestParseVarDecl(t *testing.T) {
 		{"let x, y = 42, 3.14;", true, "Multiple variables initialized with values"},
 		{"let x, y: i32 = 10, 20;", true, "Typed variables initialized"},
 		{"let p, q: i32, str = 10, \"hello\";", true, "Multiple typed variables initialized"},
-		{"let x, y = 10;", false, "Mismatched variable and value count"},
-		{"let x, y: i32;", false, "Mismatched variable and type count"},
+		{"let x, y = p;", true, "Mismatched variable and value count"},
+		{"let x, y: i32;", true, "Shared type annotation"},
 	}
 
 	for _, tt := range tests {
@@ -28,7 +29,7 @@ func TestParseVarDecl(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}

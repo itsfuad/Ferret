@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -65,35 +66,37 @@ func TestLiteralParsing(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}
 }
 
-func TestObjectLiteralParsing(t *testing.T) {
+func TestStructLiteralParsing(t *testing.T) {
 	tests := []struct {
 		input   string
 		isValid bool
 		desc    string
 	}{
 		// Valid cases
-		{`let x = { name: "John", age: 20 };`, true, "Basic object literal"},
-		{`let x = { name: "John", age: 20, scores: [1, 2, 3] };`, true, "Object with array field"},
-		{`let x = { user: { name: "John", age: 20 } };`, true, "Nested object literal"},
-		{`let x = { single: 42 };`, true, "Single field object"},
-		{`let x = { name: "John", };`, true, "Object with trailing comma"},
+		{`let x = Point{x: 10, y: 20};`, true, "Basic struct literal"},
+		{`let x = Point{x: 10, y: 20, scores: [1, 2, 3]};`, true, "Struct with array field"},
+		{`let x = Point{user: User{name: "John", age: 20}};`, true, "Nested struct literal"},
+		{`let x = Point{single: 42};`, true, "Single field struct literal"},
+		{`let x = Point{name: "John"};`, true, "Struct without trailing comma"},
+		//annonymous struct
+		{`let x = struct { name: str, age: i32 };`, true, "Anonymous struct literal"},
 
 		// Invalid cases
-		{`let x = { };`, false, "Empty object not allowed"},
-		{`let x = { name };`, false, "Missing field value"},
-		{`let x = { name: };`, false, "Missing value after colon"},
-		{`let x = { : "John" };`, false, "Missing field name"},
-		{`let x = { name: "John" age: 20 };`, false, "Missing comma between fields"},
-		{`let x = { name: "John", };`, false, "Object with trailing comma"},
-		{`let x = { name: "John", name: "Jane" };`, false, "Duplicate field names"},
-		{`let x = { "name": "John" };`, false, "Non-identifier field name"},
-		{`let x = { name: "John" };`, false, "Missing semicolon"},
+		{`let x = Point{};`, false, "Empty struct literal"},
+		{`let x = Point{name};`, false, "Missing field value"},
+		{`let x = Point{name: };`, false, "Missing value after colon"},
+		{`let x = Point{: "John"};`, false, "Missing field name"},
+		{`let x = Point{name: "John" age: 20};`, false, "Missing comma between fields"},
+		{`let x = Point{name: "John", name: "Jane"};`, false, "Duplicate field names"},
+		{`let x = Point{"name": "John"};`, false, "Non-identifier field name"},
+		{`let x = Point{name: "John", age: 20}`, false, "Missing semicolon"},
+		{`let x = Point{name: "John", };`, false, "Struct literal with trailing comma"},
 	}
 
 	for _, tt := range tests {
@@ -101,7 +104,7 @@ func TestObjectLiteralParsing(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}

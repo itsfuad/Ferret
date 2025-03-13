@@ -7,26 +7,27 @@ import (
 )
 
 type DataType interface {
+	Node
 	Type() types.TYPE_NAME
-	StartPos() lexer.Position
-	EndPos() lexer.Position
+	StartPos() *lexer.Position
+	EndPos() *lexer.Position
 }
 
 // User defined type
 type UserDefinedType struct {
 	TypeName types.TYPE_NAME
-	Start    lexer.Position
-	End      lexer.Position
+	Location
 }
 
+func (t *UserDefinedType) INode() {} // INode is a marker interface for all nodes
 func (t *UserDefinedType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *UserDefinedType) StartPos() lexer.Position {
-	return t.Start
+func (t *UserDefinedType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *UserDefinedType) EndPos() lexer.Position {
-	return t.End
+func (t *UserDefinedType) EndPos() *lexer.Position {
+	return t.Location.End
 }
 
 // Integer type
@@ -34,105 +35,138 @@ type IntType struct {
 	BitSize  int
 	Unsigned bool
 	TypeName types.TYPE_NAME
-	Start    lexer.Position
-	End      lexer.Position
+	Location
 }
 
+func (t *IntType) INode() {} // INode is a marker interface for all nodes
 func (t *IntType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *IntType) StartPos() lexer.Position {
-	return t.Start
+func (t *IntType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *IntType) EndPos() lexer.Position {
-	return t.End
+func (t *IntType) EndPos() *lexer.Position {
+	return t.Location.End
 }
 
 // Float type
 type FloatType struct {
 	BitSize  int
 	TypeName types.TYPE_NAME
-	Start    lexer.Position
-	End      lexer.Position
+	Location
 }
 
+func (t *FloatType) INode() {} // INode is a marker interface for all nodes
 func (t *FloatType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *FloatType) StartPos() lexer.Position {
-	return t.Start
+func (t *FloatType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *FloatType) EndPos() lexer.Position {
-	return t.End
+func (t *FloatType) EndPos() *lexer.Position {
+	return t.Location.End
 }
 
 // String type
 type StringType struct {
 	TypeName types.TYPE_NAME
-	Start    lexer.Position
-	End      lexer.Position
+	Location
 }
 
+func (t *StringType) INode() {} // INode is a marker interface for all nodes
 func (t *StringType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *StringType) StartPos() lexer.Position {
-	return t.Start
+func (t *StringType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *StringType) EndPos() lexer.Position {
-	return t.End
+func (t *StringType) EndPos() *lexer.Position {
+	return t.Location.End
 }
 
 // Byte type
 type ByteType struct {
 	TypeName types.TYPE_NAME
-	Start    lexer.Position
-	End      lexer.Position
+	Location
 }
 
+func (t *ByteType) INode() {} // INode is a marker interface for all nodes
 func (t *ByteType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *ByteType) StartPos() lexer.Position {
-	return t.Start
+func (t *ByteType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *ByteType) EndPos() lexer.Position {
-	return t.End
+func (t *ByteType) EndPos() *lexer.Position {
+	return t.Location.End
 }
 
 // Boolean type
 type BoolType struct {
 	TypeName types.TYPE_NAME
-	Start    lexer.Position
-	End      lexer.Position
+	Location
 }
 
+func (t *BoolType) INode() {} // INode is a marker interface for all nodes
 func (t *BoolType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *BoolType) StartPos() lexer.Position {
-	return t.Start
+func (t *BoolType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *BoolType) EndPos() lexer.Position {
-	return t.End
+func (t *BoolType) EndPos() *lexer.Position {
+	return t.Location.End
 }
 
 // Array type
 type ArrayType struct {
 	ElementType DataType
 	TypeName    types.TYPE_NAME
-	Start       lexer.Position
-	End         lexer.Position
+	Location
 }
 
+func (t *ArrayType) INode() {} // INode is a marker interface for all nodes
 func (t *ArrayType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *ArrayType) StartPos() lexer.Position {
-	return t.Start
+func (t *ArrayType) StartPos() *lexer.Position {
+	return t.Location.Start
 }
-func (t *ArrayType) EndPos() lexer.Position {
-	return t.End
+func (t *ArrayType) EndPos() *lexer.Position {
+	return t.Location.End
 }
+
+// Parameter represents a function or method parameter
+type Parameter struct {
+	Name string
+	Type DataType
+}
+
+// MethodDecl represents a method declaration
+type MethodDecl struct {
+	Name       string
+	Receiver   *Parameter
+	Parameters []Parameter
+	ReturnType DataType
+	Body       *BlockStmt
+	Location
+}
+
+func (m *MethodDecl) INode()                    {} // INode is a marker interface for all nodes
+func (m *MethodDecl) StartPos() *lexer.Position { return m.Start }
+func (m *MethodDecl) EndPos() *lexer.Position   { return m.End }
+
+// StructType represents a struct type definition
+type StructType struct {
+	Fields   []ObjectField
+	Methods  []MethodDecl
+	TypeName types.TYPE_NAME
+	Location
+}
+
+func (s *StructType) INode()                    {} // INode is a marker interface for all nodes
+func (s *StructType) Type() types.TYPE_NAME     { return s.TypeName }
+func (s *StructType) StartPos() *lexer.Position { return s.Start }
+func (s *StructType) EndPos() *lexer.Position   { return s.End }
 
 // Later, we will add more types like structs, arrays, maps, etc.

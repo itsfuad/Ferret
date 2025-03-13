@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -58,7 +59,7 @@ func TestExpressionParsing(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}
@@ -70,23 +71,25 @@ func TestOnlyExpression(t *testing.T) {
 		isValid bool
 		desc    string
 	}{
+		// expressions with no use case
 		{"a;", true, "Single expression"},
-		{"a, b;", false, "Multiple expressions"},
-		{"a = b;", true, "Assignment"},
-		{"a = b + c;", true, "Assignment with expression"},
-		{"a, b = c, d;", true, "Multiple assignments"},
-		{"a = b = c;", false, "Chained assignment"},
-		{"a = b + c = d;", false, "Invalid chained assignment"},
-		{"a = b +;", false, "Missing right operand"},
-		{"a = ;", false, "Missing left operand"},
-		{"a = b + + c;", false, "Invalid consecutive operators"},
+		{"a, b;", true, "Multiple expressions"},
+		{"a, b", false, "Expected semicolon"},
+		{"a b", false, "Unexpected token b"},
+
+		// binary expressions
+		{"a + b;", true, "Binary addition"},
+		{"a - b;", true, "Binary subtraction"},
+		{"a * b;", true, "Binary multiplication"},
+		{"a / b;", true, "Binary division"},
+		{"a % b;", true, "Binary modulo"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 			if len(nodes) == 0 && tt.isValid {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}

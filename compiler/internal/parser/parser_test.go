@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -14,9 +15,11 @@ func TestParserBasics(t *testing.T) {
 		{"const y = true;", true, "Constant declaration"},
 		{"x = 42; y = 10;", true, "Multiple statements"},
 		{"let x; x = 42;", true, "Declaration followed by assignment"},
-		{"let x, y; x, y = 1, 2;", true, "Multiple declaration and assignment"},
+		{"let x, y;\nx, y = 1, 2;", true, "Multiple declaration and assignment"},
 		{"let x: i32 = 42;", true, "Typed variable declaration"},
 		{"", true, "Empty file"},
+		{"a;", true, "Single unused statement"},
+		{"a, b;", true, "Multiple unused statements"},
 		{"let", false, "Incomplete declaration"},
 		{"x =", false, "Incomplete assignment"},
 		{"let x = ;", false, "Missing expression in declaration"},
@@ -27,7 +30,7 @@ func TestParserBasics(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid && tt.input != "" {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}

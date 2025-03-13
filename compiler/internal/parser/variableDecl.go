@@ -21,8 +21,8 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableDecl, int) {
 		identifier := &ast.IdentifierExpr{
 			Name: identifierName.Value,
 			Location: ast.Location{
-				Start: identifierName.Start,
-				End:   identifierName.End,
+				Start: &identifierName.Start,
+				End:   &identifierName.End,
 			},
 		}
 		variables = append(variables, &ast.VariableDecl{
@@ -110,25 +110,29 @@ func assignValues(p *Parser, variables []*ast.VariableDecl, values []ast.Express
 	if len(values) == 0 {
 		return true
 	}
-	if len(values) == 1 && varCount > 1 {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.SINGLE_VALUE_MULTIPLE_VARIABLES).SetLevel(report.SYNTAX_ERROR)
+	if len(values) > varCount {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
 		return false
 	}
-	if len(values) != varCount {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, fmt.Sprintf("Expected %d values, got %d", varCount, len(values))).SetLevel(report.SYNTAX_ERROR)
-		return false
-	}
+
 	for i := range variables {
-		variables[i].Initializer = values[i]
+		//if there are more variables than values, share the last value for the rest
+		variables[i].Initializer = values[min(i, len(values)-1)]
 	}
+
 	return true
 }
 
-func parseVarDecl(p *Parser) ast.Node {
+func parseVarDecl(p *Parser) ast.Statement {
 	p.advance() // consume let/const
 
 	variables, varCount := parseIdentifiers(p)
 	if variables == nil {
+		pos := p.peek()
+		report.Add(p.filePath,
+			pos.Start.Line, pos.End.Line,
+			pos.Start.Column, pos.End.Column,
+			"no variables found").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
@@ -142,9 +146,11 @@ func parseVarDecl(p *Parser) ast.Node {
 		return nil
 	}
 
-	p.consume(lexer.SEMI_COLON_TOKEN, report.EXPECTED_SEMI_COLON)
-
 	return &ast.VarDeclStmt{
 		Variables: variables,
+		Location: ast.Location{
+			Start: variables[0].Location.Start,
+			End:   variables[len(variables)-1].Location.End,
+		},
 	}
 }

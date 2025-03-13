@@ -18,7 +18,7 @@ func TestIsKeyword(t *testing.T) {
 		{"priv", true},
 		{"interface", true},
 		{"impl", true},
-		{"struct", false},
+		{"struct", true},
 		{"fn", true},
 		{"return", true},
 		{"in", false},

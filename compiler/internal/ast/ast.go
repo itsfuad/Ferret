@@ -6,13 +6,13 @@ type NODE_TYPE int
 
 type Node interface {
 	INode()
-	StartPos() lexer.Position
-	EndPos() lexer.Position
+	StartPos() *lexer.Position
+	EndPos() *lexer.Position
 }
 
 type Location struct {
-	Start lexer.Position
-	End   lexer.Position
+	Start *lexer.Position
+	End   *lexer.Position
 }
 
 const (
@@ -38,11 +38,11 @@ type LValue interface {
 
 type ExpressionList []Expression
 
-func (el ExpressionList) StartPos() lexer.Position {
+func (el ExpressionList) StartPos() *lexer.Position {
 	return el[0].StartPos()
 }
 
-func (el ExpressionList) EndPos() lexer.Position {
+func (el ExpressionList) EndPos() *lexer.Position {
 	return el[len(el)-1].EndPos()
 }
 
@@ -53,3 +53,20 @@ type Statement interface {
 	Node
 	Stmt()
 }
+
+// ExpressionStmt represents a statement that consists of one or more expressions
+type ExpressionStmt struct {
+	Expressions ExpressionList
+	Location    Location
+}
+
+func (e *ExpressionStmt) StartPos() *lexer.Position {
+	return e.Location.Start
+}
+
+func (e *ExpressionStmt) EndPos() *lexer.Position {
+	return e.Location.End
+}
+
+func (e *ExpressionStmt) INode() {} // INode is a marker interface for all nodes
+func (e *ExpressionStmt) Stmt()  {} // Stmt is a marker interface for all statements
