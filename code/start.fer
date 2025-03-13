@@ -3,7 +3,7 @@ a, b;
 a + b;
 answer = (a + b) * 2;
 
-
+let myvar;
 let a = 10;
 
 let arr : [][]i32 = [[1, 2, 3], [4, 5, 6]];
@@ -48,3 +48,8 @@ let p3: struct {
 fn add(a: i32, b: i32) -> i32 {
     return a + b;
 }
+
+const add3 = fn(a: i32, b: i32) -> i32 {
+    return a + b;
+};
+

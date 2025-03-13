@@ -68,14 +68,3 @@ func (o *ObjectType) INode()                    {} // INode is a marker interfac
 func (o *ObjectType) Type() types.TYPE_NAME     { return o.TypeName }
 func (o *ObjectType) StartPos() *lexer.Position { return o.Start }
 func (o *ObjectType) EndPos() *lexer.Position   { return o.End }
-
-// ObjectLiteralExpr represents an object literal expression
-type ObjectLiteralExpr struct {
-	Fields []ObjectField
-	Location
-}
-
-func (o *ObjectLiteralExpr) INode()                    {} // INode is a marker interface for all nodes
-func (o *ObjectLiteralExpr) Expr()                     {} // Expr is a marker interface for all expressions
-func (o *ObjectLiteralExpr) StartPos() *lexer.Position { return o.Start }
-func (o *ObjectLiteralExpr) EndPos() *lexer.Position   { return o.End }

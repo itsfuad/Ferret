@@ -31,9 +31,9 @@ type Expression interface {
 	Expr()
 }
 
-type LValue interface {
+type BlockConstruct interface {
 	Node
-	LValue()
+	Block()
 }
 
 type ExpressionList []Expression

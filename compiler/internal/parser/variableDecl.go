@@ -50,8 +50,8 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 	p.advance()
 	types := make([]ast.DataType, 0)
 	for {
-		typeNode := parseType(p)
-		if typeNode == nil {
+		typeNode, ok := parseType(p)
+		if !ok {
 			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
@@ -66,27 +66,26 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 }
 
 func parseInitializers(p *Parser) ([]ast.Expression, bool) {
-	if p.peek().Kind != lexer.EQUALS_TOKEN {
-		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_EQUALS).SetLevel(report.SYNTAX_ERROR)
-		return nil, true
-	}
 
-	p.advance()
 	values := make([]ast.Expression, 0)
-	for {
-		value := parseExpression(p)
-		if value == nil {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected value after '='").SetLevel(report.SYNTAX_ERROR)
-			return nil, false
-		}
-		values = append(values, value)
 
-		if p.peek().Kind != lexer.COMMA_TOKEN {
-			break
-		}
+	if p.match(lexer.EQUALS_TOKEN) {
 		p.advance()
+		for {
+			value := parseExpression(p)
+			if value == nil {
+				report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected value after '='").SetLevel(report.SYNTAX_ERROR)
+				return nil, false
+			}
+			values = append(values, value)
+
+			if p.peek().Kind != lexer.COMMA_TOKEN {
+				break
+			}
+			p.advance()
+		}
 	}
+
 	return values, true
 }
 

@@ -89,18 +89,14 @@ func (s *StructLiteralExpr) Expr()                     {} // Expr is a marker in
 func (s *StructLiteralExpr) StartPos() *lexer.Position { return s.Start }
 func (s *StructLiteralExpr) EndPos() *lexer.Position   { return s.End }
 
-// FunctionDeclExpr represents both named and anonymous function declarations
-type FunctionDeclExpr struct {
-	Identifier  IdentifierExpr
-	Params      []IdentifierExpr // Parameter names
-	ParamTypes  []DataType       // Parameter types
-	ReturnType  DataType         // Return type (can be nil for void functions)
-	Body        *BlockStmt       // Function body
-	IsAnonymous bool             // Whether this is an anonymous function
+type FunctionLiteral struct {
+	Params     []Parameter
+	ReturnType DataType
+	Body       *BlockConstruct
 	Location
 }
 
-func (f *FunctionDeclExpr) INode()                    {} // INode is a marker interface for all nodes
-func (f *FunctionDeclExpr) Expr()                     {} // Expr is a marker interface for all expressions
-func (f *FunctionDeclExpr) StartPos() *lexer.Position { return f.Start }
-func (f *FunctionDeclExpr) EndPos() *lexer.Position   { return f.End }
+func (f *FunctionLiteral) INode()                    {} // INode is a marker interface for all nodes
+func (f *FunctionLiteral) Expr()                     {} // Expr is a marker interface for all expressions
+func (f *FunctionLiteral) StartPos() *lexer.Position { return f.Start }
+func (f *FunctionLiteral) EndPos() *lexer.Position   { return f.End }

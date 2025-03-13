@@ -2,8 +2,22 @@ package parser
 
 import (
 	"ferret/compiler/testUtils"
+	"os"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	// Reset test results before running tests
+	ResetTestResult()
+
+	// Run all tests
+	code := m.Run()
+
+	// Print test results
+	PrintTestResult()
+
+	os.Exit(code)
+}
 
 func TestParserBasics(t *testing.T) {
 	tests := []struct {
@@ -14,6 +28,7 @@ func TestParserBasics(t *testing.T) {
 		{"let x = 42;", true, "Variable declaration with initialization"},
 		{"const y = true;", true, "Constant declaration"},
 		{"x = 42; y = 10;", true, "Multiple statements"},
+		{"let x;", true, "Declaration without initialization"},
 		{"let x; x = 42;", true, "Declaration followed by assignment"},
 		{"let x, y;\nx, y = 1, 2;", true, "Multiple declaration and assignment"},
 		{"let x: i32 = 42;", true, "Typed variable declaration"},
@@ -23,6 +38,7 @@ func TestParserBasics(t *testing.T) {
 		{"let", false, "Incomplete declaration"},
 		{"x =", false, "Incomplete assignment"},
 		{"let x = ;", false, "Missing expression in declaration"},
+		{"let x = 42; x = ;", false, "Missing expression in assignment"},
 	}
 
 	for _, tt := range tests {

@@ -328,7 +328,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 		}
 
 		fields = append(fields, ast.StructFieldInit{
-			Field:  ast.IdentifierExpr{
+			Field: ast.IdentifierExpr{
 				Name: fieldName.Value,
 				Location: ast.Location{
 					Start: &fieldName.Start,
@@ -357,7 +357,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.StructLiteralExpr{
-		TypeName:    ast.IdentifierExpr{
+		TypeName: ast.IdentifierExpr{
 			Name: typeName.Value,
 			Location: ast.Location{
 				Start: &typeName.Start,
@@ -384,6 +384,9 @@ func parsePrimary(p *Parser) ast.Expression {
 		return parseNumberLiteral(p)
 	case lexer.STRING_TOKEN:
 		return parseStringLiteral(p)
+	case lexer.FUNCTION_TOKEN:
+		start := p.advance()
+		return parseFunctionLiteral(p, &start.Start)
 	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
 		// Look ahead to see if this is a struct literal
 		next := p.next()

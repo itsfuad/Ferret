@@ -21,11 +21,6 @@ type VariableDecl struct {
 	Location
 }
 
-func (v *VariableDecl) INode()                    {} // INode is a marker interface for all nodes
-func (v *VariableDecl) Expr()                     {} // Expr is a marker interface for all expressions
-func (v *VariableDecl) StartPos() *lexer.Position { return v.Start }
-func (v *VariableDecl) EndPos() *lexer.Position   { return v.End }
-
 type AssignmentStmt struct {
 	Left  ExpressionList
 	Right ExpressionList
@@ -59,14 +54,3 @@ func (r *ReturnStmt) INode()                    {} // INode is a marker interfac
 func (r *ReturnStmt) Stmt()                     {} // Stmt is a marker method for statements
 func (r *ReturnStmt) StartPos() *lexer.Position { return r.Start }
 func (r *ReturnStmt) EndPos() *lexer.Position   { return r.End }
-
-// BlockStmt represents a block of statements
-type BlockStmt struct {
-	Statements []Statement
-	Location
-}
-
-func (b *BlockStmt) INode()                    {} // INode is a marker interface for all nodes
-func (b *BlockStmt) Stmt()                     {} // Stmt is a marker method for statements
-func (b *BlockStmt) StartPos() *lexer.Position { return b.Start }
-func (b *BlockStmt) EndPos() *lexer.Position   { return b.End }

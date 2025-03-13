@@ -4,57 +4,37 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/report"
-	"fmt"
-	//"ferret/compiler/internal/lexer"
 )
 
-func parseFunctionDecl(p *Parser) ast.Expression {
+func parseParameters(p *Parser) []ast.Parameter {
 
-	// consume the function token
-	start := p.advance()
+	params := []ast.Parameter{}
 
-	name := ast.IdentifierExpr{}
-
-	isAnonymous := false
-
-	if p.match(lexer.IDENTIFIER_TOKEN) {
-		token := p.advance()
-		location := ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		}
-		name = ast.IdentifierExpr{
-			Name:     token.Value,
-			Location: location,
-		}
-	} else {
-		isAnonymous = true
-	}
-
-	var returnType ast.DataType
-	params := []ast.IdentifierExpr{}
-	paramTypes := []ast.DataType{}
-
-	if !p.match(lexer.OPEN_PAREN) {
-		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_OPEN_PAREN).AddHint("Add an opening parenthesis after the function name").SetLevel(report.SYNTAX_ERROR)
-		return nil
-	}
-
-	p.advance() // consume the open parenthesis
+	p.consume(lexer.OPEN_PAREN, report.EXPECTED_OPEN_PAREN)
 
 	for !p.match(lexer.CLOSE_PAREN) {
 		if p.match(lexer.IDENTIFIER_TOKEN) {
 			token := p.advance()
-			params = append(params, ast.IdentifierExpr{Name: token.Value, Location: ast.Location{Start: &token.Start, End: &token.End}})
+
+			location := ast.Location{
+				Start: &token.Start,
+				End:   &token.End,
+			}
+
+			params = append(params, ast.Parameter{
+				Identifier: &ast.IdentifierExpr{Name: token.Value, Location: location},
+			})
+
 			p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
-			paramType := parseType(p)
-			if paramType == nil {
+			paramType, ok := parseType(p)
+			if !ok {
 				token := p.peek()
 				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
 				return nil
 			}
-			paramTypes = append(paramTypes, paramType)
+
+			params[len(params)-1].Type = paramType
+
 		} else {
 			token := p.peek()
 			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_NAME).AddHint("Add an identifier after the function name").SetLevel(report.SYNTAX_ERROR)
@@ -73,35 +53,82 @@ func parseFunctionDecl(p *Parser) ast.Expression {
 
 	p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
 
+	return params
+}
+
+func parseSignature(p *Parser) ([]ast.Parameter, ast.DataType) {
+
+	if !p.match(lexer.OPEN_PAREN) {
+		token := p.peek()
+		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_OPEN_PAREN).AddHint("Add an opening parenthesis after the function name").SetLevel(report.SYNTAX_ERROR)
+		return nil, nil
+	}
+
+	params := parseParameters(p)
+
 	// Parse return type if present
 	if p.match(lexer.ARROW_TOKEN) {
 		p.advance() // consume '->'
-		returnType = parseType(p)
-		if returnType == nil {
-			token := p.peek()
+		returnType, ok := parseType(p)
+		if !ok {
+			token := p.previous()
 			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
-			return nil
+			return nil, nil
+		}
+		return params, returnType
+	}
+
+	return params, nil
+}
+
+func parseFunctionLiteral(p *Parser, start *lexer.Position) *ast.FunctionLiteral {
+
+	var returnType ast.DataType
+
+	params, returnType := parseSignature(p)
+
+	block := parseBlock(p)
+
+	location := ast.Location{
+		Start: start,
+		End:   block.EndPos(),
+	}
+
+	return &ast.FunctionLiteral{
+		Params:     params,
+		ReturnType: returnType,
+		Body:       &block,
+		Location:   location,
+	}
+}
+
+func parseFunctionDecl(p *Parser) ast.BlockConstruct {
+
+	// consume the function token
+	start := p.advance()
+
+	name := ast.IdentifierExpr{}
+
+	if p.match(lexer.IDENTIFIER_TOKEN) {
+		token := p.advance()
+		location := ast.Location{
+			Start: &token.Start,
+			End:   &token.End,
+		}
+		name = ast.IdentifierExpr{
+			Name:     token.Value,
+			Location: location,
 		}
 	}
 
-	fmt.Printf("Function name: %+v\n", name)
-	fmt.Printf("Return type: %+v\n", returnType)
-	fmt.Printf("Params: %+v\n", params)
-	fmt.Printf("Param types: %+v\n", paramTypes)
-
-	// Parse function body
-	body := parseBlock(p)
+	function := parseFunctionLiteral(p, &start.Start)
 
 	return &ast.FunctionDeclExpr{
-		Identifier:  name,
-		IsAnonymous: isAnonymous,
-		Params:      params,
-		ParamTypes:  paramTypes,
-		ReturnType:  returnType,
-		Body:        body,
+		Identifier: name,
+		Function:   function,
 		Location: ast.Location{
 			Start: &start.Start,
-			End:   body.EndPos(),
+			End:   function.EndPos(),
 		},
 	}
 }

@@ -144,24 +144,24 @@ func handleUnexpectedToken(p *Parser) ast.Statement {
 }
 
 // parseBlock parses a block of statements
-func parseBlock(p *Parser) *ast.BlockStmt {
+func parseBlock(p *Parser) ast.BlockConstruct {
 	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
-	statements := make([]ast.Statement, 0)
+	nodes := make([]ast.Node, 0)
 
 	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
-		stmt := parseStatement(p)
-		if stmt == nil {
+		node := parseNode(p)
+		if node == nil {
 			token := p.peek()
 			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
-		statements = append(statements, stmt)
+		nodes = append(nodes, node)
 	}
 
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
-	return &ast.BlockStmt{
-		Statements: statements,
+	return &ast.Block{
+		Nodes: nodes,
 		Location: ast.Location{
 			Start: &start,
 			End:   &end,
@@ -169,30 +169,47 @@ func parseBlock(p *Parser) *ast.BlockStmt {
 	}
 }
 
-// parseStatement parses a single statement
-func parseStatement(p *Parser) ast.Statement {
+// parseNode parses a single statement or expression
+func parseNode(p *Parser) ast.Node {
+	var node ast.Node
 	switch p.peek().Kind {
 	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
-		return parseVarDecl(p)
+		node = parseVarDecl(p)
 	case lexer.TYPE_TOKEN:
-		return parseTypeDecl(p)
+		node = parseTypeDecl(p)
 	case lexer.RETURN_TOKEN:
-		return parseReturnStmt(p)
+		node = parseReturnStmt(p)
 	case lexer.FUNCTION_TOKEN:
-		return parseExpressionStatement(p, parseFunctionDecl(p))
+		node = parseFunctionDecl(p)
 	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
 		// Look ahead to see if this is an assignment
 		expr := parseExpression(p)
 		if expr != nil {
 			// if the expression is valid, parse it as an expression statement
-			return parseExpressionStatement(p, expr)
+			node = parseExpressionStatement(p, expr)
 		} else {
+			fmt.Printf("Invalid expression: %+v\n", expr)
 			// if the expression is invalid, report an error
-			return handleUnexpectedToken(p)
+			node = handleUnexpectedToken(p)
 		}
 	default:
-		return handleUnexpectedToken(p)
+		fmt.Printf("Invalid token: %+v\n", p.peek())
+		node = handleUnexpectedToken(p)
 	}
+
+	// Handle statement termination and update locations
+	if _, ok := node.(ast.Statement); ok {
+		//if no semicolon, show error on the previous token
+		if !p.match(lexer.SEMICOLON_TOKEN) {
+			previous := p.previous()
+			report.Add(p.filePath, previous.Start.Line, previous.End.Line, previous.Start.Column, previous.End.Column, "Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+		}
+		end := p.advance()
+		node.EndPos().Column = end.End.Column
+		node.EndPos().Line = end.End.Line
+	}
+
+	return node
 }
 
 // parseReturnStmt parses a return statement
@@ -224,28 +241,14 @@ func parseReturnStmt(p *Parser) ast.Statement {
 func (p *Parser) Parse() []ast.Node {
 	var nodes []ast.Node
 
-	//fmt.Printf("Parsing file: %s\nTokens:\n%v\n", p.filePath, p.tokens)
-
 	for !p.isAtEnd() {
 		// Parse the statement
-		node := parseStatement(p)
-
-		// Handle statement termination and update locations
+		node := parseNode(p)
 		if node != nil {
-
-			//if no semicolon, show error on the previous token
-			if !p.match(lexer.SEMICOLON_TOKEN) {
-				previous := p.previous()
-				report.Add(p.filePath,
-					previous.Start.Line, previous.End.Line,
-					previous.Start.Column, previous.End.Column,
-					"Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
-			}
-
-			end := p.advance()
-			node.EndPos().Column = end.End.Column
-			node.EndPos().Line = end.End.Line
 			nodes = append(nodes, node)
+		} else {
+			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
+			return nil
 		}
 	}
 

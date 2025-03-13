@@ -5,10 +5,9 @@ import (
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
-	"fmt"
 )
 
-func parseIntegerType(p *Parser) ast.DataType {
+func parseIntegerType(p *Parser) (ast.DataType, bool) {
 	token := p.peek()
 
 	switch token.Value {
@@ -22,7 +21,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.INT16):
 		p.advance()
 		return &ast.IntType{
@@ -33,7 +32,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.INT32):
 		p.advance()
 		return &ast.IntType{
@@ -44,7 +43,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.INT64):
 		p.advance()
 		return &ast.IntType{
@@ -55,7 +54,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.UINT8):
 		p.advance()
 		return &ast.IntType{
@@ -66,7 +65,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.UINT16):
 		p.advance()
 		return &ast.IntType{
@@ -77,7 +76,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.UINT32):
 		p.advance()
 		return &ast.IntType{
@@ -88,7 +87,7 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.UINT64):
 		p.advance()
 		return &ast.IntType{
@@ -99,26 +98,30 @@ func parseIntegerType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	}
-	report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
-	return nil
+	return nil, false
 }
 
 // user defined types are defined by the type keyword
 // type NewType OldType;
-func parseUserDefinedType(p *Parser) ast.DataType {
-	token := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
-	return &ast.UserDefinedType{
-		TypeName: types.TYPE_NAME(token.Value),
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
+	if p.match(lexer.IDENTIFIER_TOKEN) {
+		token := p.advance()
+
+		return &ast.UserDefinedType{
+			TypeName: types.TYPE_NAME(token.Value),
+			Location: ast.Location{
+				Start: &token.Start,
+				End:   &token.End,
+			},
+		}, true
 	}
+
+	return nil, false
 }
 
-func parseFloatType(p *Parser) ast.DataType {
+func parseFloatType(p *Parser) (ast.DataType, bool) {
 	token := p.peek()
 
 	switch token.Value {
@@ -131,7 +134,7 @@ func parseFloatType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	case string(types.FLOAT64):
 		p.advance()
 		return &ast.FloatType{
@@ -141,14 +144,12 @@ func parseFloatType(p *Parser) ast.DataType {
 				Start: &token.Start,
 				End:   &token.End,
 			},
-		}
+		}, true
 	}
-
-	report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
-	return nil
+	return nil, false
 }
 
-func parseStringType(p *Parser) ast.DataType {
+func parseStringType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	return &ast.StringType{
 		TypeName: types.STRING,
@@ -156,10 +157,10 @@ func parseStringType(p *Parser) ast.DataType {
 			Start: &token.Start,
 			End:   &token.End,
 		},
-	}
+	}, true
 }
 
-func parseByteType(p *Parser) ast.DataType {
+func parseByteType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	return &ast.ByteType{
 		TypeName: types.BYTE,
@@ -167,10 +168,10 @@ func parseByteType(p *Parser) ast.DataType {
 			Start: &token.Start,
 			End:   &token.End,
 		},
-	}
+	}, true
 }
 
-func parseBoolType(p *Parser) ast.DataType {
+func parseBoolType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	return &ast.BoolType{
 		TypeName: types.BOOL,
@@ -178,31 +179,28 @@ func parseBoolType(p *Parser) ast.DataType {
 			Start: &token.Start,
 			End:   &token.End,
 		},
-	}
+	}, true
 }
 
-func parseArrayType(p *Parser) ast.DataType {
+func parseArrayType(p *Parser) (ast.DataType, bool) {
 	//consume the '[' token
 	start := p.advance().Start
 	// consume the ']' token
 	p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
 
 	//parse the type
-	elementType := parseType(p)
-	if elementType == nil {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-			p.peek().Start.Column, p.peek().End.Column,
-			report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
-		return nil
-	}
 
-	return &ast.ArrayType{
-		ElementType: elementType,
-		TypeName:    types.ARRAY,
-		Location: ast.Location{
-			Start: &start,
-			End:   elementType.EndPos(),
-		},
+	if elementType, ok := parseType(p); !ok {
+		return nil, false
+	} else {
+		return &ast.ArrayType{
+			ElementType: elementType,
+			TypeName:    types.ARRAY,
+			Location: ast.Location{
+				Start: &start,
+				End:   elementType.EndPos(),
+			},
+		}, true
 	}
 }
 
@@ -216,30 +214,24 @@ func parseStructField(p *Parser) *ast.ObjectField {
 	p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
 
 	// Parse field type
-	fieldType := parseType(p)
-	if fieldType == nil {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-			p.peek().Start.Column, p.peek().End.Column,
-			report.EXPECTED_FIELD_TYPE).SetLevel(report.SYNTAX_ERROR)
+	if fieldType, ok := parseType(p); !ok {
 		return nil
-	}
-
-	return &ast.ObjectField{
-		Name: fieldName,
-		Type: fieldType,
-		Location: ast.Location{
-			Start: &nameToken.Start,
-			End:   fieldType.EndPos(),
-		},
+	} else {
+		return &ast.ObjectField{
+			Name: fieldName,
+			Type: fieldType,
+			Location: ast.Location{
+				Start: &nameToken.Start,
+				End:   fieldType.EndPos(),
+			},
+		}
 	}
 }
 
 // parseStructType parses a struct type definition like struct { name: str, age: i32 }
-func parseStructType(p *Parser) ast.DataType {
+func parseStructType(p *Parser) (ast.DataType, bool) {
 	// Consume 'struct' keyword
-	fmt.Printf("Parsing struct type\nCurrent token: %v\n", p.peek())
 	start := p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD).Start
-
 	// Consume opening brace
 	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
@@ -248,7 +240,7 @@ func parseStructType(p *Parser) ast.DataType {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 			p.peek().Start.Column, p.peek().End.Column,
 			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
-		return nil
+		return nil, false
 	}
 
 	fields := make([]ast.ObjectField, 0)
@@ -259,7 +251,7 @@ func parseStructType(p *Parser) ast.DataType {
 		// Parse field
 		field := parseStructField(p)
 		if field == nil {
-			return nil
+			return nil, false
 		}
 
 		// Check for duplicate field names
@@ -267,7 +259,7 @@ func parseStructType(p *Parser) ast.DataType {
 			report.Add(p.filePath, field.Location.Start.Line, field.Location.End.Line,
 				field.Location.Start.Column, field.Location.End.Column,
 				report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
-			return nil
+			return nil, false
 		}
 		fieldNames[field.Name] = true
 		fields = append(fields, *field)
@@ -277,7 +269,7 @@ func parseStructType(p *Parser) ast.DataType {
 			if p.peek().Kind == lexer.CLOSE_CURLY {
 				curr := p.peek()
 				report.Add(p.filePath, curr.Start.Line, curr.End.Line, curr.Start.Column, curr.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
-				return nil
+				return nil, false
 			}
 		} else {
 			break
@@ -293,11 +285,11 @@ func parseStructType(p *Parser) ast.DataType {
 			Start: &start,
 			End:   &end,
 		},
-	}
+	}, true
 }
 
 // parseType parses a type expression
-func parseType(p *Parser) ast.DataType {
+func parseType(p *Parser) (ast.DataType, bool) {
 	token := p.peek()
 	switch token.Value {
 	case string(types.INT8), string(types.INT16), string(types.INT32), string(types.INT64), string(types.UINT8), string(types.UINT16), string(types.UINT32), string(types.UINT64):
@@ -325,8 +317,8 @@ func parseTypeDecl(p *Parser) ast.Statement {
 
 	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
 	// Parse the underlying type
-	underlyingType := parseType(p)
-	if underlyingType == nil {
+	underlyingType, ok := parseType(p)
+	if !ok {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 			p.peek().Start.Column, p.peek().End.Column,
 			report.EXPECTED_TYPE).SetLevel(report.SYNTAX_ERROR)

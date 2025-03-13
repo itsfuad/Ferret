@@ -76,8 +76,8 @@ func TestParseIntegerType(t *testing.T) {
 				{Kind: lexer.EOF_TOKEN},
 			}
 
-			result := parseIntegerType(p)
-			if result == nil {
+			result, ok := parseIntegerType(p)
+			if !ok {
 				t.Fatalf("parseIntegerType() returned nil for input %s", tt.input)
 			}
 			assertIntType(t, result, tt.expected, tt.bitSize, tt.unsigned)
@@ -105,8 +105,8 @@ func TestParseFloatType(t *testing.T) {
 				{Kind: lexer.EOF_TOKEN},
 			}
 
-			result := parseFloatType(p)
-			if result == nil {
+			result, ok := parseFloatType(p)
+			if !ok {
 				t.Fatalf("parseFloatType() returned nil for input %s", tt.input)
 			}
 			assertFloatType(t, result, tt.expected, tt.bitSize)
@@ -204,9 +204,8 @@ func TestParseType(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			filePath := testUtils.CreateTestFileWithContent(t, tt.input)
 			p := New(filePath, false)
-			result := parseType(p)
-
-			if !tt.isValid && result != nil {
+			result, ok := parseType(p)
+			if !tt.isValid && ok {
 				t.Errorf("Expected nil result for invalid input %s", tt.input)
 				return
 			}

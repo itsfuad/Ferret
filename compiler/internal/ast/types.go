@@ -138,23 +138,18 @@ func (t *ArrayType) EndPos() *lexer.Position {
 
 // Parameter represents a function or method parameter
 type Parameter struct {
-	Name string
-	Type DataType
+	Identifier *IdentifierExpr
+	Type       DataType
 }
 
 // MethodDecl represents a method declaration
 type MethodDecl struct {
-	Name       string
-	Receiver   *Parameter
-	Parameters []Parameter
-	ReturnType DataType
-	Body       *BlockStmt
+	Name     string
+	Receiver *Parameter // Receiver parameter: e.g. in `fn (t *T) M(n int)`, `t` is the receiver
+	IsRRef   bool       // Whether the receiver is a reference
+	Function *FunctionLiteral
 	Location
 }
-
-func (m *MethodDecl) INode()                    {} // INode is a marker interface for all nodes
-func (m *MethodDecl) StartPos() *lexer.Position { return m.Start }
-func (m *MethodDecl) EndPos() *lexer.Position   { return m.End }
 
 // StructType represents a struct type definition
 type StructType struct {
