@@ -28,6 +28,7 @@ const (
 	NUMBER_TOKEN    TOKEN = "numeric literal"
 	STRING_TOKEN    TOKEN = "string literal"
 	BYTE_TOKEN      TOKEN = "byte literal"
+	STRUCT_TOKEN    TOKEN = TOKEN(types.STRUCT)
 	FUNCTION_TOKEN  TOKEN = TOKEN(types.FUNCTION)
 	INTERFACE_TOKEN TOKEN = TOKEN(types.INTERFACE)
 
@@ -69,18 +70,18 @@ const (
 	MOD_EQUALS_TOKEN   TOKEN = "%="
 	EXP_EQUALS_TOKEN   TOKEN = "^="
 	//delimiters
-	OPEN_PAREN       TOKEN = "("
-	CLOSE_PAREN      TOKEN = ")"
-	OPEN_BRACKET     TOKEN = "["
-	CLOSE_BRACKET    TOKEN = "]"
-	OPEN_CURLY       TOKEN = "{"
-	CLOSE_CURLY      TOKEN = "}"
-	COMMA_TOKEN      TOKEN = ","
-	DOT_TOKEN        TOKEN = "."
-	SEMI_COLON_TOKEN TOKEN = ";"
-	ARROW_TOKEN      TOKEN = "->"
-	FAT_ARROW_TOKEN  TOKEN = "=>"
-	EOF_TOKEN        TOKEN = "end_of_file"
+	OPEN_PAREN      TOKEN = "("
+	CLOSE_PAREN     TOKEN = ")"
+	OPEN_BRACKET    TOKEN = "["
+	CLOSE_BRACKET   TOKEN = "]"
+	OPEN_CURLY      TOKEN = "{"
+	CLOSE_CURLY     TOKEN = "}"
+	COMMA_TOKEN     TOKEN = ","
+	DOT_TOKEN       TOKEN = "."
+	SEMICOLON_TOKEN TOKEN = ";"
+	ARROW_TOKEN     TOKEN = "->"
+	FAT_ARROW_TOKEN TOKEN = "=>"
+	EOF_TOKEN       TOKEN = "end_of_file"
 )
 
 var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
@@ -93,6 +94,7 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	WHILE_TOKEN:     true,
 	DO_TOKEN:        true,
 	TYPE_TOKEN:      true,
+	STRUCT_TOKEN:    true,
 	PRIVATE_TOKEN:   true,
 	INTERFACE_TOKEN: true,
 	IMPL_TOKEN:      true,

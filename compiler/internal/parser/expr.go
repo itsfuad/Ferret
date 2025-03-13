@@ -282,6 +282,84 @@ func parseGrouping(p *Parser) ast.Expression {
 	return expr
 }
 
+// parseStructLiteral parses a struct literal expression like Point{x: 10, y: 20}
+func parseStructLiteral(p *Parser) ast.Expression {
+
+	//might have a name or might be anonymous
+	var typeName lexer.Token
+	if p.match(lexer.IDENTIFIER_TOKEN) {
+		typeName = p.advance()
+	} else {
+		typeName = p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD)
+	}
+
+	isAnonymous := typeName.Kind == lexer.STRUCT_TOKEN
+
+	// Consume opening brace
+	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
+
+	// Check for empty struct
+	if p.peek().Kind == lexer.CLOSE_CURLY {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
+			p.peek().Start.Column, p.peek().End.Column,
+			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+
+	fieldNames := make(map[string]bool)
+
+	// Parse field initializers
+	fields := make([]ast.StructFieldInit, 0)
+	for p.peek().Kind != lexer.CLOSE_CURLY {
+		// Parse field name
+		fieldName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME)
+		if fieldNames[fieldName.Value] {
+			report.Add(p.filePath, fieldName.Start.Line, fieldName.End.Line, fieldName.Start.Column, fieldName.End.Column, report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		fieldNames[fieldName.Value] = true
+		p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
+
+		// Parse field value
+		value := parseExpression(p)
+		if value == nil {
+			return nil
+		}
+
+		fields = append(fields, ast.StructFieldInit{
+			Name:  fieldName.Value,
+			Value: value,
+			Location: ast.Location{
+				Start: &fieldName.Start,
+				End:   value.EndPos(),
+			},
+		})
+
+		if !p.match(lexer.CLOSE_CURLY) {
+			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
+			if p.peek().Kind == lexer.CLOSE_CURLY {
+				curr := p.peek()
+				report.Add(p.filePath, curr.Start.Line, curr.End.Line, curr.Start.Column, curr.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
+				return nil
+			}
+		} else {
+			break
+		}
+	}
+
+	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
+
+	return &ast.StructLiteralExpr{
+		TypeName:    typeName.Value,
+		Fields:      fields,
+		IsAnonymous: isAnonymous,
+		Location: ast.Location{
+			Start: &start,
+			End:   &end,
+		},
+	}
+}
+
 // parsePrimary handles literals, identifiers, and parenthesized expressions
 func parsePrimary(p *Parser) ast.Expression {
 	switch p.peek().Kind {
@@ -289,40 +367,18 @@ func parsePrimary(p *Parser) ast.Expression {
 		return parseGrouping(p)
 	case lexer.OPEN_BRACKET:
 		return parseArrayLiteral(p)
-	case lexer.OPEN_CURLY:
-		// Only parse as object literal if it's in an expression context
-		// For example: after '=', in array literal, as function argument, etc.
-		if isExpressionContext(p) {
-			return parseObjectLiteral(p)
-		}
-		// Report error for unexpected curly brace
-		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line,
-			token.Start.Column, token.End.Column,
-			report.UNEXPECTED_CURLY_BRACE).SetLevel(report.SYNTAX_ERROR)
 	case lexer.NUMBER_TOKEN:
 		return parseNumberLiteral(p)
 	case lexer.STRING_TOKEN:
 		return parseStringLiteral(p)
-	case lexer.IDENTIFIER_TOKEN:
+	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
+		// Look ahead to see if this is a struct literal
+		next := p.next()
+		if next.Kind == lexer.OPEN_CURLY {
+			return parseStructLiteral(p)
+		}
 		return parseIdentifier(p)
 	}
 	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
 	return nil
-}
-
-// isExpressionContext returns true if we're in a context where an expression is expected
-func isExpressionContext(p *Parser) bool {
-	// Look at previous non-whitespace token
-	prev := p.previous().Kind
-
-	// Object literals can appear:
-	// - After '=' (assignment or initialization)
-	// - After ':' (in another object literal)
-	// - After ',' (in array or argument list)
-	// - After 'return'
-	return prev == lexer.EQUALS_TOKEN ||
-		prev == lexer.COLON_TOKEN ||
-		prev == lexer.COMMA_TOKEN ||
-		prev == lexer.RETURN_TOKEN
 }

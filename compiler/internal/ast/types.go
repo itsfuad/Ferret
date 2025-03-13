@@ -136,4 +136,37 @@ func (t *ArrayType) EndPos() *lexer.Position {
 	return t.Location.End
 }
 
+// Parameter represents a function or method parameter
+type Parameter struct {
+	Name string
+	Type DataType
+}
+
+// MethodDecl represents a method declaration
+type MethodDecl struct {
+	Name       string
+	Receiver   *Parameter
+	Parameters []Parameter
+	ReturnType DataType
+	Body       *BlockStmt
+	Location
+}
+
+func (m *MethodDecl) INode()                    {} // INode is a marker interface for all nodes
+func (m *MethodDecl) StartPos() *lexer.Position { return m.Start }
+func (m *MethodDecl) EndPos() *lexer.Position   { return m.End }
+
+// StructType represents a struct type definition
+type StructType struct {
+	Fields   []ObjectField
+	Methods  []MethodDecl
+	TypeName types.TYPE_NAME
+	Location
+}
+
+func (s *StructType) INode()                    {} // INode is a marker interface for all nodes
+func (s *StructType) Type() types.TYPE_NAME     { return s.TypeName }
+func (s *StructType) StartPos() *lexer.Position { return s.Start }
+func (s *StructType) EndPos() *lexer.Position   { return s.End }
+
 // Later, we will add more types like structs, arrays, maps, etc.

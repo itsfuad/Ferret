@@ -22,7 +22,7 @@ const (
 	ARRAY     TYPE_NAME = "array"
 	INTERFACE TYPE_NAME = "interface"
 	VOID      TYPE_NAME = "void"
-	OBJECT    TYPE_NAME = "object"
+	STRUCT    TYPE_NAME = "struct"
 )
 
 func GetBitSize(kind TYPE_NAME) (uint8, error) {

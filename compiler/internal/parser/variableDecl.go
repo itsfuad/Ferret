@@ -123,7 +123,7 @@ func assignValues(p *Parser, variables []*ast.VariableDecl, values []ast.Express
 	return true
 }
 
-func parseVarDecl(p *Parser) ast.Node {
+func parseVarDecl(p *Parser) ast.Statement {
 	p.advance() // consume let/const
 
 	variables, varCount := parseIdentifiers(p)

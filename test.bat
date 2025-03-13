@@ -8,5 +8,14 @@ for %%I in ("%CD%") do if /I not "%%~nxI"=="compiler" (
 :: Clear the screen
 cls
 
+echo Running tests...
+
 :: Run the tests
-go test -v ./...
+go test ./...
+
+:: check if the tests passed
+if errorlevel 1 (
+    echo Tests failed
+) else (
+    echo Tests passed
+)

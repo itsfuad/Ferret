@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -29,7 +30,7 @@ func TestParserBasics(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 
 			if len(nodes) == 0 && tt.isValid && tt.input != "" {
-				t.Errorf("%s: expected nodes, got none", tt.desc)
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}

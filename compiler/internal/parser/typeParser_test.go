@@ -244,35 +244,37 @@ func TestTypeDeclaration(t *testing.T) {
 	}
 }
 
-func TestObjectTypeParsing(t *testing.T) {
+func TestStructTypeDeclaration(t *testing.T) {
 	tests := []struct {
 		input   string
 		isValid bool
 		desc    string
 	}{
 		// Valid cases
-		{"type User { name: str, age: i32 };", true, "Basic object type"},
-		{"type Nested { user: { name: str, age: i32 } };", true, "Nested object type"},
-		{"type WithArray { scores: []i32 };", true, "Object type with array field"},
-		{"type Single { value: i32 };", true, "Single field object type"},
-		{"type WithTrailing { name: str, };", true, "Object type with trailing comma"},
+		{`type User struct { name: str, age: i32 };`, true, "Basic struct type declaration"},
+		{`type User struct { name: str, age: i32, scores: []i32 };`, true, "Struct with array field"},
+		{`type User struct { user: struct { name: str, age: i32 } };`, true, "Nested struct type"},
+		{`type User struct { single: i32 };`, true, "Single field struct type"},
+		{`type User struct { name: str };`, true, "Struct type without trailing comma"},
 
 		// Invalid cases
-		{"type Empty { };", false, "Empty object type"},
-		{"type Invalid { name };", false, "Missing field type"},
-		{"type Invalid { name: };", false, "Missing type after colon"},
-		{"type Invalid { : str };", false, "Missing field name"},
-		{"type Invalid { name: str age: i32 };", false, "Missing comma between fields"},
-		{"type Invalid { name: str, name: i32 };", false, "Duplicate field names"},
-		{"type Invalid { \"name\": str };", false, "Non-identifier field name"},
-		{"type User { name: str, age: i32 }", false, "Missing semicolon"},
+		{`type User struct { };`, false, "Empty struct not allowed"},
+		{`type User struct { name };`, false, "Missing field type"},
+		{`type User struct { name: };`, false, "Missing type after colon"},
+		{`type User struct { : str };`, false, "Missing field name"},
+		{`type User struct { name: str age: i32 };`, false, "Missing comma between fields"},
+		{`type User struct { name: str, name: i32 };`, false, "Duplicate field names"},
+		{`type User struct { "name": str };`, false, "Non-identifier field name"},
+		{`type User struct { name: str, age: i32 }`, false, "Missing semicolon"},
+		{`type User struct { name: str, };`, false, "Struct type with trailing comma"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
-			if !tt.isValid && len(nodes) > 0 {
-				t.Errorf("%s: expected no nodes, got %d", tt.desc, len(nodes))
+
+			if len(nodes) == 0 && tt.isValid {
+				t.Errorf(testUtils.ErrNoNodes, tt.desc)
 			}
 		})
 	}

@@ -68,3 +68,23 @@ func (a *ArrayLiteralExpr) INode()                    {} // INode is a marker in
 func (a *ArrayLiteralExpr) Expr()                     {} // Expr is a marker interface for all expressions
 func (a *ArrayLiteralExpr) StartPos() *lexer.Position { return a.Start }
 func (a *ArrayLiteralExpr) EndPos() *lexer.Position   { return a.End }
+
+// StructFieldInit represents a field initialization in a struct literal
+type StructFieldInit struct {
+	Name  string
+	Value Expression
+	Location
+}
+
+// StructLiteralExpr represents a struct literal expression like Point{x: 10, y: 20}
+type StructLiteralExpr struct {
+	TypeName    string
+	Fields      []StructFieldInit
+	IsAnonymous bool
+	Location
+}
+
+func (s *StructLiteralExpr) INode()                    {} // INode is a marker interface for all nodes
+func (s *StructLiteralExpr) Expr()                     {} // Expr is a marker interface for all expressions
+func (s *StructLiteralExpr) StartPos() *lexer.Position { return s.Start }
+func (s *StructLiteralExpr) EndPos() *lexer.Position   { return s.End }

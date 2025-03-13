@@ -48,3 +48,25 @@ func (t *TypeDeclStmt) INode()                    {} // INode is a marker interf
 func (t *TypeDeclStmt) Stmt()                     {} // Stmt is a marker interface for all statements
 func (t *TypeDeclStmt) StartPos() *lexer.Position { return t.Start }
 func (t *TypeDeclStmt) EndPos() *lexer.Position   { return t.End }
+
+// ReturnStmt represents a return statement
+type ReturnStmt struct {
+	Value Expression
+	Location
+}
+
+func (r *ReturnStmt) INode()                    {} // INode is a marker interface for all nodes
+func (r *ReturnStmt) Stmt()                     {} // Stmt is a marker method for statements
+func (r *ReturnStmt) StartPos() *lexer.Position { return r.Start }
+func (r *ReturnStmt) EndPos() *lexer.Position   { return r.End }
+
+// BlockStmt represents a block of statements
+type BlockStmt struct {
+	Statements []Statement
+	Location
+}
+
+func (b *BlockStmt) INode()                    {} // INode is a marker interface for all nodes
+func (b *BlockStmt) Stmt()                     {} // Stmt is a marker method for statements
+func (b *BlockStmt) StartPos() *lexer.Position { return b.Start }
+func (b *BlockStmt) EndPos() *lexer.Position   { return b.End }
