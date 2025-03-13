@@ -52,6 +52,10 @@ func TestExpressionParsing(t *testing.T) {
 		{"arr[0] = 42;", true, "Array element assignment"},
 		{"arr[i + 1] = x;", true, "Array assignment with expression index"},
 		{"arr[0][1] = 42;", true, "Nested array element assignment"},
+		{"return a + b;", true, "Return statement with expression"},
+		{"return;", true, "Return statement with no expression"},
+		{"return a, b;", true, "Return statement with multiple expressions"},
+		{"return;", true, "Return statement with no expression"},
 	}
 
 	for _, tt := range tests {

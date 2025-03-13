@@ -53,3 +53,6 @@ const add3 = fn(a: i32, b: i32) -> i32 {
     return a + b;
 };
 
+fn mul(a: i32, b: i32) -> (i32, bool) {
+    return a * b, true;
+}

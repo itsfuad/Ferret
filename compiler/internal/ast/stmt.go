@@ -46,7 +46,7 @@ func (t *TypeDeclStmt) EndPos() *lexer.Position   { return t.End }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
-	Value Expression
+	Values ExpressionList
 	Location
 }
 

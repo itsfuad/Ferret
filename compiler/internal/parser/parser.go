@@ -217,19 +217,19 @@ func parseReturnStmt(p *Parser) ast.Statement {
 
 	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
 	end := start
-	// Check if there's a value to return
-	var value ast.Expression
+	// Check if there's a values to return
+	var values ast.ExpressionList
 	if !p.match(lexer.SEMICOLON_TOKEN) {
-		value = parseExpression(p)
-		if value == nil {
+		values = parseExpressionList(p, parseExpression(p))
+		if values == nil {
 			token := p.peek()
 			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_EXPRESSION).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
 		}
-		end = *value.EndPos()
+		end = *values.EndPos()
 	}
 
 	return &ast.ReturnStmt{
-		Value: value,
+		Values: values,
 		Location: ast.Location{
 			Start: &start,
 			End:   &end,

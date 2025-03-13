@@ -56,7 +56,44 @@ func parseParameters(p *Parser) []ast.Parameter {
 	return params
 }
 
-func parseSignature(p *Parser) ([]ast.Parameter, ast.DataType) {
+func parseReturnTypes(p *Parser) []ast.DataType {
+	p.advance()
+	// Check for multiple return types in parentheses
+	if p.peek().Kind == lexer.OPEN_PAREN {
+		p.advance() // consume '('
+		returnTypes := make([]ast.DataType, 0)
+
+		for {
+			returnType, ok := parseType(p)
+			if !ok {
+				token := p.previous()
+				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+				return nil
+			}
+			returnTypes = append(returnTypes, returnType)
+
+			if p.peek().Kind != lexer.CLOSE_PAREN {
+				p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA)
+			} else {
+				break
+			}
+		}
+
+		p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+		return returnTypes
+	} else {
+		// Single return type
+		returnType, ok := parseType(p)
+		if !ok {
+			token := p.previous()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		return []ast.DataType{returnType}
+	}
+}
+
+func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 
 	if !p.match(lexer.OPEN_PAREN) {
 		token := p.peek()
@@ -68,14 +105,8 @@ func parseSignature(p *Parser) ([]ast.Parameter, ast.DataType) {
 
 	// Parse return type if present
 	if p.match(lexer.ARROW_TOKEN) {
-		p.advance() // consume '->'
-		returnType, ok := parseType(p)
-		if !ok {
-			token := p.previous()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
-			return nil, nil
-		}
-		return params, returnType
+		returnTypes := parseReturnTypes(p)
+		return params, returnTypes
 	}
 
 	return params, nil
@@ -83,9 +114,7 @@ func parseSignature(p *Parser) ([]ast.Parameter, ast.DataType) {
 
 func parseFunctionLiteral(p *Parser, start *lexer.Position) *ast.FunctionLiteral {
 
-	var returnType ast.DataType
-
-	params, returnType := parseSignature(p)
+	params, returnTypes := parseSignature(p)
 
 	block := parseBlock(p)
 
@@ -96,7 +125,7 @@ func parseFunctionLiteral(p *Parser, start *lexer.Position) *ast.FunctionLiteral
 
 	return &ast.FunctionLiteral{
 		Params:     params,
-		ReturnType: returnType,
+		ReturnType: returnTypes,
 		Body:       &block,
 		Location:   location,
 	}

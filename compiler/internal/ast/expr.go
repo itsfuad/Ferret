@@ -91,7 +91,7 @@ func (s *StructLiteralExpr) EndPos() *lexer.Position   { return s.End }
 
 type FunctionLiteral struct {
 	Params     []Parameter
-	ReturnType DataType
+	ReturnType []DataType
 	Body       *BlockConstruct
 	Location
 }
