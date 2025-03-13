@@ -40,6 +40,8 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableDecl, int) {
 	return variables, varCount
 }
 
+// parseTypeAnnotations parses the type annotations for the variables
+// it returns a list of types and a boolean indicating if the parsing was successful
 func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 	if p.peek().Kind != lexer.COLON_TOKEN {
 		return nil, true
@@ -65,6 +67,8 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 
 func parseInitializers(p *Parser) ([]ast.Expression, bool) {
 	if p.peek().Kind != lexer.EQUALS_TOKEN {
+		token := p.peek()
+		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_EQUALS).SetLevel(report.SYNTAX_ERROR)
 		return nil, true
 	}
 

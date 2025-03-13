@@ -151,6 +151,8 @@ func parseBlock(p *Parser) *ast.BlockStmt {
 	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
 		stmt := parseStatement(p)
 		if stmt == nil {
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		statements = append(statements, stmt)
@@ -176,6 +178,8 @@ func parseStatement(p *Parser) ast.Statement {
 		return parseTypeDecl(p)
 	case lexer.RETURN_TOKEN:
 		return parseReturnStmt(p)
+	case lexer.FUNCTION_TOKEN:
+		return parseExpressionStatement(p, parseFunctionDecl(p))
 	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
 		// Look ahead to see if this is an assignment
 		expr := parseExpression(p)
@@ -193,27 +197,25 @@ func parseStatement(p *Parser) ast.Statement {
 
 // parseReturnStmt parses a return statement
 func parseReturnStmt(p *Parser) ast.Statement {
-	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
 
+	start := p.consume(lexer.RETURN_TOKEN, report.EXPECTED_RETURN_KEYWORD).Start
+	end := start
 	// Check if there's a value to return
 	var value ast.Expression
 	if !p.match(lexer.SEMICOLON_TOKEN) {
 		value = parseExpression(p)
 		if value == nil {
-			return nil
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_EXPRESSION).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
 		}
-	}
-
-	end := value.EndPos()
-	if end == nil {
-		end = &start
+		end = *value.EndPos()
 	}
 
 	return &ast.ReturnStmt{
 		Value: value,
 		Location: ast.Location{
 			Start: &start,
-			End:   end,
+			End:   &end,
 		},
 	}
 }

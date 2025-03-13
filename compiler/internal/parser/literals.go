@@ -132,6 +132,8 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 
 		expr = parseExpression(p)
 		if expr == nil {
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_ARRAY_ELEMENT).SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		elements = append(elements, expr)

@@ -18,6 +18,7 @@ const (
 const (
 	ARRAY_EMPTY          = "Array literal must have at least one value"
 	ARRAY_TRAILING_COMMA = "Trailing comma not allowed in array literal"
+	EXPECTED_ARRAY_ELEMENT = "Expected array element"
 )
 
 // Error messages for expected tokens
@@ -38,6 +39,11 @@ const (
 	SINGLE_VALUE_MULTIPLE_VARIABLES    = "Single value cannot be assigned to multiple variables"
 )
 
+const (
+	INVALID_EXPRESSION = "Invalid expression"
+	EMPTY_STATEMENT = "Empty statement"
+)
+
 // Error messages for binary expressions
 const (
 	MISSING_RIGHT_OPERAND = "Missing right operand"
@@ -52,6 +58,10 @@ const (
 // Error messages for comparison expressions
 const (
 	INVALID_COMPARISON_OPERATOR = "Invalid comparison operator"
+	MISSING_COMPARISON_OPERAND = "Missing comparison operand"
+	MISSING_COMPARISON_OPERATOR = "Missing comparison operator"
+	MISSING_INCREMENT_OPERAND = "Missing increment operand"
+	MISSING_DECREMENT_OPERAND = "Missing decrement operand"
 )
 
 // Error messages for increment/decrement operations
@@ -75,6 +85,7 @@ const (
 const (
 	EXPECTED_TYPE_NAME = "Expected type name"
 	EXPECTED_TYPE      = "Expected type after type name"
+	EXPECTED_VALUE     = "Expected value"
 	UNEXPECTED_TOKEN   = "Unexpected token"
 )
 

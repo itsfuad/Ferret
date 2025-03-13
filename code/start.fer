@@ -44,3 +44,7 @@ let p3: struct {
     name: str,
     age: i32
 } = struct{name: "John", age: 20};
+
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}

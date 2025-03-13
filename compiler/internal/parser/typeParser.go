@@ -100,9 +100,9 @@ func parseIntegerType(p *Parser) ast.DataType {
 				End:   &token.End,
 			},
 		}
-	default:
-		return nil
 	}
+	report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+	return nil
 }
 
 // user defined types are defined by the type keyword
@@ -144,6 +144,7 @@ func parseFloatType(p *Parser) ast.DataType {
 		}
 	}
 
+	report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }
 

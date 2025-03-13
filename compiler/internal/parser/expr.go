@@ -323,11 +323,18 @@ func parseStructLiteral(p *Parser) ast.Expression {
 		// Parse field value
 		value := parseExpression(p)
 		if value == nil {
+			report.Add(p.filePath, fieldName.Start.Line, fieldName.End.Line, fieldName.Start.Column, fieldName.End.Column, report.EXPECTED_FIELD_VALUE).AddHint("Add an expression after the colon").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
 		fields = append(fields, ast.StructFieldInit{
-			Name:  fieldName.Value,
+			Field:  ast.IdentifierExpr{
+				Name: fieldName.Value,
+				Location: ast.Location{
+					Start: &fieldName.Start,
+					End:   &fieldName.End,
+				},
+			},
 			Value: value,
 			Location: ast.Location{
 				Start: &fieldName.Start,
@@ -350,7 +357,13 @@ func parseStructLiteral(p *Parser) ast.Expression {
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.StructLiteralExpr{
-		TypeName:    typeName.Value,
+		TypeName:    ast.IdentifierExpr{
+			Name: typeName.Value,
+			Location: ast.Location{
+				Start: &typeName.Start,
+				End:   &typeName.End,
+			},
+		},
 		Fields:      fields,
 		IsAnonymous: isAnonymous,
 		Location: ast.Location{
