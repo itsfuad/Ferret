@@ -124,7 +124,7 @@ type Matrix [][]f32;
 - [x] Structs
 - [ ] Methods
 - [ ] Interfaces
-- [ ] Functions
+- [x] Functions
 - [ ] Conditionals
 - [ ] Loops (for, while)
 - [ ] Switch statements
