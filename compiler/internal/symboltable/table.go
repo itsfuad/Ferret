@@ -27,16 +27,38 @@ const (
 	CONST_SYMBOL
 )
 
+var compilerGlobalSymbols = map[string]*Symbol{
+	"println": {
+		Name:       "println",
+		SymbolKind: FUNCTION_SYMBOL,
+		Type:       types.VOID,
+	},
+	"true": {
+		Name:       "true",
+		SymbolKind: CONST_SYMBOL,
+		Type:       types.BOOL,
+		IsMutable:  false,
+		Value:      true,
+	},
+	"false": {
+		Name:       "false",
+		SymbolKind: CONST_SYMBOL,
+		Type:       types.BOOL,
+		IsMutable:  false,
+		Value:      false,
+	},
+}
+
 // Symbol represents a single symbol in the program
 type Symbol struct {
-	Name       string           // The name of the symbol
-	Kind       SymbolKind      // The kind of symbol (variable, function, etc.)
+	Name       string          // The name of the symbol
+	SymbolKind SymbolKind      // The kind of symbol (variable, function, etc.)
 	Type       types.TYPE_NAME // The type of the symbol
 	Scope      ScopeKind       // The scope in which this symbol is defined
 	IsExported bool            // Whether the symbol is exported (public)
 	IsMutable  bool            // Whether the symbol can be modified
 	Location   SymbolLocation  // Source location information
-	Value      interface{}     // For constants and compile-time known values
+	Value      any             // For constants and compile-time known values
 }
 
 // SymbolLocation tracks the source location of a symbol
@@ -48,12 +70,10 @@ type SymbolLocation struct {
 
 // SymbolTable represents a scope and its symbols
 type SymbolTable struct {
-	symbols       map[string]*Symbol
-	parent        *SymbolTable
-	children      []*SymbolTable
-	kind         ScopeKind
-	functionName string     // Name of function if this is a function scope
-	structName   string     // Name of struct if this is a struct scope
+	symbols  map[string]*Symbol
+	parent   *SymbolTable
+	children []*SymbolTable
+	kind     ScopeKind
 }
 
 // NewSymbolTable creates a new symbol table with the given parent and scope kind
@@ -62,7 +82,7 @@ func NewSymbolTable(parent *SymbolTable, kind ScopeKind) *SymbolTable {
 		symbols:  make(map[string]*Symbol),
 		parent:   parent,
 		children: make([]*SymbolTable, 0),
-		kind:    kind,
+		kind:     kind,
 	}
 	if parent != nil {
 		parent.children = append(parent.children, st)
@@ -72,6 +92,9 @@ func NewSymbolTable(parent *SymbolTable, kind ScopeKind) *SymbolTable {
 
 // Define adds a new symbol to the current scope
 func (st *SymbolTable) Define(symbol *Symbol) bool {
+	if compilerGlobalSymbols[symbol.Name] != nil {
+		return false // Symbol already defined as a compiler global symbol
+	}
 	if _, exists := st.symbols[symbol.Name]; exists {
 		return false // Symbol already defined in current scope
 	}
@@ -81,21 +104,30 @@ func (st *SymbolTable) Define(symbol *Symbol) bool {
 
 // Resolve looks up a symbol by name in the current scope and parent scopes
 func (st *SymbolTable) Resolve(name string) (*Symbol, bool) {
-	// Check current scope
-	if sym, exists := st.symbols[name]; exists {
-		return sym, true
+
+	if compilerGlobalSymbols[name] != nil {
+		return compilerGlobalSymbols[name], true
 	}
-	
+
+	// Check current scope
+	sym, exists := st.symbols[name]
+	if exists {
+		return sym, exists
+	}
+
 	// Check parent scopes
 	if st.parent != nil {
 		return st.parent.Resolve(name)
 	}
-	
-	return nil, false
+
+	return nil, exists
 }
 
 // ResolveLocal looks up a symbol only in the current scope
 func (st *SymbolTable) ResolveLocal(name string) (*Symbol, bool) {
+	if compilerGlobalSymbols[name] != nil {
+		return compilerGlobalSymbols[name], true
+	}
 	sym, exists := st.symbols[name]
 	return sym, exists
 }
@@ -115,19 +147,14 @@ func (st *SymbolTable) ScopeKind() ScopeKind {
 	return st.kind
 }
 
-// SetFunctionName sets the name of the function if this is a function scope
-func (st *SymbolTable) SetFunctionName(name string) {
-	st.functionName = name
-}
-
-// SetStructName sets the name of the struct if this is a struct scope
-func (st *SymbolTable) SetStructName(name string) {
-	st.structName = name
-}
-
 // GetSymbols returns all symbols in the current scope
 func (st *SymbolTable) GetSymbols() map[string]*Symbol {
 	return st.symbols
+}
+
+// GetCompilerGlobalSymbols returns the compiler global symbols
+func GetCompilerGlobalSymbols() map[string]*Symbol {
+	return compilerGlobalSymbols
 }
 
 // Clear removes all symbols from the current scope

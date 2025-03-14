@@ -92,7 +92,7 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`\*`), defaultHandler(MUL_TOKEN)},
 			{regexp.MustCompile(`/`), defaultHandler(DIV_TOKEN)},
 			{regexp.MustCompile(`%`), defaultHandler(MOD_TOKEN)},
-			{regexp.MustCompile(`<`), defaultHandler(LESS_EQUAL_TOKEN)},
+			{regexp.MustCompile(`<=`), defaultHandler(LESS_EQUAL_TOKEN)},
 			{regexp.MustCompile(`<`), defaultHandler(LESS_TOKEN)},
 			{regexp.MustCompile(`>=`), defaultHandler(GREATER_EQUAL_TOKEN)},
 			{regexp.MustCompile(`>`), defaultHandler(GREATER_TOKEN)},

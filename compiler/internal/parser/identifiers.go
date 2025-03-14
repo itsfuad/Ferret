@@ -25,7 +25,7 @@ func parseIdentifier(p *Parser) *ast.IdentifierExpr {
 			token.End.Line,
 			token.Start.Column,
 			token.End.Column,
-			"Undefined identifier '"+token.Value+"'").SetLevel(report.NORMAL_ERROR)
+			"`"+token.Value+"` is not defined").AddHint("Did you forget to declare it? 😐").SetLevel(report.NORMAL_ERROR)
 	}
 
 	return identifier

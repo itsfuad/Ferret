@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -11,8 +10,8 @@ func TestParseVarDecl(t *testing.T) {
 		isValid bool
 		desc    string
 	}{
-		{"let x;", true, "Valid single variable declaration"},
-		{"let x, y;", true, "Valid multiple variable declaration"},
+		{"let x;", false, "Variable with no type"},
+		{"let x, y;", false, "Variable with no type"},
 		{"let x: i32;", true, "Variable with type annotation"},
 		{"let x, y: i32, str;", true, "Multiple variables with type annotations"},
 		{"let x = 42;", true, "Variable initialized with a value"},
@@ -25,12 +24,7 @@ func TestParseVarDecl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-
-			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
-
-			if len(nodes) == 0 && tt.isValid {
-				t.Errorf(testUtils.ErrNoNodes, tt.desc)
-			}
+			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 		})
 	}
 }

@@ -137,3 +137,9 @@ const (
 const (
 	TRAILING_COMMA_NOT_ALLOWED = "Unnecessary trailing comma"
 )
+
+// Error messages for if statements
+const (
+	EXPECTED_IF   = "Expected 'if' keyword"
+	EXPECTED_ELSE = "Expected 'else' keyword"
+)

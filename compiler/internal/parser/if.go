@@ -7,8 +7,8 @@ import (
 )
 
 // parseIfStatement parses an if statement with optional else and else-if branches
-func parseIfStatement(p *Parser) ast.Statement {
-	start := p.advance() // consume 'if'
+func parseIfStatement(p *Parser) ast.BlockConstruct {
+	start := p.consume(lexer.IF_TOKEN, report.EXPECTED_IF) // consume 'if'
 
 	// Parse condition (parentheses are optional)
 	var condition ast.Expression
@@ -28,7 +28,6 @@ func parseIfStatement(p *Parser) ast.Statement {
 	}
 
 	// Parse if body
-	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 	body := parseBlock(p)
 	if body == nil {
 		return nil
@@ -44,10 +43,9 @@ func parseIfStatement(p *Parser) ast.Statement {
 	}
 
 	if p.match(lexer.ELSE_TOKEN) {
-		elseToken := p.advance() // consume 'else'
+		p.advance() // consume 'else'
 		if p.match(lexer.IF_TOKEN) {
-			// Parse else-if branch
-			p.advance() // consume 'if'
+			// Parse else-if branch recursively
 			stmt := parseIfStatement(p)
 			ifStmt.Alternative = stmt
 		} else {
@@ -55,10 +53,8 @@ func parseIfStatement(p *Parser) ast.Statement {
 			stmt := parseBlock(p)
 			ifStmt.Alternative = stmt
 		}
-		ifStmt.Alternative.StartPos().Line = elseToken.Start.Line
-		ifStmt.Alternative.StartPos().Column = elseToken.Start.Column
-		ifStmt.Alternative.EndPos().Line = elseToken.End.Line
-		ifStmt.Alternative.EndPos().Column = elseToken.End.Column
+		// Update the end position to include the else branch
+		ifStmt.End = ifStmt.Alternative.EndPos()
 	}
 
 	return ifStmt

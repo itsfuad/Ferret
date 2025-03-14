@@ -185,10 +185,10 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 		// Add field to struct scope
 		sym := &symboltable.Symbol{
-			Name:      field.Name,
-			Kind:      symboltable.STRUCT_FIELD_SYMBOL,
-			Type:      field.Type.Type(),
-			IsMutable: true, // Fields are mutable by default
+			Name:       field.Name,
+			SymbolKind: symboltable.STRUCT_FIELD_SYMBOL,
+			Type:       field.Type.Type(),
+			IsMutable:  true, // Fields are mutable by default
 			Location: symboltable.SymbolLocation{
 				File:   p.filePath,
 				Line:   field.Location.Start.Line,
@@ -197,9 +197,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		}
 
 		if !p.currentScope.Define(sym) {
-			report.Add(p.filePath, field.Location.Start.Line, field.Location.End.Line,
-				field.Location.Start.Column, field.Location.End.Column,
-				"Field already defined").SetLevel(report.NORMAL_ERROR)
+			report.ShowRedeclarationError(field.Name, p.filePath, p.currentScope, field.Location.Start.Line, field.Location.End.Line, field.Location.Start.Column, field.Location.End.Column)
 			return nil, false
 		}
 
@@ -301,10 +299,10 @@ func parseTypeDecl(p *Parser) ast.Statement {
 
 	// Add type to symbol table
 	sym := &symboltable.Symbol{
-		Name:      typeName.Value,
-		Kind:      symboltable.TYPE_SYMBOL,
-		Type:      underlyingType.Type(),
-		IsMutable: false,
+		Name:       typeName.Value,
+		SymbolKind: symboltable.TYPE_SYMBOL,
+		Type:       underlyingType.Type(),
+		IsMutable:  false,
 		Location: symboltable.SymbolLocation{
 			File:   p.filePath,
 			Line:   typeName.Start.Line,
@@ -313,12 +311,7 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	}
 
 	if !p.currentScope.Define(sym) {
-		report.Add(p.filePath,
-			typeName.Start.Line,
-			typeName.End.Line,
-			typeName.Start.Column,
-			typeName.End.Column,
-			"Type '"+typeName.Value+"' already defined").SetLevel(report.NORMAL_ERROR)
+		report.ShowRedeclarationError(typeName.Value, p.filePath, p.currentScope, typeName.Start.Line, typeName.End.Line, typeName.Start.Column, typeName.End.Column)
 		return nil
 	}
 

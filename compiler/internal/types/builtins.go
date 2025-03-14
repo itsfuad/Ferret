@@ -21,4 +21,5 @@ const (
 	INTERFACE TYPE_NAME = "interface"
 	VOID      TYPE_NAME = "void"
 	STRUCT    TYPE_NAME = "struct"
+	UNDEFINED TYPE_NAME = "undefined"
 )

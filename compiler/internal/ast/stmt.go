@@ -53,16 +53,3 @@ func (r *ReturnStmt) INode()                    {} // INode is a marker interfac
 func (r *ReturnStmt) Stmt()                     {} // Stmt is a marker method for statements
 func (r *ReturnStmt) StartPos() *lexer.Position { return r.Start }
 func (r *ReturnStmt) EndPos() *lexer.Position   { return r.End }
-
-// IfStmt represents an if statement with optional else and else-if branches
-type IfStmt struct {
-	Condition   Expression
-	Body        *BlockConstruct
-	Alternative Node
-	Location
-}
-
-func (i *IfStmt) INode()                    {} // INode is a marker interface for all nodes
-func (i *IfStmt) Stmt()                     {} // Stmt is a marker interface for all statements
-func (i *IfStmt) StartPos() *lexer.Position { return i.Start }
-func (i *IfStmt) EndPos() *lexer.Position   { return i.End }

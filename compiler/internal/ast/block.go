@@ -24,3 +24,16 @@ func (f *FunctionDeclExpr) INode()                    {} // INode is a marker in
 func (f *FunctionDeclExpr) Block()                    {} // Block is a marker interface for all expressions
 func (f *FunctionDeclExpr) StartPos() *lexer.Position { return f.Start }
 func (f *FunctionDeclExpr) EndPos() *lexer.Position   { return f.End }
+
+// IfStmt represents an if statement with optional else and else-if branches
+type IfStmt struct {
+	Condition   Expression
+	Body        *BlockConstruct
+	Alternative Node
+	Location
+}
+
+func (i *IfStmt) INode()                    {} // INode is a marker interface for all nodes
+func (i *IfStmt) Block()                    {} // Block is a marker interface for all statements
+func (i *IfStmt) StartPos() *lexer.Position { return i.Start }
+func (i *IfStmt) EndPos() *lexer.Position   { return i.End }

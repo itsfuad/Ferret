@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"fmt"
 )
@@ -343,7 +344,7 @@ func parseStructLiteral(p *Parser, typeName *ast.IdentifierExpr) ast.Expression 
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.StructLiteralExpr{
-		TypeName: *typeName,
+		TypeName:    *typeName,
 		Fields:      fields,
 		IsAnonymous: isAnonymous,
 		Location: ast.Location{
@@ -419,20 +420,26 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.STRUCT_TOKEN:
 		return parseAnonymousStruct(p)
 	case lexer.IDENTIFIER_TOKEN:
-		expr := parseIdentifier(p)
-		// Check if this is a function call
+		iden := parseIdentifier(p)
+
 		if p.match(lexer.OPEN_PAREN) {
-			return parseFunctionCall(p, expr)
+			return parseFunctionCall(p, iden)
 		}
-		// Check if this is a struct literal
+
+		if p.match(lexer.OPEN_BRACKET) {
+			return parseIndexing(p, iden)
+		}
+
 		if p.match(lexer.OPEN_CURLY) {
-			return parseStructLiteral(p, expr)
+			//if identifier is a type, parse struct literal else return identifier
+			if symbol, ok := p.currentScope.Resolve(iden.Name); ok {
+				if symbol.SymbolKind == symboltable.TYPE_SYMBOL {
+					return parseStructLiteral(p, iden)
+				}
+			}
 		}
 
-		// . operator for accessing fields (in the future)
-
-		// no match, return the identifier as is
-		return expr
+		return iden
 	}
 	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 		p.peek().Start.Column, p.peek().End.Column,

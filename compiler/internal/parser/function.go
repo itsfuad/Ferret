@@ -115,10 +115,10 @@ func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 	// Add parameters to function scope
 	for _, param := range params {
 		sym := &symboltable.Symbol{
-			Name:      param.Identifier.Name,
-			Kind:      symboltable.PARAMETER_SYMBOL,
-			Type:      param.Type.Type(),
-			IsMutable: true, // Parameters are mutable by default
+			Name:       param.Identifier.Name,
+			SymbolKind: symboltable.PARAMETER_SYMBOL,
+			Type:       param.Type.Type(),
+			IsMutable:  true, // Parameters are mutable by default
 			Location: symboltable.SymbolLocation{
 				File:   p.filePath,
 				Line:   param.Identifier.StartPos().Line,
@@ -147,6 +147,10 @@ func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 }
 
 func parseFunctionLiteral(p *Parser, start *lexer.Position) *ast.FunctionLiteral {
+
+	//create new scope
+	p.enterScope(symboltable.FUNCTION_SCOPE)
+	defer p.exitScope()
 
 	params, returnTypes := parseSignature(p)
 
@@ -185,10 +189,10 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 
 		// Add function to current scope's symbol table
 		sym := &symboltable.Symbol{
-			Name:      name.Name,
-			Kind:      symboltable.FUNCTION_SYMBOL,
-			Type:      types.FUNCTION,
-			IsMutable: false,
+			Name:       name.Name,
+			SymbolKind: symboltable.FUNCTION_SYMBOL,
+			Type:       types.FUNCTION,
+			IsMutable:  false,
 			Location: symboltable.SymbolLocation{
 				File:   p.filePath,
 				Line:   name.StartPos().Line,
@@ -197,23 +201,11 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 		}
 
 		if !p.currentScope.Define(sym) {
-			report.Add(p.filePath,
-				name.StartPos().Line,
-				name.EndPos().Line,
-				name.StartPos().Column,
-				name.EndPos().Column,
-				"Function already declared in this scope").SetLevel(report.NORMAL_ERROR)
+			report.ShowRedeclarationError(name.Name, p.filePath, p.currentScope, name.StartPos().Line, name.EndPos().Line, name.StartPos().Column, name.EndPos().Column)
 			return nil
 		}
 	}
 
-	// Create function scope
-	p.enterScope(symboltable.FUNCTION_SCOPE)
-	if name != nil {
-		p.currentScope.SetFunctionName(name.Name)
-	}
-	defer p.exitScope()
-	
 	function := parseFunctionLiteral(p, &start.Start)
 
 	return &ast.FunctionDeclExpr{

@@ -4,6 +4,7 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/symboltable"
+	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
 	"fmt"
 )
@@ -123,14 +124,22 @@ func parseVarDecl(p *Parser) ast.Statement {
 		return nil
 	}
 
-	types, ok := parseTypeAnnotations(p)
-	if !ok || !assignTypes(p, variables, types, varCount) {
+	parsedTypes, ok := parseTypeAnnotations(p)
+	if !ok || !assignTypes(p, variables, parsedTypes, varCount) {
 		return nil
 	}
 
 	values, ok := parseInitializers(p)
 	if !ok {
 		return nil
+	}
+
+	// when no types provides, we must initialize
+	if len(parsedTypes) == 0 {
+		if len(values) == 0 {
+			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "cannot infer types without initializers").AddHint("👈😃 Add initializers to the variables").SetLevel(report.NORMAL_ERROR)
+			return nil
+		}
 	}
 
 	if len(values) > varCount {
@@ -140,11 +149,17 @@ func parseVarDecl(p *Parser) ast.Statement {
 
 	// Add variables to symbol table
 	for _, v := range variables {
+
+		var typename types.TYPE_NAME
+		if v.ExplicitType != nil {
+			typename = v.ExplicitType.Type()
+		}
+
 		sym := &symboltable.Symbol{
-			Name:      v.Identifier.Name,
-			Kind:      symboltable.VARIABLE_SYMBOL,
-			Type:      v.ExplicitType.Type(),
-			IsMutable: !isConst,
+			Name:       v.Identifier.Name,
+			SymbolKind: symboltable.VARIABLE_SYMBOL,
+			Type:       typename,
+			IsMutable:  !isConst,
 			Location: symboltable.SymbolLocation{
 				File:   p.filePath,
 				Line:   v.Identifier.StartPos().Line,
@@ -153,12 +168,7 @@ func parseVarDecl(p *Parser) ast.Statement {
 		}
 
 		if !p.currentScope.Define(sym) {
-			report.Add(p.filePath,
-				v.Identifier.StartPos().Line,
-				v.Identifier.EndPos().Line,
-				v.Identifier.StartPos().Column,
-				v.Identifier.EndPos().Column,
-				"Variable already declared in this scope").SetLevel(report.NORMAL_ERROR)
+			report.ShowRedeclarationError(v.Identifier.Name, p.filePath, p.currentScope, v.Identifier.StartPos().Line, v.Identifier.EndPos().Line, v.Identifier.StartPos().Column, v.Identifier.EndPos().Column)
 			return nil
 		}
 	}

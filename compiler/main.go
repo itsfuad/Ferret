@@ -7,7 +7,7 @@ import (
 
 func main() {
 
-	filename := "./../code/start.fer"
+	filename := "./../code/ifelse.fer"
 
 	r, err := analyzer.Analyze(filename, true, true, true)
 

@@ -38,6 +38,16 @@ func (s *StringLiteral) Expr()                     {} // Expr is a marker interf
 func (s *StringLiteral) StartPos() *lexer.Position { return s.Start }
 func (s *StringLiteral) EndPos() *lexer.Position   { return s.End }
 
+type BoolLiteral struct {
+	Value bool
+	Location
+}
+
+func (b *BoolLiteral) INode()                    {} // INode is a marker interface for all nodes
+func (b *BoolLiteral) Expr()                     {} // Expr is a marker interface for all expressions
+func (b *BoolLiteral) StartPos() *lexer.Position { return b.Start }
+func (b *BoolLiteral) EndPos() *lexer.Position   { return b.End }
+
 type IndexableExpr struct {
 	Indexable Expression // The expression being indexed (array, map, etc.)
 	Index     Expression // The index expression

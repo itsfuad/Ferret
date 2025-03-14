@@ -171,12 +171,9 @@ func parseBlock(p *Parser) ast.BlockConstruct {
 
 	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
 		node := parseNode(p)
-		if node == nil {
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
-			return nil
+		if node != nil {
+			nodes = append(nodes, node)
 		}
-		nodes = append(nodes, node)
 	}
 
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
@@ -205,6 +202,18 @@ func parseNode(p *Parser) ast.Node {
 	case lexer.IF_TOKEN:
 		node = parseIfStatement(p)
 	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
+		// Look ahead to see if this is a block
+		if p.next().Kind == lexer.OPEN_CURLY {
+			// This is an invalid block after identifier
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line,
+				token.Start.Column, token.End.Column,
+				"Unexpected block after identifier. Did you mean to use 'if', 'for', or 'func'?").
+				AddHint("Blocks can only appear after 'if', 'for', 'func', or similar keywords").
+				SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+
 		// Look ahead to see if this is an assignment
 		expr := parseExpression(p)
 		if expr != nil {
@@ -267,11 +276,11 @@ func (p *Parser) Parse() []ast.Node {
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
+
 		if node != nil {
 			nodes = append(nodes, node)
 		} else {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
-			return nil
+			p.consume(lexer.SEMICOLON_TOKEN, report.EXPECTED_SEMI_COLON)
 		}
 	}
 
