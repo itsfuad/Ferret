@@ -57,14 +57,14 @@ func TestParseIntegerType(t *testing.T) {
 		bitSize  uint8
 		unsigned bool
 	}{
-		{"i8", "i8", types.INT8, 8, true},
-		{"i16", "i16", types.INT16, 16, true},
-		{"i32", "i32", types.INT32, 32, true},
-		{"i64", "i64", types.INT64, 64, true},
-		{"u8", "u8", types.UINT8, 8, false},
-		{"u16", "u16", types.UINT16, 16, false},
-		{"u32", "u32", types.UINT32, 32, false},
-		{"u64", "u64", types.UINT64, 64, false},
+		{"i8", "i8", types.INT8, 8, false},
+		{"i16", "i16", types.INT16, 16, false},
+		{"i32", "i32", types.INT32, 32, false},
+		{"i64", "i64", types.INT64, 64, false},
+		{"u8", "u8", types.UINT8, 8, true},
+		{"u16", "u16", types.UINT16, 16, true},
+		{"u32", "u32", types.UINT32, 32, true},
+		{"u64", "u64", types.UINT64, 64, true},
 	}
 
 	for _, tt := range tests {

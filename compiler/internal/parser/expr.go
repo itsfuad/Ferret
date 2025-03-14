@@ -310,7 +310,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 
 	// Parse field initializers
 	fields := make([]ast.StructFieldInit, 0)
-	for p.peek().Kind != lexer.CLOSE_CURLY {
+	for {
 		// Parse field name
 		fieldName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME)
 		if fieldNames[fieldName.Value] {
@@ -342,15 +342,10 @@ func parseStructLiteral(p *Parser) ast.Expression {
 			},
 		})
 
-		if !p.match(lexer.CLOSE_CURLY) {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
-			if p.peek().Kind == lexer.CLOSE_CURLY {
-				curr := p.peek()
-				report.Add(p.filePath, curr.Start.Line, curr.End.Line, curr.Start.Column, curr.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
-				return nil
-			}
-		} else {
+		if p.match(lexer.CLOSE_CURLY) {
 			break
+		} else {
+			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
 		}
 	}
 
@@ -369,6 +364,55 @@ func parseStructLiteral(p *Parser) ast.Expression {
 		Location: ast.Location{
 			Start: &start,
 			End:   &end,
+		},
+	}
+}
+
+// parseFunctionCall parses a function call expression
+func parseFunctionCall(p *Parser, caller ast.Expression) ast.Expression {
+	start := caller.StartPos()
+	p.advance() // consume '('
+
+	arguments := make([]ast.Expression, 0)
+
+	// Handle empty argument list
+	if p.peek().Kind == lexer.CLOSE_PAREN {
+		end := p.advance() // consume ')'
+		return &ast.FunctionCallExpr{
+			Caller:    caller,
+			Arguments: arguments,
+			Location: ast.Location{
+				Start: start,
+				End:   &end.End,
+			},
+		}
+	}
+
+	// Parse arguments
+	for {
+		arg := parseExpression(p)
+		if arg == nil {
+			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
+				p.peek().Start.Column, p.peek().End.Column,
+				"Expected function argument").SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		arguments = append(arguments, arg)
+
+		if p.match(lexer.CLOSE_PAREN) {
+			break
+		} else {
+			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+		}
+	}
+
+	end := p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+	return &ast.FunctionCallExpr{
+		Caller:    caller,
+		Arguments: arguments,
+		Location: ast.Location{
+			Start: start,
+			End:   &end.End,
 		},
 	}
 }
@@ -393,8 +437,17 @@ func parsePrimary(p *Parser) ast.Expression {
 		if next.Kind == lexer.OPEN_CURLY {
 			return parseStructLiteral(p)
 		}
-		return parseIdentifier(p)
+		// Parse the identifier
+		expr := parseIdentifier(p)
+
+		// Check if this is a function call
+		if p.match(lexer.OPEN_PAREN) {
+			return parseFunctionCall(p, expr)
+		}
+		return expr
 	}
-	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
+	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
+		p.peek().Start.Column, p.peek().End.Column,
+		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
 	return nil
 }

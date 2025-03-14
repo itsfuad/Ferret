@@ -112,34 +112,30 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 	start := p.advance().Start // consume '['
 	elements := make([]ast.Expression, 0)
 
-	// Must have at least one element
-	expr := parseExpression(p)
-	if expr == nil {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.ARRAY_EMPTY).SetLevel(report.SYNTAX_ERROR)
-		return nil
-	}
-	elements = append(elements, expr)
-
-	// Parse additional elements
-	for p.peek().Kind == lexer.COMMA_TOKEN {
-		p.advance() // consume ','
-
-		// Check for trailing comma
-		if p.peek().Kind == lexer.CLOSE_BRACKET {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.ARRAY_TRAILING_COMMA).SetLevel(report.SYNTAX_ERROR)
-			return nil
+	for !p.match(lexer.CLOSE_BRACKET) {
+		expr := parseExpression(p)
+		if expr != nil {
+			elements = append(elements, expr)
 		}
 
-		expr = parseExpression(p)
-		if expr == nil {
+		if p.match(lexer.CLOSE_BRACKET) {
+			break
+		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_BRACKET {
+			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACKET)
+		} else {
 			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_ARRAY_ELEMENT).SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_COMMA_OR_CLOSE_BRACKET).AddHint("Add a comma after the element").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
-		elements = append(elements, expr)
 	}
 
 	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
+
+	// at least one element required
+	if len(elements) == 0 {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.ARRAY_EMPTY).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
 
 	return &ast.ArrayLiteralExpr{
 		Elements: elements,

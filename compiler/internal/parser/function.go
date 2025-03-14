@@ -15,7 +15,6 @@ func parseParameters(p *Parser) []ast.Parameter {
 
 	for !p.match(lexer.CLOSE_PAREN) {
 		if p.match(lexer.IDENTIFIER_TOKEN) {
-			fmt.Printf("identifier: %s\n", p.peek().Value)
 			token := p.advance() // consume the identifier
 
 			location := ast.Location{
@@ -38,20 +37,20 @@ func parseParameters(p *Parser) []ast.Parameter {
 				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
 				return nil
 			}
-
 		} else {
 			token := p.peek()
 			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_NAME).AddHint("Add an identifier after the function name").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
-		if p.match(lexer.COMMA_TOKEN) {
-			p.advance() // consume the comma
-			// check if the next token is a close parenthesis
-			if p.match(lexer.CLOSE_PAREN) {
-				report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
-				return nil
-			}
+		if p.match(lexer.CLOSE_PAREN) {
+			break
+		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_PAREN {
+			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+		} else {
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
+			return nil
 		}
 	}
 
@@ -67,7 +66,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		p.advance() // consume '('
 		returnTypes := make([]ast.DataType, 0)
 
-		for {
+		for !p.match(lexer.CLOSE_PAREN) {
 			returnType, ok := parseType(p)
 			if !ok {
 				token := p.previous()
@@ -76,10 +75,14 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 			}
 			returnTypes = append(returnTypes, returnType)
 
-			if p.peek().Kind != lexer.CLOSE_PAREN {
-				p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA)
-			} else {
+			if p.match(lexer.CLOSE_PAREN) {
 				break
+			} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_PAREN {
+				p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			} else {
+				token := p.peek()
+				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_COMMA_OR_CLOSE_PAREN).AddHint("Add a comma after the return type").SetLevel(report.SYNTAX_ERROR)
+				return nil
 			}
 		}
 

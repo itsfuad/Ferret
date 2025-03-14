@@ -7,10 +7,10 @@ import (
 	"fmt"
 )
 
-func parseIdentifiers(p *Parser) ([]*ast.VariableDecl, int) {
-	variables := make([]*ast.VariableDecl, 0)
+func parseIdentifiers(p *Parser) ([]*ast.VariableToDeclare, int) {
+
+	variables := make([]*ast.VariableToDeclare, 0)
 	varCount := 0
-	isConst := p.previous().Kind == lexer.CONST_TOKEN
 
 	for {
 		if !p.check(lexer.IDENTIFIER_TOKEN) {
@@ -18,18 +18,16 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableDecl, int) {
 			return nil, 0
 		}
 		identifierName := p.advance()
-		identifier := &ast.IdentifierExpr{
-			Name: identifierName.Value,
-			Location: ast.Location{
-				Start: &identifierName.Start,
-				End:   &identifierName.End,
+		identifier := &ast.VariableToDeclare{
+			Identifier: &ast.IdentifierExpr{
+				Name: identifierName.Value,
+				Location: ast.Location{
+					Start: &identifierName.Start,
+					End:   &identifierName.End,
+				},
 			},
 		}
-		variables = append(variables, &ast.VariableDecl{
-			Identifier: identifier,
-			IsConst:    isConst,
-			Location:   identifier.Location,
-		})
+		variables = append(variables, identifier)
 		varCount++
 
 		if p.peek().Kind != lexer.COMMA_TOKEN {
@@ -89,19 +87,19 @@ func parseInitializers(p *Parser) ([]ast.Expression, bool) {
 	return values, true
 }
 
-func assignTypes(p *Parser, variables []*ast.VariableDecl, types []ast.DataType, varCount int) bool {
+func assignTypes(p *Parser, variables []*ast.VariableToDeclare, types []ast.DataType, varCount int) bool {
 	if len(types) == 0 {
 		return true
 	}
 	if len(types) == 1 {
 		for i := range variables {
-			variables[i].Type = types[0]
+			variables[i].ExplicitType = types[0]
 		}
 		return true
 	}
 	if len(types) == varCount {
 		for i := range variables {
-			variables[i].Type = types[i]
+			variables[i].ExplicitType = types[i]
 		}
 		return true
 	}
@@ -109,25 +107,10 @@ func assignTypes(p *Parser, variables []*ast.VariableDecl, types []ast.DataType,
 	return false
 }
 
-func assignValues(p *Parser, variables []*ast.VariableDecl, values []ast.Expression, varCount int) bool {
-	if len(values) == 0 {
-		return true
-	}
-	if len(values) > varCount {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
-		return false
-	}
-
-	for i := range variables {
-		//if there are more variables than values, share the last value for the rest
-		variables[i].Initializer = values[min(i, len(values)-1)]
-	}
-
-	return true
-}
-
 func parseVarDecl(p *Parser) ast.Statement {
-	p.advance() // consume let/const
+	token := p.advance() // consume let/const
+
+	isConst := token.Kind == lexer.CONST_TOKEN
 
 	variables, varCount := parseIdentifiers(p)
 	if variables == nil {
@@ -145,15 +128,22 @@ func parseVarDecl(p *Parser) ast.Statement {
 	}
 
 	values, ok := parseInitializers(p)
-	if !ok || !assignValues(p, variables, values, varCount) {
+	if !ok {
+		return nil
+	}
+
+	if len(values) > varCount {
+		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
 	return &ast.VarDeclStmt{
-		Variables: variables,
+		Variables:    variables,
+		Initializers: values,
+		IsConst:      isConst,
 		Location: ast.Location{
-			Start: variables[0].Location.Start,
-			End:   variables[len(variables)-1].Location.End,
+			Start: &token.Start,
+			End:   variables[len(variables)-1].Identifier.EndPos(),
 		},
 	}
 }

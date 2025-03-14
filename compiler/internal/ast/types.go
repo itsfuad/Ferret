@@ -164,7 +164,6 @@ func (s *StructType) Type() types.TYPE_NAME     { return s.TypeName }
 func (s *StructType) StartPos() *lexer.Position { return s.Start }
 func (s *StructType) EndPos() *lexer.Position   { return s.End }
 
-
 type FunctionType struct {
 	Parameters  []DataType
 	ReturnTypes []DataType
@@ -172,9 +171,7 @@ type FunctionType struct {
 	Location
 }
 
-func (f *FunctionType) INode() {} // INode is a marker interface for all nodes
-func (f *FunctionType) Type() types.TYPE_NAME { return f.TypeName }
+func (f *FunctionType) INode()                    {} // INode is a marker interface for all nodes
+func (f *FunctionType) Type() types.TYPE_NAME     { return f.TypeName }
 func (f *FunctionType) StartPos() *lexer.Position { return f.Location.Start }
-func (f *FunctionType) EndPos() *lexer.Position { return f.Location.End }
-
-
+func (f *FunctionType) EndPos() *lexer.Position   { return f.Location.End }

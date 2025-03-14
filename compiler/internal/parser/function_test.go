@@ -13,8 +13,7 @@ func TestFunctionParsing(t *testing.T) {
 	}{
 		{
 			name: "Simple function declaration",
-			input: 
-			`fn add(a: i32, b: i32) -> i32 {
+			input: `fn add(a: i32, b: i32) -> i32 {
 				return a + b;
 			}`,
 			isValid: true,
@@ -22,8 +21,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Function with multiple return types",
-			input: 
-			`fn div(a: i32, b: i32) -> (i32, bool) {
+			input: `fn div(a: i32, b: i32) -> (i32, bool) {
 				return a / b, true;
 			}`,
 			isValid: true,
@@ -31,8 +29,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Anonymous function assignment",
-			input: 
-			`const add = fn(a: i32, b: i32) -> i32 {
+			input: `const add = fn(a: i32, b: i32) -> i32 {
 				return a + b;
 			};`,
 			isValid: true,
@@ -40,8 +37,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Function without return type",
-			input: 
-			`fn greet(name: str) {
+			input: `fn greet(name: str) {
 				return;
 			}`,
 			isValid: true,
@@ -49,8 +45,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Function with empty parameter list",
-			input: 
-			`fn init() -> bool {
+			input: `fn init() -> bool {
 				return true;
 			}`,
 			isValid: true,
@@ -82,8 +77,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Function with complex return types",
-			input: 
-			`fn process(data: []i32) -> ([]i32, str, bool) {
+			input: `fn process(data: []i32) -> ([]i32, str, bool) {
 				return data, "ok", true;
 			}`,
 			isValid: true,
@@ -91,8 +85,7 @@ func TestFunctionParsing(t *testing.T) {
 		},
 		{
 			name: "Nested function declaration",
-			input: 
-			`fn outer() -> fn(x: i32) -> i32 {
+			input: `fn outer() -> fn(x: i32) -> i32 {
 				return fn(x: i32) -> i32 {
 					return x * 2;
 				};
@@ -105,6 +98,42 @@ func TestFunctionParsing(t *testing.T) {
 			input:   "fn bad(a: i32,) -> i32 { return a; }",
 			isValid: false,
 			desc:    "Function with trailing comma in parameter list should fail",
+		},
+		{
+			name:    "Trailing comma in function return type",
+			input:   "fn add(a: i32, b: i32) -> (i32, f32,) { return a + b, 1.0; }",
+			isValid: false,
+			desc:    "Function with trailing comma in return type should fail",
+		},
+		{
+			name:    "Function call with no arguments",
+			input:   "hello();",
+			isValid: true,
+			desc:    "Function call with no arguments",
+		},
+		{
+			name:    "Function call with 1 argument",
+			input:   "hello(1);",
+			isValid: true,
+			desc:    "Function call with 1 argument",
+		},
+		{
+			name:    "Function call with 2 arguments, missing semicolon",
+			input:   "hello(1, 2)",
+			isValid: false,
+			desc:    "Function call with 2 arguments should fail",
+		},
+		{
+			name:    "Function call with 2 arguments",
+			input:   "hello(1, 2);",
+			isValid: true,
+			desc:    "Function call with 2 arguments",
+		},
+		{
+			name:    "Function call with trailing comma",
+			input:   "hello(1, 2, 4,);",
+			isValid: false,
+			desc:    "Function call with trailing comma should fail",
 		},
 	}
 

@@ -17,7 +17,6 @@ const (
 // Error messages for array literals
 const (
 	ARRAY_EMPTY            = "Array literal must have at least one value"
-	ARRAY_TRAILING_COMMA   = "Trailing comma not allowed in array literal"
 	EXPECTED_ARRAY_ELEMENT = "Expected array element"
 )
 
@@ -91,13 +90,12 @@ const (
 
 // Error messages for object/struct operations
 const (
-	EXPECTED_FIELD_NAME           = "Expected field name"
-	EXPECTED_FIELD_TYPE           = "Expected field type"
-	EXPECTED_FIELD_VALUE          = "Expected field value"
-	EXPECTED_COMMA_OR_CLOSE_BRACE = "Expected ',' or '}' after field"
-	DUPLICATE_FIELD_NAME          = "Duplicate field name"
-	EMPTY_STRUCT_NOT_ALLOWED      = "Empty structs are not allowed - must have at least one field"
-	EXPECTED_STRUCT_KEYWORD       = "Expected 'struct' keyword"
+	EXPECTED_FIELD_NAME      = "Expected field name"
+	EXPECTED_FIELD_TYPE      = "Expected field type"
+	EXPECTED_FIELD_VALUE     = "Expected field value"
+	DUPLICATE_FIELD_NAME     = "Duplicate field name"
+	EMPTY_STRUCT_NOT_ALLOWED = "Empty structs are not allowed - must have at least one field"
+	EXPECTED_STRUCT_KEYWORD  = "Expected 'struct' keyword"
 )
 
 // Error messages for syntax errors
@@ -119,12 +117,15 @@ const (
 
 // bracket errors
 const (
-	EXPECTED_OPEN_BRACKET  = "Expected '['"
-	EXPECTED_CLOSE_BRACKET = "Expected ']'"
-	EXPECTED_OPEN_CURLY    = "Expected '{'"
-	EXPECTED_CLOSE_CURLY   = "Expected '}'"
-	EXPECTED_OPEN_PAREN    = "Expected '('"
-	EXPECTED_CLOSE_PAREN   = "Expected ')'"
+	EXPECTED_OPEN_BRACKET           = "Expected '['"
+	EXPECTED_CLOSE_BRACKET          = "Expected ']'"
+	EXPECTED_OPEN_CURLY             = "Expected '{'"
+	EXPECTED_CLOSE_CURLY            = "Expected '}'"
+	EXPECTED_OPEN_PAREN             = "Expected '('"
+	EXPECTED_CLOSE_PAREN            = "Expected ')'"
+	EXPECTED_COMMA_OR_CLOSE_PAREN   = "Expected ',' or ')'"
+	EXPECTED_COMMA_OR_CLOSE_BRACKET = "Expected ',' or ']'"
+	EXPECTED_COMMA_OR_CLOSE_BRACE   = "Expected ',' or '}'"
 )
 
 // Statement errors
@@ -134,5 +135,5 @@ const (
 
 // New constant for the new error message
 const (
-	TRAILING_COMMA_NOT_ALLOWED = "Trailing comma not allowed in struct type definition"
+	TRAILING_COMMA_NOT_ALLOWED = "Unnecessary trailing comma"
 )

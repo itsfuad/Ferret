@@ -160,7 +160,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 	fields := make([]ast.ObjectField, 0)
 	fieldNames := make(map[string]bool)
 
-	for p.peek().Kind != lexer.CLOSE_CURLY {
+	for !p.match(lexer.CLOSE_CURLY) {
 
 		// Parse field
 		field := parseStructField(p)
@@ -178,15 +178,14 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		fieldNames[field.Name] = true
 		fields = append(fields, *field)
 
-		if !p.match(lexer.CLOSE_CURLY) {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
-			if p.peek().Kind == lexer.CLOSE_CURLY {
-				curr := p.peek()
-				report.Add(p.filePath, curr.Start.Line, curr.End.Line, curr.Start.Column, curr.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
-				return nil, false
-			}
-		} else {
+		if p.match(lexer.CLOSE_CURLY) {
 			break
+		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_CURLY {
+			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
+		} else {
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_COMMA_OR_CLOSE_BRACE).AddHint("Add a comma after the field").SetLevel(report.SYNTAX_ERROR)
+			return nil, false
 		}
 	}
 

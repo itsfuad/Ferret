@@ -4,7 +4,9 @@ import "ferret/compiler/internal/lexer"
 
 // Statement nodes
 type VarDeclStmt struct {
-	Variables []*VariableDecl
+	Variables    []*VariableToDeclare
+	Initializers []Expression
+	IsConst      bool
 	Location
 }
 
@@ -13,12 +15,9 @@ func (v *VarDeclStmt) Stmt()                     {} // Stmt is a marker interfac
 func (v *VarDeclStmt) StartPos() *lexer.Position { return v.Start }
 func (v *VarDeclStmt) EndPos() *lexer.Position   { return v.End }
 
-type VariableDecl struct {
-	IsConst     bool
-	Identifier  *IdentifierExpr
-	Type        DataType
-	Initializer Expression
-	Location
+type VariableToDeclare struct {
+	Identifier   *IdentifierExpr
+	ExplicitType DataType
 }
 
 type AssignmentStmt struct {

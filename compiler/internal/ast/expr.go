@@ -100,3 +100,15 @@ func (f *FunctionLiteral) INode()                    {} // INode is a marker int
 func (f *FunctionLiteral) Expr()                     {} // Expr is a marker interface for all expressions
 func (f *FunctionLiteral) StartPos() *lexer.Position { return f.Start }
 func (f *FunctionLiteral) EndPos() *lexer.Position   { return f.End }
+
+// FunctionCallExpr represents a function call expression
+type FunctionCallExpr struct {
+	Caller    Expression   // The function being called (can be an identifier or other expression)
+	Arguments []Expression // The arguments passed to the function
+	Location
+}
+
+func (f *FunctionCallExpr) INode()                    {} // INode is a marker interface for all nodes
+func (f *FunctionCallExpr) Expr()                     {} // Expr is a marker interface for all expressions
+func (f *FunctionCallExpr) StartPos() *lexer.Position { return f.Start }
+func (f *FunctionCallExpr) EndPos() *lexer.Position   { return f.End }
