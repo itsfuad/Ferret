@@ -32,7 +32,7 @@ func (t *UserDefinedType) EndPos() *lexer.Position {
 
 // Integer type
 type IntType struct {
-	BitSize  int
+	BitSize  uint8
 	Unsigned bool
 	TypeName types.TYPE_NAME
 	Location
@@ -51,7 +51,7 @@ func (t *IntType) EndPos() *lexer.Position {
 
 // Float type
 type FloatType struct {
-	BitSize  int
+	BitSize  uint8
 	TypeName types.TYPE_NAME
 	Location
 }
@@ -164,4 +164,17 @@ func (s *StructType) Type() types.TYPE_NAME     { return s.TypeName }
 func (s *StructType) StartPos() *lexer.Position { return s.Start }
 func (s *StructType) EndPos() *lexer.Position   { return s.End }
 
-// Later, we will add more types like structs, arrays, maps, etc.
+
+type FunctionType struct {
+	Parameters  []DataType
+	ReturnTypes []DataType
+	TypeName    types.TYPE_NAME
+	Location
+}
+
+func (f *FunctionType) INode() {} // INode is a marker interface for all nodes
+func (f *FunctionType) Type() types.TYPE_NAME { return f.TypeName }
+func (f *FunctionType) StartPos() *lexer.Position { return f.Location.Start }
+func (f *FunctionType) EndPos() *lexer.Position { return f.Location.End }
+
+

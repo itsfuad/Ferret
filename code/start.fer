@@ -56,3 +56,10 @@ const add3 = fn(a: i32, b: i32) -> i32 {
 fn mul(a: i32, b: i32) -> (i32, bool) {
     return a * b, true;
 }
+
+fn outer() -> fn(x: i32) -> i32 {
+    return fn(x: i32) -> i32 {
+        return x * 2;
+    };
+}
+

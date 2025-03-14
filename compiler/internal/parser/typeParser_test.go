@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, bitSize int, unsigned bool) {
+func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, bitSize uint8, unsigned bool) {
 	t.Helper()
 	intType, ok := result.(*ast.IntType)
 	if !ok {
@@ -25,7 +25,7 @@ func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, 
 	}
 }
 
-func assertFloatType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, bitSize int) {
+func assertFloatType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, bitSize uint8) {
 	t.Helper()
 	floatType, ok := result.(*ast.FloatType)
 	if !ok {
@@ -54,7 +54,7 @@ func TestParseIntegerType(t *testing.T) {
 		name     string
 		input    string
 		expected types.TYPE_NAME
-		bitSize  int
+		bitSize  uint8
 		unsigned bool
 	}{
 		{"i8", "i8", types.INT8, 8, true},
@@ -90,7 +90,7 @@ func TestParseFloatType(t *testing.T) {
 		name     string
 		input    string
 		expected types.TYPE_NAME
-		bitSize  int
+		bitSize  uint8
 	}{
 		{"f32", "f32", types.FLOAT32, 32},
 		{"f64", "f64", types.FLOAT64, 64},

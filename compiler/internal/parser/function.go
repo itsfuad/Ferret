@@ -4,6 +4,7 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/report"
+	"fmt"
 )
 
 func parseParameters(p *Parser) []ast.Parameter {
@@ -14,26 +15,29 @@ func parseParameters(p *Parser) []ast.Parameter {
 
 	for !p.match(lexer.CLOSE_PAREN) {
 		if p.match(lexer.IDENTIFIER_TOKEN) {
-			token := p.advance()
+			fmt.Printf("identifier: %s\n", p.peek().Value)
+			token := p.advance() // consume the identifier
 
 			location := ast.Location{
 				Start: &token.Start,
 				End:   &token.End,
 			}
 
+			iden := &ast.IdentifierExpr{Name: token.Value, Location: location}
+
 			params = append(params, ast.Parameter{
-				Identifier: &ast.IdentifierExpr{Name: token.Value, Location: location},
+				Identifier: iden,
 			})
 
-			p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
-			paramType, ok := parseType(p)
-			if !ok {
+			p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON+fmt.Sprintf(" after the parameter %s but got ", iden.Name)+p.peek().Value)
+
+			if paramType, ok := parseType(p); ok {
+				params[len(params)-1].Type = paramType
+			} else {
 				token := p.peek()
 				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
 				return nil
 			}
-
-			params[len(params)-1].Type = paramType
 
 		} else {
 			token := p.peek()

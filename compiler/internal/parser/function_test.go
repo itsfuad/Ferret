@@ -1,0 +1,119 @@
+package parser
+
+import (
+	"testing"
+)
+
+func TestFunctionParsing(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		isValid bool
+		desc    string
+	}{
+		{
+			name: "Simple function declaration",
+			input: 
+			`fn add(a: i32, b: i32) -> i32 {
+				return a + b;
+			}`,
+			isValid: true,
+			desc:    "Basic function with two parameters and single return type",
+		},
+		{
+			name: "Function with multiple return types",
+			input: 
+			`fn div(a: i32, b: i32) -> (i32, bool) {
+				return a / b, true;
+			}`,
+			isValid: true,
+			desc:    "Function with multiple return types in parentheses",
+		},
+		{
+			name: "Anonymous function assignment",
+			input: 
+			`const add = fn(a: i32, b: i32) -> i32 {
+				return a + b;
+			};`,
+			isValid: true,
+			desc:    "Anonymous function assigned to a constant",
+		},
+		{
+			name: "Function without return type",
+			input: 
+			`fn greet(name: str) {
+				return;
+			}`,
+			isValid: true,
+			desc:    "Function without explicit return type",
+		},
+		{
+			name: "Function with empty parameter list",
+			input: 
+			`fn init() -> bool {
+				return true;
+			}`,
+			isValid: true,
+			desc:    "Function with no parameters",
+		},
+		{
+			name:    "Missing parameter type",
+			input:   "fn add(a, b) -> i32 { return a + b; }",
+			isValid: false,
+			desc:    "Function with missing parameter types should fail",
+		},
+		{
+			name:    "Missing parameter name",
+			input:   "fn add(:i32, :i32) -> i32 { return 0; }",
+			isValid: false,
+			desc:    "Function with missing parameter names should fail",
+		},
+		{
+			name:    "Invalid return type syntax",
+			input:   "fn add(a: i32, b: i32) -> (i32,) { return 0; }",
+			isValid: false,
+			desc:    "Function with trailing comma in return type list should fail",
+		},
+		{
+			name:    "Missing function body",
+			input:   "fn add(a: i32, b: i32) -> i32;",
+			isValid: false,
+			desc:    "Function without body should fail",
+		},
+		{
+			name: "Function with complex return types",
+			input: 
+			`fn process(data: []i32) -> ([]i32, str, bool) {
+				return data, "ok", true;
+			}`,
+			isValid: true,
+			desc:    "Function with multiple complex return types",
+		},
+		{
+			name: "Nested function declaration",
+			input: 
+			`fn outer() -> fn(x: i32) -> i32 {
+				return fn(x: i32) -> i32 {
+					return x * 2;
+				};
+			}`,
+			isValid: true,
+			desc:    "Function with nested function declaration",
+		},
+		{
+			name:    "Invalid parameter list",
+			input:   "fn bad(a: i32,) -> i32 { return a; }",
+			isValid: false,
+			desc:    "Function with trailing comma in parameter list should fail",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
+			if tt.isValid && nodes == nil {
+				t.Errorf("Expected AST nodes for valid input, got nil")
+			}
+		})
+	}
+}

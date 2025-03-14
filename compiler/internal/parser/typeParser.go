@@ -8,99 +8,22 @@ import (
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {
-	token := p.peek()
-
-	switch token.Value {
-	case string(types.INT8):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.INT8,
-			BitSize:  8,
-			Unsigned: true,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.INT16):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.INT16,
-			BitSize:  16,
-			Unsigned: true,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.INT32):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.INT32,
-			BitSize:  32,
-			Unsigned: true,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.INT64):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.INT64,
-			BitSize:  64,
-			Unsigned: true,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.UINT8):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.UINT8,
-			BitSize:  8,
-			Unsigned: false,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.UINT16):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.UINT16,
-			BitSize:  16,
-			Unsigned: false,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.UINT32):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.UINT32,
-			BitSize:  32,
-			Unsigned: false,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.UINT64):
-		p.advance()
-		return &ast.IntType{
-			TypeName: types.UINT64,
-			BitSize:  64,
-			Unsigned: false,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
+	token := p.advance()
+	typename := types.TYPE_NAME(token.Value)
+	bitSize, err := types.GetBitSize(typename)
+	if err != nil {
+		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		return nil, false
 	}
-	return nil, false
+	return &ast.IntType{
+		TypeName: typename,
+		BitSize:  bitSize,
+		Unsigned: types.IsUnsigned(typename),
+		Location: ast.Location{
+			Start: &token.Start,
+			End:   &token.End,
+		},
+	}, true
 }
 
 // user defined types are defined by the type keyword
@@ -122,31 +45,22 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 }
 
 func parseFloatType(p *Parser) (ast.DataType, bool) {
-	token := p.peek()
-
-	switch token.Value {
-	case string(types.FLOAT32):
-		p.advance()
-		return &ast.FloatType{
-			TypeName: types.FLOAT32,
-			BitSize:  32,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
-	case string(types.FLOAT64):
-		p.advance()
-		return &ast.FloatType{
-			TypeName: types.FLOAT64,
-			BitSize:  64,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}, true
+	token := p.advance()
+	typename := types.TYPE_NAME(token.Value)
+	bitSize, err := types.GetBitSize(typename)
+	if err != nil {
+		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		return nil, false
 	}
-	return nil, false
+
+	return &ast.FloatType{
+		TypeName: typename,
+		BitSize:  bitSize,
+		Location: ast.Location{
+			Start: &token.Start,
+			End:   &token.End,
+		},
+	}, true
 }
 
 func parseStringType(p *Parser) (ast.DataType, bool) {
@@ -288,6 +202,37 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 	}, true
 }
 
+func parseFunctionTypeSignature(p *Parser) ([]ast.DataType, []ast.DataType) {
+	// parse the parameters
+	parameters := parseParameters(p)
+	parameterTypes := make([]ast.DataType, len(parameters))
+	// parse the return types
+	returnTypes := parseReturnTypes(p)
+
+	for i, parameter := range parameters {
+		parameterTypes[i] = parameter.Type
+	}
+
+	return parameterTypes, returnTypes
+}
+
+func parseFunctionType(p *Parser) (ast.DataType, bool) {
+	token := p.advance()
+
+	// parse the parameters
+	parameters, returnTypes := parseFunctionTypeSignature(p)
+
+	return &ast.FunctionType{
+		Parameters:  parameters,
+		ReturnTypes: returnTypes,
+		TypeName:    types.FUNCTION,
+		Location: ast.Location{
+			Start: &token.Start,
+			End:   &token.End,
+		},
+	}, true
+}
+
 // parseType parses a type expression
 func parseType(p *Parser) (ast.DataType, bool) {
 	token := p.peek()
@@ -306,6 +251,8 @@ func parseType(p *Parser) (ast.DataType, bool) {
 		return parseArrayType(p)
 	case string(types.STRUCT):
 		return parseStructType(p)
+	case string(types.FUNCTION):
+		return parseFunctionType(p)
 	default:
 		return parseUserDefinedType(p)
 	}
