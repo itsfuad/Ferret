@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-const HALTED = "compilation halted"
+const HALTED = "compilation halted" // this is a constant that is used to halt the compilation
 
 func Analyze(filePath string, displayErrors, debug, save2Json bool) (reports report.Reports, e error) {
 
