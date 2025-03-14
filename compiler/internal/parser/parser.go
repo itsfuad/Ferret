@@ -181,6 +181,8 @@ func parseNode(p *Parser) ast.Node {
 		node = parseReturnStmt(p)
 	case lexer.FUNCTION_TOKEN:
 		node = parseFunctionDecl(p)
+	case lexer.IF_TOKEN:
+		node = parseIfStatement(p)
 	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
 		// Look ahead to see if this is an assignment
 		expr := parseExpression(p)
