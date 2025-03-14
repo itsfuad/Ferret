@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"fmt"
 )
@@ -135,6 +136,31 @@ func parseVarDecl(p *Parser) ast.Statement {
 	if len(values) > varCount {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
 		return nil
+	}
+
+	// Add variables to symbol table
+	for _, v := range variables {
+		sym := &symboltable.Symbol{
+			Name:      v.Identifier.Name,
+			Kind:      symboltable.VARIABLE_SYMBOL,
+			Type:      v.ExplicitType.Type(),
+			IsMutable: !isConst,
+			Location: symboltable.SymbolLocation{
+				File:   p.filePath,
+				Line:   v.Identifier.StartPos().Line,
+				Column: v.Identifier.StartPos().Column,
+			},
+		}
+
+		if !p.currentScope.Define(sym) {
+			report.Add(p.filePath,
+				v.Identifier.StartPos().Line,
+				v.Identifier.EndPos().Line,
+				v.Identifier.StartPos().Column,
+				v.Identifier.EndPos().Column,
+				"Variable already declared in this scope").SetLevel(report.NORMAL_ERROR)
+			return nil
+		}
 	}
 
 	return &ast.VarDeclStmt{

@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
 )
@@ -146,6 +147,11 @@ func parseStructField(p *Parser) *ast.ObjectField {
 func parseStructType(p *Parser) (ast.DataType, bool) {
 	// Consume 'struct' keyword
 	start := p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD).Start
+
+	// Create struct scope
+	p.enterScope(symboltable.STRUCT_SCOPE)
+	defer p.exitScope()
+
 	// Consume opening brace
 	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
@@ -176,6 +182,27 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 			return nil, false
 		}
 		fieldNames[field.Name] = true
+
+		// Add field to struct scope
+		sym := &symboltable.Symbol{
+			Name:      field.Name,
+			Kind:      symboltable.STRUCT_FIELD_SYMBOL,
+			Type:      field.Type.Type(),
+			IsMutable: true, // Fields are mutable by default
+			Location: symboltable.SymbolLocation{
+				File:   p.filePath,
+				Line:   field.Location.Start.Line,
+				Column: field.Location.Start.Column,
+			},
+		}
+
+		if !p.currentScope.Define(sym) {
+			report.Add(p.filePath, field.Location.Start.Line, field.Location.End.Line,
+				field.Location.Start.Column, field.Location.End.Column,
+				"Field already defined").SetLevel(report.NORMAL_ERROR)
+			return nil, false
+		}
+
 		fields = append(fields, *field)
 
 		if p.match(lexer.CLOSE_CURLY) {
@@ -262,12 +289,36 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	start := p.advance() // consume the 'type' token
 
 	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
+
 	// Parse the underlying type
 	underlyingType, ok := parseType(p)
 	if !ok {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 			p.peek().Start.Column, p.peek().End.Column,
 			report.EXPECTED_TYPE).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+
+	// Add type to symbol table
+	sym := &symboltable.Symbol{
+		Name:      typeName.Value,
+		Kind:      symboltable.TYPE_SYMBOL,
+		Type:      underlyingType.Type(),
+		IsMutable: false,
+		Location: symboltable.SymbolLocation{
+			File:   p.filePath,
+			Line:   typeName.Start.Line,
+			Column: typeName.Start.Column,
+		},
+	}
+
+	if !p.currentScope.Define(sym) {
+		report.Add(p.filePath,
+			typeName.Start.Line,
+			typeName.End.Line,
+			typeName.Start.Column,
+			typeName.End.Column,
+			"Type '"+typeName.Value+"' already defined").SetLevel(report.NORMAL_ERROR)
 		return nil
 	}
 

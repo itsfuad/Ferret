@@ -56,8 +56,8 @@ func (r *ReturnStmt) EndPos() *lexer.Position   { return r.End }
 
 // IfStmt represents an if statement with optional else and else-if branches
 type IfStmt struct {
-	Condition Expression
-	Body      *BlockConstruct
+	Condition   Expression
+	Body        *BlockConstruct
 	Alternative Node
 	Location
 }
