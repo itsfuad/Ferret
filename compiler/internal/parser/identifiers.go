@@ -5,7 +5,7 @@ import (
 	"ferret/compiler/internal/lexer"
 )
 
-func parseIdentifier(p *Parser) ast.Expression {
+func parseIdentifier(p *Parser) *ast.IdentifierExpr {
 	token := p.consume(lexer.IDENTIFIER_TOKEN, "Expected identifier")
 	identifier := &ast.IdentifierExpr{
 		Name: token.Value,

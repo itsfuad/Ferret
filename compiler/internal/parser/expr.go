@@ -283,18 +283,9 @@ func parseGrouping(p *Parser) ast.Expression {
 }
 
 // parseStructLiteral parses a struct literal expression like Point{x: 10, y: 20}
-func parseStructLiteral(p *Parser) ast.Expression {
+func parseStructLiteral(p *Parser, typeName *ast.IdentifierExpr) ast.Expression {
 
-	//might have a name or might be anonymous
-	var typeName lexer.Token
-	if p.match(lexer.IDENTIFIER_TOKEN) {
-		typeName = p.advance()
-	} else {
-		typeName = p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD)
-	}
-
-	isAnonymous := typeName.Kind == lexer.STRUCT_TOKEN
-
+	isAnonymous := lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN
 	// Consume opening brace
 	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
 
@@ -352,13 +343,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.StructLiteralExpr{
-		TypeName: ast.IdentifierExpr{
-			Name: typeName.Value,
-			Location: ast.Location{
-				Start: &typeName.Start,
-				End:   &typeName.End,
-			},
-		},
+		TypeName: *typeName,
 		Fields:      fields,
 		IsAnonymous: isAnonymous,
 		Location: ast.Location{
@@ -431,23 +416,39 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.FUNCTION_TOKEN:
 		start := p.advance()
 		return parseFunctionLiteral(p, &start.Start)
-	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
-		// Look ahead to see if this is a struct literal
-		next := p.next()
-		if next.Kind == lexer.OPEN_CURLY {
-			return parseStructLiteral(p)
-		}
-		// Parse the identifier
+	case lexer.STRUCT_TOKEN:
+		return parseAnonymousStruct(p)
+	case lexer.IDENTIFIER_TOKEN:
 		expr := parseIdentifier(p)
-
 		// Check if this is a function call
 		if p.match(lexer.OPEN_PAREN) {
 			return parseFunctionCall(p, expr)
 		}
+		// Check if this is a struct literal
+		if p.match(lexer.OPEN_CURLY) {
+			return parseStructLiteral(p, expr)
+		}
+
+		// . operator for accessing fields (in the future)
+
+		// no match, return the identifier as is
 		return expr
 	}
 	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 		p.peek().Start.Column, p.peek().End.Column,
 		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
 	return nil
+}
+
+// parseAnonymousStruct parses an anonymous struct literal
+func parseAnonymousStruct(p *Parser) ast.Expression {
+	token := p.advance()
+	iden := &ast.IdentifierExpr{
+		Name: token.Value,
+		Location: ast.Location{
+			Start: &token.Start,
+			End:   &token.End,
+		},
+	}
+	return parseStructLiteral(p, iden)
 }
