@@ -52,7 +52,7 @@ type Point struct {
 };
 
 // Creating struct instances
-let point: Point = Point{x: 10, y: 20};
+let point: Point = @Point{x: 10, y: 20};
 
 // Anonymous struct type
 let user = struct {
@@ -64,7 +64,7 @@ let user = struct {
 let person: struct {
     name: str,
     age: i32
-} = struct{name: "John", age: 20};
+} = @struct{name: "John", age: 20};
 
 // Nested structs
 type User struct {
