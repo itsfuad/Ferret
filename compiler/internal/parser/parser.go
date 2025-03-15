@@ -257,7 +257,6 @@ func (p *Parser) Parse() []ast.Node {
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
-		fmt.Printf("Node Type: %T\n", node)
 		if node != nil {
 			nodes = append(nodes, node)
 		} else {

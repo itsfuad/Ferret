@@ -128,10 +128,10 @@ type Matrix [][]f32;
     - [x] Struct literals
     - [x] Struct field access
     - [x] Struct field assignment
-- [ ] Methods
+- [x] Methods
 - [ ] Interfaces
 - [x] Functions
-- [ ] Conditionals
+- [x] Conditionals
 - [ ] Loops (for, while)
 - [ ] Switch statements
 - [ ] Type casting

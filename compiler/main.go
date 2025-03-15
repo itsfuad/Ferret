@@ -9,7 +9,7 @@ func main() {
 
 	filename := "./../code/start.fer"
 
-	r, err := analyzer.Analyze(filename, true, true, true)
+	r, err := analyzer.Analyze(filename, true, false, true)
 
 	if len(r) > 0 {
 		r.DisplayAll()
@@ -19,4 +19,6 @@ func main() {
 	if err != nil {
 		colors.RED.Println("Error analyzing file: ", err)
 	}
+
+	colors.GREEN.Println("File parsed successfully")
 }

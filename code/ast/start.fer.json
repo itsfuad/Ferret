@@ -3001,5 +3001,72 @@
             "Column": 2,
             "Index": 1419
         }
+    },
+    {
+        "Expressions": [
+            {
+                "Caller": {
+                    "Object": {
+                        "Name": "point",
+                        "Start": {
+                            "Line": 93,
+                            "Column": 1,
+                            "Index": 1423
+                        },
+                        "End": {
+                            "Line": 93,
+                            "Column": 6,
+                            "Index": 1428
+                        }
+                    },
+                    "Field": {
+                        "Name": "distanceToOrigin",
+                        "Start": {
+                            "Line": 93,
+                            "Column": 7,
+                            "Index": 1429
+                        },
+                        "End": {
+                            "Line": 93,
+                            "Column": 23,
+                            "Index": 1445
+                        }
+                    },
+                    "Start": {
+                        "Line": 93,
+                        "Column": 1,
+                        "Index": 1423
+                    },
+                    "End": {
+                        "Line": 93,
+                        "Column": 23,
+                        "Index": 1445
+                    }
+                },
+                "Arguments": [],
+                "Start": {
+                    "Line": 93,
+                    "Column": 1,
+                    "Index": 1423
+                },
+                "End": {
+                    "Line": 93,
+                    "Column": 26,
+                    "Index": 1447
+                }
+            }
+        ],
+        "Location": {
+            "Start": {
+                "Line": 93,
+                "Column": 1,
+                "Index": 1423
+            },
+            "End": {
+                "Line": 93,
+                "Column": 26,
+                "Index": 1447
+            }
+        }
     }
 ]

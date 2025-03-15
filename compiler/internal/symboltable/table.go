@@ -28,11 +28,6 @@ const (
 )
 
 var compilerGlobalSymbols = map[string]*Symbol{
-	"println": {
-		Name:       "println",
-		SymbolKind: FUNCTION_SYMBOL,
-		Type:       types.VOID,
-	},
 	"true": {
 		Name:       "true",
 		SymbolKind: CONST_SYMBOL,

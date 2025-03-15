@@ -6,7 +6,6 @@ import (
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
-	"fmt"
 )
 
 // detect if it's a function or a method
@@ -32,15 +31,11 @@ func parseFunctionLike(p *Parser) ast.Node {
 		params = parseParameters(p)
 		// if identifier, it's a method
 		if p.match(lexer.IDENTIFIER_TOKEN) {
-			fmt.Printf("Parsing as method\n")
 			return parseMethodDeclaration(p, &start.Start, params)
 		}
-
-		fmt.Printf("Parsing as anonymous function\n")
 		// anonymous function
 		return parseFunctionLiteral(p, &start.Start, false, params...)
 	} else {
-		fmt.Printf("Parsing as named function\n")
 		// named function
 		return parseFunctionDecl(p)
 	}
