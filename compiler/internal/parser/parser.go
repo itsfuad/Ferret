@@ -187,63 +187,6 @@ func parseBlock(p *Parser) ast.BlockConstruct {
 	}
 }
 
-// parseNode parses a single statement or expression
-func parseNode(p *Parser) ast.Node {
-	var node ast.Node
-	switch p.peek().Kind {
-	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
-		node = parseVarDecl(p)
-	case lexer.TYPE_TOKEN:
-		node = parseTypeDecl(p)
-	case lexer.RETURN_TOKEN:
-		node = parseReturnStmt(p)
-	case lexer.FUNCTION_TOKEN:
-		node = parseFunctionDecl(p)
-	case lexer.IF_TOKEN:
-		node = parseIfStatement(p)
-	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
-		// Look ahead to see if this is a block
-		if p.next().Kind == lexer.OPEN_CURLY {
-			// This is an invalid block after identifier
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line,
-				token.Start.Column, token.End.Column,
-				"Unexpected block after identifier. Did you mean to use 'if', 'for', or 'func'?").
-				AddHint("Blocks can only appear after 'if', 'for', 'func', or similar keywords").
-				SetLevel(report.SYNTAX_ERROR)
-			return nil
-		}
-
-		// Look ahead to see if this is an assignment
-		expr := parseExpression(p)
-		if expr != nil {
-			// if the expression is valid, parse it as an expression statement
-			node = parseExpressionStatement(p, expr)
-		} else {
-			fmt.Printf("Invalid expression: %+v\n", expr)
-			// if the expression is invalid, report an error
-			node = handleUnexpectedToken(p)
-		}
-	default:
-		fmt.Printf("Invalid token: %+v\n", p.peek())
-		node = handleUnexpectedToken(p)
-	}
-
-	// Handle statement termination and update locations
-	if _, ok := node.(ast.Statement); ok {
-		//if no semicolon, show error on the previous token
-		if !p.match(lexer.SEMICOLON_TOKEN) {
-			previous := p.previous()
-			report.Add(p.filePath, previous.Start.Line, previous.End.Line, previous.Start.Column, previous.End.Column, "Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
-		}
-		end := p.advance()
-		node.EndPos().Column = end.End.Column
-		node.EndPos().Line = end.End.Line
-	}
-
-	return node
-}
-
 // parseReturnStmt parses a return statement
 func parseReturnStmt(p *Parser) ast.Statement {
 
@@ -267,6 +210,53 @@ func parseReturnStmt(p *Parser) ast.Statement {
 			End:   &end,
 		},
 	}
+}
+
+// parseNode parses a single statement or expression
+func parseNode(p *Parser) ast.Node {
+	var node ast.Node
+	switch p.peek().Kind {
+	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
+		node = parseVarDecl(p)
+	case lexer.TYPE_TOKEN:
+		node = parseTypeDecl(p)
+	case lexer.RETURN_TOKEN:
+		node = parseReturnStmt(p)
+	case lexer.FUNCTION_TOKEN:
+		node = parseFunctionDecl(p)
+	case lexer.IF_TOKEN:
+		node = parseIfStatement(p)
+	case lexer.AT_TOKEN:
+		node = parseStructLiteral(p)
+	case lexer.IDENTIFIER_TOKEN:
+		// Look ahead to see if this is an assignment
+		expr := parseExpression(p)
+		if expr != nil {
+			// if the expression is valid, parse it as an expression statement
+			node = parseExpressionStatement(p, expr)
+		} else {
+			fmt.Printf("Invalid expression: %+v\n", expr)
+			// if the expression is invalid, report an error
+			node = handleUnexpectedToken(p)
+		}
+	default:
+		fmt.Printf("Invalid token: %+v\n", p.peek())
+		node = handleUnexpectedToken(p)
+	}
+
+	// Handle statement termination and update locations
+	if _, ok := node.(ast.Statement); ok {
+		//if no semicolon, show error on the previous token
+		if !p.match(lexer.SEMICOLON_TOKEN) {
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, "Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+		}
+		end := p.advance()
+		node.EndPos().Column = end.End.Column
+		node.EndPos().Line = end.End.Line
+	}
+
+	return node
 }
 
 // Parse is the entry point for parsing

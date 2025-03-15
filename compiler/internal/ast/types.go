@@ -151,9 +151,16 @@ type MethodDecl struct {
 	Location
 }
 
+type StructField struct {
+	Field IdentifierExpr
+	Type  DataType   // nil for literal
+	Value Expression // nil for type
+	Location
+}
+
 // StructType represents a struct type definition
 type StructType struct {
-	Fields   []ObjectField
+	Fields   []StructField
 	Methods  []MethodDecl
 	TypeName types.TYPE_NAME
 	Location

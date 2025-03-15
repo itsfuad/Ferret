@@ -1,0 +1,615 @@
+[
+    {
+        "Alias": {
+            "Name": "Point",
+            "Start": {
+                "Line": 1,
+                "Column": 6,
+                "Index": 5
+            },
+            "End": {
+                "Line": 1,
+                "Column": 11,
+                "Index": 10
+            }
+        },
+        "BaseType": {
+            "Fields": [
+                {
+                    "Field": {
+                        "Name": "x",
+                        "Start": {
+                            "Line": 2,
+                            "Column": 5,
+                            "Index": 25
+                        },
+                        "End": {
+                            "Line": 2,
+                            "Column": 6,
+                            "Index": 26
+                        }
+                    },
+                    "Type": {
+                        "BitSize": 32,
+                        "Unsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 2,
+                            "Column": 8,
+                            "Index": 28
+                        },
+                        "End": {
+                            "Line": 2,
+                            "Column": 11,
+                            "Index": 31
+                        }
+                    },
+                    "Value": null,
+                    "Start": {
+                        "Line": 2,
+                        "Column": 5,
+                        "Index": 25
+                    },
+                    "End": {
+                        "Line": 2,
+                        "Column": 11,
+                        "Index": 31
+                    }
+                },
+                {
+                    "Field": {
+                        "Name": "y",
+                        "Start": {
+                            "Line": 3,
+                            "Column": 5,
+                            "Index": 38
+                        },
+                        "End": {
+                            "Line": 3,
+                            "Column": 6,
+                            "Index": 39
+                        }
+                    },
+                    "Type": {
+                        "BitSize": 32,
+                        "Unsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 3,
+                            "Column": 8,
+                            "Index": 41
+                        },
+                        "End": {
+                            "Line": 3,
+                            "Column": 11,
+                            "Index": 44
+                        }
+                    },
+                    "Value": null,
+                    "Start": {
+                        "Line": 3,
+                        "Column": 5,
+                        "Index": 38
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 11,
+                        "Index": 44
+                    }
+                }
+            ],
+            "Methods": null,
+            "TypeName": "struct",
+            "Start": {
+                "Line": 1,
+                "Column": 12,
+                "Index": 11
+            },
+            "End": {
+                "Line": 4,
+                "Column": 3,
+                "Index": 47
+            }
+        },
+        "Start": {
+            "Line": 1,
+            "Column": 1,
+            "Index": 0
+        },
+        "End": {
+            "Line": 4,
+            "Column": 3,
+            "Index": 47
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "point",
+                    "Start": {
+                        "Line": 6,
+                        "Column": 5,
+                        "Index": 56
+                    },
+                    "End": {
+                        "Line": 6,
+                        "Column": 34,
+                        "Index": 61
+                    }
+                },
+                "ExplicitType": null
+            }
+        ],
+        "Initializers": [
+            {
+                "TypeName": {
+                    "Name": "Point",
+                    "Start": {
+                        "Line": 6,
+                        "Column": 14,
+                        "Index": 65
+                    },
+                    "End": {
+                        "Line": 6,
+                        "Column": 19,
+                        "Index": 70
+                    }
+                },
+                "Fields": [
+                    {
+                        "Field": {
+                            "Name": "x",
+                            "Start": {
+                                "Line": 6,
+                                "Column": 20,
+                                "Index": 71
+                            },
+                            "End": {
+                                "Line": 6,
+                                "Column": 21,
+                                "Index": 72
+                            }
+                        },
+                        "Type": null,
+                        "Value": {
+                            "Value": 10,
+                            "Raw": "10",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 6,
+                                "Column": 23,
+                                "Index": 74
+                            },
+                            "End": {
+                                "Line": 6,
+                                "Column": 25,
+                                "Index": 76
+                            }
+                        },
+                        "Start": {
+                            "Line": 6,
+                            "Column": 20,
+                            "Index": 71
+                        },
+                        "End": {
+                            "Line": 6,
+                            "Column": 25,
+                            "Index": 76
+                        }
+                    },
+                    {
+                        "Field": {
+                            "Name": "y",
+                            "Start": {
+                                "Line": 6,
+                                "Column": 27,
+                                "Index": 78
+                            },
+                            "End": {
+                                "Line": 6,
+                                "Column": 28,
+                                "Index": 79
+                            }
+                        },
+                        "Type": null,
+                        "Value": {
+                            "Value": 20,
+                            "Raw": "20",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 6,
+                                "Column": 30,
+                                "Index": 81
+                            },
+                            "End": {
+                                "Line": 6,
+                                "Column": 32,
+                                "Index": 83
+                            }
+                        },
+                        "Start": {
+                            "Line": 6,
+                            "Column": 27,
+                            "Index": 78
+                        },
+                        "End": {
+                            "Line": 6,
+                            "Column": 32,
+                            "Index": 83
+                        }
+                    }
+                ],
+                "IsAnonymous": false,
+                "Start": {
+                    "Line": 6,
+                    "Column": 13,
+                    "Index": 64
+                },
+                "End": {
+                    "Line": 6,
+                    "Column": 33,
+                    "Index": 84
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 6,
+            "Column": 1,
+            "Index": 52
+        },
+        "End": {
+            "Line": 6,
+            "Column": 34,
+            "Index": 61
+        }
+    },
+    {
+        "Left": [
+            {
+                "Object": {
+                    "Name": "point",
+                    "Start": {
+                        "Line": 8,
+                        "Column": 1,
+                        "Index": 89
+                    },
+                    "End": {
+                        "Line": 8,
+                        "Column": 6,
+                        "Index": 94
+                    }
+                },
+                "Field": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 8,
+                        "Column": 7,
+                        "Index": 95
+                    },
+                    "End": {
+                        "Line": 8,
+                        "Column": 8,
+                        "Index": 96
+                    }
+                },
+                "Start": {
+                    "Line": 8,
+                    "Column": 1,
+                    "Index": 89
+                },
+                "End": {
+                    "Line": 8,
+                    "Column": 8,
+                    "Index": 96
+                }
+            }
+        ],
+        "Right": [
+            {
+                "Value": 30,
+                "Raw": "30",
+                "Base": 10,
+                "Start": {
+                    "Line": 8,
+                    "Column": 11,
+                    "Index": 99
+                },
+                "End": {
+                    "Line": 8,
+                    "Column": 14,
+                    "Index": 101
+                }
+            }
+        ],
+        "Start": {
+            "Line": 8,
+            "Column": 1,
+            "Index": 89
+        },
+        "End": {
+            "Line": 8,
+            "Column": 14,
+            "Index": 101
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "slope",
+                    "Start": {
+                        "Line": 10,
+                        "Column": 5,
+                        "Index": 110
+                    },
+                    "End": {
+                        "Line": 10,
+                        "Column": 31,
+                        "Index": 115
+                    }
+                },
+                "ExplicitType": null
+            }
+        ],
+        "Initializers": [
+            {
+                "Left": {
+                    "Object": {
+                        "Name": "point",
+                        "Start": {
+                            "Line": 10,
+                            "Column": 13,
+                            "Index": 118
+                        },
+                        "End": {
+                            "Line": 10,
+                            "Column": 18,
+                            "Index": 123
+                        }
+                    },
+                    "Field": {
+                        "Name": "x",
+                        "Start": {
+                            "Line": 10,
+                            "Column": 19,
+                            "Index": 124
+                        },
+                        "End": {
+                            "Line": 10,
+                            "Column": 20,
+                            "Index": 125
+                        }
+                    },
+                    "Start": {
+                        "Line": 10,
+                        "Column": 13,
+                        "Index": 118
+                    },
+                    "End": {
+                        "Line": 10,
+                        "Column": 20,
+                        "Index": 125
+                    }
+                },
+                "Operator": {
+                    "Kind": "/",
+                    "Value": "/",
+                    "Start": {
+                        "Line": 10,
+                        "Column": 21,
+                        "Index": 126
+                    },
+                    "End": {
+                        "Line": 10,
+                        "Column": 22,
+                        "Index": 127
+                    }
+                },
+                "Right": {
+                    "Object": {
+                        "Name": "point",
+                        "Start": {
+                            "Line": 10,
+                            "Column": 23,
+                            "Index": 128
+                        },
+                        "End": {
+                            "Line": 10,
+                            "Column": 28,
+                            "Index": 133
+                        }
+                    },
+                    "Field": {
+                        "Name": "y",
+                        "Start": {
+                            "Line": 10,
+                            "Column": 29,
+                            "Index": 134
+                        },
+                        "End": {
+                            "Line": 10,
+                            "Column": 30,
+                            "Index": 135
+                        }
+                    },
+                    "Start": {
+                        "Line": 10,
+                        "Column": 23,
+                        "Index": 128
+                    },
+                    "End": {
+                        "Line": 10,
+                        "Column": 30,
+                        "Index": 135
+                    }
+                },
+                "Start": {
+                    "Line": 10,
+                    "Column": 13,
+                    "Index": 118
+                },
+                "End": {
+                    "Line": 10,
+                    "Column": 30,
+                    "Index": 135
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 10,
+            "Column": 1,
+            "Index": 106
+        },
+        "End": {
+            "Line": 10,
+            "Column": 31,
+            "Index": 115
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "obj",
+                    "Start": {
+                        "Line": 13,
+                        "Column": 5,
+                        "Index": 166
+                    },
+                    "End": {
+                        "Line": 13,
+                        "Column": 33,
+                        "Index": 169
+                    }
+                },
+                "ExplicitType": null
+            }
+        ],
+        "Initializers": [
+            {
+                "TypeName": {
+                    "Name": "struct",
+                    "Start": {
+                        "Line": 13,
+                        "Column": 12,
+                        "Index": 173
+                    },
+                    "End": {
+                        "Line": 13,
+                        "Column": 18,
+                        "Index": 179
+                    }
+                },
+                "Fields": [
+                    {
+                        "Field": {
+                            "Name": "x",
+                            "Start": {
+                                "Line": 13,
+                                "Column": 19,
+                                "Index": 180
+                            },
+                            "End": {
+                                "Line": 13,
+                                "Column": 20,
+                                "Index": 181
+                            }
+                        },
+                        "Type": null,
+                        "Value": {
+                            "Value": 23,
+                            "Raw": "23",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 13,
+                                "Column": 22,
+                                "Index": 183
+                            },
+                            "End": {
+                                "Line": 13,
+                                "Column": 24,
+                                "Index": 185
+                            }
+                        },
+                        "Start": {
+                            "Line": 13,
+                            "Column": 19,
+                            "Index": 180
+                        },
+                        "End": {
+                            "Line": 13,
+                            "Column": 24,
+                            "Index": 185
+                        }
+                    },
+                    {
+                        "Field": {
+                            "Name": "y",
+                            "Start": {
+                                "Line": 13,
+                                "Column": 26,
+                                "Index": 187
+                            },
+                            "End": {
+                                "Line": 13,
+                                "Column": 27,
+                                "Index": 188
+                            }
+                        },
+                        "Type": null,
+                        "Value": {
+                            "Value": 45,
+                            "Raw": "45",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 13,
+                                "Column": 29,
+                                "Index": 190
+                            },
+                            "End": {
+                                "Line": 13,
+                                "Column": 31,
+                                "Index": 192
+                            }
+                        },
+                        "Start": {
+                            "Line": 13,
+                            "Column": 26,
+                            "Index": 187
+                        },
+                        "End": {
+                            "Line": 13,
+                            "Column": 31,
+                            "Index": 192
+                        }
+                    }
+                ],
+                "IsAnonymous": true,
+                "Start": {
+                    "Line": 13,
+                    "Column": 11,
+                    "Index": 172
+                },
+                "End": {
+                    "Line": 13,
+                    "Column": 32,
+                    "Index": 193
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 13,
+            "Column": 1,
+            "Index": 162
+        },
+        "End": {
+            "Line": 13,
+            "Column": 33,
+            "Index": 169
+        }
+    }
+]

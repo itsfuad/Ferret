@@ -132,7 +132,7 @@ func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 				param.Identifier.EndPos().Line,
 				param.Identifier.StartPos().Column,
 				param.Identifier.EndPos().Column,
-				"Parameter name already used").SetLevel(report.NORMAL_ERROR)
+				"Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
 			return nil, nil
 		}
 	}
@@ -201,7 +201,15 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 		}
 
 		if !p.currentScope.Define(sym) {
-			report.ShowRedeclarationError(name.Name, p.filePath, p.currentScope, name.StartPos().Line, name.EndPos().Line, name.StartPos().Column, name.EndPos().Column)
+			report.ShowRedeclarationError(
+				name.Name,
+				p.filePath,
+				p.currentScope,
+				name.StartPos().Line,
+				name.EndPos().Line,
+				name.StartPos().Column,
+				name.EndPos().Column,
+			)
 			return nil
 		}
 	}

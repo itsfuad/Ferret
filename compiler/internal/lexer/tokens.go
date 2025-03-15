@@ -81,7 +81,10 @@ const (
 	SEMICOLON_TOKEN TOKEN = ";"
 	ARROW_TOKEN     TOKEN = "->"
 	FAT_ARROW_TOKEN TOKEN = "=>"
-	EOF_TOKEN       TOKEN = "end_of_file"
+
+	AT_TOKEN TOKEN = "@"
+
+	EOF_TOKEN TOKEN = "end_of_file"
 )
 
 var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{

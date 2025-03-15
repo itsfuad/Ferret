@@ -13,6 +13,7 @@ type REPORT_TYPE string
 
 const (
 	NULL           REPORT_TYPE = ""
+	SEMANTIC_ERROR REPORT_TYPE = "semantic error" // Semantic error
 	CRITICAL_ERROR REPORT_TYPE = "critical error" // Stops compilation immediately
 	SYNTAX_ERROR   REPORT_TYPE = "syntax error"   // Syntax error, also stops compilation
 	NORMAL_ERROR   REPORT_TYPE = "error"          // Regular error that doesn't halt compilation
@@ -25,6 +26,7 @@ const (
 var colorMap = map[REPORT_TYPE]colors.COLOR{
 	CRITICAL_ERROR: colors.BOLD_RED,
 	SYNTAX_ERROR:   colors.RED,
+	SEMANTIC_ERROR: colors.RED,
 	NORMAL_ERROR:   colors.RED,
 	WARNING:        colors.YELLOW,
 	INFO:           colors.BLUE,
@@ -94,6 +96,8 @@ func printReport(r *Report) {
 		reportMsgType = "[Syntax Error]: "
 	case NORMAL_ERROR:
 		reportMsgType = "[Error]: "
+	case SEMANTIC_ERROR:
+		reportMsgType = "[Semantic Error]: "
 	}
 
 	reportColor := colorMap[r.Level]
@@ -238,12 +242,7 @@ func ShowRedeclarationError(name string, filePath string, scope *symboltable.Sym
 		msg += " this scope"
 	}
 
-	Add(filePath,
-		lineStart,
-		lineEnd,
-		colStart,
-		colEnd,
-		msg).SetLevel(NORMAL_ERROR)
+	Add(filePath, lineStart, lineEnd, colStart, colEnd, msg).SetLevel(SEMANTIC_ERROR)
 }
 
 // DisplayAll outputs all the diagnostic reports. It recovers from panics,

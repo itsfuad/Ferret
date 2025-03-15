@@ -108,6 +108,7 @@ func createLexer(filePath *string) *Lexer {
 			{regexp.MustCompile(`\}`), defaultHandler(CLOSE_CURLY)},
 			{regexp.MustCompile(","), defaultHandler(COMMA_TOKEN)},
 			{regexp.MustCompile(`\.`), defaultHandler(DOT_TOKEN)},
+			{regexp.MustCompile(`@`), defaultHandler(AT_TOKEN)},
 		},
 	}
 	return lex

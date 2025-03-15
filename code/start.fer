@@ -16,7 +16,7 @@ type Point struct {
     y: i32
 };
 
-let point: Point = Point{x: 10, y: 20};
+let point: Point = @Point{x: 10, y: 20};
 
 // future features
 // //point as value
@@ -36,7 +36,7 @@ let point: Point = Point{x: 10, y: 20};
 //p.translate(10, 20);
 
 //anonymous struct
-let p2 = struct {
+let p2 = @struct {
     name: "Abir",
     age: 23
 };
@@ -44,7 +44,7 @@ let p2 = struct {
 let p3: struct {
     name: str,
     age: i32
-} = struct{name: "John", age: 20};
+} = @struct{name: "John", age: 20};
 
 fn add(a: i32, b: i32) -> i32 {
     return a + b;

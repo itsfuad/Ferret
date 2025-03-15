@@ -30,6 +30,7 @@ const (
 	EXPECTED_EQUALS      = "Expected '='"
 	EXPECTED_OPEN_BRACE  = "Expected '{'"
 	EXPECTED_CLOSE_BRACE = "Expected '}'"
+	EXPECTED_AT_TOKEN    = "Expected '@'"
 )
 
 // Error messages for variable declarations

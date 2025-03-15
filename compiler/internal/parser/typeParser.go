@@ -120,7 +120,7 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 }
 
 // parseStructField parses a single struct field
-func parseStructField(p *Parser) *ast.ObjectField {
+func parseStructField(p *Parser) *ast.StructField {
 	// Parse field name
 	nameToken := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME+" got "+p.peek().Value)
 	fieldName := nameToken.Value
@@ -132,8 +132,14 @@ func parseStructField(p *Parser) *ast.ObjectField {
 	if fieldType, ok := parseType(p); !ok {
 		return nil
 	} else {
-		return &ast.ObjectField{
-			Name: fieldName,
+		return &ast.StructField{
+			Field: ast.IdentifierExpr{
+				Name: fieldName,
+				Location: ast.Location{
+					Start: &nameToken.Start,
+					End:   &nameToken.End,
+				},
+			},
 			Type: fieldType,
 			Location: ast.Location{
 				Start: &nameToken.Start,
@@ -163,7 +169,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		return nil, false
 	}
 
-	fields := make([]ast.ObjectField, 0)
+	fields := make([]ast.StructField, 0)
 	fieldNames := make(map[string]bool)
 
 	for !p.match(lexer.CLOSE_CURLY) {
@@ -175,17 +181,17 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		}
 
 		// Check for duplicate field names
-		if fieldNames[field.Name] {
+		if fieldNames[field.Field.Name] {
 			report.Add(p.filePath, field.Location.Start.Line, field.Location.End.Line,
 				field.Location.Start.Column, field.Location.End.Column,
 				report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
-		fieldNames[field.Name] = true
+		fieldNames[field.Field.Name] = true
 
 		// Add field to struct scope
 		sym := &symboltable.Symbol{
-			Name:       field.Name,
+			Name:       field.Field.Name,
 			SymbolKind: symboltable.STRUCT_FIELD_SYMBOL,
 			Type:       field.Type.Type(),
 			IsMutable:  true, // Fields are mutable by default
@@ -197,7 +203,15 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		}
 
 		if !p.currentScope.Define(sym) {
-			report.ShowRedeclarationError(field.Name, p.filePath, p.currentScope, field.Location.Start.Line, field.Location.End.Line, field.Location.Start.Column, field.Location.End.Column)
+			report.ShowRedeclarationError(
+				field.Field.Name,
+				p.filePath,
+				p.currentScope,
+				field.Location.Start.Line,
+				field.Location.End.Line,
+				field.Location.Start.Column,
+				field.Location.End.Column,
+			)
 			return nil, false
 		}
 
@@ -311,7 +325,15 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	}
 
 	if !p.currentScope.Define(sym) {
-		report.ShowRedeclarationError(typeName.Value, p.filePath, p.currentScope, typeName.Start.Line, typeName.End.Line, typeName.Start.Column, typeName.End.Column)
+		report.ShowRedeclarationError(
+			typeName.Value,
+			p.filePath,
+			p.currentScope,
+			typeName.Start.Line,
+			typeName.End.Line,
+			typeName.Start.Column,
+			typeName.End.Column,
+		)
 		return nil
 	}
 

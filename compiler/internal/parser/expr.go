@@ -5,7 +5,6 @@ import (
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
-	"fmt"
 )
 
 // parseExpression is the entry point for expression parsing
@@ -238,7 +237,7 @@ func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
 	}
 }
 
-// parsePostfix handles postfix operators (++, --, [])
+// parsePostfix handles postfix operators (++, --, [], ., (), {})
 func parsePostfix(p *Parser) ast.Expression {
 	expr := parsePrimary(p)
 	if expr == nil {
@@ -246,13 +245,6 @@ func parsePostfix(p *Parser) ast.Expression {
 	}
 
 	for {
-		if p.match(lexer.OPEN_BRACKET) {
-			if result := parseIndexing(p, expr); result != nil {
-				expr = result
-				continue
-			}
-			return nil
-		}
 
 		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
 			// Check if expression already has a prefix operator
@@ -263,6 +255,30 @@ func parsePostfix(p *Parser) ast.Expression {
 			}
 
 			if result := parseIncDec(p, expr); result != nil {
+				expr = result
+				continue
+			}
+			return nil
+		}
+
+		if p.match(lexer.DOT_TOKEN) {
+			if result := parseFieldAccess(p, expr); result != nil {
+				expr = result
+				continue
+			}
+			return nil
+		}
+
+		if p.match(lexer.OPEN_PAREN) {
+			if result := parseFunctionCall(p, expr); result != nil {
+				expr = result
+				continue
+			}
+			return nil
+		}
+
+		if p.match(lexer.OPEN_BRACKET) {
+			if result := parseIndexing(p, expr); result != nil {
 				expr = result
 				continue
 			}
@@ -284,16 +300,50 @@ func parseGrouping(p *Parser) ast.Expression {
 }
 
 // parseStructLiteral parses a struct literal expression like Point{x: 10, y: 20}
-func parseStructLiteral(p *Parser, typeName *ast.IdentifierExpr) ast.Expression {
+func parseStructLiteral(p *Parser) ast.Expression {
+
+	start := p.consume(lexer.AT_TOKEN, report.EXPECTED_AT_TOKEN).Start
+
+	var typeName *ast.IdentifierExpr
+
+	if p.match(lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN) {
+		token := p.advance()
+		iden := &ast.IdentifierExpr{
+			Name: token.Value,
+			Location: ast.Location{
+				Start: &token.Start,
+				End:   &token.End,
+			},
+		}
+		typeName = iden
+	} else {
+		token := p.peek()
+		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
 
 	isAnonymous := lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN
-	// Consume opening brace
-	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
+
+	if !isAnonymous {
+		//must be defined
+		if symbol, ok := p.currentScope.Resolve(typeName.Name); ok {
+			if symbol.SymbolKind != symboltable.TYPE_SYMBOL {
+				report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, "Expected type name after '@'").SetLevel(report.SYNTAX_ERROR)
+				return nil
+			}
+		} else {
+			report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, "Undefined type '"+typeName.Name+"'").SetLevel(report.SEMANTIC_ERROR)
+			return nil
+		}
+	}
+
+	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
 	// Check for empty struct
 	if p.peek().Kind == lexer.CLOSE_CURLY {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-			p.peek().Start.Column, p.peek().End.Column,
+		token := p.peek()
+		report.Add(p.filePath, token.Start.Line, token.End.Line,
+			token.Start.Column, token.End.Column,
 			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
@@ -301,7 +351,7 @@ func parseStructLiteral(p *Parser, typeName *ast.IdentifierExpr) ast.Expression 
 	fieldNames := make(map[string]bool)
 
 	// Parse field initializers
-	fields := make([]ast.StructFieldInit, 0)
+	fields := make([]ast.StructField, 0)
 	for {
 		// Parse field name
 		fieldName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME)
@@ -319,7 +369,7 @@ func parseStructLiteral(p *Parser, typeName *ast.IdentifierExpr) ast.Expression 
 			return nil
 		}
 
-		fields = append(fields, ast.StructFieldInit{
+		fields = append(fields, ast.StructField{
 			Field: ast.IdentifierExpr{
 				Name: fieldName.Value,
 				Location: ast.Location{
@@ -417,45 +467,11 @@ func parsePrimary(p *Parser) ast.Expression {
 	case lexer.FUNCTION_TOKEN:
 		start := p.advance()
 		return parseFunctionLiteral(p, &start.Start)
-	case lexer.STRUCT_TOKEN:
-		return parseAnonymousStruct(p)
+	case lexer.AT_TOKEN:
+		return parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:
-		iden := parseIdentifier(p)
-
-		if p.match(lexer.OPEN_PAREN) {
-			return parseFunctionCall(p, iden)
-		}
-
-		if p.match(lexer.OPEN_BRACKET) {
-			return parseIndexing(p, iden)
-		}
-
-		if p.match(lexer.OPEN_CURLY) {
-			//if identifier is a type, parse struct literal else return identifier
-			if symbol, ok := p.currentScope.Resolve(iden.Name); ok {
-				if symbol.SymbolKind == symboltable.TYPE_SYMBOL {
-					return parseStructLiteral(p, iden)
-				}
-			}
-		}
-
-		return iden
+		return parseIdentifier(p)
 	}
-	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-		p.peek().Start.Column, p.peek().End.Column,
-		fmt.Sprintf(report.UNEXPECTED_TOKEN+" `%s`", p.peek().Value)).SetLevel(report.SYNTAX_ERROR)
+	handleUnexpectedToken(p)
 	return nil
-}
-
-// parseAnonymousStruct parses an anonymous struct literal
-func parseAnonymousStruct(p *Parser) ast.Expression {
-	token := p.advance()
-	iden := &ast.IdentifierExpr{
-		Name: token.Value,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
-	}
-	return parseStructLiteral(p, iden)
 }

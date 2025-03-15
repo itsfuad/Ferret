@@ -56,7 +56,6 @@ func TestExpressionParsing(t *testing.T) {
 		{"return a, b;", true, "Return statement with multiple expressions"},
 		{"return;", true, "Return statement with no expression"},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)

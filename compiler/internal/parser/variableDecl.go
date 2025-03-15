@@ -74,7 +74,7 @@ func parseInitializers(p *Parser) ([]ast.Expression, bool) {
 		for {
 			value := parseExpression(p)
 			if value == nil {
-				report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected value after '='").SetLevel(report.SYNTAX_ERROR)
+				report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected value after '=', got invalid expression").SetLevel(report.SYNTAX_ERROR)
 				return nil, false
 			}
 			values = append(values, value)
@@ -168,8 +168,15 @@ func parseVarDecl(p *Parser) ast.Statement {
 		}
 
 		if !p.currentScope.Define(sym) {
-			report.ShowRedeclarationError(v.Identifier.Name, p.filePath, p.currentScope, v.Identifier.StartPos().Line, v.Identifier.EndPos().Line, v.Identifier.StartPos().Column, v.Identifier.EndPos().Column)
-			return nil
+			report.ShowRedeclarationError(
+				v.Identifier.Name,
+				p.filePath,
+				p.currentScope,
+				v.Identifier.StartPos().Line,
+				v.Identifier.EndPos().Line,
+				v.Identifier.StartPos().Column,
+				v.Identifier.EndPos().Column,
+			)
 		}
 	}
 

@@ -69,17 +69,10 @@ func (a *ArrayLiteralExpr) Expr()                     {} // Expr is a marker int
 func (a *ArrayLiteralExpr) StartPos() *lexer.Position { return a.Start }
 func (a *ArrayLiteralExpr) EndPos() *lexer.Position   { return a.End }
 
-// StructFieldInit represents a field initialization in a struct literal
-type StructFieldInit struct {
-	Field IdentifierExpr
-	Value Expression
-	Location
-}
-
 // StructLiteralExpr represents a struct literal expression like Point{x: 10, y: 20}
 type StructLiteralExpr struct {
 	TypeName    IdentifierExpr
-	Fields      []StructFieldInit
+	Fields      []StructField
 	IsAnonymous bool
 	Location
 }
@@ -112,3 +105,16 @@ func (f *FunctionCallExpr) INode()                    {} // INode is a marker in
 func (f *FunctionCallExpr) Expr()                     {} // Expr is a marker interface for all expressions
 func (f *FunctionCallExpr) StartPos() *lexer.Position { return f.Start }
 func (f *FunctionCallExpr) EndPos() *lexer.Position   { return f.End }
+
+// FieldAccessExpr represents a field access expression like struct.field
+type FieldAccessExpr struct {
+	Object Expression      // The struct being accessed
+	Field  *IdentifierExpr // The field being accessed
+	Location
+}
+
+func (f *FieldAccessExpr) INode()                    {} // INode is a marker interface for all nodes
+func (f *FieldAccessExpr) Expr()                     {} // Expr is a marker interface for all expressions
+func (f *FieldAccessExpr) LValue()                   {} // LValue is a marker interface for all lvalues
+func (f *FieldAccessExpr) StartPos() *lexer.Position { return f.Start }
+func (f *FieldAccessExpr) EndPos() *lexer.Position   { return f.End }

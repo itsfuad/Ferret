@@ -2,7 +2,6 @@ package ast
 
 import (
 	"ferret/compiler/internal/lexer"
-	"ferret/compiler/internal/types"
 )
 
 type IntLiteral struct {
@@ -58,23 +57,3 @@ func (i *IndexableExpr) INode()                    {} // INode is a marker inter
 func (i *IndexableExpr) Expr()                     {} // Expr is a marker interface for all expressions
 func (i *IndexableExpr) StartPos() *lexer.Position { return i.Start }
 func (i *IndexableExpr) EndPos() *lexer.Position   { return i.End }
-
-// ObjectField represents a field in an object type or literal
-type ObjectField struct {
-	Name  string
-	Type  DataType   // nil for object literals
-	Value Expression // nil for object types
-	Location
-}
-
-// ObjectType represents an object type definition
-type ObjectType struct {
-	Fields   []ObjectField
-	TypeName types.TYPE_NAME
-	Location
-}
-
-func (o *ObjectType) INode()                    {} // INode is a marker interface for all nodes
-func (o *ObjectType) Type() types.TYPE_NAME     { return o.TypeName }
-func (o *ObjectType) StartPos() *lexer.Position { return o.Start }
-func (o *ObjectType) EndPos() *lexer.Position   { return o.End }

@@ -1,0 +1,13 @@
+type Point struct {
+    x: i32,
+    y: i32
+};
+
+let point = @Point{x: 10, y: 20};
+
+point.x = 30;
+
+let slope = point.x / point.y;
+
+// Anonymous structs
+let obj = @struct{x: 23, y: 45};
