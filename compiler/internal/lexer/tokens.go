@@ -54,12 +54,12 @@ const (
 	DIV_TOKEN   TOKEN = "/"
 	MOD_TOKEN   TOKEN = "%"
 	//logical operators
-	LESS_TOKEN          TOKEN = "<"
-	GREATER_TOKEN       TOKEN = ">"
 	LESS_EQUAL_TOKEN    TOKEN = "<="
 	GREATER_EQUAL_TOKEN TOKEN = ">="
 	NOT_EQUAL_TOKEN     TOKEN = "!="
 	DOUBLE_EQUAL_TOKEN  TOKEN = "=="
+	LESS_TOKEN          TOKEN = "<"
+	GREATER_TOKEN       TOKEN = ">"
 	//assignment
 	COLON_TOKEN        TOKEN = ":"
 	EQUALS_TOKEN       TOKEN = "="
@@ -81,7 +81,10 @@ const (
 	SEMICOLON_TOKEN TOKEN = ";"
 	ARROW_TOKEN     TOKEN = "->"
 	FAT_ARROW_TOKEN TOKEN = "=>"
-	EOF_TOKEN       TOKEN = "end_of_file"
+
+	AT_TOKEN TOKEN = "@"
+
+	EOF_TOKEN TOKEN = "end_of_file"
 )
 
 var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{

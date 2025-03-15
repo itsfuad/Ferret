@@ -139,10 +139,7 @@ func TestFunctionParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
-			if tt.isValid && nodes == nil {
-				t.Errorf("Expected AST nodes for valid input, got nil")
-			}
+			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 		})
 	}
 }

@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
 )
@@ -119,7 +120,7 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 }
 
 // parseStructField parses a single struct field
-func parseStructField(p *Parser) *ast.ObjectField {
+func parseStructField(p *Parser) *ast.StructField {
 	// Parse field name
 	nameToken := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME+" got "+p.peek().Value)
 	fieldName := nameToken.Value
@@ -131,8 +132,14 @@ func parseStructField(p *Parser) *ast.ObjectField {
 	if fieldType, ok := parseType(p); !ok {
 		return nil
 	} else {
-		return &ast.ObjectField{
-			Name: fieldName,
+		return &ast.StructField{
+			Field: ast.IdentifierExpr{
+				Name: fieldName,
+				Location: ast.Location{
+					Start: &nameToken.Start,
+					End:   &nameToken.End,
+				},
+			},
 			Type: fieldType,
 			Location: ast.Location{
 				Start: &nameToken.Start,
@@ -146,6 +153,11 @@ func parseStructField(p *Parser) *ast.ObjectField {
 func parseStructType(p *Parser) (ast.DataType, bool) {
 	// Consume 'struct' keyword
 	start := p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD).Start
+
+	// Create struct scope
+	p.enterScope(symboltable.STRUCT_SCOPE)
+	defer p.exitScope()
+
 	// Consume opening brace
 	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
@@ -157,7 +169,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		return nil, false
 	}
 
-	fields := make([]ast.ObjectField, 0)
+	fields := make([]ast.StructField, 0)
 	fieldNames := make(map[string]bool)
 
 	for !p.match(lexer.CLOSE_CURLY) {
@@ -169,13 +181,40 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		}
 
 		// Check for duplicate field names
-		if fieldNames[field.Name] {
+		if fieldNames[field.Field.Name] {
 			report.Add(p.filePath, field.Location.Start.Line, field.Location.End.Line,
 				field.Location.Start.Column, field.Location.End.Column,
 				report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
-		fieldNames[field.Name] = true
+		fieldNames[field.Field.Name] = true
+
+		// Add field to struct scope
+		sym := &symboltable.Symbol{
+			Name:       field.Field.Name,
+			SymbolKind: symboltable.STRUCT_FIELD_SYMBOL,
+			Type:       field.Type.Type(),
+			IsMutable:  true, // Fields are mutable by default
+			Location: symboltable.SymbolLocation{
+				File:   p.filePath,
+				Line:   field.Location.Start.Line,
+				Column: field.Location.Start.Column,
+			},
+		}
+
+		if !p.currentScope.Define(sym) {
+			report.ShowRedeclarationError(
+				field.Field.Name,
+				p.filePath,
+				p.currentScope,
+				field.Location.Start.Line,
+				field.Location.End.Line,
+				field.Location.Start.Column,
+				field.Location.End.Column,
+			)
+			return nil, false
+		}
+
 		fields = append(fields, *field)
 
 		if p.match(lexer.CLOSE_CURLY) {
@@ -262,12 +301,39 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	start := p.advance() // consume the 'type' token
 
 	typeName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_TYPE_NAME)
+
 	// Parse the underlying type
 	underlyingType, ok := parseType(p)
 	if !ok {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 			p.peek().Start.Column, p.peek().End.Column,
 			report.EXPECTED_TYPE).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+
+	// Add type to symbol table
+	sym := &symboltable.Symbol{
+		Name:       typeName.Value,
+		SymbolKind: symboltable.TYPE_SYMBOL,
+		Type:       underlyingType.Type(),
+		IsMutable:  false,
+		Location: symboltable.SymbolLocation{
+			File:   p.filePath,
+			Line:   typeName.Start.Line,
+			Column: typeName.Start.Column,
+		},
+	}
+
+	if !p.currentScope.Define(sym) {
+		report.ShowRedeclarationError(
+			typeName.Value,
+			p.filePath,
+			p.currentScope,
+			typeName.Start.Line,
+			typeName.End.Line,
+			typeName.Start.Column,
+			typeName.End.Column,
+		)
 		return nil
 	}
 

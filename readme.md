@@ -121,7 +121,13 @@ type Matrix [][]f32;
 - [x] Assignment operators
 - [x] Grouping
 - [x] Arrays
+    - [x] Array indexing
+    - [x] Array assignment
 - [x] Structs
+    - [x] Anonymous structs
+    - [x] Struct literals
+    - [x] Struct field access
+    - [x] Struct field assignment
 - [ ] Methods
 - [ ] Interfaces
 - [x] Functions

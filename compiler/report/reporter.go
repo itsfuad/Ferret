@@ -2,6 +2,7 @@ package report
 
 import (
 	"ferret/compiler/colors"
+	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/utils"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ type REPORT_TYPE string
 
 const (
 	NULL           REPORT_TYPE = ""
+	SEMANTIC_ERROR REPORT_TYPE = "semantic error" // Semantic error
 	CRITICAL_ERROR REPORT_TYPE = "critical error" // Stops compilation immediately
 	SYNTAX_ERROR   REPORT_TYPE = "syntax error"   // Syntax error, also stops compilation
 	NORMAL_ERROR   REPORT_TYPE = "error"          // Regular error that doesn't halt compilation
@@ -24,6 +26,7 @@ const (
 var colorMap = map[REPORT_TYPE]colors.COLOR{
 	CRITICAL_ERROR: colors.BOLD_RED,
 	SYNTAX_ERROR:   colors.RED,
+	SEMANTIC_ERROR: colors.RED,
 	NORMAL_ERROR:   colors.RED,
 	WARNING:        colors.YELLOW,
 	INFO:           colors.BLUE,
@@ -93,6 +96,8 @@ func printReport(r *Report) {
 		reportMsgType = "[Syntax Error]: "
 	case NORMAL_ERROR:
 		reportMsgType = "[Error]: "
+	case SEMANTIC_ERROR:
+		reportMsgType = "[Semantic Error]: "
 	}
 
 	reportColor := colorMap[r.Level]
@@ -227,12 +232,28 @@ func (e *Report) SetLevel(level REPORT_TYPE) {
 	}
 }
 
+func ShowRedeclarationError(name string, filePath string, scope *symboltable.SymbolTable, lineStart, lineEnd, colStart, colEnd int) {
+	msg := name + " already declared in"
+	//find previous declaration position
+	sym, found := scope.Resolve(name)
+	if found {
+		msg += colors.GREY.Sprintf(" %s:%d:%d", sym.Location.File, sym.Location.Line, sym.Location.Column)
+	} else {
+		msg += " this scope"
+	}
+
+	Add(filePath, lineStart, lineEnd, colStart, colEnd, msg).SetLevel(SEMANTIC_ERROR)
+}
+
 // DisplayAll outputs all the diagnostic reports. It recovers from panics,
 // prints a summary status, and exits the process if errors are present.
 func (r Reports) DisplayAll() {
-	for _, err := range r {
+	for i, err := range r {
 		if err.Level == NULL {
 			panic("call SetLevel() method with valid Error level")
+		}
+		if i != 0 {
+			colors.GREY.Println("------------------------------------------------")
 		}
 		printReport(err)
 	}

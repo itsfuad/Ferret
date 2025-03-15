@@ -3,23 +3,39 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"fmt"
 )
 
 type Parser struct {
-	tokens   []lexer.Token
-	current  int
-	filePath string
+	tokens       []lexer.Token
+	current      int
+	filePath     string
+	symbolTable  *symboltable.SymbolTable
+	currentScope *symboltable.SymbolTable
 }
 
 func New(filePath string, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, debug)
+	globalScope := symboltable.NewSymbolTable(nil, symboltable.GLOBAL_SCOPE)
 	return &Parser{
-		tokens:   tokens,
-		current:  0,
-		filePath: filePath,
+		tokens:       tokens,
+		current:      0,
+		filePath:     filePath,
+		symbolTable:  globalScope,
+		currentScope: globalScope,
 	}
+}
+
+// enterScope creates a new scope of the given kind and makes it current
+func (p *Parser) enterScope(kind symboltable.ScopeKind) {
+	p.currentScope = p.currentScope.EnterScope(kind)
+}
+
+// exitScope returns to the parent scope
+func (p *Parser) exitScope() {
+	p.currentScope = p.currentScope.ExitScope()
 }
 
 // current token
@@ -146,16 +162,18 @@ func handleUnexpectedToken(p *Parser) ast.Statement {
 // parseBlock parses a block of statements
 func parseBlock(p *Parser) ast.BlockConstruct {
 	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
+
+	// Create a new block scope
+	p.enterScope(symboltable.BLOCK_SCOPE)
+	defer p.exitScope() // Ensure we exit the scope even if there's an error
+
 	nodes := make([]ast.Node, 0)
 
 	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
 		node := parseNode(p)
-		if node == nil {
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
-			return nil
+		if node != nil {
+			nodes = append(nodes, node)
 		}
-		nodes = append(nodes, node)
 	}
 
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
@@ -167,49 +185,6 @@ func parseBlock(p *Parser) ast.BlockConstruct {
 			End:   &end,
 		},
 	}
-}
-
-// parseNode parses a single statement or expression
-func parseNode(p *Parser) ast.Node {
-	var node ast.Node
-	switch p.peek().Kind {
-	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
-		node = parseVarDecl(p)
-	case lexer.TYPE_TOKEN:
-		node = parseTypeDecl(p)
-	case lexer.RETURN_TOKEN:
-		node = parseReturnStmt(p)
-	case lexer.FUNCTION_TOKEN:
-		node = parseFunctionDecl(p)
-	case lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN:
-		// Look ahead to see if this is an assignment
-		expr := parseExpression(p)
-		if expr != nil {
-			// if the expression is valid, parse it as an expression statement
-			node = parseExpressionStatement(p, expr)
-		} else {
-			fmt.Printf("Invalid expression: %+v\n", expr)
-			// if the expression is invalid, report an error
-			node = handleUnexpectedToken(p)
-		}
-	default:
-		fmt.Printf("Invalid token: %+v\n", p.peek())
-		node = handleUnexpectedToken(p)
-	}
-
-	// Handle statement termination and update locations
-	if _, ok := node.(ast.Statement); ok {
-		//if no semicolon, show error on the previous token
-		if !p.match(lexer.SEMICOLON_TOKEN) {
-			previous := p.previous()
-			report.Add(p.filePath, previous.Start.Line, previous.End.Line, previous.Start.Column, previous.End.Column, "Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
-		}
-		end := p.advance()
-		node.EndPos().Column = end.End.Column
-		node.EndPos().Line = end.End.Line
-	}
-
-	return node
 }
 
 // parseReturnStmt parses a return statement
@@ -237,6 +212,53 @@ func parseReturnStmt(p *Parser) ast.Statement {
 	}
 }
 
+// parseNode parses a single statement or expression
+func parseNode(p *Parser) ast.Node {
+	var node ast.Node
+	switch p.peek().Kind {
+	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
+		node = parseVarDecl(p)
+	case lexer.TYPE_TOKEN:
+		node = parseTypeDecl(p)
+	case lexer.RETURN_TOKEN:
+		node = parseReturnStmt(p)
+	case lexer.FUNCTION_TOKEN:
+		node = parseFunctionDecl(p)
+	case lexer.IF_TOKEN:
+		node = parseIfStatement(p)
+	case lexer.AT_TOKEN:
+		node = parseStructLiteral(p)
+	case lexer.IDENTIFIER_TOKEN:
+		// Look ahead to see if this is an assignment
+		expr := parseExpression(p)
+		if expr != nil {
+			// if the expression is valid, parse it as an expression statement
+			node = parseExpressionStatement(p, expr)
+		} else {
+			fmt.Printf("Invalid expression: %+v\n", expr)
+			// if the expression is invalid, report an error
+			node = handleUnexpectedToken(p)
+		}
+	default:
+		fmt.Printf("Invalid token: %+v\n", p.peek())
+		node = handleUnexpectedToken(p)
+	}
+
+	// Handle statement termination and update locations
+	if _, ok := node.(ast.Statement); ok {
+		//if no semicolon, show error on the previous token
+		if !p.match(lexer.SEMICOLON_TOKEN) {
+			token := p.peek()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, "Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+		}
+		end := p.advance()
+		node.EndPos().Column = end.End.Column
+		node.EndPos().Line = end.End.Line
+	}
+
+	return node
+}
+
 // Parse is the entry point for parsing
 func (p *Parser) Parse() []ast.Node {
 	var nodes []ast.Node
@@ -244,11 +266,11 @@ func (p *Parser) Parse() []ast.Node {
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
+
 		if node != nil {
 			nodes = append(nodes, node)
 		} else {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.EMPTY_STATEMENT).SetLevel(report.SYNTAX_ERROR)
-			return nil
+			p.consume(lexer.SEMICOLON_TOKEN, report.EXPECTED_SEMI_COLON)
 		}
 	}
 

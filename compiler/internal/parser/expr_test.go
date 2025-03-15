@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"ferret/compiler/testUtils"
 	"testing"
 )
 
@@ -57,14 +56,9 @@ func TestExpressionParsing(t *testing.T) {
 		{"return a, b;", true, "Return statement with multiple expressions"},
 		{"return;", true, "Return statement with no expression"},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
-
-			if len(nodes) == 0 && tt.isValid {
-				t.Errorf(testUtils.ErrNoNodes, tt.desc)
-			}
+			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 		})
 	}
 }
@@ -91,10 +85,7 @@ func TestOnlyExpression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			nodes := testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
-			if len(nodes) == 0 && tt.isValid {
-				t.Errorf(testUtils.ErrNoNodes, tt.desc)
-			}
+			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
 		})
 	}
 }

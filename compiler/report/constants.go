@@ -30,6 +30,7 @@ const (
 	EXPECTED_EQUALS      = "Expected '='"
 	EXPECTED_OPEN_BRACE  = "Expected '{'"
 	EXPECTED_CLOSE_BRACE = "Expected '}'"
+	EXPECTED_AT_TOKEN    = "Expected '@'"
 )
 
 // Error messages for variable declarations
@@ -136,4 +137,10 @@ const (
 // New constant for the new error message
 const (
 	TRAILING_COMMA_NOT_ALLOWED = "Unnecessary trailing comma"
+)
+
+// Error messages for if statements
+const (
+	EXPECTED_IF   = "Expected 'if' keyword"
+	EXPECTED_ELSE = "Expected 'else' keyword"
 )

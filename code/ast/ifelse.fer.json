@@ -1,0 +1,333 @@
+[
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 1,
+                        "Column": 5,
+                        "Index": 4
+                    },
+                    "End": {
+                        "Line": 1,
+                        "Column": 11,
+                        "Index": 5
+                    }
+                },
+                "ExplicitType": null
+            }
+        ],
+        "Initializers": [
+            {
+                "Value": 0,
+                "Raw": "0",
+                "Base": 10,
+                "Start": {
+                    "Line": 1,
+                    "Column": 9,
+                    "Index": 8
+                },
+                "End": {
+                    "Line": 1,
+                    "Column": 10,
+                    "Index": 9
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 1,
+            "Column": 1,
+            "Index": 0
+        },
+        "End": {
+            "Line": 1,
+            "Column": 11,
+            "Index": 5
+        }
+    },
+    {
+        "Condition": {
+            "Left": {
+                "Name": "x",
+                "Start": {
+                    "Line": 2,
+                    "Column": 4,
+                    "Index": 15
+                },
+                "End": {
+                    "Line": 2,
+                    "Column": 5,
+                    "Index": 16
+                }
+            },
+            "Operator": {
+                "Kind": "\u003e",
+                "Value": "\u003e",
+                "Start": {
+                    "Line": 2,
+                    "Column": 6,
+                    "Index": 17
+                },
+                "End": {
+                    "Line": 2,
+                    "Column": 7,
+                    "Index": 18
+                }
+            },
+            "Right": {
+                "Value": 0,
+                "Raw": "0",
+                "Base": 10,
+                "Start": {
+                    "Line": 2,
+                    "Column": 8,
+                    "Index": 19
+                },
+                "End": {
+                    "Line": 2,
+                    "Column": 9,
+                    "Index": 20
+                }
+            },
+            "Start": {
+                "Line": 2,
+                "Column": 4,
+                "Index": 15
+            },
+            "End": {
+                "Line": 2,
+                "Column": 9,
+                "Index": 20
+            }
+        },
+        "Body": {
+            "Nodes": [
+                {
+                    "Values": [
+                        {
+                            "Name": "x",
+                            "Start": {
+                                "Line": 3,
+                                "Column": 12,
+                                "Index": 35
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 13,
+                                "Index": 36
+                            }
+                        }
+                    ],
+                    "Start": {
+                        "Line": 3,
+                        "Column": 5,
+                        "Index": 28
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 14,
+                        "Index": 36
+                    }
+                }
+            ],
+            "Start": {
+                "Line": 2,
+                "Column": 10,
+                "Index": 21
+            },
+            "End": {
+                "Line": 4,
+                "Column": 2,
+                "Index": 40
+            }
+        },
+        "Alternative": {
+            "Condition": {
+                "Left": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 11,
+                        "Index": 49
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 12,
+                        "Index": 50
+                    }
+                },
+                "Operator": {
+                    "Kind": "\u003c",
+                    "Value": "\u003c",
+                    "Start": {
+                        "Line": 4,
+                        "Column": 13,
+                        "Index": 51
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 14,
+                        "Index": 52
+                    }
+                },
+                "Right": {
+                    "Value": 0,
+                    "Raw": "0",
+                    "Base": 10,
+                    "Start": {
+                        "Line": 4,
+                        "Column": 15,
+                        "Index": 53
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 16,
+                        "Index": 54
+                    }
+                },
+                "Start": {
+                    "Line": 4,
+                    "Column": 11,
+                    "Index": 49
+                },
+                "End": {
+                    "Line": 4,
+                    "Column": 16,
+                    "Index": 54
+                }
+            },
+            "Body": {
+                "Nodes": [
+                    {
+                        "Values": [
+                            {
+                                "Operator": {
+                                    "Kind": "-",
+                                    "Value": "-",
+                                    "Start": {
+                                        "Line": 5,
+                                        "Column": 12,
+                                        "Index": 69
+                                    },
+                                    "End": {
+                                        "Line": 5,
+                                        "Column": 13,
+                                        "Index": 70
+                                    }
+                                },
+                                "Operand": {
+                                    "Name": "x",
+                                    "Start": {
+                                        "Line": 5,
+                                        "Column": 13,
+                                        "Index": 70
+                                    },
+                                    "End": {
+                                        "Line": 5,
+                                        "Column": 14,
+                                        "Index": 71
+                                    }
+                                },
+                                "Start": {
+                                    "Line": 5,
+                                    "Column": 12,
+                                    "Index": 69
+                                },
+                                "End": {
+                                    "Line": 5,
+                                    "Column": 14,
+                                    "Index": 71
+                                }
+                            }
+                        ],
+                        "Start": {
+                            "Line": 5,
+                            "Column": 5,
+                            "Index": 62
+                        },
+                        "End": {
+                            "Line": 5,
+                            "Column": 15,
+                            "Index": 71
+                        }
+                    }
+                ],
+                "Start": {
+                    "Line": 4,
+                    "Column": 17,
+                    "Index": 55
+                },
+                "End": {
+                    "Line": 6,
+                    "Column": 2,
+                    "Index": 75
+                }
+            },
+            "Alternative": {
+                "Nodes": [
+                    {
+                        "Values": [
+                            {
+                                "Value": 0,
+                                "Raw": "0",
+                                "Base": 10,
+                                "Start": {
+                                    "Line": 7,
+                                    "Column": 12,
+                                    "Index": 95
+                                },
+                                "End": {
+                                    "Line": 7,
+                                    "Column": 13,
+                                    "Index": 96
+                                }
+                            }
+                        ],
+                        "Start": {
+                            "Line": 7,
+                            "Column": 5,
+                            "Index": 88
+                        },
+                        "End": {
+                            "Line": 7,
+                            "Column": 14,
+                            "Index": 96
+                        }
+                    }
+                ],
+                "Start": {
+                    "Line": 6,
+                    "Column": 8,
+                    "Index": 81
+                },
+                "End": {
+                    "Line": 8,
+                    "Column": 2,
+                    "Index": 100
+                }
+            },
+            "Start": {
+                "Line": 4,
+                "Column": 8,
+                "Index": 46
+            },
+            "End": {
+                "Line": 8,
+                "Column": 2,
+                "Index": 100
+            }
+        },
+        "Start": {
+            "Line": 2,
+            "Column": 1,
+            "Index": 12
+        },
+        "End": {
+            "Line": 8,
+            "Column": 2,
+            "Index": 100
+        }
+    }
+]

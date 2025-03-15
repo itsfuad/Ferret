@@ -3,6 +3,8 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/symboltable"
+	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
 	"fmt"
 )
@@ -110,6 +112,31 @@ func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 
 	params := parseParameters(p)
 
+	// Add parameters to function scope
+	for _, param := range params {
+		sym := &symboltable.Symbol{
+			Name:       param.Identifier.Name,
+			SymbolKind: symboltable.PARAMETER_SYMBOL,
+			Type:       param.Type.Type(),
+			IsMutable:  true, // Parameters are mutable by default
+			Location: symboltable.SymbolLocation{
+				File:   p.filePath,
+				Line:   param.Identifier.StartPos().Line,
+				Column: param.Identifier.StartPos().Column,
+			},
+		}
+
+		if !p.currentScope.Define(sym) {
+			report.Add(p.filePath,
+				param.Identifier.StartPos().Line,
+				param.Identifier.EndPos().Line,
+				param.Identifier.StartPos().Column,
+				param.Identifier.EndPos().Column,
+				"Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
+			return nil, nil
+		}
+	}
+
 	// Parse return type if present
 	if p.match(lexer.ARROW_TOKEN) {
 		returnTypes := parseReturnTypes(p)
@@ -120,6 +147,10 @@ func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 }
 
 func parseFunctionLiteral(p *Parser, start *lexer.Position) *ast.FunctionLiteral {
+
+	//create new scope
+	p.enterScope(symboltable.FUNCTION_SCOPE)
+	defer p.exitScope()
 
 	params, returnTypes := parseSignature(p)
 
@@ -143,7 +174,7 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	// consume the function token
 	start := p.advance()
 
-	name := ast.IdentifierExpr{}
+	var name *ast.IdentifierExpr
 
 	if p.match(lexer.IDENTIFIER_TOKEN) {
 		token := p.advance()
@@ -151,16 +182,42 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 			Start: &token.Start,
 			End:   &token.End,
 		}
-		name = ast.IdentifierExpr{
+		name = &ast.IdentifierExpr{
 			Name:     token.Value,
 			Location: location,
+		}
+
+		// Add function to current scope's symbol table
+		sym := &symboltable.Symbol{
+			Name:       name.Name,
+			SymbolKind: symboltable.FUNCTION_SYMBOL,
+			Type:       types.FUNCTION,
+			IsMutable:  false,
+			Location: symboltable.SymbolLocation{
+				File:   p.filePath,
+				Line:   name.StartPos().Line,
+				Column: name.StartPos().Column,
+			},
+		}
+
+		if !p.currentScope.Define(sym) {
+			report.ShowRedeclarationError(
+				name.Name,
+				p.filePath,
+				p.currentScope,
+				name.StartPos().Line,
+				name.EndPos().Line,
+				name.StartPos().Column,
+				name.EndPos().Column,
+			)
+			return nil
 		}
 	}
 
 	function := parseFunctionLiteral(p, &start.Start)
 
 	return &ast.FunctionDeclExpr{
-		Identifier: name,
+		Identifier: *name,
 		Function:   function,
 		Location: ast.Location{
 			Start: &start.Start,

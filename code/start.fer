@@ -1,21 +1,22 @@
+let a = 10;
 a;
+let b = 20;
 a, b;
 a + b;
-answer = (a + b) * 2;
+let answer = (a + b) * 2;
 
-let myvar;
-let a = 10;
+let myvar = 0;
 
 let arr : [][]i32 = [[1, 2, 3], [4, 5, 6]];
 
-a1, a2, a3 = 1;
+let a1, a2, a3 = 1;
 
 type Point struct {
     x: i32,
     y: i32
 };
 
-let point: Point = Point{x: 10, y: 20};
+let point: Point = @Point{x: 10, y: 20};
 
 // future features
 // //point as value
@@ -35,15 +36,15 @@ let point: Point = Point{x: 10, y: 20};
 //p.translate(10, 20);
 
 //anonymous struct
-let p2 = struct {
-    name: str,
-    age: i32
+let p2 = @struct {
+    name: "Abir",
+    age: 23
 };
 
 let p3: struct {
     name: str,
     age: i32
-} = struct{name: "John", age: 20};
+} = @struct{name: "John", age: 20};
 
 fn add(a: i32, b: i32) -> i32 {
     return a + b;
@@ -71,4 +72,10 @@ fn hello() {
 hello(1, 2, 4);
 
 let sum = add(1, 2);
-let mul, ok: i32, bool = mul(1, 2);
+let res, ok: i32, bool = mul(1, 2);
+
+if ok {
+    hello();
+} else {
+    hello();
+}
