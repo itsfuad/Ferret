@@ -142,15 +142,6 @@ type Parameter struct {
 	Type       DataType
 }
 
-// MethodDecl represents a method declaration
-type MethodDecl struct {
-	Name     string
-	Receiver *Parameter // Receiver parameter: e.g. in `fn (t *T) M(n int)`, `t` is the receiver
-	IsRRef   bool       // Whether the receiver is a reference
-	Function *FunctionLiteral
-	Location
-}
-
 type StructField struct {
 	Field IdentifierExpr
 	Type  DataType   // nil for literal
@@ -161,7 +152,6 @@ type StructField struct {
 // StructType represents a struct type definition
 type StructType struct {
 	Fields   []StructField
-	Methods  []MethodDecl
 	TypeName types.TYPE_NAME
 	Location
 }

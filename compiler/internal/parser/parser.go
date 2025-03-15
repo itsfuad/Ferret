@@ -6,6 +6,7 @@ import (
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"fmt"
+	"slices"
 )
 
 type Parser struct {
@@ -61,11 +62,6 @@ func (p *Parser) isAtEnd() bool {
 	return p.peek().Kind == lexer.EOF_TOKEN
 }
 
-// rollback to N
-func (p *Parser) rollback(n int) {
-	p.current -= n
-}
-
 // consume the current token and return that token
 func (p *Parser) advance() lexer.Token {
 	if !p.isAtEnd() {
@@ -88,12 +84,7 @@ func (p *Parser) match(kinds ...lexer.TOKEN) bool {
 		return false
 	}
 
-	for _, kind := range kinds {
-		if p.peek().Kind == kind {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(kinds, p.peek().Kind)
 }
 
 // consume the current token if it is of the given kind and return that token
@@ -223,7 +214,7 @@ func parseNode(p *Parser) ast.Node {
 	case lexer.RETURN_TOKEN:
 		node = parseReturnStmt(p)
 	case lexer.FUNCTION_TOKEN:
-		node = parseFunctionDecl(p)
+		node = parseFunctionLike(p)
 	case lexer.IF_TOKEN:
 		node = parseIfStatement(p)
 	case lexer.AT_TOKEN:
@@ -266,11 +257,12 @@ func (p *Parser) Parse() []ast.Node {
 	for !p.isAtEnd() {
 		// Parse the statement
 		node := parseNode(p)
-
+		fmt.Printf("Node Type: %T\n", node)
 		if node != nil {
 			nodes = append(nodes, node)
 		} else {
-			p.consume(lexer.SEMICOLON_TOKEN, report.EXPECTED_SEMI_COLON)
+			handleUnexpectedToken(p)
+			break
 		}
 	}
 

@@ -466,7 +466,7 @@ func parsePrimary(p *Parser) ast.Expression {
 		return parseStringLiteral(p)
 	case lexer.FUNCTION_TOKEN:
 		start := p.advance()
-		return parseFunctionLiteral(p, &start.Start)
+		return parseFunctionLiteral(p, &start.Start, true)
 	case lexer.AT_TOKEN:
 		return parseStructLiteral(p)
 	case lexer.IDENTIFIER_TOKEN:

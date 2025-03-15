@@ -9,6 +9,43 @@ import (
 	"fmt"
 )
 
+// detect if it's a function or a method
+//
+// function: fn NAME (PARAMS) {BODY} // named
+//
+// function: fn (PARAMS) {BODY} // anonymous
+//
+// method: fn (r Receiver) NAME (PARAMS) {BODY}
+//
+// method: fn (r Receiver, others...) NAME (PARAMS) {BODY} // invalid, but we can still parse it and report an error
+func parseFunctionLike(p *Parser) ast.Node {
+
+	start := p.peek()
+
+	var params []ast.Parameter
+
+	if p.next().Kind == lexer.OPEN_PAREN {
+		p.advance()
+		// either a method or anonymous function
+		// fn (PARAMS) {BODY} // anonymous
+		// fn (PARAMS) NAME (PARAMS) {BODY} // method
+		params = parseParameters(p)
+		// if identifier, it's a method
+		if p.match(lexer.IDENTIFIER_TOKEN) {
+			fmt.Printf("Parsing as method\n")
+			return parseMethodDeclaration(p, &start.Start, params)
+		}
+
+		fmt.Printf("Parsing as anonymous function\n")
+		// anonymous function
+		return parseFunctionLiteral(p, &start.Start, false, params...)
+	} else {
+		fmt.Printf("Parsing as named function\n")
+		// named function
+		return parseFunctionDecl(p)
+	}
+}
+
 func parseParameters(p *Parser) []ast.Parameter {
 
 	params := []ast.Parameter{}
@@ -30,7 +67,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 				Identifier: iden,
 			})
 
-			p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON+fmt.Sprintf(" after the parameter %s but got ", iden.Name)+p.peek().Value)
+			p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
 
 			if paramType, ok := parseType(p); ok {
 				params[len(params)-1].Type = paramType
@@ -102,15 +139,11 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 	}
 }
 
-func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
+func parseSignature(p *Parser, parseParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
 
-	if !p.match(lexer.OPEN_PAREN) {
-		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_OPEN_PAREN).AddHint("Add an opening parenthesis after the function name").SetLevel(report.SYNTAX_ERROR)
-		return nil, nil
+	if len(params) == 0 && parseParams {
+		params = parseParameters(p)
 	}
-
-	params := parseParameters(p)
 
 	// Add parameters to function scope
 	for _, param := range params {
@@ -146,13 +179,13 @@ func parseSignature(p *Parser) ([]ast.Parameter, []ast.DataType) {
 	return params, nil
 }
 
-func parseFunctionLiteral(p *Parser, start *lexer.Position) *ast.FunctionLiteral {
+func parseFunctionLiteral(p *Parser, start *lexer.Position, parseParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
 
 	//create new scope
 	p.enterScope(symboltable.FUNCTION_SCOPE)
 	defer p.exitScope()
 
-	params, returnTypes := parseSignature(p)
+	params, returnTypes := parseSignature(p, parseParams, params...)
 
 	block := parseBlock(p)
 
@@ -214,9 +247,9 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 		}
 	}
 
-	function := parseFunctionLiteral(p, &start.Start)
+	function := parseFunctionLiteral(p, &start.Start, true)
 
-	return &ast.FunctionDeclExpr{
+	return &ast.FunctionDecl{
 		Identifier: *name,
 		Function:   function,
 		Location: ast.Location{

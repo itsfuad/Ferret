@@ -41,10 +41,7 @@ let p2 = @struct {
     age: 23
 };
 
-let p3: struct {
-    name: str,
-    age: i32
-} = @struct{name: "John", age: 20};
+let p3: struct { name: str, age: i32 } = @struct{name: "John", age: 20};
 
 fn add(a: i32, b: i32) -> i32 {
     return a + b;
@@ -78,4 +75,17 @@ if ok {
     hello();
 } else {
     hello();
+}
+
+//anonymous function
+fn(){}
+
+//named function
+fn distanceToOrigin(p: Point) -> f32 {
+    return 1.3;
+}
+
+//method
+fn (p: Point) distanceToOrigin() -> f32 {
+    return 1.3;
 }
