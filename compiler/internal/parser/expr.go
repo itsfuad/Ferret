@@ -237,6 +237,32 @@ func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
 	}
 }
 
+// handlePostfixOperator handles a single postfix operator and returns the updated expression
+func handlePostfixOperator(p *Parser, expr ast.Expression) (ast.Expression, bool) {
+	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
+		if _, ok := expr.(*ast.PrefixExpr); ok {
+			current := p.peek()
+			report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
+			return nil, false
+		}
+		return parseIncDec(p, expr), true
+	}
+
+	if p.match(lexer.DOT_TOKEN) {
+		return parseFieldAccess(p, expr), true
+	}
+
+	if p.match(lexer.OPEN_PAREN) {
+		return parseFunctionCall(p, expr), true
+	}
+
+	if p.match(lexer.OPEN_BRACKET) {
+		return parseIndexing(p, expr), true
+	}
+
+	return nil, false
+}
+
 // parsePostfix handles postfix operators (++, --, [], ., (), {})
 func parsePostfix(p *Parser) ast.Expression {
 	expr := parsePrimary(p)
@@ -245,46 +271,13 @@ func parsePostfix(p *Parser) ast.Expression {
 	}
 
 	for {
-
-		if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
-			// Check if expression already has a prefix operator
-			if _, ok := expr.(*ast.PrefixExpr); ok {
-				current := p.peek()
-				report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
+		if newExpr, handled := handlePostfixOperator(p, expr); handled {
+			if newExpr == nil {
 				return nil
 			}
-
-			if result := parseIncDec(p, expr); result != nil {
-				expr = result
-				continue
-			}
-			return nil
+			expr = newExpr
+			continue
 		}
-
-		if p.match(lexer.DOT_TOKEN) {
-			if result := parseFieldAccess(p, expr); result != nil {
-				expr = result
-				continue
-			}
-			return nil
-		}
-
-		if p.match(lexer.OPEN_PAREN) {
-			if result := parseFunctionCall(p, expr); result != nil {
-				expr = result
-				continue
-			}
-			return nil
-		}
-
-		if p.match(lexer.OPEN_BRACKET) {
-			if result := parseIndexing(p, expr); result != nil {
-				expr = result
-				continue
-			}
-			return nil
-		}
-
 		break
 	}
 
@@ -299,74 +292,57 @@ func parseGrouping(p *Parser) ast.Expression {
 	return expr
 }
 
-// parseStructLiteral parses a struct literal expression like Point{x: 10, y: 20}
-func parseStructLiteral(p *Parser) ast.Expression {
-
-	start := p.consume(lexer.AT_TOKEN, report.EXPECTED_AT_TOKEN).Start
-
-	var typeName *ast.IdentifierExpr
-
-	if p.match(lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN) {
-		token := p.advance()
-		iden := &ast.IdentifierExpr{
-			Name: token.Value,
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
-		}
-		typeName = iden
-	} else {
+// validateStructType validates the struct type and returns the type name
+func validateStructType(p *Parser) (*ast.IdentifierExpr, bool) {
+	if !p.match(lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN) {
 		token := p.peek()
 		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
-		return nil
+		return nil, false
+	}
+
+	token := p.advance()
+	typeName := &ast.IdentifierExpr{
+		Name: token.Value,
+		Location: ast.Location{
+			Start: &token.Start,
+			End:   &token.End,
+		},
 	}
 
 	isAnonymous := lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN
-
 	if !isAnonymous {
-		//must be defined
 		if symbol, ok := p.currentScope.Resolve(typeName.Name); ok {
 			if symbol.SymbolKind != symboltable.TYPE_SYMBOL {
 				report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, "Expected type name after '@'").SetLevel(report.SYNTAX_ERROR)
-				return nil
+				return nil, false
 			}
 		} else {
 			report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, "Undefined type '"+typeName.Name+"'").SetLevel(report.SEMANTIC_ERROR)
-			return nil
+			return nil, false
 		}
 	}
 
-	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
+	return typeName, true
+}
 
-	// Check for empty struct
-	if p.peek().Kind == lexer.CLOSE_CURLY {
-		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line,
-			token.Start.Column, token.End.Column,
-			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
-		return nil
-	}
-
+// parseStructFields parses the fields of a struct literal
+func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 	fieldNames := make(map[string]bool)
-
-	// Parse field initializers
 	fields := make([]ast.StructField, 0)
+
 	for {
-		// Parse field name
 		fieldName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME)
 		if fieldNames[fieldName.Value] {
 			report.Add(p.filePath, fieldName.Start.Line, fieldName.End.Line, fieldName.Start.Column, fieldName.End.Column, report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
-			return nil
+			return nil, false
 		}
 		fieldNames[fieldName.Value] = true
 		p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
 
-		// Parse field value
 		value := parseExpression(p)
 		if value == nil {
 			report.Add(p.filePath, fieldName.Start.Line, fieldName.End.Line, fieldName.Start.Column, fieldName.End.Column, report.EXPECTED_FIELD_VALUE).AddHint("Add an expression after the colon").SetLevel(report.SYNTAX_ERROR)
-			return nil
+			return nil, false
 		}
 
 		fields = append(fields, ast.StructField{
@@ -386,9 +362,35 @@ func parseStructLiteral(p *Parser) ast.Expression {
 
 		if p.match(lexer.CLOSE_CURLY) {
 			break
-		} else {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
 		}
+		p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
+	}
+
+	return fields, true
+}
+
+// parseStructLiteral parses a struct literal expression like Point{x: 10, y: 20}
+func parseStructLiteral(p *Parser) ast.Expression {
+	start := p.consume(lexer.AT_TOKEN, report.EXPECTED_AT_TOKEN).Start
+
+	typeName, ok := validateStructType(p)
+	if !ok {
+		return nil
+	}
+
+	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
+
+	if p.peek().Kind == lexer.CLOSE_CURLY {
+		token := p.peek()
+		report.Add(p.filePath, token.Start.Line, token.End.Line,
+			token.Start.Column, token.End.Column,
+			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
+		return nil
+	}
+
+	fields, ok := parseStructFields(p)
+	if !ok {
+		return nil
 	}
 
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
@@ -396,7 +398,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 	return &ast.StructLiteralExpr{
 		TypeName:    *typeName,
 		Fields:      fields,
-		IsAnonymous: isAnonymous,
+		IsAnonymous: lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN,
 		Location: ast.Location{
 			Start: &start,
 			End:   &end,
