@@ -79,6 +79,17 @@ type User struct {
 };
 ```
 
+### Methods
+```rs
+// Method definition
+fn (p: Point) distanceToOrigin() -> f32 {
+    return p.x * p.x + p.y * p.y;
+}
+
+// Method call
+let d = point.distanceToOrigin();
+```
+
 ### Operators
 ```rs
 // Arithmetic operators
