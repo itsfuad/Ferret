@@ -262,7 +262,33 @@ func TestStructTypeDeclaration(t *testing.T) {
 		{`type User struct { name: str, name: i32 };`, false, "Duplicate field names"},
 		{`type User struct { "name": str };`, false, "Non-identifier field name"},
 		{`type User struct { name: str, age: i32 }`, false, "Missing semicolon"},
-		{`type User struct { name: str, };`, false, "Struct type with trailing comma"},
+		{`type User struct { name: str, };`, true, "Struct type with trailing comma. But shows warning"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			testParseWithPanic(t, tt.input, tt.desc, tt.isValid)
+		})
+	}
+}
+
+func TestInterfaceTypeDeclaration(t *testing.T) {
+	tests := []struct {
+		input   string
+		isValid bool
+		desc    string
+	}{
+		{`type INode interface {};`, true, "Basic interface type declaration with no methods"},
+		{`type Shape interface { fn show() };`, true, "Interface with method declaration"},
+		{`type INode interface { fn area() -> f64 };`, true, "Interface with method declaration and return type"},
+		{`type INode interface { fn dostuff() -> (i32, str) };`, true, "Interface with method declaration and multiple return types"},
+
+		//params
+		{`type INode interface { fn dostuff(a: i32, b: str) -> i32 };`, true, "Interface with method declaration and parameters"},
+		{`type INode interface { fn dostuff(a: i32, b: str) -> (i32, str) };`, true, "Interface with method declaration and parameters and return types"},
+
+		//invalid
+		{`type INode interface { name: str };`, false, "Interface with invalid field"},
 	}
 
 	for _, tt := range tests {

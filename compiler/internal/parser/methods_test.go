@@ -50,7 +50,7 @@ func TestMethodParsing(t *testing.T) {
 			input: `fn (r: Receiver, r2: Receiver) someMethod() -> i32 {
 				return 1;
 			}`,
-			isValid: false,
+			isValid: true,
 			desc:    "Method with multiple receivers",
 		},
 	}

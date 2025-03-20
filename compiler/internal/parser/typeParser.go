@@ -5,6 +5,7 @@ import (
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"
 )
 
@@ -219,12 +220,12 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 		if p.match(lexer.CLOSE_CURLY) {
 			break
-		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_CURLY {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
 		} else {
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_COMMA_OR_CLOSE_BRACE).AddHint("Add a comma after the field").SetLevel(report.SYNTAX_ERROR)
-			return nil, false
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
+			if p.match(lexer.CLOSE_CURLY) {
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				break
+			}
 		}
 	}
 
@@ -236,6 +237,74 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		Location: ast.Location{
 			Start: &start,
 			End:   &end,
+		},
+	}, true
+}
+
+func parseInterfaceType(p *Parser) (ast.DataType, bool) {
+
+	start := p.consume(lexer.INTERFACE_TOKEN, report.EXPECTED_INTERFACE_KEYWORD)
+
+	//create a new scope for the interface
+	p.enterScope(symboltable.INTERFACE_SCOPE)
+	defer p.exitScope()
+
+	//consume the '{' token
+	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
+
+	methods := make([]ast.InterfaceMethod, 0)
+
+	for !p.match(lexer.CLOSE_CURLY) {
+
+		start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD).Start
+
+		name := declareFunction(p)
+
+		//start a new scope
+		p.enterScope(symboltable.FUNCTION_SCOPE)
+		defer p.exitScope()
+
+		params, returnTypes := parseSignature(p, true)
+
+		end := p.previous().End
+
+		method := ast.InterfaceMethod{
+			Name:       *name,
+			Params:     params,
+			ReturnType: returnTypes,
+			Location:   ast.Location{Start: &start, End: &end},
+		}
+
+		// check if the method name is already declared in the interface
+		if utils.Has(methods, method, func(a ast.InterfaceMethod, b ast.InterfaceMethod) bool {
+			return a.Name.Name == b.Name.Name
+		}) {
+			report.Add(p.filePath, method.Location.Start.Line, method.Location.End.Line, method.Location.Start.Column, method.Location.End.Column, report.DUPLICATE_METHOD_NAME).SetLevel(report.SYNTAX_ERROR)
+			return nil, false
+		}
+
+		methods = append(methods, method)
+
+		if p.match(lexer.CLOSE_CURLY) {
+			break
+		} else {
+			//must be a comma
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
+			if p.match(lexer.CLOSE_CURLY) {
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				break
+			}
+		}
+	}
+
+	end := p.consume(lexer.CLOSE_CURLY, "expected end of interface definition")
+
+	return &ast.InterfaceType{
+		Methods:  methods,
+		TypeName: types.INTERFACE,
+		Location: ast.Location{
+			Start: &start.Start,
+			End:   &end.End,
 		},
 	}, true
 }
@@ -255,7 +324,8 @@ func parseFunctionTypeSignature(p *Parser) ([]ast.DataType, []ast.DataType) {
 }
 
 func parseFunctionType(p *Parser) (ast.DataType, bool) {
-	token := p.advance()
+	//consume the 'fn' token
+	token := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
 
 	// parse the parameters
 	parameters, returnTypes := parseFunctionTypeSignature(p)
@@ -289,6 +359,8 @@ func parseType(p *Parser) (ast.DataType, bool) {
 		return parseArrayType(p)
 	case string(types.STRUCT):
 		return parseStructType(p)
+	case string(types.INTERFACE):
+		return parseInterfaceType(p)
 	case string(types.FUNCTION):
 		return parseFunctionType(p)
 	default:

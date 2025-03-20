@@ -1,7 +1,4 @@
 # Ferret Programming Language
-
-![Ferret Mascot](./ferret.png)
-
 Welcome to Ferret! Ferret is a statically typed, beginner-friendly programming language designed to bring clarity, simplicity, and expressiveness to developers. With a focus on readability and a clean syntax, Ferret makes it easier to write clear, maintainable code while embracing modern programming principles.
 
 ## Key Features
@@ -79,17 +76,6 @@ type User struct {
 };
 ```
 
-### Methods
-```rs
-// Method definition
-fn (p: Point) distanceToOrigin() -> f32 {
-    return p.x * p.x + p.y * p.y;
-}
-
-// Method call
-let d = point.distanceToOrigin();
-```
-
 ### Operators
 ```rs
 // Arithmetic operators
@@ -143,7 +129,7 @@ type Matrix [][]f32;
     - [x] Struct field access
     - [x] Struct field assignment
 - [x] Methods
-- [ ] Interfaces
+- [x] Interfaces
 - [x] Functions
 - [x] Conditionals
 - [ ] Loops (for, while)

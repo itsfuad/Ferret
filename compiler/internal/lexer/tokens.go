@@ -22,7 +22,6 @@ const (
 	DO_TOKEN         TOKEN = "do"
 	IDENTIFIER_TOKEN TOKEN = "identifier"
 	PRIVATE_TOKEN    TOKEN = "priv"
-	IMPL_TOKEN       TOKEN = "impl"
 	RETURN_TOKEN     TOKEN = "return"
 	//data types
 	NUMBER_TOKEN    TOKEN = "numeric literal"
@@ -100,7 +99,6 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	STRUCT_TOKEN:    true,
 	PRIVATE_TOKEN:   true,
 	INTERFACE_TOKEN: true,
-	IMPL_TOKEN:      true,
 	FUNCTION_TOKEN:  true,
 	RETURN_TOKEN:    true,
 }

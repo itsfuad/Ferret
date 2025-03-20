@@ -30,8 +30,9 @@ func New(filePath string, debug bool) *Parser {
 }
 
 // enterScope creates a new scope of the given kind and makes it current
-func (p *Parser) enterScope(kind symboltable.ScopeKind) {
+func (p *Parser) enterScope(kind symboltable.ScopeKind) *symboltable.SymbolTable {
 	p.currentScope = p.currentScope.EnterScope(kind)
+	return p.currentScope
 }
 
 // exitScope returns to the parent scope

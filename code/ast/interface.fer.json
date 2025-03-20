@@ -1,0 +1,112 @@
+[
+    {
+        "Alias": {
+            "Name": "INode",
+            "Start": {
+                "Line": 2,
+                "Column": 6,
+                "Index": 7
+            },
+            "End": {
+                "Line": 2,
+                "Column": 11,
+                "Index": 12
+            }
+        },
+        "BaseType": {
+            "Methods": [
+                {
+                    "Name": {
+                        "Name": "show",
+                        "Start": {
+                            "Line": 3,
+                            "Column": 8,
+                            "Index": 33
+                        },
+                        "End": {
+                            "Line": 3,
+                            "Column": 12,
+                            "Index": 37
+                        }
+                    },
+                    "Params": [],
+                    "ReturnType": null,
+                    "Start": {
+                        "Line": 3,
+                        "Column": 5,
+                        "Index": 30
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 14,
+                        "Index": 39
+                    }
+                },
+                {
+                    "Name": {
+                        "Name": "length",
+                        "Start": {
+                            "Line": 4,
+                            "Column": 8,
+                            "Index": 49
+                        },
+                        "End": {
+                            "Line": 4,
+                            "Column": 14,
+                            "Index": 55
+                        }
+                    },
+                    "Params": [],
+                    "ReturnType": [
+                        {
+                            "BitSize": 32,
+                            "Unsigned": false,
+                            "TypeName": "i32",
+                            "Start": {
+                                "Line": 4,
+                                "Column": 20,
+                                "Index": 61
+                            },
+                            "End": {
+                                "Line": 4,
+                                "Column": 23,
+                                "Index": 64
+                            }
+                        }
+                    ],
+                    "Start": {
+                        "Line": 4,
+                        "Column": 5,
+                        "Index": 46
+                    },
+                    "End": {
+                        "Line": 4,
+                        "Column": 23,
+                        "Index": 64
+                    }
+                }
+            ],
+            "TypeName": "interface",
+            "Start": {
+                "Line": 2,
+                "Column": 12,
+                "Index": 13
+            },
+            "End": {
+                "Line": 5,
+                "Column": 3,
+                "Index": 67
+            }
+        },
+        "Start": {
+            "Line": 2,
+            "Column": 1,
+            "Index": 2
+        },
+        "End": {
+            "Line": 5,
+            "Column": 3,
+            "Index": 67
+        }
+    }
+]

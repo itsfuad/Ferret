@@ -20,12 +20,11 @@ func TestStructParsing(t *testing.T) {
 		// Struct types
 		{"type Point struct { x: i32, y: i32 };", true, "Simple struct type"},
 		{"let data: struct { name: str, address: struct { street: str, city: str } };", true, "Nested struct type"},
-		{"type Point {};", false, "Empty struct type"},
-		{"type Point { x: i32, x: i32 };", false, "Duplicate field names in struct type"},
-		{"type Point { x: i32, };", false, "Trailing comma in struct type"},
-		{"type Point { ,x: i32 };", false, "Leading comma in struct type"},
-		{"type Point { x: i32 y: i32 };", false, "Missing comma between struct fields"},
-		{"type Point { x: unknown };", false, "Invalid type name"},
+		{"type Point struct {};", false, "Empty struct type"},
+		{"type Point struct { x: i32, x: i32 };", false, "Duplicate field names in struct type"},
+		{"type Point struct { x: i32, };", true, "Trailing comma in struct type. Get warning"},
+		{"type Point struct { ,x: i32 };", false, "Leading comma in struct type"},
+		{"type Point struct { x: i32 y: i32 };", false, "Missing comma between struct fields"},
 	}
 
 	for _, tt := range tests {

@@ -1,0 +1,5 @@
+
+type INode interface {
+    fn show(),
+    fn length() -> i32
+};

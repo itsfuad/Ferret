@@ -1,10 +1,12 @@
 package parser
 
 import (
+	"ferret/compiler/colors"
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"
 )
 
@@ -34,7 +36,7 @@ func parseFunctionLike(p *Parser) ast.Node {
 			return parseMethodDeclaration(p, &start.Start, params)
 		}
 		// anonymous function
-		return parseFunctionLiteral(p, &start.Start, false, params...)
+		return parseFunctionLiteral(p, &start.Start, true, false, params...)
 	} else {
 		// named function
 		return parseFunctionDecl(p)
@@ -48,43 +50,74 @@ func parseParameters(p *Parser) []ast.Parameter {
 	p.consume(lexer.OPEN_PAREN, report.EXPECTED_OPEN_PAREN)
 
 	for !p.match(lexer.CLOSE_PAREN) {
-		if p.match(lexer.IDENTIFIER_TOKEN) {
-			token := p.advance() // consume the identifier
 
-			location := ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			}
+		identifier := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PARAMETER_NAME)
 
-			iden := &ast.IdentifierExpr{Name: token.Value, Location: location}
+		location := ast.Location{
+			Start: &identifier.Start,
+			End:   &identifier.End,
+		}
 
-			params = append(params, ast.Parameter{
-				Identifier: iden,
-			})
+		paramName := &ast.IdentifierExpr{Name: identifier.Value, Location: location}
 
-			p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
+		p.consume(lexer.COLON_TOKEN, report.EXPECTED_COLON)
 
-			if paramType, ok := parseType(p); ok {
-				params[len(params)-1].Type = paramType
-			} else {
-				token := p.peek()
-				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
-				return nil
-			}
-		} else {
+		paramType, ok := parseType(p)
+		if !ok {
 			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_NAME).AddHint("Add an identifier after the function name").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+
+		param := ast.Parameter{
+			Identifier: paramName,
+			Type:       paramType,
+		}
+
+		//check if the parameter is already defined
+		if utils.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
+			return p.Identifier.Name == b.Identifier.Name
+		}) {
+			report.Add(p.filePath, param.Identifier.StartPos().Line, param.Identifier.EndPos().Line, param.Identifier.StartPos().Column, param.Identifier.EndPos().Column, report.PARAMETER_REDEFINITION).AddHint("Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
+			return nil
+		}
+
+		params = append(params, param)
+
+		//add to current scope
+		paramSym := &symboltable.Symbol{
+			Name:       param.Identifier.Name,
+			SymbolKind: symboltable.PARAMETER_SYMBOL,
+			Type:       param.Type.Type(),
+			IsMutable:  false,
+			Location: symboltable.SymbolLocation{
+				File:   p.filePath,
+				Line:   param.Identifier.StartPos().Line,
+				Column: param.Identifier.StartPos().Column,
+			},
+		}
+
+		if !p.currentScope.Define(paramSym) {
+			report.ShowRedeclarationError(
+				param.Identifier.Name,
+				p.filePath,
+				p.currentScope,
+				param.Identifier.StartPos().Line,
+				param.Identifier.EndPos().Line,
+				param.Identifier.StartPos().Column,
+				param.Identifier.EndPos().Column,
+			)
 			return nil
 		}
 
 		if p.match(lexer.CLOSE_PAREN) {
 			break
-		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_PAREN {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 		} else {
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
-			return nil
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			if p.match(lexer.CLOSE_PAREN) {
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
+				break
+			}
 		}
 	}
 
@@ -134,35 +167,16 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 	}
 }
 
-func parseSignature(p *Parser, parseParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
+func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
 
-	if len(params) == 0 && parseParams {
-		params = parseParameters(p)
+	//scope must be a function scope
+	if p.currentScope.ScopeKind() != symboltable.FUNCTION_SCOPE {
+		report.Add(p.filePath, p.previous().Start.Line, p.previous().End.Line, p.previous().Start.Column, p.previous().End.Column, report.SCOPE_MISMATCH+": expected function scope").SetLevel(report.SYNTAX_ERROR)
+		return nil, nil
 	}
 
-	// Add parameters to function scope
-	for _, param := range params {
-		sym := &symboltable.Symbol{
-			Name:       param.Identifier.Name,
-			SymbolKind: symboltable.PARAMETER_SYMBOL,
-			Type:       param.Type.Type(),
-			IsMutable:  true, // Parameters are mutable by default
-			Location: symboltable.SymbolLocation{
-				File:   p.filePath,
-				Line:   param.Identifier.StartPos().Line,
-				Column: param.Identifier.StartPos().Column,
-			},
-		}
-
-		if !p.currentScope.Define(sym) {
-			report.Add(p.filePath,
-				param.Identifier.StartPos().Line,
-				param.Identifier.EndPos().Line,
-				param.Identifier.StartPos().Column,
-				param.Identifier.EndPos().Column,
-				"Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
-			return nil, nil
-		}
+	if len(params) == 0 && parseNewParams {
+		params = parseParameters(p)
 	}
 
 	// Parse return type if present
@@ -174,13 +188,14 @@ func parseSignature(p *Parser, parseParams bool, params ...ast.Parameter) ([]ast
 	return params, nil
 }
 
-func parseFunctionLiteral(p *Parser, start *lexer.Position, parseParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
+func parseFunctionLiteral(p *Parser, start *lexer.Position, isAnonymous, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
 
-	//create new scope
-	p.enterScope(symboltable.FUNCTION_SCOPE)
-	defer p.exitScope()
+	if isAnonymous {
+		p.enterScope(symboltable.FUNCTION_SCOPE)
+		defer p.exitScope()
+	}
 
-	params, returnTypes := parseSignature(p, parseParams, params...)
+	params, returnTypes := parseSignature(p, parseNewParams, params...)
 
 	block := parseBlock(p)
 
@@ -197,10 +212,7 @@ func parseFunctionLiteral(p *Parser, start *lexer.Position, parseParams bool, pa
 	}
 }
 
-func parseFunctionDecl(p *Parser) ast.BlockConstruct {
-
-	// consume the function token
-	start := p.advance()
+func declareFunction(p *Parser) *ast.IdentifierExpr {
 
 	var name *ast.IdentifierExpr
 
@@ -242,7 +254,23 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 		}
 	}
 
-	function := parseFunctionLiteral(p, &start.Start, true)
+	return name
+}
+
+func parseFunctionDecl(p *Parser) ast.BlockConstruct {
+
+	colors.BLUE.Println("Parsing function declaration")
+
+	// consume the function token
+	start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
+
+	name := declareFunction(p)
+
+	//start a new scope
+	p.enterScope(symboltable.FUNCTION_SCOPE)
+	defer p.exitScope()
+
+	function := parseFunctionLiteral(p, &start.Start, false, true)
 
 	return &ast.FunctionDecl{
 		Identifier: *name,

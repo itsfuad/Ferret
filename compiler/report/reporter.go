@@ -280,13 +280,13 @@ func (r Reports) ShowStatus() {
 		messageColor.Print("------------- failed with ")
 	} else {
 		messageColor = colors.GREEN
-		messageColor.Print("------------- Passed")
+		messageColor.Print("------------- Passed ")
 	}
 
 	totalProblemsString := ""
 
 	if warningCount > 0 {
-		totalProblemsString += colorMap[WARNING].Sprintf("%d %s", warningCount, utils.Plural("warning", "warnings ", warningCount))
+		totalProblemsString += colorMap[WARNING].Sprintf("(%d %s)", warningCount, utils.Plural("warning", "warnings ", warningCount))
 		if probCount > 0 {
 			totalProblemsString += colors.ORANGE.Sprintf(", ")
 		}

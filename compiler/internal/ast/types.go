@@ -161,6 +161,25 @@ func (s *StructType) Type() types.TYPE_NAME     { return s.TypeName }
 func (s *StructType) StartPos() *lexer.Position { return s.Start }
 func (s *StructType) EndPos() *lexer.Position   { return s.End }
 
+type InterfaceMethod struct {
+	Name       IdentifierExpr
+	Params     []Parameter
+	ReturnType []DataType
+	Location
+}
+
+// InterfaceType represents an interface type definition
+type InterfaceType struct {
+	Methods  []InterfaceMethod
+	TypeName types.TYPE_NAME
+	Location
+}
+
+func (i *InterfaceType) INode()                    {} // INode is a marker interface for all nodes
+func (i *InterfaceType) Type() types.TYPE_NAME     { return i.TypeName }
+func (i *InterfaceType) StartPos() *lexer.Position { return i.Start }
+func (i *InterfaceType) EndPos() *lexer.Position   { return i.End }
+
 type FunctionType struct {
 	Parameters  []DataType
 	ReturnTypes []DataType
