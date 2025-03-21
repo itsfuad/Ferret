@@ -1,0 +1,104 @@
+[
+    {
+        "Package": {
+            "Name": "main",
+            "Start": {
+                "Line": 1,
+                "Column": 9,
+                "Index": 8
+            },
+            "End": {
+                "Line": 1,
+                "Column": 14,
+                "Index": 12
+            }
+        },
+        "Start": {
+            "Line": 1,
+            "Column": 1,
+            "Index": 0
+        },
+        "End": {
+            "Line": 1,
+            "Column": 14,
+            "Index": 12
+        }
+    },
+    {
+        "Import": {
+            "Value": "fmt",
+            "Start": {
+                "Line": 3,
+                "Column": 8,
+                "Index": 24
+            },
+            "End": {
+                "Line": 3,
+                "Column": 14,
+                "Index": 29
+            }
+        },
+        "Start": {
+            "Line": 3,
+            "Column": 1,
+            "Index": 17
+        },
+        "End": {
+            "Line": 3,
+            "Column": 14,
+            "Index": 29
+        }
+    },
+    {
+        "Identifier": {
+            "Name": "main",
+            "Start": {
+                "Line": 5,
+                "Column": 4,
+                "Index": 37
+            },
+            "End": {
+                "Line": 5,
+                "Column": 8,
+                "Index": 41
+            }
+        },
+        "Function": {
+            "Params": [],
+            "ReturnType": null,
+            "Body": {
+                "Nodes": [],
+                "Start": {
+                    "Line": 5,
+                    "Column": 11,
+                    "Index": 44
+                },
+                "End": {
+                    "Line": 7,
+                    "Column": 2,
+                    "Index": 87
+                }
+            },
+            "Start": {
+                "Line": 5,
+                "Column": 1,
+                "Index": 34
+            },
+            "End": {
+                "Line": 7,
+                "Column": 2,
+                "Index": 87
+            }
+        },
+        "Start": {
+            "Line": 5,
+            "Column": 1,
+            "Index": 34
+        },
+        "End": {
+            "Line": 7,
+            "Column": 2,
+            "Index": 87
+        }
+    }
+]

@@ -53,3 +53,25 @@ func (r *ReturnStmt) INode()                    {} // INode is a marker interfac
 func (r *ReturnStmt) Stmt()                     {} // Stmt is a marker method for statements
 func (r *ReturnStmt) StartPos() *lexer.Position { return r.Start }
 func (r *ReturnStmt) EndPos() *lexer.Position   { return r.End }
+
+// PackageDeclStmt represents a package declaration
+type PackageDeclStmt struct {
+	Package *IdentifierExpr
+	Location
+}
+
+func (p *PackageDeclStmt) INode()                    {} // INode is a marker interface for all nodes
+func (p *PackageDeclStmt) Stmt()                     {} // Stmt is a marker interface for all statements
+func (p *PackageDeclStmt) StartPos() *lexer.Position { return p.Start }
+func (p *PackageDeclStmt) EndPos() *lexer.Position   { return p.End }
+
+// ImportStmt represents an import statement
+type ImportStmt struct {
+	Import *StringLiteral
+	Location
+}
+
+func (i *ImportStmt) INode()                    {} // INode is a marker interface for all nodes
+func (i *ImportStmt) Stmt()                     {} // Stmt is a marker interface for all statements
+func (i *ImportStmt) StartPos() *lexer.Position { return i.Start }
+func (i *ImportStmt) EndPos() *lexer.Position   { return i.End }

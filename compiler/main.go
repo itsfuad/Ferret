@@ -7,9 +7,9 @@ import (
 
 func main() {
 
-	filename := "./../code/start.fer"
+	filename := "./../code/main.fer"
 
-	r, err := analyzer.Analyze(filename, true, false, true)
+	r, err := analyzer.Analyze(filename, true, true, true)
 
 	if len(r) > 0 {
 		r.DisplayAll()
