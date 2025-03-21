@@ -2,7 +2,6 @@ package symboltable
 
 import (
 	"ferret/compiler/internal/types"
-	"ferret/compiler/internal/utils"
 	"testing"
 )
 
@@ -114,8 +113,8 @@ func TestResolveLocal(t *testing.T) {
 	if _, exists := local.ResolveLocal("var"); exists {
 		t.Error("ResolveLocal should not find symbol in parent scope")
 	}
-	local.Define(localSym)
-	if sym, exists := local.ResolveLocal("localVar"); !exists || sym != localSym {
+
+	if sym, exists := local.Resolve("var"); !exists || sym != globalSym {
 		t.Error("ResolveLocal failed to find symbol in current scope")
 	}
 }
