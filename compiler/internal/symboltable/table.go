@@ -2,6 +2,7 @@ package symboltable
 
 import (
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
 )
 
 type ScopeKind int
@@ -52,7 +53,6 @@ type Symbol struct {
 	SymbolKind SYMBOL_KIND     // The kind of symbol (variable, function, etc.)
 	Type       types.TYPE_NAME // The type of the symbol
 	Scope      ScopeKind       // The scope in which this symbol is defined
-	IsExported bool            // Whether the symbol is exported (public)
 	IsMutable  bool            // Whether the symbol can be modified
 	Location   SymbolLocation  // Source location information
 	Value      any             // For constants and compile-time known values
@@ -177,7 +177,7 @@ func (st *SymbolTable) ExitScope() *SymbolTable {
 func (st *SymbolTable) ResolveInModule(module, name string) (*Symbol, bool) {
 	// Check current scope
 	for _, sym := range st.symbols {
-		if sym.Module == module && sym.Name == name && sym.IsExported {
+		if sym.Module == module && sym.Name == name && utils.IsCapitalized(sym.Name) {
 			return sym, true
 		}
 	}

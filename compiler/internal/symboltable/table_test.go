@@ -2,6 +2,7 @@ package symboltable
 
 import (
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
 	"testing"
 )
 
@@ -336,7 +337,6 @@ func TestModuleScope(t *testing.T) {
 				Name:       tt.name,
 				SymbolKind: VARIABLE_SYMBOL,
 				Type:       types.INT32,
-				IsExported: tt.isExported,
 			}
 			if !module.Define(sym) {
 				t.Errorf("Failed to define symbol %s", tt.name)
@@ -346,8 +346,9 @@ func TestModuleScope(t *testing.T) {
 			if !found {
 				t.Errorf("Failed to resolve symbol %s", tt.name)
 			}
-			if resolved.IsExported != tt.isExported {
-				t.Errorf("Wrong export status for %s: got %v, want %v", tt.name, resolved.IsExported, tt.isExported)
+
+			if utils.IsCapitalized(resolved.Name) != tt.isExported {
+				t.Errorf("Wrong export status for %s: got %v, want %v", tt.name, utils.IsCapitalized(resolved.Name), tt.isExported)
 			}
 		}
 	})
