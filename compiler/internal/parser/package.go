@@ -64,7 +64,6 @@ func parseImport(p *Parser) ast.Node {
 		Name:       moduleName,
 		SymbolKind: symboltable.MODULE_SYMBOL,
 		Type:       types.MODULE,
-		IsExported: true,
 		Module:     moduleName,
 		Location: symboltable.SymbolLocation{
 			File:   p.filePath,

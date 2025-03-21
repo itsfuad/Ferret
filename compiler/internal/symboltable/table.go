@@ -2,6 +2,7 @@ package symboltable
 
 import (
 	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/utils"
 )
 
 type SCOPE_KIND int
@@ -175,7 +176,7 @@ func (st *SymbolTable) ExitScope() *SymbolTable {
 func (st *SymbolTable) ResolveInModule(module, name string) (*Symbol, bool) {
 	// Check current scope
 	for _, sym := range st.symbols {
-		if sym.Module == module && sym.Name == name && sym.IsExported {
+		if sym.Module == module && sym.Name == name && utils.IsCapitalized(sym.Name) {
 			return sym, true
 		}
 	}
