@@ -23,6 +23,8 @@ const (
 	IDENTIFIER_TOKEN TOKEN = "identifier"
 	PRIVATE_TOKEN    TOKEN = "priv"
 	RETURN_TOKEN     TOKEN = "return"
+	IMPORT_TOKEN     TOKEN = "import"
+	PACKAGE_TOKEN    TOKEN = "package"
 	//data types
 	NUMBER_TOKEN    TOKEN = "numeric literal"
 	STRING_TOKEN    TOKEN = "string literal"
@@ -60,6 +62,7 @@ const (
 	LESS_TOKEN          TOKEN = "<"
 	GREATER_TOKEN       TOKEN = ">"
 	//assignment
+	SCOPE_TOKEN        TOKEN = "::"
 	COLON_TOKEN        TOKEN = ":"
 	EQUALS_TOKEN       TOKEN = "="
 	PLUS_EQUALS_TOKEN  TOKEN = "+="
@@ -101,6 +104,8 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	INTERFACE_TOKEN: true,
 	FUNCTION_TOKEN:  true,
 	RETURN_TOKEN:    true,
+	IMPORT_TOKEN:    true,
+	PACKAGE_TOKEN:   true,
 }
 
 func IsKeyword(token string) bool {

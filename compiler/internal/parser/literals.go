@@ -120,12 +120,12 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 
 		if p.match(lexer.CLOSE_BRACKET) {
 			break
-		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_BRACKET {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACKET)
 		} else {
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_COMMA_OR_CLOSE_BRACKET).AddHint("Add a comma after the element").SetLevel(report.SYNTAX_ERROR)
-			return nil
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACKET)
+			if p.match(lexer.CLOSE_BRACKET) {
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				break
+			}
 		}
 	}
 

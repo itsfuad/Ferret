@@ -66,8 +66,8 @@ func TestFunctionParsing(t *testing.T) {
 		{
 			name:    "Invalid return type syntax",
 			input:   "fn add(a: i32, b: i32) -> (i32,) { return 0; }",
-			isValid: false,
-			desc:    "Function with trailing comma in return type list should fail",
+			isValid: true,
+			desc:    "Function with trailing comma in return type list should pass with a warning",
 		},
 		{
 			name:    "Missing function body",
@@ -96,14 +96,14 @@ func TestFunctionParsing(t *testing.T) {
 		{
 			name:    "Invalid parameter list",
 			input:   "fn bad(a: i32,) -> i32 { return a; }",
-			isValid: false,
-			desc:    "Function with trailing comma in parameter list should fail",
+			isValid: true,
+			desc:    "Function with trailing comma in parameter list should pass with a warning",
 		},
 		{
 			name:    "Trailing comma in function return type",
 			input:   "fn add(a: i32, b: i32) -> (i32, f32,) { return a + b, 1.0; }",
-			isValid: false,
-			desc:    "Function with trailing comma in return type should fail",
+			isValid: true,
+			desc:    "Function with trailing comma in return type should pass with a warning",
 		},
 		{
 			name:    "Function call with no arguments",
@@ -132,8 +132,8 @@ func TestFunctionParsing(t *testing.T) {
 		{
 			name:    "Function call with trailing comma",
 			input:   "hello(1, 2, 4,);",
-			isValid: false,
-			desc:    "Function call with trailing comma should fail",
+			isValid: true,
+			desc:    "Function call with trailing comma should pass with a warning",
 		},
 	}
 

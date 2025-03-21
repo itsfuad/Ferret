@@ -26,6 +26,7 @@ const (
 	STRUCT_FIELD_SYMBOL
 	PARAMETER_SYMBOL
 	CONST_SYMBOL
+	MODULE_SYMBOL
 )
 
 var compilerGlobalSymbols = map[string]*Symbol{
@@ -53,6 +54,7 @@ type Symbol struct {
 	IsMutable  bool            // Whether the symbol can be modified
 	Location   SymbolLocation  // Source location information
 	Value      any             // For constants and compile-time known values
+	Module     string          // The module this symbol belongs to (if any)
 }
 
 // SymbolLocation tracks the source location of a symbol
@@ -167,4 +169,21 @@ func (st *SymbolTable) ExitScope() *SymbolTable {
 		return st // Can't exit global scope
 	}
 	return st.parent
+}
+
+// ResolveInModule looks up a symbol by name in a specific module
+func (st *SymbolTable) ResolveInModule(module, name string) (*Symbol, bool) {
+	// Check current scope
+	for _, sym := range st.symbols {
+		if sym.Module == module && sym.Name == name && sym.IsExported {
+			return sym, true
+		}
+	}
+
+	// Check parent scopes
+	if st.parent != nil {
+		return st.parent.ResolveInModule(module, name)
+	}
+
+	return nil, false
 }

@@ -1,5 +1,14 @@
 package report
 
+// package error messages
+const (
+	EXPECTED_PACKAGE_KEYWORD = "Expected 'package' keyword"
+	EXPECTED_IMPORT_KEYWORD  = "Expected 'import' keyword"
+	EXPECTED_PACKAGE_NAME    = "Expected package name"
+	EXPECTED_IMPORT_PATH     = "Expected import path"
+	INVALID_IMPORT_PATH      = "Invalid import path"
+)
+
 // general error messages
 const (
 	MISSING_NAME      = "Expected variable name"
@@ -24,7 +33,7 @@ const (
 const (
 	EXPECTED_NUMBER      = "Expected number"
 	EXPECTED_STRING      = "Expected string"
-	EXPECTED_SEMI_COLON  = "Expected ';'"
+	EXPECTED_SEMICOLON   = "Expected ';'"
 	EXPECTED_COMMA       = "Expected ','"
 	EXPECTED_COLON       = "Expected ':'"
 	EXPECTED_EQUALS      = "Expected '='"
@@ -128,12 +137,14 @@ const (
 	EXPECTED_CLOSE_PAREN            = "Expected ')'"
 	EXPECTED_COMMA_OR_CLOSE_PAREN   = "Expected ',' or ')'"
 	EXPECTED_COMMA_OR_CLOSE_BRACKET = "Expected ',' or ']'"
-	EXPECTED_COMMA_OR_CLOSE_BRACE   = "Expected ',' or '}'"
+	EXPECTED_COMMA_OR_CLOSE_CURLY   = "Expected ',' or '}'"
 )
 
 // scope errors
 const (
-	SCOPE_MISMATCH = "Scope mismatch"
+	SCOPE_MISMATCH                     = "Scope mismatch"
+	INVALID_SCOPE                      = "Invalid scope"
+	EXPECTED_SCOPE_RESOLUTION_OPERATOR = "Expected '::' operator"
 )
 
 // Statement errors

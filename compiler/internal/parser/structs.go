@@ -64,7 +64,7 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 		if p.match(lexer.CLOSE_CURLY) {
 			break
 		} else {
-			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_BRACE)
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
 			if p.match(lexer.CLOSE_CURLY) {
 				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
@@ -113,7 +113,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 }
 
 // parseFieldAccess parses a field access expression like struct.field
-func parseFieldAccess(p *Parser, object ast.Expression) ast.Expression {
+func parseFieldAccess(p *Parser, object ast.Expression) (ast.Expression, bool) {
 	p.advance() // consume '.'
 
 	// Parse field name
@@ -121,7 +121,7 @@ func parseFieldAccess(p *Parser, object ast.Expression) ast.Expression {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 			p.peek().Start.Column, p.peek().End.Column,
 			"Expected field name after '.'").SetLevel(report.SYNTAX_ERROR)
-		return nil
+		return nil, false
 	}
 
 	fieldToken := p.advance()
@@ -140,5 +140,5 @@ func parseFieldAccess(p *Parser, object ast.Expression) ast.Expression {
 			Start: object.StartPos(),
 			End:   &fieldToken.End,
 		},
-	}
+	}, true
 }

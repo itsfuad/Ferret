@@ -11,7 +11,7 @@ import (
 
 type Parser struct {
 	tokens       []lexer.Token
-	current      int
+	tokenNo      int
 	filePath     string
 	symbolTable  *symboltable.SymbolTable
 	currentScope *symboltable.SymbolTable
@@ -22,7 +22,7 @@ func New(filePath string, debug bool) *Parser {
 	globalScope := symboltable.NewSymbolTable(nil, symboltable.GLOBAL_SCOPE)
 	return &Parser{
 		tokens:       tokens,
-		current:      0,
+		tokenNo:      0,
 		filePath:     filePath,
 		symbolTable:  globalScope,
 		currentScope: globalScope,
@@ -42,20 +42,20 @@ func (p *Parser) exitScope() {
 
 // current token
 func (p *Parser) peek() lexer.Token {
-	return p.tokens[p.current]
+	return p.tokens[p.tokenNo]
 }
 
 // previous token
 func (p *Parser) previous() lexer.Token {
-	return p.tokens[p.current-1]
+	return p.tokens[p.tokenNo-1]
 }
 
 // next returns the next token without consuming it
 func (p *Parser) next() lexer.Token {
-	if p.current+1 >= len(p.tokens) {
+	if p.tokenNo+1 >= len(p.tokens) {
 		return lexer.Token{Kind: lexer.EOF_TOKEN}
 	}
-	return p.tokens[p.current+1]
+	return p.tokens[p.tokenNo+1]
 }
 
 // is at end of file
@@ -66,7 +66,7 @@ func (p *Parser) isAtEnd() bool {
 // consume the current token and return that token
 func (p *Parser) advance() lexer.Token {
 	if !p.isAtEnd() {
-		p.current++
+		p.tokenNo++
 	}
 	return p.previous()
 }
@@ -208,6 +208,10 @@ func parseReturnStmt(p *Parser) ast.Statement {
 func parseNode(p *Parser) ast.Node {
 	var node ast.Node
 	switch p.peek().Kind {
+	case lexer.PACKAGE_TOKEN:
+		node = parsePackage(p)
+	case lexer.IMPORT_TOKEN:
+		node = parseImport(p)
 	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
 		node = parseVarDecl(p)
 	case lexer.TYPE_TOKEN:
