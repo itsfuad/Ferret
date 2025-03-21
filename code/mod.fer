@@ -1,0 +1,15 @@
+package main;
+
+// style 2
+import (
+    "fmt",
+    "os",
+    "bufio",
+    "some_other_package/fmt" as fmt2, // solve name collision
+    //external import
+    //"github.com/some_package/utils",
+)
+
+fn main() {
+    fmt::println("Hello, World!");
+}
