@@ -358,7 +358,7 @@ func TestSymbolMutability(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		kind      SymbolKind
+		kind      SYMBOL_KIND
 		isMutable bool
 	}{
 		{"var", VARIABLE_SYMBOL, true},

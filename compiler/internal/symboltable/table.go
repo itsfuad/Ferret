@@ -16,11 +16,11 @@ const (
 	MODULE_SCOPE
 )
 
-// SymbolKind represents the kind of symbol (variable, function, type, etc.)
-type SymbolKind int
+// SYMBOL_KIND represents the kind of symbol (variable, function, type, etc.)
+type SYMBOL_KIND int
 
 const (
-	VARIABLE_SYMBOL SymbolKind = iota
+	VARIABLE_SYMBOL SYMBOL_KIND = iota
 	FUNCTION_SYMBOL
 	TYPE_SYMBOL
 	STRUCT_FIELD_SYMBOL
@@ -48,7 +48,7 @@ var compilerGlobalSymbols = map[string]*Symbol{
 // Symbol represents a single symbol in the program
 type Symbol struct {
 	Name       string          // The name of the symbol
-	SymbolKind SymbolKind      // The kind of symbol (variable, function, etc.)
+	SymbolKind SYMBOL_KIND     // The kind of symbol (variable, function, etc.)
 	Type       types.TYPE_NAME // The type of the symbol
 	Scope      ScopeKind       // The scope in which this symbol is defined
 	IsExported bool            // Whether the symbol is exported (public)
