@@ -142,6 +142,10 @@ type Matrix [][]f32;
 - [ ] Range expressions
 - [ ] Error handling
 - [ ] Imports and modules
+    - [x] Import statements
+    - [x] Scope resolution
+    - [x] Module declarations
+    - [ ] Parsing of imported modules
 - [ ] Nullable/optional types
 - [ ] Generics
 - [ ] Advanced code generation

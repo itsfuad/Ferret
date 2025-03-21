@@ -137,13 +137,14 @@ const (
 	EXPECTED_CLOSE_PAREN            = "Expected ')'"
 	EXPECTED_COMMA_OR_CLOSE_PAREN   = "Expected ',' or ')'"
 	EXPECTED_COMMA_OR_CLOSE_BRACKET = "Expected ',' or ']'"
-	EXPECTED_COMMA_OR_CLOSE_BRACE   = "Expected ',' or '}'"
+	EXPECTED_COMMA_OR_CLOSE_CURLY   = "Expected ',' or '}'"
 )
 
 // scope errors
 const (
-	SCOPE_MISMATCH = "Scope mismatch"
-	INVALID_SCOPE  = "Invalid scope"
+	SCOPE_MISMATCH                     = "Scope mismatch"
+	INVALID_SCOPE                      = "Invalid scope"
+	EXPECTED_SCOPE_RESOLUTION_OPERATOR = "Expected '::' operator"
 )
 
 // Statement errors

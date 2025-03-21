@@ -67,7 +67,89 @@
             "Params": [],
             "ReturnType": null,
             "Body": {
-                "Nodes": [],
+                "Nodes": [
+                    {
+                        "Expressions": [
+                            {
+                                "Caller": {
+                                    "Module": {
+                                        "Name": "fmt",
+                                        "Start": {
+                                            "Line": 6,
+                                            "Column": 5,
+                                            "Index": 51
+                                        },
+                                        "End": {
+                                            "Line": 6,
+                                            "Column": 8,
+                                            "Index": 54
+                                        }
+                                    },
+                                    "Member": {
+                                        "Name": "Println",
+                                        "Start": {
+                                            "Line": 6,
+                                            "Column": 10,
+                                            "Index": 56
+                                        },
+                                        "End": {
+                                            "Line": 6,
+                                            "Column": 17,
+                                            "Index": 63
+                                        }
+                                    },
+                                    "Start": {
+                                        "Line": 6,
+                                        "Column": 5,
+                                        "Index": 51
+                                    },
+                                    "End": {
+                                        "Line": 6,
+                                        "Column": 17,
+                                        "Index": 63
+                                    }
+                                },
+                                "Arguments": [
+                                    {
+                                        "Value": "Hello, Ferret!",
+                                        "Start": {
+                                            "Line": 6,
+                                            "Column": 18,
+                                            "Index": 64
+                                        },
+                                        "End": {
+                                            "Line": 6,
+                                            "Column": 34,
+                                            "Index": 80
+                                        }
+                                    }
+                                ],
+                                "Start": {
+                                    "Line": 6,
+                                    "Column": 5,
+                                    "Index": 51
+                                },
+                                "End": {
+                                    "Line": 6,
+                                    "Column": 36,
+                                    "Index": 81
+                                }
+                            }
+                        ],
+                        "Location": {
+                            "Start": {
+                                "Line": 6,
+                                "Column": 5,
+                                "Index": 51
+                            },
+                            "End": {
+                                "Line": 6,
+                                "Column": 36,
+                                "Index": 81
+                            }
+                        }
+                    }
+                ],
                 "Start": {
                     "Line": 5,
                     "Column": 11,
@@ -76,7 +158,7 @@
                 "End": {
                     "Line": 7,
                     "Column": 2,
-                    "Index": 87
+                    "Index": 85
                 }
             },
             "Start": {
@@ -87,7 +169,7 @@
             "End": {
                 "Line": 7,
                 "Column": 2,
-                "Index": 87
+                "Index": 85
             }
         },
         "Start": {
@@ -98,7 +180,7 @@
         "End": {
             "Line": 7,
             "Column": 2,
-            "Index": 87
+            "Index": 85
         }
     }
 ]

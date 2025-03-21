@@ -21,4 +21,5 @@ const (
 	INTERFACE TYPE_NAME = "interface"
 	VOID      TYPE_NAME = "void"
 	STRUCT    TYPE_NAME = "struct"
+	MODULE    TYPE_NAME = "module"
 )

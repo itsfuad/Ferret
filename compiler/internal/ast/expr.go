@@ -118,3 +118,15 @@ func (f *FieldAccessExpr) Expr()                     {} // Expr is a marker inte
 func (f *FieldAccessExpr) LValue()                   {} // LValue is a marker interface for all lvalues
 func (f *FieldAccessExpr) StartPos() *lexer.Position { return f.Start }
 func (f *FieldAccessExpr) EndPos() *lexer.Position   { return f.End }
+
+// ScopeResolutionExpr represents a scope resolution expression like fmt::Println
+type ScopeResolutionExpr struct {
+	Module     *IdentifierExpr
+	Identifier *IdentifierExpr
+	Location
+}
+
+func (s *ScopeResolutionExpr) INode()                    {} // INode is a marker interface for all nodes
+func (s *ScopeResolutionExpr) Expr()                     {} // Expr is a marker interface for all expressions
+func (s *ScopeResolutionExpr) StartPos() *lexer.Position { return s.Start }
+func (s *ScopeResolutionExpr) EndPos() *lexer.Position   { return s.End }

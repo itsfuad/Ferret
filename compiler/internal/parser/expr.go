@@ -194,14 +194,14 @@ func parseUnary(p *Parser) ast.Expression {
 }
 
 // parseIndexing handles array/map indexing operations
-func parseIndexing(p *Parser, expr ast.Expression) ast.Expression {
+func parseIndexing(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	start := expr.StartPos()
 	p.advance() // consume '['
 
 	index := parseExpression(p)
 	if index == nil {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_INDEX_EXPRESSION).SetLevel(report.SYNTAX_ERROR)
-		return nil
+		return nil, false
 	}
 
 	end := p.consume(lexer.CLOSE_BRACKET, report.EXPECTED_CLOSE_BRACKET)
@@ -212,11 +212,11 @@ func parseIndexing(p *Parser, expr ast.Expression) ast.Expression {
 			Start: start,
 			End:   &end.End,
 		},
-	}
+	}, true
 }
 
 // parseIncDec handles postfix increment/decrement
-func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
+func parseIncDec(p *Parser, expr ast.Expression) (ast.Expression, bool) {
 	operator := p.advance()
 	if p.match(lexer.PLUS_PLUS_TOKEN, lexer.MINUS_MINUS_TOKEN) {
 		errMsg := report.INVALID_CONSECUTIVE_INCREMENT
@@ -224,7 +224,7 @@ func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
 			errMsg = report.INVALID_CONSECUTIVE_DECREMENT
 		}
 		report.Add(p.filePath, operator.Start.Line, operator.End.Line, operator.Start.Column, operator.End.Column, errMsg).SetLevel(report.SYNTAX_ERROR)
-		return nil
+		return nil, false
 	}
 	return &ast.PostfixExpr{
 		Operand:  expr,
@@ -233,7 +233,7 @@ func parseIncDec(p *Parser, expr ast.Expression) ast.Expression {
 			Start: expr.StartPos(),
 			End:   &operator.End,
 		},
-	}
+	}, true
 }
 
 // handlePostfixOperator handles a single postfix operator and returns the updated expression
@@ -244,19 +244,23 @@ func handlePostfixOperator(p *Parser, expr ast.Expression) (ast.Expression, bool
 			report.Add(p.filePath, current.Start.Line, current.End.Line, current.Start.Column, current.End.Column, "Cannot mix prefix and postfix operators").SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
-		return parseIncDec(p, expr), true
+		return parseIncDec(p, expr)
 	}
 
 	if p.match(lexer.DOT_TOKEN) {
-		return parseFieldAccess(p, expr), true
+		return parseFieldAccess(p, expr)
+	}
+
+	if p.match(lexer.SCOPE_TOKEN) {
+		return parseScopeResolution(p, expr)
 	}
 
 	if p.match(lexer.OPEN_PAREN) {
-		return parseFunctionCall(p, expr), true
+		return parseFunctionCall(p, expr)
 	}
 
 	if p.match(lexer.OPEN_BRACKET) {
-		return parseIndexing(p, expr), true
+		return parseIndexing(p, expr)
 	}
 
 	return nil, false
@@ -292,44 +296,35 @@ func parseGrouping(p *Parser) ast.Expression {
 }
 
 // parseFunctionCall parses a function call expression
-func parseFunctionCall(p *Parser, caller ast.Expression) ast.Expression {
+func parseFunctionCall(p *Parser, caller ast.Expression) (ast.Expression, bool) {
 	start := caller.StartPos()
 	p.advance() // consume '('
 
 	arguments := make([]ast.Expression, 0)
-
-	// Handle empty argument list
-	if p.peek().Kind == lexer.CLOSE_PAREN {
-		end := p.advance() // consume ')'
-		return &ast.FunctionCallExpr{
-			Caller:    caller,
-			Arguments: arguments,
-			Location: ast.Location{
-				Start: start,
-				End:   &end.End,
-			},
-		}
-	}
-
 	// Parse arguments
-	for {
+	for !p.match(lexer.CLOSE_PAREN) {
 		arg := parseExpression(p)
 		if arg == nil {
 			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
 				p.peek().Start.Column, p.peek().End.Column,
 				"Expected function argument").SetLevel(report.SYNTAX_ERROR)
-			return nil
+			return nil, false
 		}
 		arguments = append(arguments, arg)
 
 		if p.match(lexer.CLOSE_PAREN) {
 			break
 		} else {
-			p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			if p.match(lexer.CLOSE_PAREN) {
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				break
+			}
 		}
 	}
 
 	end := p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+
 	return &ast.FunctionCallExpr{
 		Caller:    caller,
 		Arguments: arguments,
@@ -337,7 +332,7 @@ func parseFunctionCall(p *Parser, caller ast.Expression) ast.Expression {
 			Start: start,
 			End:   &end.End,
 		},
-	}
+	}, true
 }
 
 // parsePrimary handles literals, identifiers, and parenthesized expressions

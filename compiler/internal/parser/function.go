@@ -129,33 +129,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 func parseReturnTypes(p *Parser) []ast.DataType {
 	p.advance()
 	// Check for multiple return types in parentheses
-	if p.peek().Kind == lexer.OPEN_PAREN {
-		p.advance() // consume '('
-		returnTypes := make([]ast.DataType, 0)
-
-		for !p.match(lexer.CLOSE_PAREN) {
-			returnType, ok := parseType(p)
-			if !ok {
-				token := p.previous()
-				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
-				return nil
-			}
-			returnTypes = append(returnTypes, returnType)
-
-			if p.match(lexer.CLOSE_PAREN) {
-				break
-			} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_PAREN {
-				p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
-			} else {
-				token := p.peek()
-				report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_COMMA_OR_CLOSE_PAREN).AddHint("Add a comma after the return type").SetLevel(report.SYNTAX_ERROR)
-				return nil
-			}
-		}
-
-		p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
-		return returnTypes
-	} else {
+	if p.peek().Kind != lexer.OPEN_PAREN {
 		// Single return type
 		returnType, ok := parseType(p)
 		if !ok {
@@ -165,6 +139,32 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		}
 		return []ast.DataType{returnType}
 	}
+
+	p.advance() // consume '('
+	returnTypes := make([]ast.DataType, 0)
+
+	for !p.match(lexer.CLOSE_PAREN) {
+		returnType, ok := parseType(p)
+		if !ok {
+			token := p.previous()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+			return nil
+		}
+		returnTypes = append(returnTypes, returnType)
+
+		if p.match(lexer.CLOSE_PAREN) {
+			break
+		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_PAREN {
+			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
+			if p.match(lexer.CLOSE_PAREN) {
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				break
+			}
+		}
+	}
+
+	p.consume(lexer.CLOSE_PAREN, report.EXPECTED_CLOSE_PAREN)
+	return returnTypes
 }
 
 func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
