@@ -57,7 +57,7 @@ func TestLiteralParsing(t *testing.T) {
 		{"let x = [1, 2;", false, "Unclosed array literal"},
 		{"let x = [,];", false, "Invalid array literal with just comma"},
 		{"let x = [1 2];", false, "Array literal missing comma"},
-		{"let x = [1, 2,];", false, "Array literal with trailing comma"},
+		{"let x = [1, 2,];", true, "Array literal with trailing comma"},
 	}
 
 	for _, tt := range tests {

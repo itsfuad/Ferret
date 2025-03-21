@@ -115,7 +115,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.SYNTAX_ERROR)
+				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -154,7 +154,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 
 		if p.match(lexer.CLOSE_PAREN) {
 			break
-		} else if p.match(lexer.COMMA_TOKEN) && p.next().Kind != lexer.CLOSE_PAREN {
+		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
 				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)

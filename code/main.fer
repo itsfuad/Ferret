@@ -2,6 +2,8 @@ package main;
 
 import "fmt";
 
+let x = [2, 5];
+
 fn main() {
     fmt::Println("Hello, Ferret!");
 }
