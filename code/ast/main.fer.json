@@ -77,13 +77,13 @@
                         "Base": 10,
                         "Start": {
                             "Line": 5,
-                            "Column": 11,
-                            "Index": 44
+                            "Column": 10,
+                            "Index": 43
                         },
                         "End": {
                             "Line": 5,
-                            "Column": 12,
-                            "Index": 45
+                            "Column": 11,
+                            "Index": 44
                         }
                     },
                     {

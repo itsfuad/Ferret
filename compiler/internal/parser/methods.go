@@ -4,11 +4,12 @@ import (
 	"ferret/compiler/colors"
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 )
 
-func parseMethodDeclaration(p *Parser, startPos *lexer.Position, receivers []ast.Parameter) *ast.MethodDecl {
+func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {
 	colors.BLUE.Println("Parsing ")
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_METHOD_NAME)
 
@@ -17,11 +18,8 @@ func parseMethodDeclaration(p *Parser, startPos *lexer.Position, receivers []ast
 	defer p.exitScope()
 
 	iden := ast.IdentifierExpr{
-		Name: name.Value,
-		Location: ast.Location{
-			Start: &name.Start,
-			End:   &name.End,
-		},
+		Name:     name.Value,
+		Location: *source.NewLocation(&name.Start, &name.End),
 	}
 
 	if len(receivers) == 0 {
@@ -42,9 +40,6 @@ func parseMethodDeclaration(p *Parser, startPos *lexer.Position, receivers []ast
 		Method:   iden,
 		Receiver: &receiver,
 		Function: funcLit,
-		Location: ast.Location{
-			Start: startPos,
-			End:   funcLit.EndPos(),
-		},
+		Location: *source.NewLocation(startPos, funcLit.EndPos()),
 	}
 }

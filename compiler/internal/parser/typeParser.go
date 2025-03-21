@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/internal/utils"
@@ -21,10 +22,7 @@ func parseIntegerType(p *Parser) (ast.DataType, bool) {
 		TypeName: typename,
 		BitSize:  bitSize,
 		Unsigned: types.IsUnsigned(typename),
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Location: *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -36,10 +34,7 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 
 		return &ast.UserDefinedType{
 			TypeName: types.TYPE_NAME(token.Value),
-			Location: ast.Location{
-				Start: &token.Start,
-				End:   &token.End,
-			},
+			Location: *source.NewLocation(&token.Start, &token.End),
 		}, true
 	}
 
@@ -58,10 +53,7 @@ func parseFloatType(p *Parser) (ast.DataType, bool) {
 	return &ast.FloatType{
 		TypeName: typename,
 		BitSize:  bitSize,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Location: *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -69,10 +61,7 @@ func parseStringType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	return &ast.StringType{
 		TypeName: types.STRING,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Location: *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -80,10 +69,7 @@ func parseByteType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	return &ast.ByteType{
 		TypeName: types.BYTE,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Location: *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -91,10 +77,7 @@ func parseBoolType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	return &ast.BoolType{
 		TypeName: types.BOOL,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Location: *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -112,10 +95,7 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 		return &ast.ArrayType{
 			ElementType: elementType,
 			TypeName:    types.ARRAY,
-			Location: ast.Location{
-				Start: &start,
-				End:   elementType.EndPos(),
-			},
+			Location:    *source.NewLocation(&start, elementType.EndPos()),
 		}, true
 	}
 }
@@ -135,17 +115,11 @@ func parseStructField(p *Parser) *ast.StructField {
 	} else {
 		return &ast.StructField{
 			Field: ast.IdentifierExpr{
-				Name: fieldName,
-				Location: ast.Location{
-					Start: &nameToken.Start,
-					End:   &nameToken.End,
-				},
+				Name:     fieldName,
+				Location: *source.NewLocation(&nameToken.Start, &nameToken.End),
 			},
-			Type: fieldType,
-			Location: ast.Location{
-				Start: &nameToken.Start,
-				End:   fieldType.EndPos(),
-			},
+			Type:     fieldType,
+			Location: *source.NewLocation(&nameToken.Start, fieldType.EndPos()),
 		}
 	}
 }
@@ -234,10 +208,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 	return &ast.StructType{
 		Fields:   fields,
 		TypeName: types.STRUCT,
-		Location: ast.Location{
-			Start: &start,
-			End:   &end,
-		},
+		Location: *source.NewLocation(&start, &end),
 	}, true
 }
 
@@ -272,7 +243,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 			Name:       *name,
 			Params:     params,
 			ReturnType: returnTypes,
-			Location:   ast.Location{Start: &start, End: &end},
+			Location:   source.Location{Start: &start, End: &end},
 		}
 
 		// check if the method name is already declared in the interface
@@ -302,10 +273,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 	return &ast.InterfaceType{
 		Methods:  methods,
 		TypeName: types.INTERFACE,
-		Location: ast.Location{
-			Start: &start.Start,
-			End:   &end.End,
-		},
+		Location: *source.NewLocation(&start.Start, &end.End),
 	}, true
 }
 
@@ -334,10 +302,7 @@ func parseFunctionType(p *Parser) (ast.DataType, bool) {
 		Parameters:  parameters,
 		ReturnTypes: returnTypes,
 		TypeName:    types.FUNCTION,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Location:    *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -411,16 +376,10 @@ func parseTypeDecl(p *Parser) ast.Statement {
 
 	return &ast.TypeDeclStmt{
 		Alias: &ast.IdentifierExpr{
-			Name: typeName.Value,
-			Location: ast.Location{
-				Start: &typeName.Start,
-				End:   &typeName.End,
-			},
+			Name:     typeName.Value,
+			Location: *source.NewLocation(&typeName.Start, &typeName.End),
 		},
 		BaseType: underlyingType,
-		Location: ast.Location{
-			Start: &start.Start,
-			End:   underlyingType.EndPos(),
-		},
+		Location: *source.NewLocation(&start.Start, underlyingType.EndPos()),
 	}
 }

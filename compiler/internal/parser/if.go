@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/report"
 )
 
@@ -36,10 +37,7 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 	ifStmt := &ast.IfStmt{
 		Condition: condition,
 		Body:      &body,
-		Location: ast.Location{
-			Start: &start.Start,
-			End:   body.EndPos(),
-		},
+		Location:  *source.NewLocation(&start.Start, body.EndPos()),
 	}
 
 	if p.match(lexer.ELSE_TOKEN) {

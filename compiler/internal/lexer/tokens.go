@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"ferret/compiler/colors"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/types"
 )
 
@@ -118,8 +119,8 @@ func IsKeyword(token string) bool {
 type Token struct {
 	Kind  TOKEN
 	Value string
-	Start Position
-	End   Position
+	Start source.Position
+	End   source.Position
 }
 
 func (t *Token) Debug(filename string) {
@@ -131,7 +132,7 @@ func (t *Token) Debug(filename string) {
 	}
 }
 
-func NewToken(kind TOKEN, value string, start Position, end Position) Token {
+func NewToken(kind TOKEN, value string, start source.Position, end source.Position) Token {
 	return Token{
 		Kind:  kind,
 		Value: value,

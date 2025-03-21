@@ -1,18 +1,13 @@
 package ast
 
-import "ferret/compiler/internal/lexer"
+import "ferret/compiler/internal/source"
 
 type NODE_TYPE int
 
 type Node interface {
 	INode()
-	StartPos() *lexer.Position
-	EndPos() *lexer.Position
-}
-
-type Location struct {
-	Start *lexer.Position
-	End   *lexer.Position
+	StartPos() *source.Position
+	EndPos() *source.Position
 }
 
 const (
@@ -38,11 +33,11 @@ type BlockConstruct interface {
 
 type ExpressionList []Expression
 
-func (el ExpressionList) StartPos() *lexer.Position {
+func (el ExpressionList) StartPos() *source.Position {
 	return el[0].StartPos()
 }
 
-func (el ExpressionList) EndPos() *lexer.Position {
+func (el ExpressionList) EndPos() *source.Position {
 	return el[len(el)-1].EndPos()
 }
 
@@ -57,14 +52,14 @@ type Statement interface {
 // ExpressionStmt represents a statement that consists of one or more expressions
 type ExpressionStmt struct {
 	Expressions ExpressionList
-	Location    Location
+	Location    source.Location
 }
 
-func (e *ExpressionStmt) StartPos() *lexer.Position {
+func (e *ExpressionStmt) StartPos() *source.Position {
 	return e.Location.Start
 }
 
-func (e *ExpressionStmt) EndPos() *lexer.Position {
+func (e *ExpressionStmt) EndPos() *source.Position {
 	return e.Location.End
 }
 

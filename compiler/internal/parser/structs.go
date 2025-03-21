@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/report"
 )
 
@@ -16,11 +17,8 @@ func validateStructType(p *Parser) (*ast.IdentifierExpr, bool) {
 
 	token := p.advance()
 	typeName := &ast.IdentifierExpr{
-		Name: token.Value,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		},
+		Name:     token.Value,
+		Location: *source.NewLocation(&token.Start, &token.End),
 	}
 
 	return typeName, true
@@ -48,17 +46,11 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 
 		fields = append(fields, ast.StructField{
 			Field: ast.IdentifierExpr{
-				Name: fieldName.Value,
-				Location: ast.Location{
-					Start: &fieldName.Start,
-					End:   &fieldName.End,
-				},
+				Name:     fieldName.Value,
+				Location: *source.NewLocation(&fieldName.Start, &fieldName.End),
 			},
-			Value: value,
-			Location: ast.Location{
-				Start: &fieldName.Start,
-				End:   value.EndPos(),
-			},
+			Value:    value,
+			Location: *source.NewLocation(&fieldName.Start, value.EndPos()),
 		})
 
 		if p.match(lexer.CLOSE_CURLY) {
@@ -105,10 +97,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 		TypeName:    *typeName,
 		Fields:      fields,
 		IsAnonymous: lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN,
-		Location: ast.Location{
-			Start: &start,
-			End:   &end,
-		},
+		Location:    *source.NewLocation(&start, &end),
 	}
 }
 
@@ -126,19 +115,13 @@ func parseFieldAccess(p *Parser, object ast.Expression) (ast.Expression, bool) {
 
 	fieldToken := p.advance()
 	field := &ast.IdentifierExpr{
-		Name: fieldToken.Value,
-		Location: ast.Location{
-			Start: &fieldToken.Start,
-			End:   &fieldToken.End,
-		},
+		Name:     fieldToken.Value,
+		Location: *source.NewLocation(&fieldToken.Start, &fieldToken.End),
 	}
 
 	return &ast.FieldAccessExpr{
-		Object: object,
-		Field:  field,
-		Location: ast.Location{
-			Start: object.StartPos(),
-			End:   &fieldToken.End,
-		},
+		Object:   object,
+		Field:    field,
+		Location: *source.NewLocation(object.StartPos(), &fieldToken.End),
 	}, true
 }

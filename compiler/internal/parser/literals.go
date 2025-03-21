@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
 	"strings"
@@ -12,10 +13,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 	number := p.consume(lexer.NUMBER_TOKEN, report.EXPECTED_NUMBER)
 	raw := number.Value
 	value := strings.ReplaceAll(raw, "_", "") // Remove underscores
-	loc := ast.Location{
-		Start: &number.Start,
-		End:   &number.End,
-	}
+	loc := *source.NewLocation(&number.Start, &number.End)
 
 	// Try parsing as integer first
 	if types.ValidateHexadecimal(value) {
@@ -97,10 +95,7 @@ func parseNumberLiteral(p *Parser) ast.Expression {
 
 func parseStringLiteral(p *Parser) ast.Expression {
 	stringLiteral := p.consume(lexer.STRING_TOKEN, report.EXPECTED_STRING)
-	loc := ast.Location{
-		Start: &stringLiteral.Start,
-		End:   &stringLiteral.End,
-	}
+	loc := *source.NewLocation(&stringLiteral.Start, &stringLiteral.End)
 
 	return &ast.StringLiteral{
 		Value:    stringLiteral.Value,
@@ -139,9 +134,6 @@ func parseArrayLiteral(p *Parser) ast.Expression {
 
 	return &ast.ArrayLiteralExpr{
 		Elements: elements,
-		Location: ast.Location{
-			Start: &start,
-			End:   &end.End,
-		},
+		Location: *source.NewLocation(&start, &end.End),
 	}
 }

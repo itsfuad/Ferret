@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"fmt"
@@ -132,10 +133,7 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 
 	return &ast.ExpressionStmt{
 		Expressions: exprs,
-		Location: ast.Location{
-			Start: first.StartPos(),
-			End:   exprs[len(exprs)-1].EndPos(),
-		},
+		Location:    *source.NewLocation(first.StartPos(), exprs[len(exprs)-1].EndPos()),
 	}
 }
 
@@ -171,11 +169,8 @@ func parseBlock(p *Parser) ast.BlockConstruct {
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.Block{
-		Nodes: nodes,
-		Location: ast.Location{
-			Start: &start,
-			End:   &end,
-		},
+		Nodes:    nodes,
+		Location: *source.NewLocation(&start, &end),
 	}
 }
 
@@ -196,11 +191,8 @@ func parseReturnStmt(p *Parser) ast.Statement {
 	}
 
 	return &ast.ReturnStmt{
-		Values: values,
-		Location: ast.Location{
-			Start: &start,
-			End:   &end,
-		},
+		Values:   values,
+		Location: *source.NewLocation(&start, &end),
 	}
 }
 

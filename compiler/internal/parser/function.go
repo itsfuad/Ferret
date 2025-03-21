@@ -4,6 +4,7 @@ import (
 	"ferret/compiler/colors"
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/internal/utils"
@@ -53,10 +54,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 
 		identifier := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PARAMETER_NAME)
 
-		location := ast.Location{
-			Start: &identifier.Start,
-			End:   &identifier.End,
-		}
+		location := *source.NewLocation(&identifier.Start, &identifier.End)
 
 		paramName := &ast.IdentifierExpr{Name: identifier.Value, Location: location}
 
@@ -188,7 +186,7 @@ func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]
 	return params, nil
 }
 
-func parseFunctionLiteral(p *Parser, start *lexer.Position, isAnonymous, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
+func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
 
 	if isAnonymous {
 		p.enterScope(symboltable.FUNCTION_SCOPE)
@@ -199,10 +197,7 @@ func parseFunctionLiteral(p *Parser, start *lexer.Position, isAnonymous, parseNe
 
 	block := parseBlock(p)
 
-	location := ast.Location{
-		Start: start,
-		End:   block.EndPos(),
-	}
+	location := *source.NewLocation(start, block.EndPos())
 
 	return &ast.FunctionLiteral{
 		Params:     params,
@@ -218,10 +213,7 @@ func declareFunction(p *Parser) *ast.IdentifierExpr {
 
 	if p.match(lexer.IDENTIFIER_TOKEN) {
 		token := p.advance()
-		location := ast.Location{
-			Start: &token.Start,
-			End:   &token.End,
-		}
+		location := *source.NewLocation(&token.Start, &token.End)
 		name = &ast.IdentifierExpr{
 			Name:     token.Value,
 			Location: location,
@@ -275,9 +267,6 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	return &ast.FunctionDecl{
 		Identifier: *name,
 		Function:   function,
-		Location: ast.Location{
-			Start: &start.Start,
-			End:   function.EndPos(),
-		},
+		Location:   *source.NewLocation(&start.Start, function.EndPos()),
 	}
 }

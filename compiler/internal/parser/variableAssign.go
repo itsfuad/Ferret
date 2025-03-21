@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/report"
 )
 
@@ -47,11 +48,8 @@ func parseAssignment(p *Parser, left ...ast.Expression) ast.Statement {
 	}
 
 	return &ast.AssignmentStmt{
-		Left:  assignees,
-		Right: expressions,
-		Location: ast.Location{
-			Start: assignees[0].StartPos(),
-			End:   expressions[len(expressions)-1].EndPos(),
-		},
+		Left:     assignees,
+		Right:    expressions,
+		Location: *source.NewLocation(assignees[0].StartPos(), expressions[len(expressions)-1].EndPos()),
 	}
 }

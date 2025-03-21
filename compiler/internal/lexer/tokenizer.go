@@ -2,6 +2,7 @@ package lexer
 
 import (
 	//Standard packages
+	"ferret/compiler/internal/source"
 	"os"
 	"regexp"
 )
@@ -16,7 +17,7 @@ type regexPattern struct {
 type Lexer struct {
 	Errors     []error
 	Tokens     []Token
-	Position   Position
+	Position   source.Position
 	sourceCode []byte
 	patterns   []regexPattern
 	FilePath   string
@@ -53,7 +54,7 @@ func createLexer(filePath *string) *Lexer {
 	lex := &Lexer{
 		sourceCode: fileText,
 		Tokens:     make([]Token, 0),
-		Position: Position{
+		Position: source.Position{
 			Line:   1,
 			Column: 1,
 			Index:  0,

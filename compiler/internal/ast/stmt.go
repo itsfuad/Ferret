@@ -1,19 +1,19 @@
 package ast
 
-import "ferret/compiler/internal/lexer"
+import "ferret/compiler/internal/source"
 
 // Statement nodes
 type VarDeclStmt struct {
 	Variables    []*VariableToDeclare
 	Initializers []Expression
 	IsConst      bool
-	Location
+	source.Location
 }
 
-func (v *VarDeclStmt) INode()                    {} // INode is a marker interface for all nodes
-func (v *VarDeclStmt) Stmt()                     {} // Stmt is a marker interface for all statements
-func (v *VarDeclStmt) StartPos() *lexer.Position { return v.Start }
-func (v *VarDeclStmt) EndPos() *lexer.Position   { return v.End }
+func (v *VarDeclStmt) INode()                     {} // INode is a marker interface for all nodes
+func (v *VarDeclStmt) Stmt()                      {} // Stmt is a marker interface for all statements
+func (v *VarDeclStmt) StartPos() *source.Position { return v.Start }
+func (v *VarDeclStmt) EndPos() *source.Position   { return v.End }
 
 type VariableToDeclare struct {
 	Identifier   *IdentifierExpr
@@ -23,55 +23,55 @@ type VariableToDeclare struct {
 type AssignmentStmt struct {
 	Left  ExpressionList
 	Right ExpressionList
-	Location
+	source.Location
 }
 
-func (a *AssignmentStmt) INode()                    {} // INode is a marker interface for all nodes
-func (a *AssignmentStmt) Stmt()                     {} // Stmt is a marker interface for all statements
-func (a *AssignmentStmt) StartPos() *lexer.Position { return a.Start }
-func (a *AssignmentStmt) EndPos() *lexer.Position   { return a.End }
+func (a *AssignmentStmt) INode()                     {} // INode is a marker interface for all nodes
+func (a *AssignmentStmt) Stmt()                      {} // Stmt is a marker interface for all statements
+func (a *AssignmentStmt) StartPos() *source.Position { return a.Start }
+func (a *AssignmentStmt) EndPos() *source.Position   { return a.End }
 
 // TypeDeclStmt represents a type declaration statement
 type TypeDeclStmt struct {
 	Alias    *IdentifierExpr // The name of the type
 	BaseType DataType        // The underlying type
-	Location
+	source.Location
 }
 
-func (t *TypeDeclStmt) INode()                    {} // INode is a marker interface for all nodes
-func (t *TypeDeclStmt) Stmt()                     {} // Stmt is a marker interface for all statements
-func (t *TypeDeclStmt) StartPos() *lexer.Position { return t.Start }
-func (t *TypeDeclStmt) EndPos() *lexer.Position   { return t.End }
+func (t *TypeDeclStmt) INode()                     {} // INode is a marker interface for all nodes
+func (t *TypeDeclStmt) Stmt()                      {} // Stmt is a marker interface for all statements
+func (t *TypeDeclStmt) StartPos() *source.Position { return t.Start }
+func (t *TypeDeclStmt) EndPos() *source.Position   { return t.End }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
 	Values ExpressionList
-	Location
+	source.Location
 }
 
-func (r *ReturnStmt) INode()                    {} // INode is a marker interface for all nodes
-func (r *ReturnStmt) Stmt()                     {} // Stmt is a marker method for statements
-func (r *ReturnStmt) StartPos() *lexer.Position { return r.Start }
-func (r *ReturnStmt) EndPos() *lexer.Position   { return r.End }
+func (r *ReturnStmt) INode()                     {} // INode is a marker interface for all nodes
+func (r *ReturnStmt) Stmt()                      {} // Stmt is a marker method for statements
+func (r *ReturnStmt) StartPos() *source.Position { return r.Start }
+func (r *ReturnStmt) EndPos() *source.Position   { return r.End }
 
 // PackageDeclStmt represents a package declaration
 type PackageDeclStmt struct {
 	Package *IdentifierExpr
-	Location
+	source.Location
 }
 
-func (p *PackageDeclStmt) INode()                    {} // INode is a marker interface for all nodes
-func (p *PackageDeclStmt) Stmt()                     {} // Stmt is a marker interface for all statements
-func (p *PackageDeclStmt) StartPos() *lexer.Position { return p.Start }
-func (p *PackageDeclStmt) EndPos() *lexer.Position   { return p.End }
+func (p *PackageDeclStmt) INode()                     {} // INode is a marker interface for all nodes
+func (p *PackageDeclStmt) Stmt()                      {} // Stmt is a marker interface for all statements
+func (p *PackageDeclStmt) StartPos() *source.Position { return p.Start }
+func (p *PackageDeclStmt) EndPos() *source.Position   { return p.End }
 
 // ImportStmt represents an import statement
 type ImportStmt struct {
 	Import *StringLiteral
-	Location
+	source.Location
 }
 
-func (i *ImportStmt) INode()                    {} // INode is a marker interface for all nodes
-func (i *ImportStmt) Stmt()                     {} // Stmt is a marker interface for all statements
-func (i *ImportStmt) StartPos() *lexer.Position { return i.Start }
-func (i *ImportStmt) EndPos() *lexer.Position   { return i.End }
+func (i *ImportStmt) INode()                     {} // INode is a marker interface for all nodes
+func (i *ImportStmt) Stmt()                      {} // Stmt is a marker interface for all statements
+func (i *ImportStmt) StartPos() *source.Position { return i.Start }
+func (i *ImportStmt) EndPos() *source.Position   { return i.End }

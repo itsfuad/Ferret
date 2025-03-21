@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
@@ -22,11 +23,8 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableToDeclare, int) {
 		identifierName := p.advance()
 		identifier := &ast.VariableToDeclare{
 			Identifier: &ast.IdentifierExpr{
-				Name: identifierName.Value,
-				Location: ast.Location{
-					Start: &identifierName.Start,
-					End:   &identifierName.End,
-				},
+				Name:     identifierName.Value,
+				Location: *source.NewLocation(&identifierName.Start, &identifierName.End),
 			},
 		}
 		variables = append(variables, identifier)
@@ -184,9 +182,6 @@ func parseVarDecl(p *Parser) ast.Statement {
 		Variables:    variables,
 		Initializers: values,
 		IsConst:      isConst,
-		Location: ast.Location{
-			Start: &token.Start,
-			End:   variables[len(variables)-1].Identifier.EndPos(),
-		},
+		Location:     *source.NewLocation(&token.Start, variables[len(variables)-1].Identifier.EndPos()),
 	}
 }

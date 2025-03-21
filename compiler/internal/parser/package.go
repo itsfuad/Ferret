@@ -3,6 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
@@ -30,16 +31,10 @@ func parsePackage(p *Parser) ast.Node {
 
 	return &ast.PackageDeclStmt{
 		Package: &ast.IdentifierExpr{
-			Name: name.Value,
-			Location: ast.Location{
-				Start: &name.Start,
-				End:   &name.End,
-			},
+			Name:     name.Value,
+			Location: *source.NewLocation(&name.Start, &name.End),
 		},
-		Location: ast.Location{
-			Start: &start.Start,
-			End:   &name.End,
-		},
+		Location: *source.NewLocation(&start.Start, &name.End),
 	}
 }
 
@@ -78,16 +73,10 @@ func parseImport(p *Parser) ast.Node {
 
 	return &ast.ImportStmt{
 		Import: &ast.StringLiteral{
-			Value: importPath.Value,
-			Location: ast.Location{
-				Start: &importPath.Start,
-				End:   &importPath.End,
-			},
+			Value:    importPath.Value,
+			Location: *source.NewLocation(&importPath.Start, &importPath.End),
 		},
-		Location: ast.Location{
-			Start: &start.Start,
-			End:   &importPath.End,
-		},
+		Location: *source.NewLocation(&start.Start, &importPath.End),
 	}
 }
 
@@ -103,10 +92,7 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 		return &ast.ScopeResolutionExpr{
 			Module:     module,
 			Identifier: member,
-			Location: ast.Location{
-				Start: module.StartPos(),
-				End:   member.EndPos(),
-			},
+			Location:   *source.NewLocation(module.StartPos(), member.EndPos()),
 		}, true
 	} else {
 		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Left side of '::' must be an identifier").SetLevel(report.SYNTAX_ERROR)

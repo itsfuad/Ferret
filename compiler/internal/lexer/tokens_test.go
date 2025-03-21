@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"ferret/compiler/internal/source"
 	"testing"
 )
 
@@ -35,8 +36,8 @@ func TestIsKeyword(t *testing.T) {
 func TestNewToken(t *testing.T) {
 	kind := LET_TOKEN
 	value := "let"
-	start := Position{Line: 1, Column: 1}
-	end := Position{Line: 1, Column: 4}
+	start := source.Position{Line: 1, Column: 1}
+	end := source.Position{Line: 1, Column: 4}
 	token := NewToken(kind, value, start, end)
 
 	if token.Kind != kind {
