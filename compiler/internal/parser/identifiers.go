@@ -3,7 +3,6 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
-	"ferret/compiler/report"
 )
 
 func parseIdentifier(p *Parser) *ast.IdentifierExpr {
@@ -16,16 +15,6 @@ func parseIdentifier(p *Parser) *ast.IdentifierExpr {
 			Start: &token.Start,
 			End:   &token.End,
 		},
-	}
-
-	// Check if identifier is defined in current scope
-	if _, found := p.currentScope.Resolve(token.Value); !found {
-		report.Add(p.filePath,
-			token.Start.Line,
-			token.End.Line,
-			token.Start.Column,
-			token.End.Column,
-			"`"+token.Value+"` is not defined").AddHint("Did you forget to declare it? 😐").SetLevel(report.SEMANTIC_ERROR)
 	}
 
 	return identifier

@@ -3,10 +3,7 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
-	"ferret/compiler/internal/symboltable"
-	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
-	"fmt"
 )
 
 // validateStructType validates the struct type and returns the type name
@@ -24,24 +21,6 @@ func validateStructType(p *Parser) (*ast.IdentifierExpr, bool) {
 			Start: &token.Start,
 			End:   &token.End,
 		},
-	}
-
-	isAnonymous := lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN
-	if !isAnonymous {
-		if symbol, ok := p.currentScope.Resolve(typeName.Name); ok {
-			if symbol.SymbolKind != symboltable.TYPE_SYMBOL {
-				report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, "Expected type name after '@'").SetLevel(report.SYNTAX_ERROR)
-				return nil, false
-			}
-
-			if symbol.Type != types.STRUCT {
-				report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, fmt.Sprintf("`%s` is not a struct", typeName.Name)).SetLevel(report.SEMANTIC_ERROR)
-				return nil, false
-			}
-		} else {
-			report.Add(p.filePath, typeName.StartPos().Line, typeName.EndPos().Line, typeName.StartPos().Column, typeName.EndPos().Column, "Undefined type '"+typeName.Name+"'").SetLevel(report.SEMANTIC_ERROR)
-			return nil, false
-		}
 	}
 
 	return typeName, true
