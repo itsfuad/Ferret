@@ -4,10 +4,10 @@ import (
 	"ferret/compiler/internal/types"
 )
 
-type ScopeKind int
+type SCOPE_KIND int
 
 const (
-	GLOBAL_SCOPE ScopeKind = iota
+	GLOBAL_SCOPE SCOPE_KIND = iota
 	LOCAL_SCOPE
 	BLOCK_SCOPE
 	FUNCTION_SCOPE
@@ -50,8 +50,6 @@ type Symbol struct {
 	Name       string          // The name of the symbol
 	SymbolKind SYMBOL_KIND     // The kind of symbol (variable, function, etc.)
 	Type       types.TYPE_NAME // The type of the symbol
-	Scope      ScopeKind       // The scope in which this symbol is defined
-	IsExported bool            // Whether the symbol is exported (public)
 	IsMutable  bool            // Whether the symbol can be modified
 	Location   SymbolLocation  // Source location information
 	Value      any             // For constants and compile-time known values
@@ -69,11 +67,11 @@ type SymbolTable struct {
 	symbols  map[string]*Symbol
 	parent   *SymbolTable
 	children []*SymbolTable
-	kind     ScopeKind
+	kind     SCOPE_KIND
 }
 
 // NewSymbolTable creates a new symbol table with the given parent and scope kind
-func NewSymbolTable(parent *SymbolTable, kind ScopeKind) *SymbolTable {
+func NewSymbolTable(parent *SymbolTable, kind SCOPE_KIND) *SymbolTable {
 	st := &SymbolTable{
 		symbols:  make(map[string]*Symbol),
 		parent:   parent,
@@ -139,7 +137,7 @@ func (st *SymbolTable) Children() []*SymbolTable {
 }
 
 // ScopeKind returns the kind of this scope
-func (st *SymbolTable) ScopeKind() ScopeKind {
+func (st *SymbolTable) ScopeKind() SCOPE_KIND {
 	return st.kind
 }
 
@@ -159,7 +157,7 @@ func (st *SymbolTable) Clear() {
 }
 
 // EnterScope creates and returns a new child scope
-func (st *SymbolTable) EnterScope(kind ScopeKind) *SymbolTable {
+func (st *SymbolTable) EnterScope(kind SCOPE_KIND) *SymbolTable {
 	return NewSymbolTable(st, kind)
 }
 
