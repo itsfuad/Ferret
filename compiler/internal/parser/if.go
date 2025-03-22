@@ -9,6 +9,7 @@ import (
 
 // parseIfStatement parses an if statement with optional else and else-if branches
 func parseIfStatement(p *Parser) ast.BlockConstruct {
+
 	start := p.consume(lexer.IF_TOKEN, report.EXPECTED_IF) // consume 'if'
 
 	// Parse condition (parentheses are optional)
@@ -27,7 +28,6 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 			"Expected condition after 'if'").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
-
 	// Parse if body
 	body := parseBlock(p)
 	if body == nil {
