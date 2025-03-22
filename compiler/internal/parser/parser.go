@@ -236,8 +236,8 @@ func parseNode(p *Parser) ast.Node {
 	if _, ok := node.(ast.Statement); ok {
 		//if no semicolon, show error on the previous token
 		if !p.match(lexer.SEMICOLON_TOKEN) {
-			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, "Expected ';' after statement").AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
+			token := p.previous()
+			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column+1, token.End.Column+1, report.EXPECTED_SEMICOLON+" after "+token.Value).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
 		}
 		end := p.advance()
 		node.EndPos().Column = end.End.Column

@@ -4,7 +4,9 @@ import "fmt";
 
 let x = [2, 5];
 
-let p: interface{};
+type any interface{}
+
+let p: any;
 
 fn main() {
     fmt::Println("Hello, Ferret!");
