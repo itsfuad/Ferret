@@ -4,6 +4,8 @@ import "fmt";
 
 let x = [2, 5];
 
+let p: interface{};
+
 fn main() {
     fmt::Println("Hello, Ferret!");
 }

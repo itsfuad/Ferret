@@ -127,17 +127,62 @@
         }
     },
     {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "p",
+                    "Start": {
+                        "Line": 7,
+                        "Column": 5,
+                        "Index": 57
+                    },
+                    "End": {
+                        "Line": 7,
+                        "Column": 20,
+                        "Index": 58
+                    }
+                },
+                "ExplicitType": {
+                    "Methods": [],
+                    "TypeName": "interface",
+                    "Start": {
+                        "Line": 7,
+                        "Column": 8,
+                        "Index": 60
+                    },
+                    "End": {
+                        "Line": 7,
+                        "Column": 19,
+                        "Index": 71
+                    }
+                }
+            }
+        ],
+        "Initializers": [],
+        "IsConst": false,
+        "Start": {
+            "Line": 7,
+            "Column": 1,
+            "Index": 53
+        },
+        "End": {
+            "Line": 7,
+            "Column": 20,
+            "Index": 58
+        }
+    },
+    {
         "Identifier": {
             "Name": "main",
             "Start": {
-                "Line": 7,
+                "Line": 9,
                 "Column": 4,
-                "Index": 56
+                "Index": 79
             },
             "End": {
-                "Line": 7,
+                "Line": 9,
                 "Column": 8,
-                "Index": 60
+                "Index": 83
             }
         },
         "Function": {
@@ -152,112 +197,112 @@
                                     "Module": {
                                         "Name": "fmt",
                                         "Start": {
-                                            "Line": 8,
+                                            "Line": 10,
                                             "Column": 5,
-                                            "Index": 70
+                                            "Index": 93
                                         },
                                         "End": {
-                                            "Line": 8,
+                                            "Line": 10,
                                             "Column": 8,
-                                            "Index": 73
+                                            "Index": 96
                                         }
                                     },
                                     "Identifier": {
                                         "Name": "Println",
                                         "Start": {
-                                            "Line": 8,
+                                            "Line": 10,
                                             "Column": 10,
-                                            "Index": 75
+                                            "Index": 98
                                         },
                                         "End": {
-                                            "Line": 8,
+                                            "Line": 10,
                                             "Column": 17,
-                                            "Index": 82
+                                            "Index": 105
                                         }
                                     },
                                     "Start": {
-                                        "Line": 8,
+                                        "Line": 10,
                                         "Column": 5,
-                                        "Index": 70
+                                        "Index": 93
                                     },
                                     "End": {
-                                        "Line": 8,
+                                        "Line": 10,
                                         "Column": 17,
-                                        "Index": 82
+                                        "Index": 105
                                     }
                                 },
                                 "Arguments": [
                                     {
                                         "Value": "Hello, Ferret!",
                                         "Start": {
-                                            "Line": 8,
+                                            "Line": 10,
                                             "Column": 18,
-                                            "Index": 83
+                                            "Index": 106
                                         },
                                         "End": {
-                                            "Line": 8,
+                                            "Line": 10,
                                             "Column": 34,
-                                            "Index": 99
+                                            "Index": 122
                                         }
                                     }
                                 ],
                                 "Start": {
-                                    "Line": 8,
+                                    "Line": 10,
                                     "Column": 5,
-                                    "Index": 70
+                                    "Index": 93
                                 },
                                 "End": {
-                                    "Line": 8,
+                                    "Line": 10,
                                     "Column": 36,
-                                    "Index": 100
+                                    "Index": 123
                                 }
                             }
                         ],
                         "Location": {
                             "Start": {
-                                "Line": 8,
+                                "Line": 10,
                                 "Column": 5,
-                                "Index": 70
+                                "Index": 93
                             },
                             "End": {
-                                "Line": 8,
+                                "Line": 10,
                                 "Column": 36,
-                                "Index": 100
+                                "Index": 123
                             }
                         }
                     }
                 ],
                 "Start": {
-                    "Line": 7,
+                    "Line": 9,
                     "Column": 11,
-                    "Index": 63
+                    "Index": 86
                 },
                 "End": {
-                    "Line": 9,
+                    "Line": 11,
                     "Column": 2,
-                    "Index": 104
+                    "Index": 127
                 }
             },
             "Start": {
-                "Line": 7,
+                "Line": 9,
                 "Column": 1,
-                "Index": 53
+                "Index": 76
             },
             "End": {
-                "Line": 9,
+                "Line": 11,
                 "Column": 2,
-                "Index": 104
+                "Index": 127
             }
         },
         "Start": {
-            "Line": 7,
+            "Line": 9,
             "Column": 1,
-            "Index": 53
+            "Index": 76
         },
         "End": {
-            "Line": 9,
+            "Line": 11,
             "Column": 2,
-            "Index": 104
+            "Index": 127
         }
     }
 ]
