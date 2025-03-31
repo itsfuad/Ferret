@@ -86,6 +86,7 @@
   "author": "Fuad Hasan",
   "license": "ISC",
   "dependencies": {
+    "-": "^0.0.1",
     "vscode-languageclient": "^9.0.1"
   }
 }
