@@ -8,7 +8,7 @@ func main() {
 
 	filename := "./../code/main.fer"
 
-	r, err := compile(filename, true, true, true)
+	r, err := compile(filename, false, true)
 
 	if len(r) > 0 {
 		r.DisplayAll()

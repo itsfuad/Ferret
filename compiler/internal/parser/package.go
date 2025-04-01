@@ -6,7 +6,6 @@ import (
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
-	"ferret/compiler/types"
 	"strings"
 )
 
@@ -21,12 +20,12 @@ func parsePackage(p *Parser) ast.Node {
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PACKAGE_NAME)
 
 	if !valid {
-		report.Add(p.filePath, start.Start.Line, name.End.Line, start.Start.Column, name.End.Column, report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&start.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
 	}
 
 	// check scope
 	if p.currentScope.ScopeKind() != symboltable.GLOBAL_SCOPE {
-		report.Add(p.filePath, name.Start.Line, name.End.Line, name.Start.Column, name.End.Column, report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&name.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
 	}
 
 	return &ast.PackageDeclStmt{
@@ -45,7 +44,7 @@ func parseImport(p *Parser) ast.Node {
 
 	// check scope
 	if p.currentScope.ScopeKind() != symboltable.GLOBAL_SCOPE {
-		report.Add(p.filePath, start.Start.Line, importPath.End.Line, start.Start.Column, importPath.End.Column, report.INVALID_SCOPE).AddHint("Import statements must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_SCOPE).AddHint("Import statements must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
 	}
 
 	// Get module name from import path (last component)
@@ -58,25 +57,21 @@ func parseImport(p *Parser) ast.Node {
 	sym := &symboltable.Symbol{
 		Name:       moduleName,
 		SymbolKind: symboltable.MODULE_SYMBOL,
-		Type:       types.MODULE,
 		Module:     moduleName,
-		Location: symboltable.SymbolLocation{
-			File:   p.filePath,
-			Line:   start.Start.Line,
-			Column: start.Start.Column,
-		},
+		Location:   source.NewLocation(&start.Start, &importPath.End),
+		FilePath:   p.filePath,
 	}
 
 	if !p.currentScope.Define(sym) {
-		report.Add(p.filePath, start.Start.Line, importPath.End.Line, start.Start.Column, importPath.End.Column, "Module already imported").SetLevel(report.SEMANTIC_ERROR)
+		report.Add(p.filePath, sym.Location, "Module already imported").SetLevel(report.SEMANTIC_ERROR)
 	}
 
 	return &ast.ImportStmt{
 		Import: &ast.StringLiteral{
 			Value:    importPath.Value,
-			Location: *source.NewLocation(&importPath.Start, &importPath.End),
+			Location: *sym.Location,
 		},
-		Location: *source.NewLocation(&start.Start, &importPath.End),
+		Location: *sym.Location,
 	}
 }
 
@@ -85,7 +80,8 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 	if module, ok := expr.(*ast.IdentifierExpr); ok {
 		p.consume(lexer.SCOPE_TOKEN, report.EXPECTED_SCOPE_RESOLUTION_OPERATOR)
 		if !p.match(lexer.IDENTIFIER_TOKEN) {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected identifier after '::'").SetLevel(report.SYNTAX_ERROR)
+			token := p.peek()
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected identifier after '::'").SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		member := parseIdentifier(p)
@@ -95,7 +91,8 @@ func parseScopeResolution(p *Parser, expr ast.Expression) (ast.Expression, bool)
 			Location:   *source.NewLocation(module.StartPos(), member.EndPos()),
 		}, true
 	} else {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Left side of '::' must be an identifier").SetLevel(report.SYNTAX_ERROR)
+		token := p.peek()
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Left side of '::' must be an identifier").SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 }

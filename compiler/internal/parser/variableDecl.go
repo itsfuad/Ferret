@@ -17,7 +17,8 @@ func parseIdentifiers(p *Parser) ([]*ast.VariableToDeclare, int) {
 
 	for {
 		if !p.check(lexer.IDENTIFIER_TOKEN) {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_NAME).SetLevel(report.SYNTAX_ERROR)
+			token := p.peek()
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, 0
 		}
 		identifierName := p.advance()
@@ -50,7 +51,8 @@ func parseTypeAnnotations(p *Parser) ([]ast.DataType, bool) {
 	for {
 		typeNode, ok := parseType(p)
 		if !ok {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISSING_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+			token := p.peek()
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISSING_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		types = append(types, typeNode)
@@ -72,7 +74,8 @@ func parseInitializers(p *Parser) ([]ast.Expression, bool) {
 		for {
 			value := parseExpression(p)
 			if value == nil {
-				report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "Expected value after '=', got invalid expression").SetLevel(report.SYNTAX_ERROR)
+				token := p.peek()
+				report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "Expected value after '=', got invalid expression").SetLevel(report.SYNTAX_ERROR)
 				return nil, false
 			}
 			values = append(values, value)
@@ -103,7 +106,8 @@ func assignTypes(p *Parser, variables []*ast.VariableToDeclare, types []ast.Data
 		}
 		return true
 	}
-	report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, report.MISMATCHED_VARIABLE_AND_TYPE_COUNT+fmt.Sprintf(": Expected %d types, got %d", varCount, len(types))).SetLevel(report.SYNTAX_ERROR)
+	token := p.peek()
+	report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.MISMATCHED_VARIABLE_AND_TYPE_COUNT+fmt.Sprintf(": Expected %d types, got %d", varCount, len(types))).SetLevel(report.SYNTAX_ERROR)
 	return false
 }
 
@@ -115,10 +119,7 @@ func parseVarDecl(p *Parser) ast.Statement {
 	variables, varCount := parseIdentifiers(p)
 	if variables == nil {
 		pos := p.peek()
-		report.Add(p.filePath,
-			pos.Start.Line, pos.End.Line,
-			pos.Start.Column, pos.End.Column,
-			"no variables found").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&pos.Start, &pos.End), "no variables found").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
@@ -135,13 +136,15 @@ func parseVarDecl(p *Parser) ast.Statement {
 	// when no types provides, we must initialize
 	if len(parsedTypes) == 0 {
 		if len(values) == 0 {
-			report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "cannot infer types without initializers").AddHint("👈😃 Add initializers to the variables").SetLevel(report.NORMAL_ERROR)
+			token := p.peek()
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "cannot infer types without initializers").AddHint("👈😃 Add initializers to the variables").SetLevel(report.NORMAL_ERROR)
 			return nil
 		}
 	}
 
 	if len(values) > varCount {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line, p.peek().Start.Column, p.peek().End.Column, "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
+		token := p.peek()
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), "values cannot be more than the number of variables").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
@@ -153,16 +156,14 @@ func parseVarDecl(p *Parser) ast.Statement {
 			typename = v.ExplicitType.Type()
 		}
 
+		fmt.Printf("var %s's typename: %+v\n", v.Identifier.Name, typename)
+
 		sym := &symboltable.Symbol{
 			Name:       v.Identifier.Name,
 			SymbolKind: symboltable.VARIABLE_SYMBOL,
-			Type:       typename,
 			IsMutable:  !isConst,
-			Location: symboltable.SymbolLocation{
-				File:   p.filePath,
-				Line:   v.Identifier.StartPos().Line,
-				Column: v.Identifier.StartPos().Column,
-			},
+			Location:   &v.Identifier.Location,
+			FilePath:   p.filePath,
 		}
 
 		if !p.currentScope.Define(sym) {
@@ -170,10 +171,7 @@ func parseVarDecl(p *Parser) ast.Statement {
 				v.Identifier.Name,
 				p.filePath,
 				p.currentScope,
-				v.Identifier.StartPos().Line,
-				v.Identifier.EndPos().Line,
-				v.Identifier.StartPos().Column,
-				v.Identifier.EndPos().Column,
+				&v.Identifier.Location,
 			)
 		}
 	}

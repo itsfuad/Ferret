@@ -8,7 +8,6 @@ import (
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"
-	"ferret/compiler/types"
 )
 
 // detect if it's a function or a method
@@ -63,7 +62,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		paramType, ok := parseType(p)
 		if !ok {
 			token := p.peek()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_PARAMETER_TYPE).AddHint("Add a type after the colon").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 
@@ -76,7 +75,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		if utils.Has(params, param, func(p ast.Parameter, b ast.Parameter) bool {
 			return p.Identifier.Name == b.Identifier.Name
 		}) {
-			report.Add(p.filePath, param.Identifier.StartPos().Line, param.Identifier.EndPos().Line, param.Identifier.StartPos().Column, param.Identifier.EndPos().Column, report.PARAMETER_REDEFINITION).AddHint("Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
+			report.Add(p.filePath, &param.Identifier.Location, report.PARAMETER_REDEFINITION).AddHint("Parameter name already used").SetLevel(report.SEMANTIC_ERROR)
 			return nil
 		}
 
@@ -85,14 +84,10 @@ func parseParameters(p *Parser) []ast.Parameter {
 		//add to current scope
 		paramSym := &symboltable.Symbol{
 			Name:       param.Identifier.Name,
-			SymbolKind: symboltable.PARAMETER_SYMBOL,
-			Type:       param.Type.Type(),
+			SymbolKind: symboltable.VARIABLE_SYMBOL,
 			IsMutable:  false,
-			Location: symboltable.SymbolLocation{
-				File:   p.filePath,
-				Line:   param.Identifier.StartPos().Line,
-				Column: param.Identifier.StartPos().Column,
-			},
+			FilePath:   p.filePath,
+			Location:   &param.Identifier.Location,
 		}
 
 		if !p.currentScope.Define(paramSym) {
@@ -100,10 +95,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 				param.Identifier.Name,
 				p.filePath,
 				p.currentScope,
-				param.Identifier.StartPos().Line,
-				param.Identifier.EndPos().Line,
-				param.Identifier.StartPos().Column,
-				param.Identifier.EndPos().Column,
+				&param.Identifier.Location,
 			)
 			return nil
 		}
@@ -113,7 +105,7 @@ func parseParameters(p *Parser) []ast.Parameter {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -132,7 +124,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		returnType, ok := parseType(p)
 		if !ok {
 			token := p.previous()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		return []ast.DataType{returnType}
@@ -145,7 +137,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		returnType, ok := parseType(p)
 		if !ok {
 			token := p.previous()
-			report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_RETURN_TYPE).AddHint("Add a return type after the arrow").SetLevel(report.SYNTAX_ERROR)
 			return nil
 		}
 		returnTypes = append(returnTypes, returnType)
@@ -155,7 +147,7 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_PAREN)
 			if p.match(lexer.CLOSE_PAREN) {
-				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -169,7 +161,8 @@ func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]
 
 	//scope must be a function scope
 	if p.currentScope.ScopeKind() != symboltable.FUNCTION_SCOPE {
-		report.Add(p.filePath, p.previous().Start.Line, p.previous().End.Line, p.previous().Start.Column, p.previous().End.Column, report.SCOPE_MISMATCH+": expected function scope").SetLevel(report.SYNTAX_ERROR)
+		previous := p.previous()
+		report.Add(p.filePath, source.NewLocation(&previous.Start, &previous.End), report.SCOPE_MISMATCH+": expected function scope").SetLevel(report.SYNTAX_ERROR)
 		return nil, nil
 	}
 
@@ -222,14 +215,10 @@ func declareFunction(p *Parser) *ast.IdentifierExpr {
 		// Add function to current scope's symbol table
 		sym := &symboltable.Symbol{
 			Name:       name.Name,
-			SymbolKind: symboltable.FUNCTION_SYMBOL,
-			Type:       types.FUNCTION,
+			SymbolKind: symboltable.VARIABLE_SYMBOL,
 			IsMutable:  false,
-			Location: symboltable.SymbolLocation{
-				File:   p.filePath,
-				Line:   name.StartPos().Line,
-				Column: name.StartPos().Column,
-			},
+			Location:   &name.Location,
+			FilePath:   p.filePath,
 		}
 
 		if !p.currentScope.Define(sym) {
@@ -237,10 +226,7 @@ func declareFunction(p *Parser) *ast.IdentifierExpr {
 				name.Name,
 				p.filePath,
 				p.currentScope,
-				name.StartPos().Line,
-				name.EndPos().Line,
-				name.StartPos().Column,
-				name.EndPos().Column,
+				&name.Location,
 			)
 			return nil
 		}

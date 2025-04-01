@@ -15,7 +15,7 @@ func parseIntegerType(p *Parser) (ast.DataType, bool) {
 	typename := types.TYPE_NAME(token.Value)
 	bitSize, err := types.GetBitSize(typename)
 	if err != nil {
-		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 	return &ast.IntType{
@@ -46,7 +46,7 @@ func parseFloatType(p *Parser) (ast.DataType, bool) {
 	typename := types.TYPE_NAME(token.Value)
 	bitSize, err := types.GetBitSize(typename)
 	if err != nil {
-		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
@@ -138,8 +138,8 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 	// Check for empty struct
 	if p.peek().Kind == lexer.CLOSE_CURLY {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-			p.peek().Start.Column, p.peek().End.Column,
+		token := p.peek()
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
 			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
@@ -157,8 +157,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 		// Check for duplicate field names
 		if fieldNames[field.Field.Name] {
-			report.Add(p.filePath, field.Location.Start.Line, field.Location.End.Line,
-				field.Location.Start.Column, field.Location.End.Column,
+			report.Add(p.filePath, source.NewLocation(field.Location.Start, field.Location.End),
 				report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
@@ -167,14 +166,10 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		// Add field to struct scope
 		sym := &symboltable.Symbol{
 			Name:       field.Field.Name,
-			SymbolKind: symboltable.STRUCT_FIELD_SYMBOL,
-			Type:       field.Type.Type(),
-			IsMutable:  true, // Fields are mutable by default
-			Location: symboltable.SymbolLocation{
-				File:   p.filePath,
-				Line:   field.Location.Start.Line,
-				Column: field.Location.Start.Column,
-			},
+			SymbolKind: symboltable.VARIABLE_SYMBOL,
+			IsMutable:  true,
+			Location:   &field.Location,
+			FilePath:   p.filePath,
 		}
 
 		if !p.currentScope.Define(sym) {
@@ -182,10 +177,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 				field.Field.Name,
 				p.filePath,
 				p.currentScope,
-				field.Location.Start.Line,
-				field.Location.End.Line,
-				field.Location.Start.Column,
-				field.Location.End.Column,
+				&field.Location,
 			)
 			return nil, false
 		}
@@ -197,7 +189,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
 			if p.match(lexer.CLOSE_CURLY) {
-				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -250,7 +242,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		if utils.Has(methods, method, func(a ast.InterfaceMethod, b ast.InterfaceMethod) bool {
 			return a.Name.Name == b.Name.Name
 		}) {
-			report.Add(p.filePath, method.Location.Start.Line, method.Location.End.Line, method.Location.Start.Column, method.Location.End.Column, report.DUPLICATE_METHOD_NAME).SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, source.NewLocation(method.Location.Start, method.Location.End), report.DUPLICATE_METHOD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 
@@ -262,7 +254,7 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 			//must be a comma
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
 			if p.match(lexer.CLOSE_CURLY) {
-				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -342,8 +334,8 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	// Parse the underlying type
 	underlyingType, ok := parseType(p)
 	if !ok {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-			p.peek().Start.Column, p.peek().End.Column,
+		token := p.peek()
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
 			report.EXPECTED_TYPE).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
@@ -352,13 +344,9 @@ func parseTypeDecl(p *Parser) ast.Statement {
 	sym := &symboltable.Symbol{
 		Name:       typeName.Value,
 		SymbolKind: symboltable.TYPE_SYMBOL,
-		Type:       underlyingType.Type(),
 		IsMutable:  false,
-		Location: symboltable.SymbolLocation{
-			File:   p.filePath,
-			Line:   typeName.Start.Line,
-			Column: typeName.Start.Column,
-		},
+		Location:   source.NewLocation(&typeName.Start, &typeName.End),
+		FilePath:   p.filePath,
 	}
 
 	if !p.currentScope.Define(sym) {
@@ -366,10 +354,7 @@ func parseTypeDecl(p *Parser) ast.Statement {
 			typeName.Value,
 			p.filePath,
 			p.currentScope,
-			typeName.Start.Line,
-			typeName.End.Line,
-			typeName.Start.Column,
-			typeName.End.Column,
+			sym.Location,
 		)
 		return nil
 	}

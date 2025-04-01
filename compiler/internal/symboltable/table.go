@@ -2,6 +2,7 @@ package symboltable
 
 import (
 	"ferret/compiler/internal/analyzer"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/types"
 )
@@ -23,59 +24,38 @@ type SYMBOL_KIND int
 
 const (
 	VARIABLE_SYMBOL SYMBOL_KIND = iota
-	FUNCTION_SYMBOL
 	TYPE_SYMBOL
-	STRUCT_FIELD_SYMBOL
-	PARAMETER_SYMBOL
-	CONST_SYMBOL
 	MODULE_SYMBOL
 )
 
 var compilerGlobalSymbols = map[string]*Symbol{
 	"true": {
 		Name:       "true",
-		SymbolKind: CONST_SYMBOL,
-		Type:       types.BOOL,
+		SymbolKind: VARIABLE_SYMBOL,
 		IsMutable:  false,
-		Value: &analyzer.BoolType{
+		SymbolType: &analyzer.BoolType{
 			TypeName: types.BOOL,
-			NodeType: analyzer.TYPE_NODE,
-			IsLValue: false,
-			IsRef:    false,
-			IsConst:  true,
 		},
 	},
 	"false": {
 		Name:       "false",
-		SymbolKind: CONST_SYMBOL,
-		Type:       types.BOOL,
+		SymbolKind: VARIABLE_SYMBOL,
 		IsMutable:  false,
-		Value: &analyzer.BoolType{
+		SymbolType: &analyzer.BoolType{
 			TypeName: types.BOOL,
-			NodeType: analyzer.TYPE_NODE,
-			IsLValue: false,
-			IsRef:    false,
-			IsConst:  true,
 		},
 	},
 }
 
 // Symbol represents a single symbol in the program
 type Symbol struct {
-	Name       string                // The name of the symbol
-	SymbolKind SYMBOL_KIND           // The kind of symbol (variable, function, etc.)
-	Type       types.TYPE_NAME       // The type of the symbol
-	IsMutable  bool                  // Whether the symbol can be modified
-	Location   SymbolLocation        // Source location information
-	Value      analyzer.AnalyzerNode // For constants and compile-time known values
-	Module     string                // The module this symbol belongs to (if any)
-}
-
-// SymbolLocation tracks the source location of a symbol
-type SymbolLocation struct {
-	File   string // Source file path
-	Line   int    // Line number (1-based)
-	Column int    // Column number (1-based)
+	Name       string
+	SymbolKind SYMBOL_KIND
+	IsMutable  bool
+	FilePath   string
+	Location   *source.Location
+	SymbolType analyzer.AnalyzerNode
+	Module     string
 }
 
 // SymbolTable represents a scope and its symbols

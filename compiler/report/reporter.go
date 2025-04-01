@@ -2,6 +2,7 @@ package report
 
 import (
 	"ferret/compiler/colors"
+	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/utils"
 	"fmt"
@@ -191,7 +192,13 @@ func (r *Report) AddHintAt(msg string, col int) *Report {
 
 // Add creates and registers a new diagnostic report with basic position validation.
 // It returns a pointer to the newly created Diagnostic.
-func Add(filePath string, lineStart, lineEnd int, colStart, colEnd int, msg string) *Report {
+func Add(filePath string, location *source.Location, msg string) *Report {
+
+	lineStart := location.Start.Line
+	lineEnd := location.End.Line
+	colStart := location.Start.Column
+	colEnd := location.End.Column
+
 	if lineStart < 1 {
 		lineStart = 1
 	}
@@ -232,17 +239,17 @@ func (e *Report) SetLevel(level REPORT_TYPE) {
 	}
 }
 
-func ShowRedeclarationError(name string, filePath string, scope *symboltable.SymbolTable, lineStart, lineEnd, colStart, colEnd int) {
+func ShowRedeclarationError(name string, filePath string, scope *symboltable.SymbolTable, location *source.Location) {
 	msg := name + " already declared in"
 	//find previous declaration position
 	sym, found := scope.Resolve(name)
 	if found {
-		msg += colors.GREY.Sprintf(" %s:%d:%d", sym.Location.File, sym.Location.Line, sym.Location.Column)
+		msg += colors.GREY.Sprintf(" %s:%d:%d", sym.FilePath, sym.Location.Start.Line, sym.Location.Start.Column)
 	} else {
 		msg += " this scope"
 	}
 
-	Add(filePath, lineStart, lineEnd, colStart, colEnd, msg).SetLevel(SEMANTIC_ERROR)
+	Add(filePath, location, msg).SetLevel(SEMANTIC_ERROR)
 }
 
 // DisplayAll outputs all the diagnostic reports. It recovers from panics,

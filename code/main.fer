@@ -4,7 +4,7 @@ import "fmt";
 
 let x = [2, 5];
 
-type any interface{}
+type any interface{};
 
 let p: any;
 

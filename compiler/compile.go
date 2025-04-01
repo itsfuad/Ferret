@@ -11,7 +11,7 @@ import (
 
 const HALTED = "compilation halted" // this is a constant that is used to halt the compilation
 
-func compile(filePath string, displayErrors, debug, save2Json bool) (reports report.Reports, e error) {
+func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.Reports, e error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -30,9 +30,9 @@ func compile(filePath string, displayErrors, debug, save2Json bool) (reports rep
 	//get the folder and file name
 	folder, fileName := filepath.Split(filePath)
 
-	tree := parser.New(filePath, debug).Parse()
+	tree := parser.New(filePath, showTokenDebug).Parse()
 
-	if save2Json {
+	if saveToJson {
 		//write the tree to a file named 'expressions.json' in 'code/ast' folder
 		e = wio.Serialize(&tree, folder, fileName)
 		if reports != nil {

@@ -11,7 +11,7 @@ import (
 func validateStructType(p *Parser) (*ast.IdentifierExpr, bool) {
 	if !p.match(lexer.IDENTIFIER_TOKEN, lexer.STRUCT_TOKEN) {
 		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line, token.Start.Column, token.End.Column, report.EXPECTED_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.EXPECTED_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
@@ -32,7 +32,7 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 	for !p.match(lexer.CLOSE_CURLY) {
 		fieldName := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_FIELD_NAME)
 		if fieldNames[fieldName.Value] {
-			report.Add(p.filePath, fieldName.Start.Line, fieldName.End.Line, fieldName.Start.Column, fieldName.End.Column, report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, source.NewLocation(&fieldName.Start, &fieldName.End), report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 		fieldNames[fieldName.Value] = true
@@ -40,7 +40,7 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 
 		value := parseExpression(p)
 		if value == nil {
-			report.Add(p.filePath, fieldName.Start.Line, fieldName.End.Line, fieldName.Start.Column, fieldName.End.Column, report.EXPECTED_FIELD_VALUE).AddHint("Add an expression after the colon").SetLevel(report.SYNTAX_ERROR)
+			report.Add(p.filePath, source.NewLocation(&fieldName.Start, &fieldName.End), report.EXPECTED_FIELD_VALUE).AddHint("Add an expression after the colon").SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
 
@@ -58,7 +58,7 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 		} else {
 			comma := p.consume(lexer.COMMA_TOKEN, report.EXPECTED_COMMA_OR_CLOSE_CURLY)
 			if p.match(lexer.CLOSE_CURLY) {
-				report.Add(p.filePath, comma.Start.Line, comma.End.Line, comma.Start.Column, comma.End.Column, report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
+				report.Add(p.filePath, source.NewLocation(&comma.Start, &comma.End), report.TRAILING_COMMA_NOT_ALLOWED).AddHint("Remove the trailing comma").SetLevel(report.WARNING)
 				break
 			}
 		}
@@ -80,8 +80,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 
 	if p.peek().Kind == lexer.CLOSE_CURLY {
 		token := p.peek()
-		report.Add(p.filePath, token.Start.Line, token.End.Line,
-			token.Start.Column, token.End.Column,
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
 			report.EMPTY_STRUCT_NOT_ALLOWED).SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
@@ -107,8 +106,8 @@ func parseFieldAccess(p *Parser, object ast.Expression) (ast.Expression, bool) {
 
 	// Parse field name
 	if !p.match(lexer.IDENTIFIER_TOKEN) {
-		report.Add(p.filePath, p.peek().Start.Line, p.peek().End.Line,
-			p.peek().Start.Column, p.peek().End.Column,
+		token := p.peek()
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
 			"Expected field name after '.'").SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}

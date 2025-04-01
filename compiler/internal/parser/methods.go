@@ -23,13 +23,13 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 	}
 
 	if len(receivers) == 0 {
-		report.Add(p.filePath, name.Start.Line, name.End.Line, name.Start.Column, name.End.Column, "Expected receiver").SetLevel(report.SYNTAX_ERROR)
+		report.Add(p.filePath, &iden.Location, "Expected receiver").SetLevel(report.SYNTAX_ERROR)
 		return nil
 	}
 
 	if len(receivers) > 1 {
 		receiver := receivers[1]
-		report.Add(p.filePath, receiver.Identifier.StartPos().Line, receiver.Identifier.EndPos().Line, receiver.Identifier.StartPos().Column, receiver.Identifier.EndPos().Column, "expected only one receiver").SetLevel(report.NORMAL_ERROR)
+		report.Add(p.filePath, &receiver.Identifier.Location, "expected only one receiver").SetLevel(report.NORMAL_ERROR)
 	}
 
 	receiver := receivers[0]

@@ -9,4 +9,4 @@ for %%I in ("%CD%") do if /I not "%%~nxI"=="compiler" (
 cls
 
 :: Run the compiler
-go run main.go
+go run .
