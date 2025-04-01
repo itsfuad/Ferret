@@ -4,8 +4,8 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
+	"ferret/compiler/types"
 	"strings"
 )
 

@@ -1,4 +1,4 @@
-package analyzer
+package main
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 
 const HALTED = "compilation halted" // this is a constant that is used to halt the compilation
 
-func Analyze(filePath string, displayErrors, debug, save2Json bool) (reports report.Reports, e error) {
+func compile(filePath string, displayErrors, debug, save2Json bool) (reports report.Reports, e error) {
 
 	defer func() {
 		if r := recover(); r != nil {

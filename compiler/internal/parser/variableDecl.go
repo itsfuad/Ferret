@@ -5,8 +5,8 @@ import (
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
-	"ferret/compiler/internal/types"
 	"ferret/compiler/report"
+	"ferret/compiler/types"
 	"fmt"
 )
 

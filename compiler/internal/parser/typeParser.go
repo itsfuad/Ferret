@@ -5,9 +5,9 @@ import (
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
-	"ferret/compiler/internal/types"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"
+	"ferret/compiler/types"
 )
 
 func parseIntegerType(p *Parser) (ast.DataType, bool) {

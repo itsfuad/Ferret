@@ -3,8 +3,8 @@ package parser
 import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
-	"ferret/compiler/internal/types"
 	"ferret/compiler/testUtils"
+	"ferret/compiler/types"
 	"testing"
 )
 

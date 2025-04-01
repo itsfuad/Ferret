@@ -1,7 +1,7 @@
 package symboltable
 
 import (
-	"ferret/compiler/internal/types"
+	"ferret/compiler/types"
 	"testing"
 )
 

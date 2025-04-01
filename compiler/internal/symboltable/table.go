@@ -1,8 +1,9 @@
 package symboltable
 
 import (
-	"ferret/compiler/internal/types"
+	"ferret/compiler/internal/analyzer"
 	"ferret/compiler/internal/utils"
+	"ferret/compiler/types"
 )
 
 type SCOPE_KIND int
@@ -36,26 +37,38 @@ var compilerGlobalSymbols = map[string]*Symbol{
 		SymbolKind: CONST_SYMBOL,
 		Type:       types.BOOL,
 		IsMutable:  false,
-		Value:      true,
+		Value: &analyzer.BoolType{
+			TypeName: types.BOOL,
+			NodeType: analyzer.TYPE_NODE,
+			IsLValue: false,
+			IsRef:    false,
+			IsConst:  true,
+		},
 	},
 	"false": {
 		Name:       "false",
 		SymbolKind: CONST_SYMBOL,
 		Type:       types.BOOL,
 		IsMutable:  false,
-		Value:      false,
+		Value: &analyzer.BoolType{
+			TypeName: types.BOOL,
+			NodeType: analyzer.TYPE_NODE,
+			IsLValue: false,
+			IsRef:    false,
+			IsConst:  true,
+		},
 	},
 }
 
 // Symbol represents a single symbol in the program
 type Symbol struct {
-	Name       string          // The name of the symbol
-	SymbolKind SYMBOL_KIND     // The kind of symbol (variable, function, etc.)
-	Type       types.TYPE_NAME // The type of the symbol
-	IsMutable  bool            // Whether the symbol can be modified
-	Location   SymbolLocation  // Source location information
-	Value      any             // For constants and compile-time known values
-	Module     string          // The module this symbol belongs to (if any)
+	Name       string                // The name of the symbol
+	SymbolKind SYMBOL_KIND           // The kind of symbol (variable, function, etc.)
+	Type       types.TYPE_NAME       // The type of the symbol
+	IsMutable  bool                  // Whether the symbol can be modified
+	Location   SymbolLocation        // Source location information
+	Value      analyzer.AnalyzerNode // For constants and compile-time known values
+	Module     string                // The module this symbol belongs to (if any)
 }
 
 // SymbolLocation tracks the source location of a symbol

@@ -5,7 +5,7 @@ import (
 
 	"ferret/compiler/colors"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/types"
+	"ferret/compiler/types"
 )
 
 type TOKEN string
