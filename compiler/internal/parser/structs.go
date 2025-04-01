@@ -50,7 +50,7 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 				Location: *source.NewLocation(&fieldName.Start, &fieldName.End),
 			},
 			Value:    value,
-			Location: *source.NewLocation(&fieldName.Start, value.EndPos()),
+			Location: *source.NewLocation(&fieldName.Start, value.Loc().End),
 		})
 
 		if p.match(lexer.CLOSE_CURLY) {
@@ -121,6 +121,6 @@ func parseFieldAccess(p *Parser, object ast.Expression) (ast.Expression, bool) {
 	return &ast.FieldAccessExpr{
 		Object:   object,
 		Field:    field,
-		Location: *source.NewLocation(object.StartPos(), &fieldToken.End),
+		Location: *source.NewLocation(object.Loc().Start, &fieldToken.End),
 	}, true
 }

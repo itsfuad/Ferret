@@ -20,7 +20,7 @@ type Parser struct {
 
 func New(filePath string, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, debug)
-	globalScope := symboltable.NewSymbolTable(nil, symboltable.GLOBAL_SCOPE)
+	globalScope := symboltable.NewSymbolTable(nil, symboltable.GLOBAL_SCOPE, filePath)
 	return &Parser{
 		tokens:       tokens,
 		tokenNo:      0,
@@ -32,7 +32,7 @@ func New(filePath string, debug bool) *Parser {
 
 // enterScope creates a new scope of the given kind and makes it current
 func (p *Parser) enterScope(kind symboltable.SCOPE_KIND) *symboltable.SymbolTable {
-	p.currentScope = p.currentScope.EnterScope(kind)
+	p.currentScope = p.currentScope.EnterScope(kind, p.filePath)
 	return p.currentScope
 }
 
@@ -130,7 +130,7 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 
 	return &ast.ExpressionStmt{
 		Expressions: exprs,
-		Location:    *source.NewLocation(first.StartPos(), exprs[len(exprs)-1].EndPos()),
+		Location:    *source.NewLocation(first.Loc().Start, exprs[len(exprs)-1].Loc().End),
 	}
 }
 
@@ -183,7 +183,7 @@ func parseReturnStmt(p *Parser) ast.Statement {
 			token := p.peek()
 			report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_EXPRESSION).AddHint("Add an expression after the return keyword").SetLevel(report.SYNTAX_ERROR)
 		}
-		end = *values.EndPos()
+		end = *values.Loc().End
 	}
 
 	return &ast.ReturnStmt{
@@ -239,15 +239,15 @@ func parseNode(p *Parser) ast.Node {
 			report.Add(p.filePath, loc, report.EXPECTED_SEMICOLON+" after "+token.Value).AddHint("Add a semicolon to the end of the statement").SetLevel(report.SYNTAX_ERROR)
 		}
 		end := p.advance()
-		node.EndPos().Column = end.End.Column
-		node.EndPos().Line = end.End.Line
+		node.Loc().End.Column = end.End.Column
+		node.Loc().End.Line = end.End.Line
 	}
 
 	return node
 }
 
 // Parse is the entry point for parsing
-func (p *Parser) Parse() []ast.Node {
+func (p *Parser) Parse() ([]ast.Node, *symboltable.SymbolTable) {
 	var nodes []ast.Node
 
 	for !p.isAtEnd() {
@@ -261,5 +261,5 @@ func (p *Parser) Parse() []ast.Node {
 		}
 	}
 
-	return nodes
+	return nodes, p.symbolTable
 }

@@ -6,8 +6,7 @@ type NODE_TYPE int
 
 type Node interface {
 	INode()
-	StartPos() *source.Position
-	EndPos() *source.Position
+	Loc() *source.Location
 }
 
 const (
@@ -33,12 +32,8 @@ type BlockConstruct interface {
 
 type ExpressionList []Expression
 
-func (el ExpressionList) StartPos() *source.Position {
-	return el[0].StartPos()
-}
-
-func (el ExpressionList) EndPos() *source.Position {
-	return el[len(el)-1].EndPos()
+func (el ExpressionList) Loc() *source.Location {
+	return el[0].Loc()
 }
 
 func (el ExpressionList) INode() {} // INode is a marker interface for all nodes
@@ -55,12 +50,8 @@ type ExpressionStmt struct {
 	Location    source.Location
 }
 
-func (e *ExpressionStmt) StartPos() *source.Position {
-	return e.Location.Start
-}
-
-func (e *ExpressionStmt) EndPos() *source.Position {
-	return e.Location.End
+func (e *ExpressionStmt) Loc() *source.Location {
+	return &e.Location
 }
 
 func (e *ExpressionStmt) INode() {} // INode is a marker interface for all nodes

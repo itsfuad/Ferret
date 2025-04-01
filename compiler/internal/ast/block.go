@@ -8,10 +8,9 @@ type Block struct {
 	source.Location
 }
 
-func (b *Block) INode()                     {} // INode is a marker interface for all nodes
-func (b *Block) Block()                     {} // Block is a marker method for statements
-func (b *Block) StartPos() *source.Position { return b.Start }
-func (b *Block) EndPos() *source.Position   { return b.End }
+func (b *Block) INode()                {} // INode is a marker interface for all nodes
+func (b *Block) Block()                {} // Block is a marker method for statements
+func (b *Block) Loc() *source.Location { return &b.Location }
 
 // FunctionDecl represents both named and anonymous function declarations
 type FunctionDecl struct {
@@ -20,10 +19,9 @@ type FunctionDecl struct {
 	source.Location
 }
 
-func (f *FunctionDecl) INode()                     {} // INode is a marker interface for all nodes
-func (f *FunctionDecl) Block()                     {} // Block is a marker interface for all expressions
-func (f *FunctionDecl) StartPos() *source.Position { return f.Start }
-func (f *FunctionDecl) EndPos() *source.Position   { return f.End }
+func (f *FunctionDecl) INode()                {} // INode is a marker interface for all nodes
+func (f *FunctionDecl) Block()                {} // Block is a marker interface for all expressions
+func (f *FunctionDecl) Loc() *source.Location { return &f.Location }
 
 // IfStmt represents an if statement with optional else and else-if branches
 type IfStmt struct {
@@ -33,10 +31,9 @@ type IfStmt struct {
 	source.Location
 }
 
-func (i *IfStmt) INode()                     {} // INode is a marker interface for all nodes
-func (i *IfStmt) Block()                     {} // Block is a marker interface for all statements
-func (i *IfStmt) StartPos() *source.Position { return i.Start }
-func (i *IfStmt) EndPos() *source.Position   { return i.End }
+func (i *IfStmt) INode()                {} // INode is a marker interface for all nodes
+func (i *IfStmt) Block()                {} // Block is a marker interface for all statements
+func (i *IfStmt) Loc() *source.Location { return &i.Location }
 
 // MethodDecl represents a method declaration
 type MethodDecl struct {
@@ -47,7 +44,6 @@ type MethodDecl struct {
 	source.Location
 }
 
-func (m *MethodDecl) INode()                     {} // INode is a marker interface for all nodes
-func (m *MethodDecl) Block()                     {} // Block is a marker interface for all statements
-func (m *MethodDecl) StartPos() *source.Position { return m.Start }
-func (m *MethodDecl) EndPos() *source.Position   { return m.End }
+func (m *MethodDecl) INode()                {} // INode is a marker interface for all nodes
+func (m *MethodDecl) Block()                {} // Block is a marker interface for all statements
+func (m *MethodDecl) Loc() *source.Location { return &m.Location }

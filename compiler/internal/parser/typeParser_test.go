@@ -20,8 +20,8 @@ func assertIntType(t *testing.T, result ast.DataType, expected types.TYPE_NAME, 
 	if intType.BitSize != bitSize {
 		t.Errorf(testUtils.ErrMsgFmt, "BitSize", intType.BitSize, bitSize)
 	}
-	if intType.Unsigned != unsigned {
-		t.Errorf(testUtils.ErrMsgFmt, "Unsigned", intType.Unsigned, unsigned)
+	if intType.IsUnsigned != unsigned {
+		t.Errorf(testUtils.ErrMsgFmt, "Unsigned", intType.IsUnsigned, unsigned)
 	}
 }
 

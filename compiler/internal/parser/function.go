@@ -190,7 +190,7 @@ func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseN
 
 	block := parseBlock(p)
 
-	location := *source.NewLocation(start, block.EndPos())
+	location := *source.NewLocation(start, block.Loc().End)
 
 	return &ast.FunctionLiteral{
 		Params:     params,
@@ -253,6 +253,6 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	return &ast.FunctionDecl{
 		Identifier: *name,
 		Function:   function,
-		Location:   *source.NewLocation(&start.Start, function.EndPos()),
+		Location:   *source.NewLocation(&start.Start, function.Loc().End),
 	}
 }

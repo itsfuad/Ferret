@@ -8,8 +8,7 @@ import (
 type DataType interface {
 	Node
 	Type() types.TYPE_NAME
-	StartPos() *source.Position
-	EndPos() *source.Position
+	Loc() *source.Location
 }
 
 // User defined type
@@ -22,18 +21,15 @@ func (t *UserDefinedType) INode() {} // INode is a marker interface for all node
 func (t *UserDefinedType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *UserDefinedType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *UserDefinedType) EndPos() *source.Position {
-	return t.Location.End
+func (t *UserDefinedType) Loc() *source.Location {
+	return &t.Location
 }
 
 // Integer type
 type IntType struct {
-	BitSize  uint8
-	Unsigned bool
-	TypeName types.TYPE_NAME
+	BitSize    uint8
+	IsUnsigned bool
+	TypeName   types.TYPE_NAME
 	source.Location
 }
 
@@ -41,11 +37,8 @@ func (t *IntType) INode() {} // INode is a marker interface for all nodes
 func (t *IntType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *IntType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *IntType) EndPos() *source.Position {
-	return t.Location.End
+func (t *IntType) Loc() *source.Location {
+	return &t.Location
 }
 
 // Float type
@@ -59,11 +52,8 @@ func (t *FloatType) INode() {} // INode is a marker interface for all nodes
 func (t *FloatType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *FloatType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *FloatType) EndPos() *source.Position {
-	return t.Location.End
+func (t *FloatType) Loc() *source.Location {
+	return &t.Location
 }
 
 // String type
@@ -76,11 +66,8 @@ func (t *StringType) INode() {} // INode is a marker interface for all nodes
 func (t *StringType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *StringType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *StringType) EndPos() *source.Position {
-	return t.Location.End
+func (t *StringType) Loc() *source.Location {
+	return &t.Location
 }
 
 // Byte type
@@ -93,11 +80,8 @@ func (t *ByteType) INode() {} // INode is a marker interface for all nodes
 func (t *ByteType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *ByteType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *ByteType) EndPos() *source.Position {
-	return t.Location.End
+func (t *ByteType) Loc() *source.Location {
+	return &t.Location
 }
 
 // Boolean type
@@ -110,11 +94,8 @@ func (t *BoolType) INode() {} // INode is a marker interface for all nodes
 func (t *BoolType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *BoolType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *BoolType) EndPos() *source.Position {
-	return t.Location.End
+func (t *BoolType) Loc() *source.Location {
+	return &t.Location
 }
 
 // Array type
@@ -128,11 +109,8 @@ func (t *ArrayType) INode() {} // INode is a marker interface for all nodes
 func (t *ArrayType) Type() types.TYPE_NAME {
 	return t.TypeName
 }
-func (t *ArrayType) StartPos() *source.Position {
-	return t.Location.Start
-}
-func (t *ArrayType) EndPos() *source.Position {
-	return t.Location.End
+func (t *ArrayType) Loc() *source.Location {
+	return &t.Location
 }
 
 // Parameter represents a function or method parameter
@@ -155,10 +133,9 @@ type StructType struct {
 	source.Location
 }
 
-func (s *StructType) INode()                     {} // INode is a marker interface for all nodes
-func (s *StructType) Type() types.TYPE_NAME      { return s.TypeName }
-func (s *StructType) StartPos() *source.Position { return s.Start }
-func (s *StructType) EndPos() *source.Position   { return s.End }
+func (s *StructType) INode()                {} // INode is a marker interface for all nodes
+func (s *StructType) Type() types.TYPE_NAME { return s.TypeName }
+func (s *StructType) Loc() *source.Location { return &s.Location }
 
 type InterfaceMethod struct {
 	Name       IdentifierExpr
@@ -174,10 +151,9 @@ type InterfaceType struct {
 	source.Location
 }
 
-func (i *InterfaceType) INode()                     {} // INode is a marker interface for all nodes
-func (i *InterfaceType) Type() types.TYPE_NAME      { return i.TypeName }
-func (i *InterfaceType) StartPos() *source.Position { return i.Start }
-func (i *InterfaceType) EndPos() *source.Position   { return i.End }
+func (i *InterfaceType) INode()                {} // INode is a marker interface for all nodes
+func (i *InterfaceType) Type() types.TYPE_NAME { return i.TypeName }
+func (i *InterfaceType) Loc() *source.Location { return &i.Location }
 
 type FunctionType struct {
 	Parameters  []DataType
@@ -186,7 +162,6 @@ type FunctionType struct {
 	source.Location
 }
 
-func (f *FunctionType) INode()                     {} // INode is a marker interface for all nodes
-func (f *FunctionType) Type() types.TYPE_NAME      { return f.TypeName }
-func (f *FunctionType) StartPos() *source.Position { return f.Location.Start }
-func (f *FunctionType) EndPos() *source.Position   { return f.Location.End }
+func (f *FunctionType) INode()                {} // INode is a marker interface for all nodes
+func (f *FunctionType) Type() types.TYPE_NAME { return f.TypeName }
+func (f *FunctionType) Loc() *source.Location { return &f.Location }

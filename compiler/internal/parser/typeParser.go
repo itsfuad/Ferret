@@ -13,16 +13,17 @@ import (
 func parseIntegerType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	typename := types.TYPE_NAME(token.Value)
-	bitSize, err := types.GetBitSize(typename)
-	if err != nil {
-		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+	bitSize := types.GetNumberBitSize(typename)
+	if bitSize == 0 {
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0").SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
+
 	return &ast.IntType{
-		TypeName: typename,
-		BitSize:  bitSize,
-		Unsigned: types.IsUnsigned(typename),
-		Location: *source.NewLocation(&token.Start, &token.End),
+		TypeName:   typename,
+		BitSize:    bitSize,
+		IsUnsigned: types.IsUnsigned(typename),
+		Location:   *source.NewLocation(&token.Start, &token.End),
 	}, true
 }
 
@@ -44,9 +45,9 @@ func parseUserDefinedType(p *Parser) (ast.DataType, bool) {
 func parseFloatType(p *Parser) (ast.DataType, bool) {
 	token := p.advance()
 	typename := types.TYPE_NAME(token.Value)
-	bitSize, err := types.GetBitSize(typename)
-	if err != nil {
-		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME).SetLevel(report.SYNTAX_ERROR)
+	bitSize := types.GetNumberBitSize(typename)
+	if bitSize == 0 {
+		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End), report.INVALID_TYPE_NAME+" bitsize cannot be 0").SetLevel(report.SYNTAX_ERROR)
 		return nil, false
 	}
 
@@ -95,7 +96,7 @@ func parseArrayType(p *Parser) (ast.DataType, bool) {
 		return &ast.ArrayType{
 			ElementType: elementType,
 			TypeName:    types.ARRAY,
-			Location:    *source.NewLocation(&start, elementType.EndPos()),
+			Location:    *source.NewLocation(&start, elementType.Loc().End),
 		}, true
 	}
 }
@@ -119,7 +120,7 @@ func parseStructField(p *Parser) *ast.StructField {
 				Location: *source.NewLocation(&nameToken.Start, &nameToken.End),
 			},
 			Type:     fieldType,
-			Location: *source.NewLocation(&nameToken.Start, fieldType.EndPos()),
+			Location: *source.NewLocation(&nameToken.Start, fieldType.Loc().End),
 		}
 	}
 }
@@ -365,6 +366,6 @@ func parseTypeDecl(p *Parser) ast.Statement {
 			Location: *source.NewLocation(&typeName.Start, &typeName.End),
 		},
 		BaseType: underlyingType,
-		Location: *source.NewLocation(&start.Start, underlyingType.EndPos()),
+		Location: *source.NewLocation(&start.Start, underlyingType.Loc().End),
 	}
 }

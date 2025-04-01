@@ -51,5 +51,5 @@ func testParseWithPanic(t *testing.T, input string, desc string, isValid bool) {
 		evaluateTestResult(t, recover(), nodes, desc, isValid)
 	}()
 
-	nodes = p.Parse()
+	nodes, _ = p.Parse()
 }

@@ -10,10 +10,9 @@ type VarDeclStmt struct {
 	source.Location
 }
 
-func (v *VarDeclStmt) INode()                     {} // INode is a marker interface for all nodes
-func (v *VarDeclStmt) Stmt()                      {} // Stmt is a marker interface for all statements
-func (v *VarDeclStmt) StartPos() *source.Position { return v.Start }
-func (v *VarDeclStmt) EndPos() *source.Position   { return v.End }
+func (v *VarDeclStmt) INode()                {} // INode is a marker interface for all nodes
+func (v *VarDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
+func (v *VarDeclStmt) Loc() *source.Location { return &v.Location }
 
 type VariableToDeclare struct {
 	Identifier   *IdentifierExpr
@@ -26,10 +25,9 @@ type AssignmentStmt struct {
 	source.Location
 }
 
-func (a *AssignmentStmt) INode()                     {} // INode is a marker interface for all nodes
-func (a *AssignmentStmt) Stmt()                      {} // Stmt is a marker interface for all statements
-func (a *AssignmentStmt) StartPos() *source.Position { return a.Start }
-func (a *AssignmentStmt) EndPos() *source.Position   { return a.End }
+func (a *AssignmentStmt) INode()                {} // INode is a marker interface for all nodes
+func (a *AssignmentStmt) Stmt()                 {} // Stmt is a marker interface for all statements
+func (a *AssignmentStmt) Loc() *source.Location { return &a.Location }
 
 // TypeDeclStmt represents a type declaration statement
 type TypeDeclStmt struct {
@@ -38,10 +36,9 @@ type TypeDeclStmt struct {
 	source.Location
 }
 
-func (t *TypeDeclStmt) INode()                     {} // INode is a marker interface for all nodes
-func (t *TypeDeclStmt) Stmt()                      {} // Stmt is a marker interface for all statements
-func (t *TypeDeclStmt) StartPos() *source.Position { return t.Start }
-func (t *TypeDeclStmt) EndPos() *source.Position   { return t.End }
+func (t *TypeDeclStmt) INode()                {} // INode is a marker interface for all nodes
+func (t *TypeDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
+func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
 // ReturnStmt represents a return statement
 type ReturnStmt struct {
@@ -49,10 +46,9 @@ type ReturnStmt struct {
 	source.Location
 }
 
-func (r *ReturnStmt) INode()                     {} // INode is a marker interface for all nodes
-func (r *ReturnStmt) Stmt()                      {} // Stmt is a marker method for statements
-func (r *ReturnStmt) StartPos() *source.Position { return r.Start }
-func (r *ReturnStmt) EndPos() *source.Position   { return r.End }
+func (r *ReturnStmt) INode()                {} // INode is a marker interface for all nodes
+func (r *ReturnStmt) Stmt()                 {} // Stmt is a marker method for statements
+func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 
 // PackageDeclStmt represents a package declaration
 type PackageDeclStmt struct {
@@ -60,10 +56,9 @@ type PackageDeclStmt struct {
 	source.Location
 }
 
-func (p *PackageDeclStmt) INode()                     {} // INode is a marker interface for all nodes
-func (p *PackageDeclStmt) Stmt()                      {} // Stmt is a marker interface for all statements
-func (p *PackageDeclStmt) StartPos() *source.Position { return p.Start }
-func (p *PackageDeclStmt) EndPos() *source.Position   { return p.End }
+func (p *PackageDeclStmt) INode()                {} // INode is a marker interface for all nodes
+func (p *PackageDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
+func (p *PackageDeclStmt) Loc() *source.Location { return &p.Location }
 
 // ImportStmt represents an import statement
 type ImportStmt struct {
@@ -71,7 +66,6 @@ type ImportStmt struct {
 	source.Location
 }
 
-func (i *ImportStmt) INode()                     {} // INode is a marker interface for all nodes
-func (i *ImportStmt) Stmt()                      {} // Stmt is a marker interface for all statements
-func (i *ImportStmt) StartPos() *source.Position { return i.Start }
-func (i *ImportStmt) EndPos() *source.Position   { return i.End }
+func (i *ImportStmt) INode()                {} // INode is a marker interface for all nodes
+func (i *ImportStmt) Stmt()                 {} // Stmt is a marker interface for all statements
+func (i *ImportStmt) Loc() *source.Location { return &i.Location }

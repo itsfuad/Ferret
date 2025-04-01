@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"ferret/compiler/internal/parser"
+	"ferret/compiler/internal/typecheck"
 	"ferret/compiler/report"
 	"ferret/compiler/wio"
 	"fmt"
@@ -30,7 +31,7 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 	//get the folder and file name
 	folder, fileName := filepath.Split(filePath)
 
-	tree := parser.New(filePath, showTokenDebug).Parse()
+	tree, table := parser.New(filePath, showTokenDebug).Parse()
 
 	if saveToJson {
 		//write the tree to a file named 'expressions.json' in 'code/ast' folder
@@ -38,6 +39,10 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 		if reports != nil {
 			return report.GetReports(), e
 		}
+	}
+
+	for _, node := range tree {
+		typecheck.ASTNodeToAnalyzerNode(table, &node)
 	}
 
 	reports = report.GetReports()

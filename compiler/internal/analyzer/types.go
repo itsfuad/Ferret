@@ -9,9 +9,9 @@ type AnalyzerNode interface {
 }
 
 type IntegerType struct {
-	TypeName types.TYPE_NAME
-	IsSigned bool
-	BitSize  uint8
+	TypeName   types.TYPE_NAME
+	IsUnsigned bool
+	BitSize    uint8
 }
 
 func (t *IntegerType) ANode() types.TYPE_NAME { return t.TypeName }
@@ -35,6 +35,12 @@ type BoolType struct {
 
 func (t *BoolType) ANode() types.TYPE_NAME { return t.TypeName }
 
+type ByteType struct {
+	TypeName types.TYPE_NAME
+}
+
+func (t *ByteType) ANode() types.TYPE_NAME { return t.TypeName }
+
 type ArrayType struct {
 	TypeName    types.TYPE_NAME
 	ElementType AnalyzerNode
@@ -50,12 +56,6 @@ type FunctionType struct {
 }
 
 func (t *FunctionType) ANode() types.TYPE_NAME { return t.TypeName }
-
-type VoidType struct {
-	TypeName types.TYPE_NAME
-}
-
-func (t *VoidType) ANode() types.TYPE_NAME { return t.TypeName }
 
 type StructType struct {
 	TypeName types.TYPE_NAME

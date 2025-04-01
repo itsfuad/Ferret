@@ -60,19 +60,21 @@ type Symbol struct {
 
 // SymbolTable represents a scope and its symbols
 type SymbolTable struct {
-	symbols  map[string]*Symbol
+	Symbols  map[string]*Symbol
 	parent   *SymbolTable
 	children []*SymbolTable
-	kind     SCOPE_KIND
+	Kind     SCOPE_KIND
+	Filepath string
 }
 
 // NewSymbolTable creates a new symbol table with the given parent and scope kind
-func NewSymbolTable(parent *SymbolTable, kind SCOPE_KIND) *SymbolTable {
+func NewSymbolTable(parent *SymbolTable, kind SCOPE_KIND, filepath string) *SymbolTable {
 	st := &SymbolTable{
-		symbols:  make(map[string]*Symbol),
+		Symbols:  make(map[string]*Symbol),
 		parent:   parent,
 		children: make([]*SymbolTable, 0),
-		kind:     kind,
+		Kind:     kind,
+		Filepath: filepath,
 	}
 	if parent != nil {
 		parent.children = append(parent.children, st)
@@ -85,10 +87,10 @@ func (st *SymbolTable) Define(symbol *Symbol) bool {
 	if compilerGlobalSymbols[symbol.Name] != nil {
 		return false // Symbol already defined as a compiler global symbol
 	}
-	if _, exists := st.symbols[symbol.Name]; exists {
+	if _, exists := st.Symbols[symbol.Name]; exists {
 		return false // Symbol already defined in current scope
 	}
-	st.symbols[symbol.Name] = symbol
+	st.Symbols[symbol.Name] = symbol
 	return true
 }
 
@@ -100,7 +102,7 @@ func (st *SymbolTable) Resolve(name string) (*Symbol, bool) {
 	}
 
 	// Check current scope
-	sym, exists := st.symbols[name]
+	sym, exists := st.Symbols[name]
 	if exists {
 		return sym, exists
 	}
@@ -118,7 +120,7 @@ func (st *SymbolTable) ResolveLocal(name string) (*Symbol, bool) {
 	if compilerGlobalSymbols[name] != nil {
 		return compilerGlobalSymbols[name], true
 	}
-	sym, exists := st.symbols[name]
+	sym, exists := st.Symbols[name]
 	return sym, exists
 }
 
@@ -134,12 +136,12 @@ func (st *SymbolTable) Children() []*SymbolTable {
 
 // ScopeKind returns the kind of this scope
 func (st *SymbolTable) ScopeKind() SCOPE_KIND {
-	return st.kind
+	return st.Kind
 }
 
 // GetSymbols returns all symbols in the current scope
 func (st *SymbolTable) GetSymbols() map[string]*Symbol {
-	return st.symbols
+	return st.Symbols
 }
 
 // GetCompilerGlobalSymbols returns the compiler global symbols
@@ -149,12 +151,12 @@ func GetCompilerGlobalSymbols() map[string]*Symbol {
 
 // Clear removes all symbols from the current scope
 func (st *SymbolTable) Clear() {
-	st.symbols = make(map[string]*Symbol)
+	st.Symbols = make(map[string]*Symbol)
 }
 
 // EnterScope creates and returns a new child scope
-func (st *SymbolTable) EnterScope(kind SCOPE_KIND) *SymbolTable {
-	return NewSymbolTable(st, kind)
+func (st *SymbolTable) EnterScope(kind SCOPE_KIND, filepath string) *SymbolTable {
+	return NewSymbolTable(st, kind, filepath)
 }
 
 // ExitScope returns to the parent scope
@@ -168,7 +170,7 @@ func (st *SymbolTable) ExitScope() *SymbolTable {
 // ResolveInModule looks up a symbol by name in a specific module
 func (st *SymbolTable) ResolveInModule(module, name string) (*Symbol, bool) {
 	// Check current scope
-	for _, sym := range st.symbols {
+	for _, sym := range st.Symbols {
 		if sym.Module == module && sym.Name == name && utils.IsCapitalized(sym.Name) {
 			return sym, true
 		}

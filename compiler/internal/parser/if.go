@@ -36,7 +36,7 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 	ifStmt := &ast.IfStmt{
 		Condition: condition,
 		Body:      &body,
-		Location:  *source.NewLocation(&start.Start, body.EndPos()),
+		Location:  *source.NewLocation(&start.Start, body.Loc().End),
 	}
 
 	if p.match(lexer.ELSE_TOKEN) {
@@ -51,7 +51,7 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 			ifStmt.Alternative = stmt
 		}
 		// Update the end position to include the else branch
-		ifStmt.End = ifStmt.Alternative.EndPos()
+		ifStmt.End = ifStmt.Alternative.Loc().End
 	}
 
 	return ifStmt

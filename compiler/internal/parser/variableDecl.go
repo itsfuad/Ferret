@@ -180,6 +180,6 @@ func parseVarDecl(p *Parser) ast.Statement {
 		Variables:    variables,
 		Initializers: values,
 		IsConst:      isConst,
-		Location:     *source.NewLocation(&token.Start, variables[len(variables)-1].Identifier.EndPos()),
+		Location:     *source.NewLocation(&token.Start, variables[len(variables)-1].Identifier.Loc().End),
 	}
 }

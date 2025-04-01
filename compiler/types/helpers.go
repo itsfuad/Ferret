@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -15,18 +14,18 @@ func IsFloat(value string) bool {
 	return err == nil
 }
 
-func GetBitSize(kind TYPE_NAME) (uint8, error) {
+func GetNumberBitSize(kind TYPE_NAME) uint8 {
 	switch kind {
 	case INT8, UINT8, BYTE:
-		return 8, nil
+		return 8
 	case INT16, UINT16:
-		return 16, nil
+		return 16
 	case INT32, UINT32, FLOAT32:
-		return 32, nil
+		return 32
 	case INT64, UINT64, FLOAT64:
-		return 64, nil
+		return 64
 	default:
-		return 0, fmt.Errorf("invalid type: %s", kind)
+		return 0
 	}
 }
 

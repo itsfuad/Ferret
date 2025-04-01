@@ -40,6 +40,6 @@ func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []as
 		Method:   iden,
 		Receiver: &receiver,
 		Function: funcLit,
-		Location: *source.NewLocation(startPos, funcLit.EndPos()),
+		Location: *source.NewLocation(startPos, funcLit.Loc().End),
 	}
 }
