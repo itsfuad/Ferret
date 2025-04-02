@@ -45,14 +45,11 @@ type HintContainer struct {
 
 // Report represents a diagnostic report used both internally and by LSP.
 type Report struct {
-	FilePath  string
-	LineStart int
-	LineEnd   int
-	ColStart  int
-	ColEnd    int
-	Message   string
-	Hints     HintContainer
-	Level     REPORT_TYPE
+	FilePath string
+	Location *source.Location
+	Message  string
+	Hints    HintContainer
+	Level    REPORT_TYPE
 }
 
 // GetReports returns a slice of diagnostics converted from internal reports.
@@ -108,17 +105,17 @@ func printReport(r *Report) {
 	reportColor.Println(r.Message)
 
 	//numlen is the length of the line number
-	numlen := len(fmt.Sprint(r.LineStart))
+	numlen := len(fmt.Sprint(r.Location.Start.Line))
 
 	// The file path is printed in grey.
-	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.LineStart, r.ColStart)
+	colors.GREY.Printf("%s> [%s:%d:%d]\n", strings.Repeat("-", numlen+2), r.FilePath, r.Location.Start.Line, r.Location.Start.Column)
 
 	// The code snippet and underline are printed in the same color.
 	fmt.Print(snippet)
 
 	if r.Hints.hint != "" {
 		reportColor.Print(underline)
-		colors.YELLOW.Printf(" %s%s\n", r.Hints.hint, strings.Repeat(" ", r.ColStart-r.Hints.col))
+		colors.YELLOW.Printf(" %s%s\n", r.Hints.hint, strings.Repeat(" ", r.Location.Start.Column-r.Hints.col))
 	} else {
 		reportColor.Println(underline)
 	}
@@ -134,12 +131,12 @@ func makeParts(r *Report) (snippet, underline string) {
 	}
 
 	lines := strings.Split(string(fileData), "\n")
-	line := lines[r.LineStart-1]
+	line := lines[r.Location.Start.Line-1]
 
 	hLen := 0
 
-	if r.LineStart == r.LineEnd {
-		hLen = (r.ColEnd - r.ColStart) - 1
+	if r.Location.Start.Line == r.Location.End.Line {
+		hLen = (r.Location.End.Column - r.Location.Start.Column) - 1
 	} else {
 		//full line
 		hLen = len(line) - 2
@@ -148,10 +145,10 @@ func makeParts(r *Report) (snippet, underline string) {
 		hLen = 0
 	}
 
-	bar := fmt.Sprintf("%s |", strings.Repeat(" ", len(fmt.Sprint(r.LineStart))))
-	lineNumber := fmt.Sprintf("%d | ", r.LineStart)
+	bar := fmt.Sprintf("%s |", strings.Repeat(" ", len(fmt.Sprint(r.Location.Start.Line))))
+	lineNumber := fmt.Sprintf("%d | ", r.Location.Start.Line)
 
-	padding := strings.Repeat(" ", (((r.ColStart - 1) + len(lineNumber)) - len(bar)))
+	padding := strings.Repeat(" ", (((r.Location.Start.Column - 1) + len(lineNumber)) - len(bar)))
 
 	snippet = colors.GREY.Sprint(bar) + "\n" + colors.GREY.Sprint(lineNumber) + line + "\n"
 	snippet += colors.GREY.Sprint(bar)
@@ -169,7 +166,7 @@ func (r *Report) AddHint(msg string) *Report {
 	}
 
 	r.Hints.hint = msg
-	r.Hints.col = r.ColStart
+	r.Hints.col = r.Location.Start.Column
 
 	return r
 }
@@ -181,8 +178,8 @@ func (r *Report) AddHintAt(msg string, col int) *Report {
 
 	r.Hints.hint = msg
 
-	if col < r.ColStart {
-		col = r.ColStart
+	if col < r.Location.Start.Column {
+		col = r.Location.Start.Column
 	}
 
 	r.Hints.col = col
@@ -194,32 +191,24 @@ func (r *Report) AddHintAt(msg string, col int) *Report {
 // It returns a pointer to the newly created Diagnostic.
 func Add(filePath string, location *source.Location, msg string) *Report {
 
-	lineStart := location.Start.Line
-	lineEnd := location.End.Line
-	colStart := location.Start.Column
-	colEnd := location.End.Column
-
-	if lineStart < 1 {
-		lineStart = 1
+	if location.Start.Line < 1 {
+		location.Start.Line = 1
 	}
-	if lineEnd < 1 {
-		lineEnd = 1
+	if location.End.Line < 1 {
+		location.End.Line = 1
 	}
-	if colStart < 1 {
-		colStart = 1
+	if location.Start.Column < 1 {
+		location.Start.Column = 1
 	}
-	if colEnd < 1 {
-		colEnd = 1
+	if location.End.Column < 1 {
+		location.End.Column = 1
 	}
 
 	report := &Report{
-		FilePath:  filePath,
-		LineStart: lineStart,
-		LineEnd:   lineEnd,
-		ColStart:  colStart,
-		ColEnd:    colEnd,
-		Message:   msg,
-		Level:     NULL,
+		FilePath: filePath,
+		Location: location,
+		Message:  msg,
+		Level:    NULL,
 	}
 
 	globalReports = append(globalReports, report)

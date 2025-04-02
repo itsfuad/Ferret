@@ -33,6 +33,7 @@ const (
 const (
 	EXPECTED_NUMBER      = "Expected number"
 	EXPECTED_STRING      = "Expected string"
+	EXPECTED_BYTE        = "Expected byte"
 	EXPECTED_SEMICOLON   = "Expected ';'"
 	EXPECTED_COMMA       = "Expected ','"
 	EXPECTED_COLON       = "Expected ':'"

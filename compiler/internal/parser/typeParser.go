@@ -115,12 +115,12 @@ func parseStructField(p *Parser) *ast.StructField {
 		return nil
 	} else {
 		return &ast.StructField{
-			Field: ast.IdentifierExpr{
+			FieldIdentifier: ast.IdentifierExpr{
 				Name:     fieldName,
 				Location: *source.NewLocation(&nameToken.Start, &nameToken.End),
 			},
-			Type:     fieldType,
-			Location: *source.NewLocation(&nameToken.Start, fieldType.Loc().End),
+			FieldType: fieldType,
+			Location:  *source.NewLocation(&nameToken.Start, fieldType.Loc().End),
 		}
 	}
 }
@@ -157,16 +157,16 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 		}
 
 		// Check for duplicate field names
-		if fieldNames[field.Field.Name] {
+		if fieldNames[field.FieldIdentifier.Name] {
 			report.Add(p.filePath, source.NewLocation(field.Location.Start, field.Location.End),
 				report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
-		fieldNames[field.Field.Name] = true
+		fieldNames[field.FieldIdentifier.Name] = true
 
 		// Add field to struct scope
 		sym := &symboltable.Symbol{
-			Name:       field.Field.Name,
+			Name:       field.FieldIdentifier.Name,
 			SymbolKind: symboltable.VARIABLE_SYMBOL,
 			IsMutable:  true,
 			Location:   &field.Location,
@@ -175,7 +175,7 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 
 		if !p.currentScope.Define(sym) {
 			report.ShowRedeclarationError(
-				field.Field.Name,
+				field.FieldIdentifier.Name,
 				p.filePath,
 				p.currentScope,
 				&field.Location,

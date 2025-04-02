@@ -103,6 +103,16 @@ func parseStringLiteral(p *Parser) ast.Expression {
 	}
 }
 
+func parseByteLiteral(p *Parser) ast.Expression {
+	byteLiteral := p.consume(lexer.BYTE_TOKEN, report.EXPECTED_BYTE)
+	loc := *source.NewLocation(&byteLiteral.Start, &byteLiteral.End)
+
+	return &ast.ByteLiteral{
+		Value:    byteLiteral.Value,
+		Location: loc,
+	}
+}
+
 func parseArrayLiteral(p *Parser) ast.Expression {
 	start := p.advance().Start // consume '['
 	elements := make([]ast.Expression, 0)

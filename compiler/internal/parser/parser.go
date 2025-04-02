@@ -129,7 +129,7 @@ func parseExpressionStatement(p *Parser, first ast.Expression) ast.Statement {
 	}
 
 	return &ast.ExpressionStmt{
-		Expressions: exprs,
+		Expressions: &exprs,
 		Location:    *source.NewLocation(first.Loc().Start, exprs[len(exprs)-1].Loc().End),
 	}
 }

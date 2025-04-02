@@ -5,7 +5,7 @@ import "ferret/compiler/internal/source"
 type NODE_TYPE int
 
 type Node interface {
-	INode()
+	INode() Node
 	Loc() *source.Location
 }
 
@@ -32,11 +32,10 @@ type BlockConstruct interface {
 
 type ExpressionList []Expression
 
-func (el ExpressionList) Loc() *source.Location {
-	return el[0].Loc()
+func (el *ExpressionList) Loc() *source.Location {
+	return (*el)[0].Loc()
 }
-
-func (el ExpressionList) INode() {} // INode is a marker interface for all nodes
+func (el *ExpressionList) INode() Node { return el }
 
 // Statement represents any node that doesn't produce a value
 type Statement interface {
@@ -46,13 +45,13 @@ type Statement interface {
 
 // ExpressionStmt represents a statement that consists of one or more expressions
 type ExpressionStmt struct {
-	Expressions ExpressionList
-	Location    source.Location
+	Expressions *ExpressionList
+	source.Location
 }
 
 func (e *ExpressionStmt) Loc() *source.Location {
 	return &e.Location
 }
 
-func (e *ExpressionStmt) INode() {} // INode is a marker interface for all nodes
-func (e *ExpressionStmt) Stmt()  {} // Stmt is a marker interface for all statements
+func (e *ExpressionStmt) INode() Node { return e }
+func (e *ExpressionStmt) Stmt()       {} // Stmt is a marker interface for all statements

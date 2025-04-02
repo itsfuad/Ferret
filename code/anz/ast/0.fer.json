@@ -1,0 +1,821 @@
+[
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "x",
+                    "Start": {
+                        "Line": 1,
+                        "Column": 5,
+                        "Index": 4
+                    },
+                    "End": {
+                        "Line": 1,
+                        "Column": 6,
+                        "Index": 5
+                    }
+                },
+                "ExplicitType": {
+                    "BitSize": 32,
+                    "IsUnsigned": false,
+                    "TypeName": "i32",
+                    "Start": {
+                        "Line": 1,
+                        "Column": 11,
+                        "Index": 10
+                    },
+                    "End": {
+                        "Line": 1,
+                        "Column": 14,
+                        "Index": 13
+                    }
+                }
+            },
+            {
+                "Identifier": {
+                    "Name": "y",
+                    "Start": {
+                        "Line": 1,
+                        "Column": 8,
+                        "Index": 7
+                    },
+                    "End": {
+                        "Line": 1,
+                        "Column": 30,
+                        "Index": 8
+                    }
+                },
+                "ExplicitType": {
+                    "TypeName": "byte",
+                    "Start": {
+                        "Line": 1,
+                        "Column": 16,
+                        "Index": 15
+                    },
+                    "End": {
+                        "Line": 1,
+                        "Column": 20,
+                        "Index": 19
+                    }
+                }
+            }
+        ],
+        "Initializers": [
+            {
+                "Value": 1,
+                "Raw": "1",
+                "Base": 10,
+                "Start": {
+                    "Line": 1,
+                    "Column": 23,
+                    "Index": 22
+                },
+                "End": {
+                    "Line": 1,
+                    "Column": 24,
+                    "Index": 23
+                }
+            },
+            {
+                "Value": "a",
+                "Start": {
+                    "Line": 1,
+                    "Column": 26,
+                    "Index": 25
+                },
+                "End": {
+                    "Line": 1,
+                    "Column": 29,
+                    "Index": 28
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 1,
+            "Column": 1,
+            "Index": 0
+        },
+        "End": {
+            "Line": 1,
+            "Column": 30,
+            "Index": 8
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "point",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 5,
+                        "Index": 37
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 60,
+                        "Index": 42
+                    }
+                },
+                "ExplicitType": {
+                    "Fields": [
+                        {
+                            "FieldIdentifier": {
+                                "Name": "x",
+                                "Start": {
+                                    "Line": 3,
+                                    "Column": 20,
+                                    "Index": 52
+                                },
+                                "End": {
+                                    "Line": 3,
+                                    "Column": 21,
+                                    "Index": 53
+                                }
+                            },
+                            "FieldType": {
+                                "BitSize": 32,
+                                "IsUnsigned": false,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 3,
+                                    "Column": 23,
+                                    "Index": 55
+                                },
+                                "End": {
+                                    "Line": 3,
+                                    "Column": 26,
+                                    "Index": 58
+                                }
+                            },
+                            "FieldValue": null,
+                            "Start": {
+                                "Line": 3,
+                                "Column": 20,
+                                "Index": 52
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 26,
+                                "Index": 58
+                            }
+                        },
+                        {
+                            "FieldIdentifier": {
+                                "Name": "y",
+                                "Start": {
+                                    "Line": 3,
+                                    "Column": 28,
+                                    "Index": 60
+                                },
+                                "End": {
+                                    "Line": 3,
+                                    "Column": 29,
+                                    "Index": 61
+                                }
+                            },
+                            "FieldType": {
+                                "BitSize": 32,
+                                "IsUnsigned": false,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 3,
+                                    "Column": 31,
+                                    "Index": 63
+                                },
+                                "End": {
+                                    "Line": 3,
+                                    "Column": 34,
+                                    "Index": 66
+                                }
+                            },
+                            "FieldValue": null,
+                            "Start": {
+                                "Line": 3,
+                                "Column": 28,
+                                "Index": 60
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 34,
+                                "Index": 66
+                            }
+                        }
+                    ],
+                    "TypeName": "struct",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 12,
+                        "Index": 44
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 35,
+                        "Index": 67
+                    }
+                }
+            }
+        ],
+        "Initializers": [
+            {
+                "Literal": {
+                    "Name": "struct",
+                    "Start": {
+                        "Line": 3,
+                        "Column": 39,
+                        "Index": 71
+                    },
+                    "End": {
+                        "Line": 3,
+                        "Column": 45,
+                        "Index": 77
+                    }
+                },
+                "Fields": [
+                    {
+                        "FieldIdentifier": {
+                            "Name": "x",
+                            "Start": {
+                                "Line": 3,
+                                "Column": 46,
+                                "Index": 78
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 47,
+                                "Index": 79
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 1,
+                            "Raw": "1",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 3,
+                                "Column": 49,
+                                "Index": 81
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 50,
+                                "Index": 82
+                            }
+                        },
+                        "Start": {
+                            "Line": 3,
+                            "Column": 46,
+                            "Index": 78
+                        },
+                        "End": {
+                            "Line": 3,
+                            "Column": 50,
+                            "Index": 82
+                        }
+                    },
+                    {
+                        "FieldIdentifier": {
+                            "Name": "y",
+                            "Start": {
+                                "Line": 3,
+                                "Column": 52,
+                                "Index": 84
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 53,
+                                "Index": 85
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 2.8,
+                            "Raw": "2.8",
+                            "Start": {
+                                "Line": 3,
+                                "Column": 55,
+                                "Index": 87
+                            },
+                            "End": {
+                                "Line": 3,
+                                "Column": 58,
+                                "Index": 90
+                            }
+                        },
+                        "Start": {
+                            "Line": 3,
+                            "Column": 52,
+                            "Index": 84
+                        },
+                        "End": {
+                            "Line": 3,
+                            "Column": 58,
+                            "Index": 90
+                        }
+                    }
+                ],
+                "IsAnonymous": true,
+                "Start": {
+                    "Line": 3,
+                    "Column": 38,
+                    "Index": 70
+                },
+                "End": {
+                    "Line": 3,
+                    "Column": 59,
+                    "Index": 91
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 3,
+            "Column": 1,
+            "Index": 33
+        },
+        "End": {
+            "Line": 3,
+            "Column": 60,
+            "Index": 42
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "point2",
+                    "Start": {
+                        "Line": 5,
+                        "Column": 5,
+                        "Index": 100
+                    },
+                    "End": {
+                        "Line": 5,
+                        "Column": 65,
+                        "Index": 106
+                    }
+                },
+                "ExplicitType": {
+                    "Fields": [
+                        {
+                            "FieldIdentifier": {
+                                "Name": "x",
+                                "Start": {
+                                    "Line": 5,
+                                    "Column": 21,
+                                    "Index": 116
+                                },
+                                "End": {
+                                    "Line": 5,
+                                    "Column": 22,
+                                    "Index": 117
+                                }
+                            },
+                            "FieldType": {
+                                "BitSize": 32,
+                                "IsUnsigned": false,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 5,
+                                    "Column": 24,
+                                    "Index": 119
+                                },
+                                "End": {
+                                    "Line": 5,
+                                    "Column": 27,
+                                    "Index": 122
+                                }
+                            },
+                            "FieldValue": null,
+                            "Start": {
+                                "Line": 5,
+                                "Column": 21,
+                                "Index": 116
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 27,
+                                "Index": 122
+                            }
+                        },
+                        {
+                            "FieldIdentifier": {
+                                "Name": "y",
+                                "Start": {
+                                    "Line": 5,
+                                    "Column": 29,
+                                    "Index": 124
+                                },
+                                "End": {
+                                    "Line": 5,
+                                    "Column": 30,
+                                    "Index": 125
+                                }
+                            },
+                            "FieldType": {
+                                "BitSize": 32,
+                                "IsUnsigned": false,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 5,
+                                    "Column": 32,
+                                    "Index": 127
+                                },
+                                "End": {
+                                    "Line": 5,
+                                    "Column": 35,
+                                    "Index": 130
+                                }
+                            },
+                            "FieldValue": null,
+                            "Start": {
+                                "Line": 5,
+                                "Column": 29,
+                                "Index": 124
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 35,
+                                "Index": 130
+                            }
+                        }
+                    ],
+                    "TypeName": "struct",
+                    "Start": {
+                        "Line": 5,
+                        "Column": 13,
+                        "Index": 108
+                    },
+                    "End": {
+                        "Line": 5,
+                        "Column": 36,
+                        "Index": 131
+                    }
+                }
+            }
+        ],
+        "Initializers": [
+            {
+                "Literal": {
+                    "Name": "struct",
+                    "Start": {
+                        "Line": 5,
+                        "Column": 40,
+                        "Index": 135
+                    },
+                    "End": {
+                        "Line": 5,
+                        "Column": 46,
+                        "Index": 141
+                    }
+                },
+                "Fields": [
+                    {
+                        "FieldIdentifier": {
+                            "Name": "x",
+                            "Start": {
+                                "Line": 5,
+                                "Column": 47,
+                                "Index": 142
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 48,
+                                "Index": 143
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 1,
+                            "Raw": "1",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 5,
+                                "Column": 50,
+                                "Index": 145
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 51,
+                                "Index": 146
+                            }
+                        },
+                        "Start": {
+                            "Line": 5,
+                            "Column": 47,
+                            "Index": 142
+                        },
+                        "End": {
+                            "Line": 5,
+                            "Column": 51,
+                            "Index": 146
+                        }
+                    },
+                    {
+                        "FieldIdentifier": {
+                            "Name": "y",
+                            "Start": {
+                                "Line": 5,
+                                "Column": 53,
+                                "Index": 148
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 54,
+                                "Index": 149
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 2,
+                            "Raw": "2",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 5,
+                                "Column": 56,
+                                "Index": 151
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 57,
+                                "Index": 152
+                            }
+                        },
+                        "Start": {
+                            "Line": 5,
+                            "Column": 53,
+                            "Index": 148
+                        },
+                        "End": {
+                            "Line": 5,
+                            "Column": 57,
+                            "Index": 152
+                        }
+                    },
+                    {
+                        "FieldIdentifier": {
+                            "Name": "z",
+                            "Start": {
+                                "Line": 5,
+                                "Column": 59,
+                                "Index": 154
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 60,
+                                "Index": 155
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 3,
+                            "Raw": "3",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 5,
+                                "Column": 62,
+                                "Index": 157
+                            },
+                            "End": {
+                                "Line": 5,
+                                "Column": 63,
+                                "Index": 158
+                            }
+                        },
+                        "Start": {
+                            "Line": 5,
+                            "Column": 59,
+                            "Index": 154
+                        },
+                        "End": {
+                            "Line": 5,
+                            "Column": 63,
+                            "Index": 158
+                        }
+                    }
+                ],
+                "IsAnonymous": true,
+                "Start": {
+                    "Line": 5,
+                    "Column": 39,
+                    "Index": 134
+                },
+                "End": {
+                    "Line": 5,
+                    "Column": 64,
+                    "Index": 159
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 5,
+            "Column": 1,
+            "Index": 96
+        },
+        "End": {
+            "Line": 5,
+            "Column": 65,
+            "Index": 106
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "point3",
+                    "Start": {
+                        "Line": 7,
+                        "Column": 5,
+                        "Index": 168
+                    },
+                    "End": {
+                        "Line": 7,
+                        "Column": 53,
+                        "Index": 174
+                    }
+                },
+                "ExplicitType": {
+                    "Fields": [
+                        {
+                            "FieldIdentifier": {
+                                "Name": "x",
+                                "Start": {
+                                    "Line": 7,
+                                    "Column": 21,
+                                    "Index": 184
+                                },
+                                "End": {
+                                    "Line": 7,
+                                    "Column": 22,
+                                    "Index": 185
+                                }
+                            },
+                            "FieldType": {
+                                "BitSize": 32,
+                                "IsUnsigned": false,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 7,
+                                    "Column": 24,
+                                    "Index": 187
+                                },
+                                "End": {
+                                    "Line": 7,
+                                    "Column": 27,
+                                    "Index": 190
+                                }
+                            },
+                            "FieldValue": null,
+                            "Start": {
+                                "Line": 7,
+                                "Column": 21,
+                                "Index": 184
+                            },
+                            "End": {
+                                "Line": 7,
+                                "Column": 27,
+                                "Index": 190
+                            }
+                        },
+                        {
+                            "FieldIdentifier": {
+                                "Name": "y",
+                                "Start": {
+                                    "Line": 7,
+                                    "Column": 29,
+                                    "Index": 192
+                                },
+                                "End": {
+                                    "Line": 7,
+                                    "Column": 30,
+                                    "Index": 193
+                                }
+                            },
+                            "FieldType": {
+                                "BitSize": 32,
+                                "IsUnsigned": false,
+                                "TypeName": "i32",
+                                "Start": {
+                                    "Line": 7,
+                                    "Column": 32,
+                                    "Index": 195
+                                },
+                                "End": {
+                                    "Line": 7,
+                                    "Column": 35,
+                                    "Index": 198
+                                }
+                            },
+                            "FieldValue": null,
+                            "Start": {
+                                "Line": 7,
+                                "Column": 29,
+                                "Index": 192
+                            },
+                            "End": {
+                                "Line": 7,
+                                "Column": 35,
+                                "Index": 198
+                            }
+                        }
+                    ],
+                    "TypeName": "struct",
+                    "Start": {
+                        "Line": 7,
+                        "Column": 13,
+                        "Index": 176
+                    },
+                    "End": {
+                        "Line": 7,
+                        "Column": 36,
+                        "Index": 199
+                    }
+                }
+            }
+        ],
+        "Initializers": [
+            {
+                "Literal": {
+                    "Name": "struct",
+                    "Start": {
+                        "Line": 7,
+                        "Column": 40,
+                        "Index": 203
+                    },
+                    "End": {
+                        "Line": 7,
+                        "Column": 46,
+                        "Index": 209
+                    }
+                },
+                "Fields": [
+                    {
+                        "FieldIdentifier": {
+                            "Name": "x",
+                            "Start": {
+                                "Line": 7,
+                                "Column": 47,
+                                "Index": 210
+                            },
+                            "End": {
+                                "Line": 7,
+                                "Column": 48,
+                                "Index": 211
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 1,
+                            "Raw": "1",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 7,
+                                "Column": 50,
+                                "Index": 213
+                            },
+                            "End": {
+                                "Line": 7,
+                                "Column": 51,
+                                "Index": 214
+                            }
+                        },
+                        "Start": {
+                            "Line": 7,
+                            "Column": 47,
+                            "Index": 210
+                        },
+                        "End": {
+                            "Line": 7,
+                            "Column": 51,
+                            "Index": 214
+                        }
+                    }
+                ],
+                "IsAnonymous": true,
+                "Start": {
+                    "Line": 7,
+                    "Column": 39,
+                    "Index": 202
+                },
+                "End": {
+                    "Line": 7,
+                    "Column": 52,
+                    "Index": 215
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 7,
+            "Column": 1,
+            "Index": 164
+        },
+        "End": {
+            "Line": 7,
+            "Column": 53,
+            "Index": 174
+        }
+    }
+]

@@ -42,7 +42,7 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 	}
 
 	for _, node := range tree {
-		typecheck.ASTNodeToAnalyzerNode(table, &node)
+		typecheck.ASTNodeToAnalyzerNode(node, table)
 	}
 
 	reports = report.GetReports()

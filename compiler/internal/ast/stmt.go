@@ -10,7 +10,7 @@ type VarDeclStmt struct {
 	source.Location
 }
 
-func (v *VarDeclStmt) INode()                {} // INode is a marker interface for all nodes
+func (v *VarDeclStmt) INode() Node           { return v }
 func (v *VarDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (v *VarDeclStmt) Loc() *source.Location { return &v.Location }
 
@@ -25,7 +25,7 @@ type AssignmentStmt struct {
 	source.Location
 }
 
-func (a *AssignmentStmt) INode()                {} // INode is a marker interface for all nodes
+func (a *AssignmentStmt) INode() Node           { return a }
 func (a *AssignmentStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (a *AssignmentStmt) Loc() *source.Location { return &a.Location }
 
@@ -36,7 +36,7 @@ type TypeDeclStmt struct {
 	source.Location
 }
 
-func (t *TypeDeclStmt) INode()                {} // INode is a marker interface for all nodes
+func (t *TypeDeclStmt) INode() Node           { return t }
 func (t *TypeDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (t *TypeDeclStmt) Loc() *source.Location { return &t.Location }
 
@@ -46,7 +46,7 @@ type ReturnStmt struct {
 	source.Location
 }
 
-func (r *ReturnStmt) INode()                {} // INode is a marker interface for all nodes
+func (r *ReturnStmt) INode() Node           { return r }
 func (r *ReturnStmt) Stmt()                 {} // Stmt is a marker method for statements
 func (r *ReturnStmt) Loc() *source.Location { return &r.Location }
 
@@ -56,7 +56,7 @@ type PackageDeclStmt struct {
 	source.Location
 }
 
-func (p *PackageDeclStmt) INode()                {} // INode is a marker interface for all nodes
+func (p *PackageDeclStmt) INode() Node           { return p }
 func (p *PackageDeclStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (p *PackageDeclStmt) Loc() *source.Location { return &p.Location }
 
@@ -66,6 +66,6 @@ type ImportStmt struct {
 	source.Location
 }
 
-func (i *ImportStmt) INode()                {} // INode is a marker interface for all nodes
+func (i *ImportStmt) INode() Node           { return i }
 func (i *ImportStmt) Stmt()                 {} // Stmt is a marker interface for all statements
 func (i *ImportStmt) Loc() *source.Location { return &i.Location }

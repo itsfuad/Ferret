@@ -10,8 +10,8 @@ import (
 	"fmt"
 )
 
-func builtinTypes(node *ast.Node) analyzer.AnalyzerNode {
-	switch n := (*node).(type) {
+func checkTypeNames(node ast.Node, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+	switch n := node.(type) {
 	case *ast.IntType:
 		return &analyzer.IntegerType{
 			TypeName:   n.TypeName,
@@ -39,33 +39,156 @@ func builtinTypes(node *ast.Node) analyzer.AnalyzerNode {
 		return &analyzer.ArrayType{
 			TypeName: n.TypeName,
 		}
+	case *ast.StructType:
+		return checkStructType(n, table)
 	default:
 		return nil
 	}
 }
 
-func ASTNodeToAnalyzerNode(table *symboltable.SymbolTable, node *ast.Node) analyzer.AnalyzerNode {
+func checkStructType(structType *ast.StructType, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
 
-	// Check if the node is a builtin type
-	if t := builtinTypes(node); t != nil {
+	var fields []analyzer.StructField
+
+	for _, structField := range structType.Fields {
+		fieldType := ASTNodeToAnalyzerNode(structField.FieldType, table)
+		field := analyzer.StructField{
+			Name: structField.FieldIdentifier.Name,
+			Type: fieldType,
+		}
+		fields = append(fields, field)
+	}
+
+	return &analyzer.StructType{
+		TypeName: structType.TypeName,
+		Fields:   fields,
+	}
+}
+
+func getLiteralType(lit ast.Node, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+	switch n := lit.(type) {
+	case *ast.IntLiteral:
+		return &analyzer.IntegerType{
+			TypeName:   types.INT64,
+			BitSize:    types.GetNumberBitSize(types.INT64),
+			IsUnsigned: true,
+		}
+	case *ast.FloatLiteral:
+		return &analyzer.FloatType{
+			TypeName: types.FLOAT64,
+			BitSize:  types.GetNumberBitSize(types.FLOAT64),
+		}
+	case *ast.StringLiteral:
+		return &analyzer.StringType{
+			TypeName: types.STRING,
+		}
+	case *ast.BoolLiteral:
+		return &analyzer.BoolType{
+			TypeName: types.BOOL,
+		}
+	case *ast.ByteLiteral:
+		return &analyzer.ByteType{
+			TypeName: types.BYTE,
+		}
+	case *ast.StructLiteralExpr:
+		return checkStructLiteral(n, table)
+	}
+
+	return nil
+}
+
+func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	var fields []analyzer.StructField
+
+	for _, field := range structLiteral.Fields {
+		fieldType := ASTNodeToAnalyzerNode(field.FieldValue, table)
+		field := analyzer.StructField{
+			Name: field.FieldIdentifier.Name,
+			Type: fieldType,
+		}
+		fields = append(fields, field)
+	}
+
+	return &analyzer.StructType{
+		TypeName: types.STRUCT,
+		Fields:   fields,
+	}
+}
+
+func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	fmt.Printf("Node: %T\n", node)
+
+	// Check if the node is a type
+	if t := checkTypeNames(node, table); t != nil {
 		return t
 	}
 
-	switch n := (*node).(type) {
+	// Check if the node is a literal
+	if lit := getLiteralType(node, table); lit != nil {
+		return lit
+	}
+
+	switch n := node.(type) {
 	case *ast.IdentifierExpr:
-		return getIdentifierNode(n, table)
+		return ckeckIdentifierNode(n, table)
+	case *ast.ExpressionStmt:
+		return checkExpressionStmtNode(n, table)
+	case *ast.VarDeclStmt:
+		return checkVarDeclStmtNode(n, table)
 	default:
 		report.Add(table.Filepath, n.Loc(), colors.BROWN.Sprintf("typechecker: <%T> node is not implemented\n", n)).SetLevel(report.NORMAL_ERROR)
 		return nil
 	}
 }
 
-func getIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	initializerNodes := varDeclStmt.Initializers
+
+	//first get the type of the initializers
+	var inits []analyzer.AnalyzerNode
+	for _, initializer := range initializerNodes {
+		var node ast.Node = initializer
+		inits = append(inits, ASTNodeToAnalyzerNode(node, table))
+	}
+
+	// if explicit type is provided, check if it matches the type of the initializer, otherwise set the type of initializer to the table
+	for i, variableNode := range varDeclStmt.Variables {
+		if variableNode.ExplicitType != nil {
+			// match the type of the initializer to the explicit type
+			init := inits[i]
+			fmt.Printf("Explicit type: %T\n", variableNode.ExplicitType)
+			explicitType := ASTNodeToAnalyzerNode(variableNode.ExplicitType.INode(), table)
+
+			colors.PURPLE.Printf("Got explicit type: %T\n", explicitType)
+			colors.PURPLE.Printf("Got initializer type: %T\n", init)
+
+			if ok, err := isCompatible(explicitType, init); !ok {
+				report.Add(table.Filepath, initializerNodes[i].Loc(), err.Error()).SetLevel(report.NORMAL_ERROR)
+			}
+		} else {
+			fmt.Printf("No explicit type provided for variable: %s\n", variableNode.Identifier.Name)
+		}
+	}
+
+	return nil
+}
+
+func checkExpressionStmtNode(expressionStmt *ast.ExpressionStmt, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+	for _, expr := range *expressionStmt.Expressions {
+		ASTNodeToAnalyzerNode(expr, table)
+	}
+	return nil
+}
+
+func ckeckIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
 
 	symbol, ok := table.Resolve(identifier.Name)
 
 	if !ok {
-		fmt.Printf("Identifier %s not found\n", identifier.Name)
+		report.Add(table.Filepath, identifier.Loc(), "Identifier "+identifier.Name+" not found").AddHint("Did you forget to declare this variable?").SetLevel(report.NORMAL_ERROR)
 		return nil
 	}
 
@@ -75,21 +198,4 @@ func getIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.Symbol
 	}
 
 	return symbol.SymbolType
-}
-
-func numericTypeNameToAnalyzerNode(typeName types.TYPE_NAME) analyzer.AnalyzerNode {
-	switch typeName {
-	case types.INT8, types.INT16, types.INT32, types.INT64, types.UINT8, types.UINT16, types.UINT32, types.UINT64:
-		return &analyzer.IntegerType{
-			TypeName:   typeName,
-			BitSize:    types.GetNumberBitSize(typeName),
-			IsUnsigned: types.IsUnsigned(typeName),
-		}
-	case types.FLOAT32, types.FLOAT64:
-		return &analyzer.FloatType{
-			TypeName: typeName,
-			BitSize:  types.GetNumberBitSize(typeName),
-		}
-	}
-	return nil
 }

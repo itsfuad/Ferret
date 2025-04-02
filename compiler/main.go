@@ -6,9 +6,9 @@ import (
 
 func main() {
 
-	filename := "./../code/main.fer"
+	filename := "./../code/anz/0.fer"
 
-	r, err := compile(filename, false, true)
+	r, err := compile(filename, true, true)
 
 	if len(r) > 0 {
 		r.DisplayAll()

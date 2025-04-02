@@ -45,12 +45,12 @@ func parseStructFields(p *Parser) ([]ast.StructField, bool) {
 		}
 
 		fields = append(fields, ast.StructField{
-			Field: ast.IdentifierExpr{
+			FieldIdentifier: ast.IdentifierExpr{
 				Name:     fieldName.Value,
 				Location: *source.NewLocation(&fieldName.Start, &fieldName.End),
 			},
-			Value:    value,
-			Location: *source.NewLocation(&fieldName.Start, value.Loc().End),
+			FieldValue: value,
+			Location:   *source.NewLocation(&fieldName.Start, value.Loc().End),
 		})
 
 		if p.match(lexer.CLOSE_CURLY) {
@@ -93,7 +93,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.StructLiteralExpr{
-		TypeName:    *typeName,
+		Literal:     *typeName,
 		Fields:      fields,
 		IsAnonymous: lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN,
 		Location:    *source.NewLocation(&start, &end),

@@ -314,6 +314,8 @@ func parsePrimary(p *Parser) ast.Expression {
 		return parseNumberLiteral(p)
 	case lexer.STRING_TOKEN:
 		return parseStringLiteral(p)
+	case lexer.BYTE_TOKEN:
+		return parseByteLiteral(p)
 	case lexer.FUNCTION_TOKEN:
 		start := p.advance()
 		return parseFunctionLiteral(p, &start.Start, true, true)

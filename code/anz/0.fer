@@ -1,0 +1,7 @@
+let x, y: i32, byte = 1, 'a';
+
+let point: struct {x: i32, y: i32} = @struct{x: 1, y: 2.8};
+
+let point2: struct {x: i32, y: i32} = @struct{x: 1, y: 2, z: 3};
+
+let point3: struct {x: i32, y: i32} = @struct{x: 1};
