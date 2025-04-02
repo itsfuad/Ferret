@@ -94,6 +94,15 @@ func (st *SymbolTable) Define(symbol *Symbol) bool {
 	return true
 }
 
+// Update updates a symbol type
+func (st *SymbolTable) UpdateSymbolType(name string, symbolType analyzer.AnalyzerNode) bool {
+	if _, exists := st.Symbols[name]; exists {
+		st.Symbols[name].SymbolType = symbolType
+		return true
+	}
+	return false
+}
+
 // Resolve looks up a symbol by name in the current scope and parent scopes
 func (st *SymbolTable) Resolve(name string) (*Symbol, bool) {
 

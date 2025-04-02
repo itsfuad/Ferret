@@ -168,8 +168,13 @@ func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.Symbo
 			if ok, err := isCompatible(explicitType, init); !ok {
 				report.Add(table.Filepath, initializerNodes[i].Loc(), err.Error()).SetLevel(report.NORMAL_ERROR)
 			}
-		} else {
-			fmt.Printf("No explicit type provided for variable: %s\n", variableNode.Identifier.Name)
+		}
+	}
+
+	//all ok now update the table
+	for i, variableNode := range varDeclStmt.Variables {
+		if ok := table.UpdateSymbolType(variableNode.Identifier.Name, inits[i]); !ok {
+			report.Add(table.Filepath, variableNode.Identifier.Loc(), fmt.Sprintf("couldn't update symbol type for variable %s", variableNode.Identifier.Name)).SetLevel(report.NORMAL_ERROR)
 		}
 	}
 
@@ -195,6 +200,10 @@ func ckeckIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.Symb
 	if symbol.SymbolKind != symboltable.VARIABLE_SYMBOL {
 		report.Add(table.Filepath, symbol.Location, "Identifier "+identifier.Name+" is not a variable").SetLevel(report.NORMAL_ERROR)
 		return nil
+	}
+
+	if symbol.SymbolType == nil {
+		panic(fmt.Sprintf("Symbol %s is nil. Implement table update", identifier.Name))
 	}
 
 	return symbol.SymbolType
