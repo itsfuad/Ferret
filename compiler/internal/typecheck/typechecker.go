@@ -208,6 +208,8 @@ func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) analyz
 		return ckeckIdentifierNode(n, table)
 	case *ast.ExpressionStmt:
 		return checkExpressionStmtNode(n, table)
+	case *ast.BinaryExpr:
+		return checkBinaryExprNode(n, table)
 	case *ast.VarDeclStmt:
 		return checkVarDeclStmtNode(n, table)
 	case *ast.TypeDeclStmt:
@@ -220,9 +222,51 @@ func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) analyz
 	}
 }
 
+func checkBinaryExprNode(binaryExpr *ast.BinaryExpr, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	left := ASTNodeToAnalyzerNode(binaryExpr.Left, table)
+	right := ASTNodeToAnalyzerNode(binaryExpr.Right, table)
+
+	if ok, err := isCompatible(left, right); !ok {
+		report.Add(table.Filepath, binaryExpr.Loc(), fmt.Sprintf("cannot perform binary %s operation between %s and %s: %s", binaryExpr.Operator.Value, left.ToString(), right.ToString(), err.Error())).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	} else {
+		return left
+	}
+}
+
 func checkFieldAccessExpr(fieldAccessExpr *ast.FieldAccessExpr, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
 
-	return nil
+	//check if the object is a struct
+
+	objType := ASTNodeToAnalyzerNode(fieldAccessExpr.Object, table)
+
+	fmt.Printf("Field access expr: %s\n", objType.ToString())
+
+	if objType.ANode() != types.STRUCT {
+		report.Add(table.Filepath, fieldAccessExpr.Loc(), fmt.Sprintf("expression is `%s` not a struct", objType.ToString())).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	}
+
+	//check if the field is defined
+	structType := objType.(*analyzer.StructType)
+
+	found := false
+	var fieldType analyzer.AnalyzerNode
+	for _, field := range structType.Fields {
+		if field.Name == fieldAccessExpr.Field.Name {
+			found = true
+			fieldType = field.Type
+			break
+		}
+	}
+
+	if !found {
+		report.Add(table.Filepath, fieldAccessExpr.Loc(), fmt.Sprintf("field %s is not defined", fieldAccessExpr.Field.Name)).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	}
+
+	return fieldType
 }
 
 func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.SymbolTable) analyzer.AnalyzerNode {

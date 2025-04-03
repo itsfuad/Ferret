@@ -23,6 +23,7 @@ type Rectangle2 Rectangle;
 
 let rect = @Rectangle2{width: 10, height: 20};
 
-rect.width;
+
+let aa: i32 = rect.width + 1.0;
 
 // rect.area();

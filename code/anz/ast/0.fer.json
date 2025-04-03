@@ -791,55 +791,128 @@
         }
     },
     {
-        "Expressions": [
+        "Variables": [
             {
-                "Object": {
-                    "Name": "rect",
+                "Identifier": {
+                    "Name": "aa",
                     "Start": {
-                        "Line": 26,
-                        "Column": 1,
-                        "Index": 373
-                    },
-                    "End": {
-                        "Line": 26,
+                        "Line": 27,
                         "Column": 5,
-                        "Index": 377
-                    }
-                },
-                "Field": {
-                    "Name": "width",
-                    "Start": {
-                        "Line": 26,
-                        "Column": 6,
-                        "Index": 378
+                        "Index": 379
                     },
                     "End": {
-                        "Line": 26,
-                        "Column": 12,
-                        "Index": 383
+                        "Line": 27,
+                        "Column": 32,
+                        "Index": 381
                     }
                 },
-                "Start": {
-                    "Line": 26,
-                    "Column": 1,
-                    "Index": 373
-                },
-                "End": {
-                    "Line": 26,
-                    "Column": 12,
-                    "Index": 383
+                "ExplicitType": {
+                    "BitSize": 32,
+                    "IsUnsigned": false,
+                    "TypeName": "i32",
+                    "Start": {
+                        "Line": 27,
+                        "Column": 9,
+                        "Index": 383
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 12,
+                        "Index": 386
+                    }
                 }
             }
         ],
+        "Initializers": [
+            {
+                "Left": {
+                    "Object": {
+                        "Name": "rect",
+                        "Start": {
+                            "Line": 27,
+                            "Column": 15,
+                            "Index": 389
+                        },
+                        "End": {
+                            "Line": 27,
+                            "Column": 19,
+                            "Index": 393
+                        }
+                    },
+                    "Field": {
+                        "Name": "width",
+                        "Start": {
+                            "Line": 27,
+                            "Column": 20,
+                            "Index": 394
+                        },
+                        "End": {
+                            "Line": 27,
+                            "Column": 25,
+                            "Index": 399
+                        }
+                    },
+                    "Start": {
+                        "Line": 27,
+                        "Column": 15,
+                        "Index": 389
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 25,
+                        "Index": 399
+                    }
+                },
+                "Operator": {
+                    "Kind": "+",
+                    "Value": "+",
+                    "Start": {
+                        "Line": 27,
+                        "Column": 26,
+                        "Index": 400
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 27,
+                        "Index": 401
+                    }
+                },
+                "Right": {
+                    "Value": 1,
+                    "Raw": "1.0",
+                    "Start": {
+                        "Line": 27,
+                        "Column": 28,
+                        "Index": 402
+                    },
+                    "End": {
+                        "Line": 27,
+                        "Column": 31,
+                        "Index": 405
+                    }
+                },
+                "Start": {
+                    "Line": 27,
+                    "Column": 15,
+                    "Index": 389
+                },
+                "End": {
+                    "Line": 27,
+                    "Column": 31,
+                    "Index": 405
+                }
+            }
+        ],
+        "IsConst": false,
         "Start": {
-            "Line": 26,
+            "Line": 27,
             "Column": 1,
-            "Index": 373
+            "Index": 375
         },
         "End": {
-            "Line": 26,
-            "Column": 12,
-            "Index": 383
+            "Line": 27,
+            "Column": 32,
+            "Index": 381
         }
     }
 ]
