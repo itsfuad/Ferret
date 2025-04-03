@@ -264,7 +264,7 @@ func (r Reports) ShowStatus() {
 	for _, report := range r {
 		if report.Level == WARNING {
 			warningCount++
-		} else if report.Level == NORMAL_ERROR || report.Level == CRITICAL_ERROR || report.Level == SYNTAX_ERROR {
+		} else if report.Level == NORMAL_ERROR || report.Level == CRITICAL_ERROR || report.Level == SYNTAX_ERROR || report.Level == SEMANTIC_ERROR {
 			probCount++
 		}
 	}

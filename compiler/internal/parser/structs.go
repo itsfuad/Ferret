@@ -93,7 +93,7 @@ func parseStructLiteral(p *Parser) ast.Expression {
 	end := p.consume(lexer.CLOSE_CURLY, report.EXPECTED_CLOSE_BRACE).End
 
 	return &ast.StructLiteralExpr{
-		Literal:     *typeName,
+		StructName:  *typeName,
 		Fields:      fields,
 		IsAnonymous: lexer.TOKEN(typeName.Name) == lexer.STRUCT_TOKEN,
 		Location:    *source.NewLocation(&start, &end),

@@ -41,9 +41,28 @@ func checkTypeNames(node ast.Node, table *symboltable.SymbolTable) analyzer.Anal
 		}
 	case *ast.StructType:
 		return checkStructType(n, table)
+	case *ast.UserDefinedType:
+		return checkUserDefinedType(n, table)
 	default:
 		return nil
 	}
+}
+
+func checkUserDefinedType(userDefinedType *ast.UserDefinedType, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	sym, ok := table.Resolve(string(userDefinedType.TypeName))
+
+	if !ok {
+		report.Add(table.Filepath, userDefinedType.Loc(), "type "+string(userDefinedType.TypeName)+" not found").SetLevel(report.NORMAL_ERROR)
+		return nil
+	}
+
+	if sym.SymbolKind != symboltable.TYPE_SYMBOL {
+		report.Add(table.Filepath, userDefinedType.Loc(), string(userDefinedType.TypeName)+" is not a type").SetLevel(report.NORMAL_ERROR)
+		return nil
+	}
+
+	return sym.SymbolType
 }
 
 func checkStructType(structType *ast.StructType, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
@@ -110,9 +129,63 @@ func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable
 		fields = append(fields, field)
 	}
 
-	return &analyzer.StructType{
+	structType := &analyzer.StructType{
 		TypeName: types.STRUCT,
 		Fields:   fields,
+	}
+
+	if structLiteral.IsAnonymous {
+		return structType
+	}
+
+	fmt.Printf("Struct name: %s\n", structLiteral.StructName.Name)
+
+	sym, ok := table.Resolve(structLiteral.StructName.Name)
+
+	if !ok {
+		report.Add(table.Filepath, structLiteral.Loc(), fmt.Sprintf("struct %s not defined", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	}
+
+	//check if the symbol is a struct
+	if sym.SymbolKind != symboltable.TYPE_SYMBOL {
+		report.Add(table.Filepath, structLiteral.Loc(), fmt.Sprintf("struct %s is not a type", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	}
+
+	if _, ok := sym.SymbolType.(*analyzer.StructType); !ok {
+		report.Add(table.Filepath, structLiteral.Loc(), fmt.Sprintf("struct %s is not a struct", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
+		return nil
+	}
+
+	checkPropsType(sym.SymbolType.(*analyzer.StructType), structType, structLiteral, table)
+
+	//check if the fields are compatible with the declared fields
+
+	return sym.SymbolType
+}
+
+func checkPropsType(declared, provided *analyzer.StructType, literal *ast.StructLiteralExpr, table *symboltable.SymbolTable) {
+	for i, prop := range provided.Fields {
+		//check if the property is defined
+		found := false
+		for _, declaredProp := range declared.Fields {
+			if prop.Name == declaredProp.Name {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			report.Add(table.Filepath, &literal.Fields[i].Location, fmt.Sprintf("property %s is not defined", prop.Name)).SetLevel(report.CRITICAL_ERROR)
+			return
+		}
+
+		//check if the property type matches the defined type
+		if ok, err := isCompatible(declared.Fields[i].Type, prop.Type); !ok {
+			report.Add(table.Filepath, &literal.Fields[i].Location, err.Error()).SetLevel(report.CRITICAL_ERROR)
+			return
+		}
 	}
 }
 
@@ -137,10 +210,30 @@ func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) analyz
 		return checkExpressionStmtNode(n, table)
 	case *ast.VarDeclStmt:
 		return checkVarDeclStmtNode(n, table)
+	case *ast.TypeDeclStmt:
+		return checkTypeDeclStmtNode(n, table)
+	case *ast.FieldAccessExpr:
+		return checkFieldAccessExpr(n, table)
 	default:
 		report.Add(table.Filepath, n.Loc(), colors.BROWN.Sprintf("typechecker: <%T> node is not implemented\n", n)).SetLevel(report.NORMAL_ERROR)
 		return nil
 	}
+}
+
+func checkFieldAccessExpr(fieldAccessExpr *ast.FieldAccessExpr, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	return nil
+}
+
+func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
+
+	alias := typeDeclStmt.Alias
+
+	baseType := ASTNodeToAnalyzerNode(typeDeclStmt.BaseType, table)
+
+	table.UpdateSymbolType(alias.Name, baseType)
+
+	return nil
 }
 
 func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.SymbolTable) analyzer.AnalyzerNode {
@@ -193,12 +286,12 @@ func ckeckIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.Symb
 	symbol, ok := table.Resolve(identifier.Name)
 
 	if !ok {
-		report.Add(table.Filepath, identifier.Loc(), "Identifier "+identifier.Name+" not found").AddHint("Did you forget to declare this variable?").SetLevel(report.NORMAL_ERROR)
+		report.Add(table.Filepath, identifier.Loc(), identifier.Name+" not found").AddHint("Did you forget to declare this variable?").SetLevel(report.NORMAL_ERROR)
 		return nil
 	}
 
 	if symbol.SymbolKind != symboltable.VARIABLE_SYMBOL {
-		report.Add(table.Filepath, symbol.Location, "Identifier "+identifier.Name+" is not a variable").SetLevel(report.NORMAL_ERROR)
+		report.Add(table.Filepath, symbol.Location, identifier.Name+" is not a variable").SetLevel(report.NORMAL_ERROR)
 		return nil
 	}
 

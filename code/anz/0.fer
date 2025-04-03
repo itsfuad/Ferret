@@ -2,4 +2,27 @@ let x, y: i32, byte = 1, 'a';
 
 let point: struct {x: i32, y: i32} = @struct{x: 1, y: 2};
 
-let b: i64 = x;
+let b = x;
+
+type Integer i32;
+
+let i: Integer = 1;
+
+type Rectangle struct {
+	width: i32,
+	height: i32
+};
+
+
+
+// fn (r: Rectangle) area() -> i32 {
+// 	return r.width * r.height;
+// }
+
+type Rectangle2 Rectangle;
+
+let rect = @Rectangle2{width: 10, height: 20};
+
+rect.width;
+
+// rect.area();

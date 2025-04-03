@@ -13,17 +13,15 @@ func isCompatible(first, second analyzer.AnalyzerNode) (bool, error) {
 	if reflect.TypeOf(first) == reflect.TypeOf(second) {
 		switch t := first.(type) {
 		case *analyzer.StructType:
-			secondStruct, ok := second.(*analyzer.StructType)
-			if !ok {
-				return false, fmt.Errorf("incompatible types: `%s` and `%s`: `%s` is not a struct", first, second, second)
+			if secondStruct, ok := second.(*analyzer.StructType); ok {
+				return checkStructCompatibility(t, secondStruct)
 			}
-			return checkStructCompatibility(t, secondStruct)
 		default:
 			return true, nil
 		}
 	}
 
-	return false, fmt.Errorf("incompatible types: `%s` and `%s`", first.ToString(), second.ToString())
+	return false, fmt.Errorf("expected `%s` but got `%s`", first.ToString(), second.ToString())
 }
 
 func checkStructCompatibility(first, second *analyzer.StructType) (bool, error) {
@@ -53,17 +51,23 @@ func checkStructCompatibility(first, second *analyzer.StructType) (bool, error) 
 	}
 
 	if fieldErrors != "" {
-		return false, fmt.Errorf("incompatible structs: `%s` and `%s`\n%s", first.ToString(), second.ToString(), fieldErrors)
+		return false, fmt.Errorf("[ES01] incompatible structs: `%s` and `%s`\n%s", first.ToString(), second.ToString(), fieldErrors)
 	}
+
+	fieldErrors = ""
 
 	for i := 0; i < len(first.Fields); i++ {
 		fmt.Printf("First field: %s, Second field: %s\n", first.Fields[i], second.Fields[i])
 		if first.Fields[i].Name != second.Fields[i].Name {
-			return false, fmt.Errorf("incompatible structs: `%s` and `%s`: field names do not match", first.ToString(), second.ToString())
+			return false, fmt.Errorf("[ES02] incompatible structs: `%s` and `%s`: field names do not match", first.ToString(), second.ToString())
 		}
 		if ok, err := isCompatible(first.Fields[i].Type, second.Fields[i].Type); !ok {
-			return false, fmt.Errorf("incompatible structs: `%s` and `%s`: %s", first.ToString(), second.ToString(), err)
+			fieldErrors += colors.BROWN.Sprintf(" - field %s: %s", first.Fields[i].Name, err)
 		}
+	}
+
+	if fieldErrors != "" {
+		return false, fmt.Errorf("[ES03] incompatible structs: `%s` and `%s`\n%s", first.ToString(), second.ToString(), fieldErrors)
 	}
 
 	return true, nil

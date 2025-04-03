@@ -59,3 +59,35 @@ type IndexableExpr struct {
 func (i *IndexableExpr) INode() Node           { return i }
 func (i *IndexableExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (i *IndexableExpr) Loc() *source.Location { return &i.Location }
+
+type ArrayLiteralExpr struct {
+	Elements []Expression
+	source.Location
+}
+
+func (a *ArrayLiteralExpr) INode() Node           { return a }
+func (a *ArrayLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (a *ArrayLiteralExpr) Loc() *source.Location { return &a.Location }
+
+// StructLiteralExpr represents a struct literal expression like Point{x: 10, y: 20}
+type StructLiteralExpr struct {
+	StructName  IdentifierExpr
+	Fields      []StructField
+	IsAnonymous bool
+	source.Location
+}
+
+func (s *StructLiteralExpr) INode() Node           { return s }
+func (s *StructLiteralExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (s *StructLiteralExpr) Loc() *source.Location { return &s.Location }
+
+type FunctionLiteral struct {
+	Params     []Parameter
+	ReturnType []DataType
+	Body       *BlockConstruct
+	source.Location
+}
+
+func (f *FunctionLiteral) INode() Node           { return f }
+func (f *FunctionLiteral) Expr()                 {} // Expr is a marker interface for all expressions
+func (f *FunctionLiteral) Loc() *source.Location { return &f.Location }

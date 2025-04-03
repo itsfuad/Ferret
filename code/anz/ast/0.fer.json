@@ -219,7 +219,7 @@
         ],
         "Initializers": [
             {
-                "Literal": {
+                "StructName": {
                     "Name": "struct",
                     "Start": {
                         "Line": 3,
@@ -353,25 +353,11 @@
                     },
                     "End": {
                         "Line": 5,
-                        "Column": 16,
+                        "Column": 11,
                         "Index": 99
                     }
                 },
-                "ExplicitType": {
-                    "BitSize": 64,
-                    "IsUnsigned": false,
-                    "TypeName": "i64",
-                    "Start": {
-                        "Line": 5,
-                        "Column": 8,
-                        "Index": 101
-                    },
-                    "End": {
-                        "Line": 5,
-                        "Column": 11,
-                        "Index": 104
-                    }
-                }
+                "ExplicitType": null
             }
         ],
         "Initializers": [
@@ -379,13 +365,13 @@
                 "Name": "x",
                 "Start": {
                     "Line": 5,
-                    "Column": 14,
-                    "Index": 107
+                    "Column": 9,
+                    "Index": 102
                 },
                 "End": {
                     "Line": 5,
-                    "Column": 15,
-                    "Index": 108
+                    "Column": 10,
+                    "Index": 103
                 }
             }
         ],
@@ -397,8 +383,463 @@
         },
         "End": {
             "Line": 5,
-            "Column": 16,
+            "Column": 11,
             "Index": 99
+        }
+    },
+    {
+        "Alias": {
+            "Name": "Integer",
+            "Start": {
+                "Line": 7,
+                "Column": 6,
+                "Index": 113
+            },
+            "End": {
+                "Line": 7,
+                "Column": 13,
+                "Index": 120
+            }
+        },
+        "BaseType": {
+            "BitSize": 32,
+            "IsUnsigned": false,
+            "TypeName": "i32",
+            "Start": {
+                "Line": 7,
+                "Column": 14,
+                "Index": 121
+            },
+            "End": {
+                "Line": 7,
+                "Column": 18,
+                "Index": 124
+            }
+        },
+        "Start": {
+            "Line": 7,
+            "Column": 1,
+            "Index": 108
+        },
+        "End": {
+            "Line": 7,
+            "Column": 18,
+            "Index": 124
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "i",
+                    "Start": {
+                        "Line": 9,
+                        "Column": 5,
+                        "Index": 133
+                    },
+                    "End": {
+                        "Line": 9,
+                        "Column": 20,
+                        "Index": 134
+                    }
+                },
+                "ExplicitType": {
+                    "TypeName": "Integer",
+                    "Start": {
+                        "Line": 9,
+                        "Column": 8,
+                        "Index": 136
+                    },
+                    "End": {
+                        "Line": 9,
+                        "Column": 15,
+                        "Index": 143
+                    }
+                }
+            }
+        ],
+        "Initializers": [
+            {
+                "Value": 1,
+                "Raw": "1",
+                "Base": 10,
+                "Start": {
+                    "Line": 9,
+                    "Column": 18,
+                    "Index": 146
+                },
+                "End": {
+                    "Line": 9,
+                    "Column": 19,
+                    "Index": 147
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 9,
+            "Column": 1,
+            "Index": 129
+        },
+        "End": {
+            "Line": 9,
+            "Column": 20,
+            "Index": 134
+        }
+    },
+    {
+        "Alias": {
+            "Name": "Rectangle",
+            "Start": {
+                "Line": 11,
+                "Column": 6,
+                "Index": 157
+            },
+            "End": {
+                "Line": 11,
+                "Column": 15,
+                "Index": 166
+            }
+        },
+        "BaseType": {
+            "Fields": [
+                {
+                    "FieldIdentifier": {
+                        "Name": "width",
+                        "Start": {
+                            "Line": 12,
+                            "Column": 5,
+                            "Index": 178
+                        },
+                        "End": {
+                            "Line": 12,
+                            "Column": 10,
+                            "Index": 183
+                        }
+                    },
+                    "FieldType": {
+                        "BitSize": 32,
+                        "IsUnsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 12,
+                            "Column": 12,
+                            "Index": 185
+                        },
+                        "End": {
+                            "Line": 12,
+                            "Column": 15,
+                            "Index": 188
+                        }
+                    },
+                    "FieldValue": null,
+                    "Start": {
+                        "Line": 12,
+                        "Column": 5,
+                        "Index": 178
+                    },
+                    "End": {
+                        "Line": 12,
+                        "Column": 15,
+                        "Index": 188
+                    }
+                },
+                {
+                    "FieldIdentifier": {
+                        "Name": "height",
+                        "Start": {
+                            "Line": 13,
+                            "Column": 5,
+                            "Index": 192
+                        },
+                        "End": {
+                            "Line": 13,
+                            "Column": 11,
+                            "Index": 198
+                        }
+                    },
+                    "FieldType": {
+                        "BitSize": 32,
+                        "IsUnsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 13,
+                            "Column": 13,
+                            "Index": 200
+                        },
+                        "End": {
+                            "Line": 13,
+                            "Column": 16,
+                            "Index": 203
+                        }
+                    },
+                    "FieldValue": null,
+                    "Start": {
+                        "Line": 13,
+                        "Column": 5,
+                        "Index": 192
+                    },
+                    "End": {
+                        "Line": 13,
+                        "Column": 16,
+                        "Index": 203
+                    }
+                }
+            ],
+            "TypeName": "struct",
+            "Start": {
+                "Line": 11,
+                "Column": 16,
+                "Index": 167
+            },
+            "End": {
+                "Line": 14,
+                "Column": 3,
+                "Index": 206
+            }
+        },
+        "Start": {
+            "Line": 11,
+            "Column": 1,
+            "Index": 152
+        },
+        "End": {
+            "Line": 14,
+            "Column": 3,
+            "Index": 206
+        }
+    },
+    {
+        "Alias": {
+            "Name": "Rectangle2",
+            "Start": {
+                "Line": 22,
+                "Column": 6,
+                "Index": 298
+            },
+            "End": {
+                "Line": 22,
+                "Column": 16,
+                "Index": 308
+            }
+        },
+        "BaseType": {
+            "TypeName": "Rectangle",
+            "Start": {
+                "Line": 22,
+                "Column": 17,
+                "Index": 309
+            },
+            "End": {
+                "Line": 22,
+                "Column": 27,
+                "Index": 318
+            }
+        },
+        "Start": {
+            "Line": 22,
+            "Column": 1,
+            "Index": 293
+        },
+        "End": {
+            "Line": 22,
+            "Column": 27,
+            "Index": 318
+        }
+    },
+    {
+        "Variables": [
+            {
+                "Identifier": {
+                    "Name": "rect",
+                    "Start": {
+                        "Line": 24,
+                        "Column": 5,
+                        "Index": 327
+                    },
+                    "End": {
+                        "Line": 24,
+                        "Column": 47,
+                        "Index": 331
+                    }
+                },
+                "ExplicitType": null
+            }
+        ],
+        "Initializers": [
+            {
+                "StructName": {
+                    "Name": "Rectangle2",
+                    "Start": {
+                        "Line": 24,
+                        "Column": 13,
+                        "Index": 335
+                    },
+                    "End": {
+                        "Line": 24,
+                        "Column": 23,
+                        "Index": 345
+                    }
+                },
+                "Fields": [
+                    {
+                        "FieldIdentifier": {
+                            "Name": "width",
+                            "Start": {
+                                "Line": 24,
+                                "Column": 24,
+                                "Index": 346
+                            },
+                            "End": {
+                                "Line": 24,
+                                "Column": 29,
+                                "Index": 351
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 10,
+                            "Raw": "10",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 24,
+                                "Column": 31,
+                                "Index": 353
+                            },
+                            "End": {
+                                "Line": 24,
+                                "Column": 33,
+                                "Index": 355
+                            }
+                        },
+                        "Start": {
+                            "Line": 24,
+                            "Column": 24,
+                            "Index": 346
+                        },
+                        "End": {
+                            "Line": 24,
+                            "Column": 33,
+                            "Index": 355
+                        }
+                    },
+                    {
+                        "FieldIdentifier": {
+                            "Name": "height",
+                            "Start": {
+                                "Line": 24,
+                                "Column": 35,
+                                "Index": 357
+                            },
+                            "End": {
+                                "Line": 24,
+                                "Column": 41,
+                                "Index": 363
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 20,
+                            "Raw": "20",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 24,
+                                "Column": 43,
+                                "Index": 365
+                            },
+                            "End": {
+                                "Line": 24,
+                                "Column": 45,
+                                "Index": 367
+                            }
+                        },
+                        "Start": {
+                            "Line": 24,
+                            "Column": 35,
+                            "Index": 357
+                        },
+                        "End": {
+                            "Line": 24,
+                            "Column": 45,
+                            "Index": 367
+                        }
+                    }
+                ],
+                "IsAnonymous": false,
+                "Start": {
+                    "Line": 24,
+                    "Column": 12,
+                    "Index": 334
+                },
+                "End": {
+                    "Line": 24,
+                    "Column": 46,
+                    "Index": 368
+                }
+            }
+        ],
+        "IsConst": false,
+        "Start": {
+            "Line": 24,
+            "Column": 1,
+            "Index": 323
+        },
+        "End": {
+            "Line": 24,
+            "Column": 47,
+            "Index": 331
+        }
+    },
+    {
+        "Expressions": [
+            {
+                "Object": {
+                    "Name": "rect",
+                    "Start": {
+                        "Line": 26,
+                        "Column": 1,
+                        "Index": 373
+                    },
+                    "End": {
+                        "Line": 26,
+                        "Column": 5,
+                        "Index": 377
+                    }
+                },
+                "Field": {
+                    "Name": "width",
+                    "Start": {
+                        "Line": 26,
+                        "Column": 6,
+                        "Index": 378
+                    },
+                    "End": {
+                        "Line": 26,
+                        "Column": 12,
+                        "Index": 383
+                    }
+                },
+                "Start": {
+                    "Line": 26,
+                    "Column": 1,
+                    "Index": 373
+                },
+                "End": {
+                    "Line": 26,
+                    "Column": 12,
+                    "Index": 383
+                }
+            }
+        ],
+        "Start": {
+            "Line": 26,
+            "Column": 1,
+            "Index": 373
+        },
+        "End": {
+            "Line": 26,
+            "Column": 12,
+            "Index": 383
         }
     }
 ]
