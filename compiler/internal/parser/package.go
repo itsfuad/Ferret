@@ -4,7 +4,6 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"strings"
 )
@@ -23,11 +22,6 @@ func parsePackage(p *Parser) ast.Node {
 		report.Add(p.filePath, source.NewLocation(&start.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
 	}
 
-	// check scope
-	if p.currentScope.ScopeKind() != symboltable.GLOBAL_SCOPE {
-		report.Add(p.filePath, source.NewLocation(&name.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
-	}
-
 	return &ast.PackageDeclStmt{
 		Package: &ast.IdentifierExpr{
 			Name:     name.Value,
@@ -42,36 +36,21 @@ func parseImport(p *Parser) ast.Node {
 	start := p.consume(lexer.IMPORT_TOKEN, report.EXPECTED_IMPORT_KEYWORD)
 	importPath := p.consume(lexer.STRING_TOKEN, report.EXPECTED_IMPORT_PATH)
 
-	// check scope
-	if p.currentScope.ScopeKind() != symboltable.GLOBAL_SCOPE {
-		report.Add(p.filePath, source.NewLocation(&start.Start, &importPath.End), report.INVALID_SCOPE).AddHint("Import statements must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
-	}
-
 	// Get module name from import path (last component)
 	moduleName := strings.Trim(importPath.Value, "\"")
 	if lastSlash := strings.LastIndex(moduleName, "/"); lastSlash >= 0 {
 		moduleName = moduleName[lastSlash+1:]
 	}
 
-	// Add module to symbol table
-	sym := &symboltable.Symbol{
-		Name:       moduleName,
-		SymbolKind: symboltable.MODULE_SYMBOL,
-		Module:     moduleName,
-		Location:   source.NewLocation(&start.Start, &importPath.End),
-		FilePath:   p.filePath,
-	}
-
-	if !p.currentScope.Define(sym) {
-		report.Add(p.filePath, sym.Location, "Module already imported").SetLevel(report.SEMANTIC_ERROR)
-	}
+	loc := *source.NewLocation(&start.Start, &importPath.End)
 
 	return &ast.ImportStmt{
-		Import: &ast.StringLiteral{
+		ImportPath: &ast.StringLiteral{
 			Value:    importPath.Value,
-			Location: *sym.Location,
+			Location: loc,
 		},
-		Location: *sym.Location,
+		ModuleName: moduleName,
+		Location: loc,
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"ferret/compiler/types"
 	"fmt"
@@ -157,23 +156,6 @@ func parseVarDecl(p *Parser) ast.Statement {
 		}
 
 		fmt.Printf("var %s's typename: %+v\n", v.Identifier.Name, typename)
-
-		sym := &symboltable.Symbol{
-			Name:       v.Identifier.Name,
-			SymbolKind: symboltable.VARIABLE_SYMBOL,
-			IsMutable:  !isConst,
-			Location:   &v.Identifier.Location,
-			FilePath:   p.filePath,
-		}
-
-		if !p.currentScope.Define(sym) {
-			report.ShowRedeclarationError(
-				v.Identifier.Name,
-				p.filePath,
-				p.currentScope,
-				&v.Identifier.Location,
-			)
-		}
 	}
 
 	return &ast.VarDeclStmt{

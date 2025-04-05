@@ -4,70 +4,71 @@ import (
 	"reflect"
 
 	"ferret/compiler/colors"
-	"ferret/compiler/internal/analyzer"
+	"ferret/compiler/internal/symboltable"
+	"ferret/compiler/types"
 	"fmt"
 )
 
-func isCompatible(first, second analyzer.AnalyzerNode) (bool, error) {
+func isCompatible(first, second *symboltable.Symbol) (bool, error) {
 
-	if reflect.TypeOf(first) == reflect.TypeOf(second) {
-		switch t := first.(type) {
-		case *analyzer.StructType:
-			if secondStruct, ok := second.(*analyzer.StructType); ok {
-				return checkStructCompatibility(t, secondStruct)
+	if reflect.TypeOf(first.SymbolType) == reflect.TypeOf(second.SymbolType) {
+		switch first.SymbolType.(type) {
+		case *symboltable.StructType:
+			if _, ok := second.SymbolType.(*symboltable.StructType); ok {
+				return checkStructCompatibility(first, second)
 			}
 		default:
 			return true, nil
 		}
 	}
 
-	return false, fmt.Errorf("expected `%s` but got `%s`", first.ToString(), second.ToString())
+	return false, fmt.Errorf("expected `%s` but got `%s`", first.SymbolType.ToString(), second.SymbolType.ToString())
 }
 
-func checkStructCompatibility(first, second *analyzer.StructType) (bool, error) {
+func checkStructCompatibility(first, second *symboltable.Symbol) (bool, error) {
 
 	//check for missing and extra fields
 	missingFields := make(map[string]bool)
 	extraFields := make(map[string]bool)
 
-	for _, field := range first.Fields {
-		missingFields[field.Name] = true
+	for _, field := range first.SymbolType.(*symboltable.StructType).Scope.GetSymbols() {
+		if _, ok := second.SymbolType.(*symboltable.StructType).Scope.ResolveLocal(field.Name); !ok {
+			missingFields[field.Name] = true
+		}
 	}
-	for _, field := range second.Fields {
-		if _, ok := missingFields[field.Name]; ok {
-			delete(missingFields, field.Name)
-		} else {
+
+	for _, field := range second.SymbolType.(*symboltable.StructType).Scope.GetSymbols() {
+		if _, ok := first.SymbolType.(*symboltable.StructType).Scope.ResolveLocal(field.Name); !ok {
 			extraFields[field.Name] = true
 		}
 	}
 
-	fieldErrors := ""
+	errorString := ""
 
 	for field := range missingFields {
-		fieldErrors += colors.BROWN.Sprintf(" - missing field: %s\n", field)
+		errorString += colors.BROWN.Sprintf(" - missing field: %s\n", field)
 	}
+
 	for field := range extraFields {
-		fieldErrors += colors.BROWN.Sprintf(" - extra field: %s\n", field)
+		errorString += colors.BROWN.Sprintf(" - extra field: %s\n", field)
 	}
 
-	if fieldErrors != "" {
-		return false, fmt.Errorf("[ES01] incompatible structs: `%s` and `%s`\n%s", first.ToString(), second.ToString(), fieldErrors)
-	}
-
-	fieldErrors = ""
-
-	for i := 0; i < len(first.Fields); i++ {
-		fmt.Printf("First field: %s, Second field: %s\n", first.Fields[i], second.Fields[i])
-		if first.Fields[i].Name != second.Fields[i].Name {
-			return false, fmt.Errorf("[ES02] incompatible structs: `%s` and `%s`: field names do not match", first.ToString(), second.ToString())
+	if errorString != "" {
+		firstStr := ""
+		if first.Name == string(types.STRUCT) {
+			firstStr = fmt.Sprintf("`%s`", first.SymbolType.ToString())
+		} else {
+			firstStr = fmt.Sprintf("`%s` expands to `%s`", first.Name, first.SymbolType.ToString())
 		}
-		if ok, err := isCompatible(first.Fields[i].Type, second.Fields[i].Type); !ok {
-			fieldErrors += colors.BROWN.Sprintf(" - field %s: %s", first.Fields[i].Name, err)
-		}
-	}
 
-	if fieldErrors != "" {
-		return false, fmt.Errorf("[ES03] incompatible structs: `%s` and `%s`\n%s", first.ToString(), second.ToString(), fieldErrors)
+		secondStr := ""
+		if second.Name == string(types.STRUCT) {
+			secondStr = fmt.Sprintf("`%s`", second.SymbolType.ToString())
+		} else {
+			secondStr = fmt.Sprintf("`%s` expands to `%s`", second.Name, second.SymbolType.ToString())
+		}
+
+		return false, fmt.Errorf("incompatible structs: %s and %s\n%s", firstStr, secondStr, errorString)
 	}
 
 	return true, nil

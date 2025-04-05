@@ -1,6 +1,8 @@
 package ast
 
-import "ferret/compiler/internal/source"
+import (
+	"ferret/compiler/internal/source"
+)
 
 type NODE_TYPE int
 

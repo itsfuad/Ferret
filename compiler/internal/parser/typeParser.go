@@ -4,7 +4,6 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"
 	"ferret/compiler/types"
@@ -130,10 +129,6 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 	// Consume 'struct' keyword
 	start := p.consume(lexer.STRUCT_TOKEN, report.EXPECTED_STRUCT_KEYWORD).Start
 
-	// Create struct scope
-	p.enterScope(symboltable.STRUCT_SCOPE)
-	defer p.exitScope()
-
 	// Consume opening brace
 	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
@@ -162,26 +157,8 @@ func parseStructType(p *Parser) (ast.DataType, bool) {
 				report.DUPLICATE_FIELD_NAME).SetLevel(report.SYNTAX_ERROR)
 			return nil, false
 		}
+
 		fieldNames[field.FieldIdentifier.Name] = true
-
-		// Add field to struct scope
-		sym := &symboltable.Symbol{
-			Name:       field.FieldIdentifier.Name,
-			SymbolKind: symboltable.VARIABLE_SYMBOL,
-			IsMutable:  true,
-			Location:   &field.Location,
-			FilePath:   p.filePath,
-		}
-
-		if !p.currentScope.Define(sym) {
-			report.ShowRedeclarationError(
-				field.FieldIdentifier.Name,
-				p.filePath,
-				p.currentScope,
-				&field.Location,
-			)
-			return nil, false
-		}
 
 		fields = append(fields, *field)
 
@@ -209,10 +186,6 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 
 	start := p.consume(lexer.INTERFACE_TOKEN, report.EXPECTED_INTERFACE_KEYWORD)
 
-	//create a new scope for the interface
-	p.enterScope(symboltable.INTERFACE_SCOPE)
-	defer p.exitScope()
-
 	//consume the '{' token
 	p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE)
 
@@ -223,10 +196,6 @@ func parseInterfaceType(p *Parser) (ast.DataType, bool) {
 		start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD).Start
 
 		name := declareFunction(p)
-
-		//start a new scope
-		p.enterScope(symboltable.FUNCTION_SCOPE)
-		defer p.exitScope()
 
 		params, returnTypes := parseSignature(p, true)
 
@@ -338,25 +307,6 @@ func parseTypeDecl(p *Parser) ast.Statement {
 		token := p.peek()
 		report.Add(p.filePath, source.NewLocation(&token.Start, &token.End),
 			report.EXPECTED_TYPE).SetLevel(report.SYNTAX_ERROR)
-		return nil
-	}
-
-	// Add type to symbol table
-	sym := &symboltable.Symbol{
-		Name:       typeName.Value,
-		SymbolKind: symboltable.TYPE_SYMBOL,
-		IsMutable:  false,
-		Location:   source.NewLocation(&typeName.Start, &typeName.End),
-		FilePath:   p.filePath,
-	}
-
-	if !p.currentScope.Define(sym) {
-		report.ShowRedeclarationError(
-			typeName.Value,
-			p.filePath,
-			p.currentScope,
-			sym.Location,
-		)
 		return nil
 	}
 

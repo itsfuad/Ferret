@@ -114,107 +114,11 @@
                     },
                     "End": {
                         "Line": 3,
-                        "Column": 58,
+                        "Column": 33,
                         "Index": 42
                     }
                 },
-                "ExplicitType": {
-                    "Fields": [
-                        {
-                            "FieldIdentifier": {
-                                "Name": "x",
-                                "Start": {
-                                    "Line": 3,
-                                    "Column": 20,
-                                    "Index": 52
-                                },
-                                "End": {
-                                    "Line": 3,
-                                    "Column": 21,
-                                    "Index": 53
-                                }
-                            },
-                            "FieldType": {
-                                "BitSize": 32,
-                                "IsUnsigned": false,
-                                "TypeName": "i32",
-                                "Start": {
-                                    "Line": 3,
-                                    "Column": 23,
-                                    "Index": 55
-                                },
-                                "End": {
-                                    "Line": 3,
-                                    "Column": 26,
-                                    "Index": 58
-                                }
-                            },
-                            "FieldValue": null,
-                            "Start": {
-                                "Line": 3,
-                                "Column": 20,
-                                "Index": 52
-                            },
-                            "End": {
-                                "Line": 3,
-                                "Column": 26,
-                                "Index": 58
-                            }
-                        },
-                        {
-                            "FieldIdentifier": {
-                                "Name": "y",
-                                "Start": {
-                                    "Line": 3,
-                                    "Column": 28,
-                                    "Index": 60
-                                },
-                                "End": {
-                                    "Line": 3,
-                                    "Column": 29,
-                                    "Index": 61
-                                }
-                            },
-                            "FieldType": {
-                                "BitSize": 32,
-                                "IsUnsigned": false,
-                                "TypeName": "i32",
-                                "Start": {
-                                    "Line": 3,
-                                    "Column": 31,
-                                    "Index": 63
-                                },
-                                "End": {
-                                    "Line": 3,
-                                    "Column": 34,
-                                    "Index": 66
-                                }
-                            },
-                            "FieldValue": null,
-                            "Start": {
-                                "Line": 3,
-                                "Column": 28,
-                                "Index": 60
-                            },
-                            "End": {
-                                "Line": 3,
-                                "Column": 34,
-                                "Index": 66
-                            }
-                        }
-                    ],
-                    "TypeName": "struct",
-                    "Start": {
-                        "Line": 3,
-                        "Column": 12,
-                        "Index": 44
-                    },
-                    "End": {
-                        "Line": 3,
-                        "Column": 35,
-                        "Index": 67
-                    }
-                }
+                "ExplicitType": null
             }
         ],
         "Initializers": [
@@ -223,13 +127,13 @@
                     "Name": "struct",
                     "Start": {
                         "Line": 3,
-                        "Column": 39,
-                        "Index": 71
+                        "Column": 14,
+                        "Index": 46
                     },
                     "End": {
                         "Line": 3,
-                        "Column": 45,
-                        "Index": 77
+                        "Column": 20,
+                        "Index": 52
                     }
                 },
                 "Fields": [
@@ -238,13 +142,13 @@
                             "Name": "x",
                             "Start": {
                                 "Line": 3,
-                                "Column": 46,
-                                "Index": 78
+                                "Column": 21,
+                                "Index": 53
                             },
                             "End": {
                                 "Line": 3,
-                                "Column": 47,
-                                "Index": 79
+                                "Column": 22,
+                                "Index": 54
                             }
                         },
                         "FieldType": null,
@@ -254,24 +158,24 @@
                             "Base": 10,
                             "Start": {
                                 "Line": 3,
-                                "Column": 49,
-                                "Index": 81
+                                "Column": 24,
+                                "Index": 56
                             },
                             "End": {
                                 "Line": 3,
-                                "Column": 50,
-                                "Index": 82
+                                "Column": 25,
+                                "Index": 57
                             }
                         },
                         "Start": {
                             "Line": 3,
-                            "Column": 46,
-                            "Index": 78
+                            "Column": 21,
+                            "Index": 53
                         },
                         "End": {
                             "Line": 3,
-                            "Column": 50,
-                            "Index": 82
+                            "Column": 25,
+                            "Index": 57
                         }
                     },
                     {
@@ -279,13 +183,13 @@
                             "Name": "y",
                             "Start": {
                                 "Line": 3,
-                                "Column": 52,
-                                "Index": 84
+                                "Column": 27,
+                                "Index": 59
                             },
                             "End": {
                                 "Line": 3,
-                                "Column": 53,
-                                "Index": 85
+                                "Column": 28,
+                                "Index": 60
                             }
                         },
                         "FieldType": null,
@@ -295,37 +199,37 @@
                             "Base": 10,
                             "Start": {
                                 "Line": 3,
-                                "Column": 55,
-                                "Index": 87
+                                "Column": 30,
+                                "Index": 62
                             },
                             "End": {
                                 "Line": 3,
-                                "Column": 56,
-                                "Index": 88
+                                "Column": 31,
+                                "Index": 63
                             }
                         },
                         "Start": {
                             "Line": 3,
-                            "Column": 52,
-                            "Index": 84
+                            "Column": 27,
+                            "Index": 59
                         },
                         "End": {
                             "Line": 3,
-                            "Column": 56,
-                            "Index": 88
+                            "Column": 31,
+                            "Index": 63
                         }
                     }
                 ],
                 "IsAnonymous": true,
                 "Start": {
                     "Line": 3,
-                    "Column": 38,
-                    "Index": 70
+                    "Column": 13,
+                    "Index": 45
                 },
                 "End": {
                     "Line": 3,
-                    "Column": 57,
-                    "Index": 89
+                    "Column": 32,
+                    "Index": 64
                 }
             }
         ],
@@ -337,7 +241,7 @@
         },
         "End": {
             "Line": 3,
-            "Column": 58,
+            "Column": 33,
             "Index": 42
         }
     },
@@ -349,12 +253,12 @@
                     "Start": {
                         "Line": 5,
                         "Column": 5,
-                        "Index": 98
+                        "Index": 73
                     },
                     "End": {
                         "Line": 5,
                         "Column": 11,
-                        "Index": 99
+                        "Index": 74
                     }
                 },
                 "ExplicitType": null
@@ -366,12 +270,12 @@
                 "Start": {
                     "Line": 5,
                     "Column": 9,
-                    "Index": 102
+                    "Index": 77
                 },
                 "End": {
                     "Line": 5,
                     "Column": 10,
-                    "Index": 103
+                    "Index": 78
                 }
             }
         ],
@@ -379,12 +283,12 @@
         "Start": {
             "Line": 5,
             "Column": 1,
-            "Index": 94
+            "Index": 69
         },
         "End": {
             "Line": 5,
             "Column": 11,
-            "Index": 99
+            "Index": 74
         }
     },
     {
@@ -393,12 +297,12 @@
             "Start": {
                 "Line": 7,
                 "Column": 6,
-                "Index": 113
+                "Index": 88
             },
             "End": {
                 "Line": 7,
                 "Column": 13,
-                "Index": 120
+                "Index": 95
             }
         },
         "BaseType": {
@@ -408,23 +312,23 @@
             "Start": {
                 "Line": 7,
                 "Column": 14,
-                "Index": 121
+                "Index": 96
             },
             "End": {
                 "Line": 7,
                 "Column": 18,
-                "Index": 124
+                "Index": 99
             }
         },
         "Start": {
             "Line": 7,
             "Column": 1,
-            "Index": 108
+            "Index": 83
         },
         "End": {
             "Line": 7,
             "Column": 18,
-            "Index": 124
+            "Index": 99
         }
     },
     {
@@ -435,12 +339,12 @@
                     "Start": {
                         "Line": 9,
                         "Column": 5,
-                        "Index": 133
+                        "Index": 108
                     },
                     "End": {
                         "Line": 9,
                         "Column": 20,
-                        "Index": 134
+                        "Index": 109
                     }
                 },
                 "ExplicitType": {
@@ -448,12 +352,12 @@
                     "Start": {
                         "Line": 9,
                         "Column": 8,
-                        "Index": 136
+                        "Index": 111
                     },
                     "End": {
                         "Line": 9,
                         "Column": 15,
-                        "Index": 143
+                        "Index": 118
                     }
                 }
             }
@@ -466,12 +370,12 @@
                 "Start": {
                     "Line": 9,
                     "Column": 18,
-                    "Index": 146
+                    "Index": 121
                 },
                 "End": {
                     "Line": 9,
                     "Column": 19,
-                    "Index": 147
+                    "Index": 122
                 }
             }
         ],
@@ -479,12 +383,12 @@
         "Start": {
             "Line": 9,
             "Column": 1,
-            "Index": 129
+            "Index": 104
         },
         "End": {
             "Line": 9,
             "Column": 20,
-            "Index": 134
+            "Index": 109
         }
     },
     {
@@ -493,12 +397,12 @@
             "Start": {
                 "Line": 11,
                 "Column": 6,
-                "Index": 157
+                "Index": 132
             },
             "End": {
                 "Line": 11,
                 "Column": 15,
-                "Index": 166
+                "Index": 141
             }
         },
         "BaseType": {
@@ -509,12 +413,12 @@
                         "Start": {
                             "Line": 12,
                             "Column": 5,
-                            "Index": 178
+                            "Index": 153
                         },
                         "End": {
                             "Line": 12,
                             "Column": 10,
-                            "Index": 183
+                            "Index": 158
                         }
                     },
                     "FieldType": {
@@ -524,24 +428,24 @@
                         "Start": {
                             "Line": 12,
                             "Column": 12,
-                            "Index": 185
+                            "Index": 160
                         },
                         "End": {
                             "Line": 12,
                             "Column": 15,
-                            "Index": 188
+                            "Index": 163
                         }
                     },
                     "FieldValue": null,
                     "Start": {
                         "Line": 12,
                         "Column": 5,
-                        "Index": 178
+                        "Index": 153
                     },
                     "End": {
                         "Line": 12,
                         "Column": 15,
-                        "Index": 188
+                        "Index": 163
                     }
                 },
                 {
@@ -550,12 +454,12 @@
                         "Start": {
                             "Line": 13,
                             "Column": 5,
-                            "Index": 192
+                            "Index": 167
                         },
                         "End": {
                             "Line": 13,
                             "Column": 11,
-                            "Index": 198
+                            "Index": 173
                         }
                     },
                     "FieldType": {
@@ -565,24 +469,24 @@
                         "Start": {
                             "Line": 13,
                             "Column": 13,
-                            "Index": 200
+                            "Index": 175
                         },
                         "End": {
                             "Line": 13,
                             "Column": 16,
-                            "Index": 203
+                            "Index": 178
                         }
                     },
                     "FieldValue": null,
                     "Start": {
                         "Line": 13,
                         "Column": 5,
-                        "Index": 192
+                        "Index": 167
                     },
                     "End": {
                         "Line": 13,
                         "Column": 16,
-                        "Index": 203
+                        "Index": 178
                     }
                 }
             ],
@@ -590,61 +494,365 @@
             "Start": {
                 "Line": 11,
                 "Column": 16,
-                "Index": 167
+                "Index": 142
             },
             "End": {
                 "Line": 14,
                 "Column": 3,
-                "Index": 206
+                "Index": 181
             }
         },
         "Start": {
             "Line": 11,
             "Column": 1,
-            "Index": 152
+            "Index": 127
         },
         "End": {
             "Line": 14,
             "Column": 3,
-            "Index": 206
+            "Index": 181
+        }
+    },
+    {
+        "Alias": {
+            "Name": "Circle",
+            "Start": {
+                "Line": 16,
+                "Column": 6,
+                "Index": 191
+            },
+            "End": {
+                "Line": 16,
+                "Column": 12,
+                "Index": 197
+            }
+        },
+        "BaseType": {
+            "Fields": [
+                {
+                    "FieldIdentifier": {
+                        "Name": "radius",
+                        "Start": {
+                            "Line": 17,
+                            "Column": 5,
+                            "Index": 209
+                        },
+                        "End": {
+                            "Line": 17,
+                            "Column": 11,
+                            "Index": 215
+                        }
+                    },
+                    "FieldType": {
+                        "BitSize": 32,
+                        "IsUnsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 17,
+                            "Column": 13,
+                            "Index": 217
+                        },
+                        "End": {
+                            "Line": 17,
+                            "Column": 16,
+                            "Index": 220
+                        }
+                    },
+                    "FieldValue": null,
+                    "Start": {
+                        "Line": 17,
+                        "Column": 5,
+                        "Index": 209
+                    },
+                    "End": {
+                        "Line": 17,
+                        "Column": 16,
+                        "Index": 220
+                    }
+                }
+            ],
+            "TypeName": "struct",
+            "Start": {
+                "Line": 16,
+                "Column": 13,
+                "Index": 198
+            },
+            "End": {
+                "Line": 18,
+                "Column": 3,
+                "Index": 223
+            }
+        },
+        "Start": {
+            "Line": 16,
+            "Column": 1,
+            "Index": 186
+        },
+        "End": {
+            "Line": 18,
+            "Column": 3,
+            "Index": 223
+        }
+    },
+    {
+        "Identifier": {
+            "Name": "add",
+            "Start": {
+                "Line": 20,
+                "Column": 4,
+                "Index": 231
+            },
+            "End": {
+                "Line": 20,
+                "Column": 7,
+                "Index": 234
+            }
+        },
+        "Function": {
+            "Params": [
+                {
+                    "Identifier": {
+                        "Name": "a",
+                        "Start": {
+                            "Line": 20,
+                            "Column": 8,
+                            "Index": 235
+                        },
+                        "End": {
+                            "Line": 20,
+                            "Column": 9,
+                            "Index": 236
+                        }
+                    },
+                    "Type": {
+                        "BitSize": 32,
+                        "IsUnsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 20,
+                            "Column": 11,
+                            "Index": 238
+                        },
+                        "End": {
+                            "Line": 20,
+                            "Column": 14,
+                            "Index": 241
+                        }
+                    }
+                },
+                {
+                    "Identifier": {
+                        "Name": "b",
+                        "Start": {
+                            "Line": 20,
+                            "Column": 16,
+                            "Index": 243
+                        },
+                        "End": {
+                            "Line": 20,
+                            "Column": 17,
+                            "Index": 244
+                        }
+                    },
+                    "Type": {
+                        "BitSize": 32,
+                        "IsUnsigned": false,
+                        "TypeName": "i32",
+                        "Start": {
+                            "Line": 20,
+                            "Column": 19,
+                            "Index": 246
+                        },
+                        "End": {
+                            "Line": 20,
+                            "Column": 22,
+                            "Index": 249
+                        }
+                    }
+                }
+            ],
+            "ReturnType": [
+                {
+                    "BitSize": 32,
+                    "IsUnsigned": false,
+                    "TypeName": "i32",
+                    "Start": {
+                        "Line": 20,
+                        "Column": 27,
+                        "Index": 254
+                    },
+                    "End": {
+                        "Line": 20,
+                        "Column": 30,
+                        "Index": 257
+                    }
+                }
+            ],
+            "Body": {
+                "Nodes": [
+                    {
+                        "Values": [
+                            {
+                                "Left": {
+                                    "Name": "a",
+                                    "Start": {
+                                        "Line": 21,
+                                        "Column": 12,
+                                        "Index": 269
+                                    },
+                                    "End": {
+                                        "Line": 21,
+                                        "Column": 13,
+                                        "Index": 270
+                                    }
+                                },
+                                "Operator": {
+                                    "Kind": "+",
+                                    "Value": "+",
+                                    "Start": {
+                                        "Line": 21,
+                                        "Column": 14,
+                                        "Index": 271
+                                    },
+                                    "End": {
+                                        "Line": 21,
+                                        "Column": 15,
+                                        "Index": 272
+                                    }
+                                },
+                                "Right": {
+                                    "Name": "b",
+                                    "Start": {
+                                        "Line": 21,
+                                        "Column": 16,
+                                        "Index": 273
+                                    },
+                                    "End": {
+                                        "Line": 21,
+                                        "Column": 17,
+                                        "Index": 274
+                                    }
+                                },
+                                "Start": {
+                                    "Line": 21,
+                                    "Column": 12,
+                                    "Index": 269
+                                },
+                                "End": {
+                                    "Line": 21,
+                                    "Column": 17,
+                                    "Index": 274
+                                }
+                            }
+                        ],
+                        "Start": {
+                            "Line": 21,
+                            "Column": 5,
+                            "Index": 262
+                        },
+                        "End": {
+                            "Line": 21,
+                            "Column": 18,
+                            "Index": 274
+                        }
+                    }
+                ],
+                "Start": {
+                    "Line": 20,
+                    "Column": 31,
+                    "Index": 258
+                },
+                "End": {
+                    "Line": 22,
+                    "Column": 2,
+                    "Index": 278
+                }
+            },
+            "Start": {
+                "Line": 20,
+                "Column": 1,
+                "Index": 228
+            },
+            "End": {
+                "Line": 22,
+                "Column": 2,
+                "Index": 278
+            }
+        },
+        "Start": {
+            "Line": 20,
+            "Column": 1,
+            "Index": 228
+        },
+        "End": {
+            "Line": 22,
+            "Column": 2,
+            "Index": 278
+        }
+    },
+    {
+        "Params": [],
+        "ReturnType": null,
+        "Body": {
+            "Nodes": [],
+            "Start": {
+                "Line": 24,
+                "Column": 5,
+                "Index": 286
+            },
+            "End": {
+                "Line": 26,
+                "Column": 2,
+                "Index": 292
+            }
+        },
+        "Start": {
+            "Line": 24,
+            "Column": 1,
+            "Index": 282
+        },
+        "End": {
+            "Line": 26,
+            "Column": 2,
+            "Index": 292
         }
     },
     {
         "Alias": {
             "Name": "Rectangle2",
             "Start": {
-                "Line": 22,
+                "Line": 33,
                 "Column": 6,
-                "Index": 298
+                "Index": 381
             },
             "End": {
-                "Line": 22,
+                "Line": 33,
                 "Column": 16,
-                "Index": 308
+                "Index": 391
             }
         },
         "BaseType": {
             "TypeName": "Rectangle",
             "Start": {
-                "Line": 22,
+                "Line": 33,
                 "Column": 17,
-                "Index": 309
+                "Index": 392
             },
             "End": {
-                "Line": 22,
+                "Line": 33,
                 "Column": 27,
-                "Index": 318
+                "Index": 401
             }
         },
         "Start": {
-            "Line": 22,
+            "Line": 33,
             "Column": 1,
-            "Index": 293
+            "Index": 376
         },
         "End": {
-            "Line": 22,
+            "Line": 33,
             "Column": 27,
-            "Index": 318
+            "Index": 401
         }
     },
     {
@@ -653,14 +861,14 @@
                 "Identifier": {
                     "Name": "rect",
                     "Start": {
-                        "Line": 24,
+                        "Line": 35,
                         "Column": 5,
-                        "Index": 327
+                        "Index": 410
                     },
                     "End": {
-                        "Line": 24,
+                        "Line": 35,
                         "Column": 47,
-                        "Index": 331
+                        "Index": 414
                     }
                 },
                 "ExplicitType": null
@@ -671,14 +879,14 @@
                 "StructName": {
                     "Name": "Rectangle2",
                     "Start": {
-                        "Line": 24,
+                        "Line": 35,
                         "Column": 13,
-                        "Index": 335
+                        "Index": 418
                     },
                     "End": {
-                        "Line": 24,
+                        "Line": 35,
                         "Column": 23,
-                        "Index": 345
+                        "Index": 428
                     }
                 },
                 "Fields": [
@@ -686,14 +894,14 @@
                         "FieldIdentifier": {
                             "Name": "width",
                             "Start": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 24,
-                                "Index": 346
+                                "Index": 429
                             },
                             "End": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 29,
-                                "Index": 351
+                                "Index": 434
                             }
                         },
                         "FieldType": null,
@@ -702,39 +910,39 @@
                             "Raw": "10",
                             "Base": 10,
                             "Start": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 31,
-                                "Index": 353
+                                "Index": 436
                             },
                             "End": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 33,
-                                "Index": 355
+                                "Index": 438
                             }
                         },
                         "Start": {
-                            "Line": 24,
+                            "Line": 35,
                             "Column": 24,
-                            "Index": 346
+                            "Index": 429
                         },
                         "End": {
-                            "Line": 24,
+                            "Line": 35,
                             "Column": 33,
-                            "Index": 355
+                            "Index": 438
                         }
                     },
                     {
                         "FieldIdentifier": {
                             "Name": "height",
                             "Start": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 35,
-                                "Index": 357
+                                "Index": 440
                             },
                             "End": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 41,
-                                "Index": 363
+                                "Index": 446
                             }
                         },
                         "FieldType": null,
@@ -743,176 +951,165 @@
                             "Raw": "20",
                             "Base": 10,
                             "Start": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 43,
-                                "Index": 365
+                                "Index": 448
                             },
                             "End": {
-                                "Line": 24,
+                                "Line": 35,
                                 "Column": 45,
-                                "Index": 367
+                                "Index": 450
                             }
                         },
                         "Start": {
-                            "Line": 24,
+                            "Line": 35,
                             "Column": 35,
-                            "Index": 357
+                            "Index": 440
                         },
                         "End": {
-                            "Line": 24,
+                            "Line": 35,
                             "Column": 45,
-                            "Index": 367
+                            "Index": 450
                         }
                     }
                 ],
                 "IsAnonymous": false,
                 "Start": {
-                    "Line": 24,
+                    "Line": 35,
                     "Column": 12,
-                    "Index": 334
+                    "Index": 417
                 },
                 "End": {
-                    "Line": 24,
+                    "Line": 35,
                     "Column": 46,
-                    "Index": 368
+                    "Index": 451
                 }
             }
         ],
         "IsConst": false,
         "Start": {
-            "Line": 24,
+            "Line": 35,
             "Column": 1,
-            "Index": 323
+            "Index": 406
         },
         "End": {
-            "Line": 24,
+            "Line": 35,
             "Column": 47,
-            "Index": 331
+            "Index": 414
         }
     },
     {
         "Variables": [
             {
                 "Identifier": {
-                    "Name": "aa",
+                    "Name": "rect2",
                     "Start": {
-                        "Line": 27,
+                        "Line": 37,
                         "Column": 5,
-                        "Index": 379
+                        "Index": 460
                     },
                     "End": {
-                        "Line": 27,
-                        "Column": 32,
-                        "Index": 381
+                        "Line": 37,
+                        "Column": 45,
+                        "Index": 465
                     }
                 },
                 "ExplicitType": {
-                    "BitSize": 32,
-                    "IsUnsigned": false,
-                    "TypeName": "i32",
+                    "TypeName": "Rectangle2",
                     "Start": {
-                        "Line": 27,
-                        "Column": 9,
-                        "Index": 383
+                        "Line": 37,
+                        "Column": 12,
+                        "Index": 467
                     },
                     "End": {
-                        "Line": 27,
-                        "Column": 12,
-                        "Index": 386
+                        "Line": 37,
+                        "Column": 22,
+                        "Index": 477
                     }
                 }
             }
         ],
         "Initializers": [
             {
-                "Left": {
-                    "Object": {
-                        "Name": "rect",
-                        "Start": {
-                            "Line": 27,
-                            "Column": 15,
-                            "Index": 389
-                        },
-                        "End": {
-                            "Line": 27,
-                            "Column": 19,
-                            "Index": 393
-                        }
-                    },
-                    "Field": {
-                        "Name": "width",
-                        "Start": {
-                            "Line": 27,
-                            "Column": 20,
-                            "Index": 394
-                        },
-                        "End": {
-                            "Line": 27,
-                            "Column": 25,
-                            "Index": 399
-                        }
-                    },
+                "StructName": {
+                    "Name": "struct",
                     "Start": {
-                        "Line": 27,
-                        "Column": 15,
-                        "Index": 389
-                    },
-                    "End": {
-                        "Line": 27,
-                        "Column": 25,
-                        "Index": 399
-                    }
-                },
-                "Operator": {
-                    "Kind": "+",
-                    "Value": "+",
-                    "Start": {
-                        "Line": 27,
+                        "Line": 37,
                         "Column": 26,
-                        "Index": 400
+                        "Index": 481
                     },
                     "End": {
-                        "Line": 27,
-                        "Column": 27,
-                        "Index": 401
+                        "Line": 37,
+                        "Column": 32,
+                        "Index": 487
                     }
                 },
-                "Right": {
-                    "Value": 1,
-                    "Raw": "1.0",
-                    "Start": {
-                        "Line": 27,
-                        "Column": 28,
-                        "Index": 402
-                    },
-                    "End": {
-                        "Line": 27,
-                        "Column": 31,
-                        "Index": 405
+                "Fields": [
+                    {
+                        "FieldIdentifier": {
+                            "Name": "radius",
+                            "Start": {
+                                "Line": 37,
+                                "Column": 33,
+                                "Index": 488
+                            },
+                            "End": {
+                                "Line": 37,
+                                "Column": 39,
+                                "Index": 494
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 10,
+                            "Raw": "10",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 37,
+                                "Column": 41,
+                                "Index": 496
+                            },
+                            "End": {
+                                "Line": 37,
+                                "Column": 43,
+                                "Index": 498
+                            }
+                        },
+                        "Start": {
+                            "Line": 37,
+                            "Column": 33,
+                            "Index": 488
+                        },
+                        "End": {
+                            "Line": 37,
+                            "Column": 43,
+                            "Index": 498
+                        }
                     }
-                },
+                ],
+                "IsAnonymous": true,
                 "Start": {
-                    "Line": 27,
-                    "Column": 15,
-                    "Index": 389
+                    "Line": 37,
+                    "Column": 25,
+                    "Index": 480
                 },
                 "End": {
-                    "Line": 27,
-                    "Column": 31,
-                    "Index": 405
+                    "Line": 37,
+                    "Column": 44,
+                    "Index": 499
                 }
             }
         ],
         "IsConst": false,
         "Start": {
-            "Line": 27,
+            "Line": 37,
             "Column": 1,
-            "Index": 375
+            "Index": 456
         },
         "End": {
-            "Line": 27,
-            "Column": 32,
-            "Index": 381
+            "Line": 37,
+            "Column": 45,
+            "Index": 465
         }
     }
 ]

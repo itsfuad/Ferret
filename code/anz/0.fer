@@ -1,6 +1,6 @@
 let x, y: i32, byte = 1, 'a';
 
-let point: struct {x: i32, y: i32} = @struct{x: 1, y: 2};
+let point = @struct{x: 1, y: 2};
 
 let b = x;
 
@@ -13,6 +13,17 @@ type Rectangle struct {
 	height: i32
 };
 
+type Circle struct {
+	radius: i32
+};
+
+fn add(a: i32, b: i32) -> i32 {
+	return a + b;
+}
+
+fn(){
+
+}
 
 
 // fn (r: Rectangle) area() -> i32 {
@@ -23,7 +34,8 @@ type Rectangle2 Rectangle;
 
 let rect = @Rectangle2{width: 10, height: 20};
 
+let rect2: Rectangle2 = @struct{radius: 10};
 
-let aa: i32 = rect.width + 1.0;
+//let aa: i32 = rect.widths + 1;
 
-// rect.area();
+//rect.area();

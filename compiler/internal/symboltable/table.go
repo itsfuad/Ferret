@@ -1,7 +1,6 @@
 package symboltable
 
 import (
-	"ferret/compiler/internal/analyzer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/types"
@@ -19,6 +18,10 @@ const (
 	MODULE_SCOPE
 )
 
+func (s SCOPE_KIND) String() string {
+	return []string{"global", "local", "block", "function", "struct", "interface", "module"}[s]
+}
+
 // SYMBOL_KIND represents the kind of symbol (variable, function, type, etc.)
 type SYMBOL_KIND int
 
@@ -33,7 +36,7 @@ var compilerGlobalSymbols = map[string]*Symbol{
 		Name:       "true",
 		SymbolKind: VARIABLE_SYMBOL,
 		IsMutable:  false,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	},
@@ -41,7 +44,7 @@ var compilerGlobalSymbols = map[string]*Symbol{
 		Name:       "false",
 		SymbolKind: VARIABLE_SYMBOL,
 		IsMutable:  false,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	},
@@ -54,7 +57,7 @@ type Symbol struct {
 	IsMutable  bool
 	FilePath   string
 	Location   *source.Location
-	SymbolType analyzer.AnalyzerNode
+	SymbolType AnalyzerNode
 	Module     string
 }
 
@@ -92,15 +95,6 @@ func (st *SymbolTable) Define(symbol *Symbol) bool {
 	}
 	st.Symbols[symbol.Name] = symbol
 	return true
-}
-
-// Update updates a symbol type
-func (st *SymbolTable) UpdateSymbolType(name string, symbolType analyzer.AnalyzerNode) bool {
-	if _, exists := st.Symbols[name]; exists {
-		st.Symbols[name].SymbolType = symbolType
-		return true
-	}
-	return false
 }
 
 // Resolve looks up a symbol by name in the current scope and parent scopes
@@ -164,8 +158,8 @@ func (st *SymbolTable) Clear() {
 }
 
 // EnterScope creates and returns a new child scope
-func (st *SymbolTable) EnterScope(kind SCOPE_KIND, filepath string) *SymbolTable {
-	return NewSymbolTable(st, kind, filepath)
+func (st *SymbolTable) EnterScope(kind SCOPE_KIND) *SymbolTable {
+	return NewSymbolTable(st, kind, st.Filepath)
 }
 
 // ExitScope returns to the parent scope

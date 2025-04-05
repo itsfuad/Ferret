@@ -5,7 +5,6 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"
 )
@@ -81,23 +80,8 @@ func parseParameters(p *Parser) []ast.Parameter {
 
 		params = append(params, param)
 
-		//add to current scope
-		paramSym := &symboltable.Symbol{
-			Name:       param.Identifier.Name,
-			SymbolKind: symboltable.VARIABLE_SYMBOL,
-			IsMutable:  false,
-			FilePath:   p.filePath,
-			Location:   &param.Identifier.Location,
-		}
-
-		if !p.currentScope.Define(paramSym) {
-			report.ShowRedeclarationError(
-				param.Identifier.Name,
-				p.filePath,
-				p.currentScope,
-				&param.Identifier.Location,
-			)
-			return nil
+		if p.match(lexer.CLOSE_PAREN) {
+			break
 		}
 
 		if p.match(lexer.CLOSE_PAREN) {
@@ -159,13 +143,6 @@ func parseReturnTypes(p *Parser) []ast.DataType {
 
 func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]ast.Parameter, []ast.DataType) {
 
-	//scope must be a function scope
-	if p.currentScope.ScopeKind() != symboltable.FUNCTION_SCOPE {
-		previous := p.previous()
-		report.Add(p.filePath, source.NewLocation(&previous.Start, &previous.End), report.SCOPE_MISMATCH+": expected function scope").SetLevel(report.SYNTAX_ERROR)
-		return nil, nil
-	}
-
 	if len(params) == 0 && parseNewParams {
 		params = parseParameters(p)
 	}
@@ -180,11 +157,6 @@ func parseSignature(p *Parser, parseNewParams bool, params ...ast.Parameter) ([]
 }
 
 func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseNewParams bool, params ...ast.Parameter) *ast.FunctionLiteral {
-
-	if isAnonymous {
-		p.enterScope(symboltable.FUNCTION_SCOPE)
-		defer p.exitScope()
-	}
 
 	params, returnTypes := parseSignature(p, parseNewParams, params...)
 
@@ -211,25 +183,6 @@ func declareFunction(p *Parser) *ast.IdentifierExpr {
 			Name:     token.Value,
 			Location: location,
 		}
-
-		// Add function to current scope's symbol table
-		sym := &symboltable.Symbol{
-			Name:       name.Name,
-			SymbolKind: symboltable.VARIABLE_SYMBOL,
-			IsMutable:  false,
-			Location:   &name.Location,
-			FilePath:   p.filePath,
-		}
-
-		if !p.currentScope.Define(sym) {
-			report.ShowRedeclarationError(
-				name.Name,
-				p.filePath,
-				p.currentScope,
-				&name.Location,
-			)
-			return nil
-		}
 	}
 
 	return name
@@ -243,10 +196,6 @@ func parseFunctionDecl(p *Parser) ast.BlockConstruct {
 	start := p.consume(lexer.FUNCTION_TOKEN, report.EXPECTED_FUNCTION_KEYWORD)
 
 	name := declareFunction(p)
-
-	//start a new scope
-	p.enterScope(symboltable.FUNCTION_SCOPE)
-	defer p.exitScope()
 
 	function := parseFunctionLiteral(p, &start.Start, false, true)
 

@@ -4,7 +4,6 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 	"fmt"
 	"slices"
@@ -14,31 +13,15 @@ type Parser struct {
 	tokens       []lexer.Token
 	tokenNo      int
 	filePath     string
-	symbolTable  *symboltable.SymbolTable
-	currentScope *symboltable.SymbolTable
 }
 
 func New(filePath string, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, debug)
-	globalScope := symboltable.NewSymbolTable(nil, symboltable.GLOBAL_SCOPE, filePath)
 	return &Parser{
 		tokens:       tokens,
 		tokenNo:      0,
 		filePath:     filePath,
-		symbolTable:  globalScope,
-		currentScope: globalScope,
 	}
-}
-
-// enterScope creates a new scope of the given kind and makes it current
-func (p *Parser) enterScope(kind symboltable.SCOPE_KIND) *symboltable.SymbolTable {
-	p.currentScope = p.currentScope.EnterScope(kind, p.filePath)
-	return p.currentScope
-}
-
-// exitScope returns to the parent scope
-func (p *Parser) exitScope() {
-	p.currentScope = p.currentScope.ExitScope()
 }
 
 // current token
@@ -149,10 +132,6 @@ func handleUnexpectedToken(p *Parser) ast.Statement {
 func parseBlock(p *Parser) ast.BlockConstruct {
 	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
 
-	// Create a new block scope
-	p.enterScope(symboltable.BLOCK_SCOPE)
-	defer p.exitScope() // Ensure we exit the scope even if there's an error
-
 	nodes := make([]ast.Node, 0)
 
 	for !p.isAtEnd() && p.peek().Kind != lexer.CLOSE_CURLY {
@@ -247,7 +226,7 @@ func parseNode(p *Parser) ast.Node {
 }
 
 // Parse is the entry point for parsing
-func (p *Parser) Parse() ([]ast.Node, *symboltable.SymbolTable) {
+func (p *Parser) Parse() []ast.Node {
 	var nodes []ast.Node
 
 	for !p.isAtEnd() {
@@ -261,5 +240,5 @@ func (p *Parser) Parse() ([]ast.Node, *symboltable.SymbolTable) {
 		}
 	}
 
-	return nodes, p.symbolTable
+	return nodes
 }

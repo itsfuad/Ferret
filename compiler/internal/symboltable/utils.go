@@ -1,4 +1,4 @@
-package analyzer
+package symboltable
 
 func unwrapType(value AnalyzerNode) AnalyzerNode {
 	switch t := value.(type) {

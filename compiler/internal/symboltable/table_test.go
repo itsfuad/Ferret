@@ -1,7 +1,6 @@
 package symboltable
 
 import (
-	"ferret/compiler/internal/analyzer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/types"
 	"testing"
@@ -50,7 +49,7 @@ func TestDefineAndResolve(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   location,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -90,7 +89,7 @@ func TestScopeHierarchy(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   globalLocation,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -115,7 +114,7 @@ func TestScopeHierarchy(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   localLocation,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -142,7 +141,7 @@ func TestEnterExitScope(t *testing.T) {
 	global := NewSymbolTable(nil, GLOBAL_SCOPE, testFilePath)
 
 	// Test entering new scope
-	local := global.EnterScope(LOCAL_SCOPE, testFilePath)
+	local := global.EnterScope(LOCAL_SCOPE)
 	if local == nil || local.Kind != LOCAL_SCOPE {
 		t.Errorf("EnterScope returned nil or wrong kind: got %v", local)
 	}
@@ -181,7 +180,7 @@ func TestResolveInModule(t *testing.T) {
 		FilePath:   testFilePath,
 		Location:   location,
 		Module:     "testModule",
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -260,7 +259,7 @@ func TestClear(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   location1,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -270,7 +269,7 @@ func TestClear(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   location2,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -313,7 +312,7 @@ func TestResolveLocal(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   globalLocation,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}
@@ -335,7 +334,7 @@ func TestResolveLocal(t *testing.T) {
 		IsMutable:  true,
 		FilePath:   testFilePath,
 		Location:   localLocation,
-		SymbolType: &analyzer.BoolType{
+		SymbolType: &BoolType{
 			TypeName: types.BOOL,
 		},
 	}

@@ -62,7 +62,8 @@ func (p *PackageDeclStmt) Loc() *source.Location { return &p.Location }
 
 // ImportStmt represents an import statement
 type ImportStmt struct {
-	Import *StringLiteral
+	ImportPath *StringLiteral
+	ModuleName string
 	source.Location
 }
 

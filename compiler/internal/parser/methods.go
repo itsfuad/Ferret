@@ -5,17 +5,12 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/lexer"
 	"ferret/compiler/internal/source"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 )
 
 func parseMethodDeclaration(p *Parser, startPos *source.Position, receivers []ast.Parameter) *ast.MethodDecl {
 	colors.BLUE.Println("Parsing ")
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_METHOD_NAME)
-
-	//start a new scope
-	p.enterScope(symboltable.FUNCTION_SCOPE)
-	defer p.exitScope()
 
 	iden := ast.IdentifierExpr{
 		Name:     name.Value,

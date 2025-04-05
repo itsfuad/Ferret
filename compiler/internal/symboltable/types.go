@@ -1,4 +1,4 @@
-package analyzer
+package symboltable
 
 import (
 	"ferret/compiler/types"
@@ -81,26 +81,28 @@ func (t *FunctionType) ToString() string {
 	return fmt.Sprintf("(%s)%s", paramString, tail)
 }
 
-type StructField struct {
-	Name string
-	Type AnalyzerNode
-}
-
 type StructType struct {
 	TypeName types.TYPE_NAME
-	Fields   []StructField
+	Name     string
+	Scope    *SymbolTable
 }
 
 func (t *StructType) ANode() types.TYPE_NAME { return t.TypeName }
 func (t *StructType) ToString() string {
-	fieldString := ""
-	for i, field := range t.Fields {
-		if i > 0 {
-			fieldString += ", "
+	str := "{ "
+	propCount := len(t.Scope.Symbols)
+	propIndex := 0
+	for _, symbol := range t.Scope.Symbols {
+		str += fmt.Sprintf("%s: %s", symbol.Name, symbol.SymbolType.ToString())
+		propIndex++
+		if propIndex < propCount {
+			str += ", "
 		}
-		fieldString += fmt.Sprintf("%s: %s", field.Name, field.Type.ToString())
 	}
-	return fmt.Sprintf("%s { %s }", t.TypeName, fieldString)
+
+	str += " }"
+
+	return fmt.Sprintf("%s%s", t.TypeName, str)
 }
 
 type InterfaceType struct {
@@ -120,5 +122,5 @@ type UserDefType struct {
 
 func (t *UserDefType) ANode() types.TYPE_NAME { return t.TypeName }
 func (t *UserDefType) ToString() string {
-	return unwrapType(t.UnderlyingType).ToString()
+	return t.UnderlyingType.ToString()
 }
