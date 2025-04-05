@@ -85,17 +85,17 @@ func printReport(r *Report) {
 
 	switch r.Level {
 	case WARNING:
-		reportMsgType = "[Warning]: "
+		reportMsgType = "[Warning 🚨]: "
 	case INFO:
-		reportMsgType = "[Info]: "
+		reportMsgType = "[Info 😓]: "
 	case CRITICAL_ERROR:
-		reportMsgType = "[Critical Error]: "
+		reportMsgType = "[Critical Error 💀]: "
 	case SYNTAX_ERROR:
-		reportMsgType = "[Syntax Error]: "
+		reportMsgType = "[Syntax Error 😑]: "
 	case NORMAL_ERROR:
-		reportMsgType = "[Error]: "
+		reportMsgType = "[Error 😨]: "
 	case SEMANTIC_ERROR:
-		reportMsgType = "[Semantic Error]: "
+		reportMsgType = "[Semantic Error 😱]: "
 	}
 
 	reportColor := colorMap[r.Level]

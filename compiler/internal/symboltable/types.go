@@ -121,5 +121,5 @@ type UserDefType struct {
 
 func (t *UserDefType) ANode() types.TYPE_NAME { return t.TypeName }
 func (t *UserDefType) ToString() string {
-	return string(t.TypeName)
+	return fmt.Sprintf("%s -> %s", t.TypeName, t.UnderlyingType.ToString())
 }

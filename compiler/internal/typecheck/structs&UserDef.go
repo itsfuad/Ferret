@@ -1,6 +1,7 @@
 package typecheck
 
 import (
+	"ferret/compiler/colors"
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/symboltable"
@@ -14,6 +15,7 @@ func checkUserDefinedType(userDefinedType *ast.UserDefinedType, table *symboltab
 	sym, ok := table.Resolve(string(userDefinedType.TypeName))
 
 	fmt.Printf("User defined type: %s\n", string(sym.Name))
+	fmt.Printf("User defined type Symbol: %T\n", sym.SymbolType)
 
 	if !ok {
 		report.Add(table.Filepath, userDefinedType.Loc(), "type "+string(userDefinedType.TypeName)+" not found").SetLevel(report.NORMAL_ERROR)
@@ -91,7 +93,7 @@ func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable
 
 	checkPropsType(structLiteral.StructName.Name, unwrappedSym.(*symboltable.StructType), structType, fieldLocations, table)
 
-	return structType
+	return sym.SymbolType
 }
 
 // check if the props are defined in the declared struct and the types match
@@ -101,12 +103,12 @@ func checkPropsType(structName string, declared, provided *symboltable.StructTyp
 		//check if defined in declared struct
 		fieldType, found := declared.Scope.ResolveLocal(field.Name)
 		if !found {
-			report.Add(table.Filepath, locs[field.Name], fmt.Sprintf("error in struct literal `@%s`: field %s is not defined in the struct", structName, field.Name)).SetLevel(report.NORMAL_ERROR)
+			report.Add(table.Filepath, locs[field.Name], fmt.Sprintf("error in struct literal of type `%s`: field %s is not defined in the struct", structName, field.Name)).SetLevel(report.NORMAL_ERROR)
 		}
 
 		//check if types match
 		if ok, err := isCompatible(fieldType.SymbolType, field.SymbolType); !ok {
-			report.Add(table.Filepath, locs[field.Name], fmt.Sprintf("error in struct literal `@%s`: field %s: %s", structName, field.Name, err.Error())).SetLevel(report.NORMAL_ERROR)
+			report.Add(table.Filepath, locs[field.Name], fmt.Sprintf("error in struct literal of type `%s`: field %s: %s", structName, field.Name, err.Error())).SetLevel(report.NORMAL_ERROR)
 		}
 	}
 }
@@ -131,4 +133,64 @@ func checkStructType(structType *ast.StructType, table *symboltable.SymbolTable)
 		TypeName: types.STRUCT,
 		Scope:    scope,
 	}
+}
+
+func checkStructCompatibility(first, second *symboltable.AnalyzerNode) (bool, error) {
+	unwrappedFirst := symboltable.UnwrapUserDefType(first)
+	unwrappedSecond := symboltable.UnwrapUserDefType(second)
+
+	firstStruct := unwrappedFirst.(*symboltable.StructType)
+	secondStruct := unwrappedSecond.(*symboltable.StructType)
+
+	missingFields, extraFields, allFirstFields, allSecondFields := compareStructFields(firstStruct, secondStruct)
+
+	if errorString := buildFieldErrorString(missingFields, extraFields); errorString != "" {
+		return false, fmt.Errorf("incompatible structs: %s and %s\n%s", (*first).ToString(), (*second).ToString(), errorString)
+	}
+
+	return checkFieldTypeCompatibility(allFirstFields, allSecondFields)
+}
+
+func compareStructFields(first, second *symboltable.StructType) (map[string]bool, map[string]bool, map[string]symboltable.AnalyzerNode, map[string]symboltable.AnalyzerNode) {
+	missingFields := make(map[string]bool)
+	extraFields := make(map[string]bool)
+	allFirstFields := make(map[string]symboltable.AnalyzerNode)
+	allSecondFields := make(map[string]symboltable.AnalyzerNode)
+
+	for _, field := range first.Scope.GetSymbols() {
+		if _, ok := second.Scope.ResolveLocal(field.Name); !ok {
+			missingFields[field.Name] = true
+		}
+		allFirstFields[field.Name] = field.SymbolType
+	}
+
+	for _, field := range second.Scope.GetSymbols() {
+		if _, ok := first.Scope.ResolveLocal(field.Name); !ok {
+			extraFields[field.Name] = true
+		}
+		allSecondFields[field.Name] = field.SymbolType
+	}
+
+	return missingFields, extraFields, allFirstFields, allSecondFields
+}
+
+func buildFieldErrorString(missingFields, extraFields map[string]bool) string {
+	var errorString string
+	for field := range missingFields {
+		errorString += colors.BROWN.Sprintf(" - missing field: %s\n", field)
+	}
+	for field := range extraFields {
+		errorString += colors.BROWN.Sprintf(" - extra field: %s\n", field)
+	}
+	return errorString
+}
+
+func checkFieldTypeCompatibility(firstFields, secondFields map[string]symboltable.AnalyzerNode) (bool, error) {
+	for field, secondType := range secondFields {
+		firstType := firstFields[field]
+		if ok, err := isCompatible(firstType, secondType); !ok {
+			return false, fmt.Errorf("struct field `%s` is %s", field, err)
+		}
+	}
+	return true, nil
 }

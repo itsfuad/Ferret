@@ -27,20 +27,23 @@ func checkFieldAccessExpr(fieldAccessExpr *ast.FieldAccessExpr, table *symboltab
 
 	objType := ASTNodeToAnalyzerNode(fieldAccessExpr.Object, table)
 
-	fmt.Printf("Field access expr: %s\n", objType.ANode())
+	fmt.Printf("Object type: %v\n", fieldAccessExpr.Object)
+	fmt.Printf("Field access expr: %s\n", objType.ToString())
 
-	if objType.ANode() != types.STRUCT {
+	unwrappedObjType := symboltable.UnwrapUserDefType(&objType)
+
+	if unwrappedObjType.ANode() != types.STRUCT {
 		report.Add(table.Filepath, fieldAccessExpr.Loc(), fmt.Sprintf("expression is `%s` not a struct", objType.ANode())).SetLevel(report.CRITICAL_ERROR)
 		return nil
 	}
 
 	//check if the field is defined
-	structType := objType.(*symboltable.StructType)
+	structType := unwrappedObjType.(*symboltable.StructType)
 
 	fieldType, found := structType.Scope.ResolveLocal(fieldAccessExpr.Field.Name)
 
 	if !found {
-		report.Add(table.Filepath, fieldAccessExpr.Loc(), fmt.Sprintf("field %s is not defined in `%s`", fieldAccessExpr.Field.Name, structType.ToString())).SetLevel(report.CRITICAL_ERROR)
+		report.Add(table.Filepath, fieldAccessExpr.Loc(), fmt.Sprintf("field %s is not defined in %s", fieldAccessExpr.Field.Name, objType.ToString())).SetLevel(report.CRITICAL_ERROR)
 		return nil
 	}
 
@@ -71,6 +74,8 @@ func ckeckIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.Symb
 	if symbol.SymbolType == nil {
 		panic(fmt.Sprintf("Symbol %s is nil. Implement table update", identifier.Name))
 	}
+
+	fmt.Printf("Identifier %s Symbol type: %T\n", identifier.Name, symbol.SymbolType)
 
 	return symbol.SymbolType
 }

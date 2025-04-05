@@ -41,29 +41,33 @@ func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.Symbo
 	//first get the type of the initializers
 	var inits []symboltable.AnalyzerNode
 	for _, initializer := range initializerNodes {
-		var node ast.Node = initializer
-		inits = append(inits, ASTNodeToAnalyzerNode(node, table))
+		inits = append(inits, ASTNodeToAnalyzerNode(initializer, table))
 	}
 
 	// if explicit type is provided, check if it matches the type of the initializer, otherwise set the type of initializer to the table
 	for i, variableNode := range varDeclStmt.Variables {
 		if variableNode.ExplicitType != nil {
 			// match the type of the initializer to the explicit type
-			init := inits[i]
 			fmt.Printf("Explicit type: %T\n", variableNode.ExplicitType)
 			explicitType := ASTNodeToAnalyzerNode(variableNode.ExplicitType, table)
 
 			colors.PURPLE.Printf("Got explicit type: %T\n", explicitType)
-			colors.PURPLE.Printf("Got initializer type: %T\n", init)
+			colors.PURPLE.Printf("Got initializer type: %T\n", inits[i])
 
-			if ok, err := isCompatible(explicitType, init); !ok {
+			if ok, err := isCompatible(explicitType, inits[i]); !ok {
 				report.Add(table.Filepath, initializerNodes[i].Loc(), err.Error()).SetLevel(report.NORMAL_ERROR)
 			}
+
+			//when explicit type is provided, the initializer must use that type
+			//so we update the initializer type to the explicit type
+			colors.BLUE.Printf("Updated initializer type: %T to %T\n", inits[i], explicitType)
+			inits[i] = explicitType
 		}
 	}
 
 	//all ok now update the table
 	for i, variableNode := range varDeclStmt.Variables {
+		fmt.Printf("Defining variable: %s with type: %s\n", variableNode.Identifier.Name, inits[i].ToString())
 		symbol := &symboltable.Symbol{
 			Name:       variableNode.Identifier.Name,
 			SymbolKind: symboltable.VARIABLE_SYMBOL,
