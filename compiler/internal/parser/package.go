@@ -50,7 +50,7 @@ func parseImport(p *Parser) ast.Node {
 			Location: loc,
 		},
 		ModuleName: moduleName,
-		Location: loc,
+		Location:   loc,
 	}
 }
 

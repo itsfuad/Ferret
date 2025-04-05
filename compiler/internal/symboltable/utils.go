@@ -1,9 +1,9 @@
 package symboltable
 
-func unwrapType(value AnalyzerNode) AnalyzerNode {
-	switch t := value.(type) {
+func UnwrapUserDefType(value *AnalyzerNode) AnalyzerNode {
+	switch t := (*value).(type) {
 	case *UserDefType:
-		return unwrapType(t.UnderlyingType)
+		return UnwrapUserDefType(&t.UnderlyingType)
 	default:
 		return t
 	}

@@ -10,17 +10,17 @@ import (
 )
 
 type Parser struct {
-	tokens       []lexer.Token
-	tokenNo      int
-	filePath     string
+	tokens   []lexer.Token
+	tokenNo  int
+	filePath string
 }
 
 func New(filePath string, debug bool) *Parser {
 	tokens := lexer.Tokenize(filePath, debug)
 	return &Parser{
-		tokens:       tokens,
-		tokenNo:      0,
-		filePath:     filePath,
+		tokens:   tokens,
+		tokenNo:  0,
+		filePath: filePath,
 	}
 }
 
@@ -129,7 +129,7 @@ func handleUnexpectedToken(p *Parser) ast.Statement {
 }
 
 // parseBlock parses a block of statements
-func parseBlock(p *Parser) ast.BlockConstruct {
+func parseBlock(p *Parser) *ast.Block {
 	start := p.consume(lexer.OPEN_CURLY, report.EXPECTED_OPEN_BRACE).Start
 
 	nodes := make([]ast.Node, 0)

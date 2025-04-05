@@ -1,14 +1,15 @@
 package typecheck
 
 import (
-	"fmt"
 	"ferret/compiler/colors"
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
+	"ferret/compiler/types"
+	"fmt"
 )
 
-func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	alias := typeDeclStmt.Alias
 
@@ -20,7 +21,10 @@ func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.Sy
 		IsMutable:  false,
 		FilePath:   table.Filepath,
 		Location:   alias.Loc(),
-		SymbolType: baseType.SymbolType,
+		SymbolType: &symboltable.UserDefType{
+			TypeName:       types.TYPE_NAME(alias.Name),
+			UnderlyingType: baseType,
+		},
 	}
 
 	if !table.Define(symbol) {
@@ -30,12 +34,12 @@ func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.Sy
 	return nil
 }
 
-func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	initializerNodes := varDeclStmt.Initializers
 
 	//first get the type of the initializers
-	var inits []*symboltable.Symbol
+	var inits []symboltable.AnalyzerNode
 	for _, initializer := range initializerNodes {
 		var node ast.Node = initializer
 		inits = append(inits, ASTNodeToAnalyzerNode(node, table))
@@ -47,7 +51,7 @@ func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.Symbo
 			// match the type of the initializer to the explicit type
 			init := inits[i]
 			fmt.Printf("Explicit type: %T\n", variableNode.ExplicitType)
-			explicitType := ASTNodeToAnalyzerNode(variableNode.ExplicitType.INode(), table)
+			explicitType := ASTNodeToAnalyzerNode(variableNode.ExplicitType, table)
 
 			colors.PURPLE.Printf("Got explicit type: %T\n", explicitType)
 			colors.PURPLE.Printf("Got initializer type: %T\n", init)
@@ -66,7 +70,7 @@ func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.Symbo
 			IsMutable:  !varDeclStmt.IsConst,
 			FilePath:   table.Filepath,
 			Location:   variableNode.Identifier.Loc(),
-			SymbolType: inits[i].SymbolType,
+			SymbolType: inits[i],
 		}
 
 		if !table.Define(symbol) {

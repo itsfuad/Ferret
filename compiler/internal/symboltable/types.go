@@ -83,7 +83,6 @@ func (t *FunctionType) ToString() string {
 
 type StructType struct {
 	TypeName types.TYPE_NAME
-	Name     string
 	Scope    *SymbolTable
 }
 
@@ -122,5 +121,5 @@ type UserDefType struct {
 
 func (t *UserDefType) ANode() types.TYPE_NAME { return t.TypeName }
 func (t *UserDefType) ToString() string {
-	return t.UnderlyingType.ToString()
+	return string(t.TypeName)
 }

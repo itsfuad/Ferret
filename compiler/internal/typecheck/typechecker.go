@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) *symboltable.Symbol {
+func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	fmt.Printf("Node: %T\n", node)
 

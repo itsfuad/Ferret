@@ -8,26 +8,17 @@ import (
 	"fmt"
 )
 
-func checkFunctionLiteral(functionLiteral *ast.FunctionLiteral, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkFunctionLiteral(functionLiteral *ast.FunctionLiteral, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	//params := functionLiteral.Params
 	//body := functionLiteral.Body
 
-	return &symboltable.Symbol{
-		Name:       string(types.FUNCTION),
-		SymbolKind: symboltable.TYPE_SYMBOL,
-		IsMutable:  false,
-		FilePath:   table.Filepath,
-		Location:   functionLiteral.Loc(),
-		SymbolType: &symboltable.FunctionType{
-			TypeName: types.FUNCTION,
-		},
+	return &symboltable.FunctionType{
+		TypeName: types.FUNCTION,
 	}
 }
 
-
-
-func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	fmt.Printf("Function decl: %s\n", functionDecl.Identifier.Name)
 
@@ -42,20 +33,23 @@ func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.Sy
 			IsMutable:  true,
 			FilePath:   table.Filepath,
 			Location:   param.Identifier.Loc(),
-			SymbolType: paramType.SymbolType,
+			SymbolType: paramType,
 		})
 	}
-
-	body := functionDecl.Function.Body
-
-	ASTNodeToAnalyzerNode(*body, scope)
 
 	//check return types
 	returnTypes := make([]*symboltable.AnalyzerNode, 0)
 
 	for _, returnType := range functionDecl.Function.ReturnType {
 		returnType := ASTNodeToAnalyzerNode(returnType, scope)
-		returnTypes = append(returnTypes, &returnType.SymbolType)
+		returnTypes = append(returnTypes, &returnType)
+	}
+
+	fmt.Printf("Return types: %#v\n", returnTypes)
+
+	//body
+	for _, stmt := range functionDecl.Function.Body.Nodes {
+		ASTNodeToAnalyzerNode(stmt, scope)
 	}
 
 	funcSymbol := &symboltable.Symbol{
@@ -74,12 +68,12 @@ func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.Sy
 	return nil
 }
 
-func checkFunctionCallExpr(functionCallExpr *ast.FunctionCallExpr, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkFunctionCallExpr(functionCallExpr *ast.FunctionCallExpr, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	caller := ASTNodeToAnalyzerNode(functionCallExpr.Caller, table)
 
-	if caller.SymbolType.ANode() != types.FUNCTION {
-		report.Add(table.Filepath, functionCallExpr.Loc(), fmt.Sprintf("expression is `%s` not a function", caller.SymbolType.ToString())).SetLevel(report.CRITICAL_ERROR)
+	if caller.ANode() != types.FUNCTION {
+		report.Add(table.Filepath, functionCallExpr.Loc(), fmt.Sprintf("expression is `%s` not a function", caller.ANode())).SetLevel(report.CRITICAL_ERROR)
 		return nil
 	}
 

@@ -17,13 +17,13 @@ type Circle struct {
 	radius: i32
 };
 
-fn add(a: i32, b: i32) -> i32 {
-	return a + b;
-}
+// fn add(a: i32, b: i32) -> i32 {
+// 	return a + b;
+// }
 
-fn(){
+// fn(){
 
-}
+// }
 
 
 // fn (r: Rectangle) area() -> i32 {
@@ -34,7 +34,7 @@ type Rectangle2 Rectangle;
 
 let rect = @Rectangle2{width: 10, height: 20};
 
-let rect2: Rectangle2 = @Rectangle{width: 10, height: 20};
+let rect2: Rectangle2 = @struct{width: 10, height: 20.3, area: 200};
 
 //let aa: i32 = rect.widths + 1;
 

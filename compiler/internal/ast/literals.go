@@ -84,7 +84,7 @@ func (s *StructLiteralExpr) Loc() *source.Location { return &s.Location }
 type FunctionLiteral struct {
 	Params     []Parameter
 	ReturnType []DataType
-	Body       *BlockConstruct
+	Body       *Block
 	source.Location
 }
 

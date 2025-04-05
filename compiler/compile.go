@@ -21,6 +21,7 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 			reports = report.GetReports()
 		}
 		report.ClearReports()
+		//panic(":(")
 	}()
 
 	//must have .fer file

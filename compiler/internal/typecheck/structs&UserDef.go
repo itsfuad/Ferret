@@ -9,10 +9,10 @@ import (
 	"fmt"
 )
 
-func checkUserDefinedType(userDefinedType *ast.UserDefinedType, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkUserDefinedType(userDefinedType *ast.UserDefinedType, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	sym, ok := table.Resolve(string(userDefinedType.TypeName))
-	
+
 	fmt.Printf("User defined type: %s\n", string(sym.Name))
 
 	if !ok {
@@ -25,33 +25,12 @@ func checkUserDefinedType(userDefinedType *ast.UserDefinedType, table *symboltab
 		return nil
 	}
 
-	return sym
+	return sym.SymbolType
 }
 
-
-func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	sym, ok := table.Resolve(structLiteral.StructName.Name)
-	
-	if !structLiteral.IsAnonymous {
-
-		if !ok {
-			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("`%s` is not defined as a struct anywhere", structLiteral.StructName.Name)).AddHint("Did you forget to declare this struct?").SetLevel(report.CRITICAL_ERROR)
-			return nil
-		}
-
-		//check if the symbol is a type
-		if sym.SymbolKind != symboltable.TYPE_SYMBOL {
-			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("`%s` is not a type", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
-			return nil
-		}
-
-		//check if the symbol is a struct
-		if _, ok := sym.SymbolType.(*symboltable.StructType); !ok {
-			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("struct %s is not a struct", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
-			return nil
-		}
-	}
 
 	scope := table.EnterScope(symboltable.STRUCT_SCOPE)
 	defer table.ExitScope()
@@ -66,23 +45,40 @@ func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable
 			IsMutable:  true,
 			FilePath:   table.Filepath,
 			Location:   field.FieldIdentifier.Loc(),
-			SymbolType: fieldValue.SymbolType,
+			SymbolType: fieldValue,
 		})
 
 		fieldLocations[field.FieldIdentifier.Name] = field.FieldIdentifier.Loc()
 	}
 
 	if structLiteral.IsAnonymous {
-		return &symboltable.Symbol{
-			Name:       string(types.STRUCT),
-			SymbolKind: symboltable.TYPE_SYMBOL,
-			IsMutable:  false,
-			FilePath:   table.Filepath,
-			Location:   structLiteral.Loc(),
-			SymbolType: &symboltable.StructType{
-				TypeName: types.STRUCT,
-				Scope:    scope,
-			},
+		return &symboltable.StructType{
+			TypeName: types.STRUCT,
+			Scope:    scope,
+		}
+	}
+
+	unwrappedSym := symboltable.UnwrapUserDefType(&sym.SymbolType)
+
+	if !structLiteral.IsAnonymous {
+
+		if !ok {
+			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("`%s` is not defined as a struct anywhere", structLiteral.StructName.Name)).AddHint("Did you forget to declare this struct?").SetLevel(report.CRITICAL_ERROR)
+			return nil
+		}
+
+		//check if the symbol is a type
+		if sym.SymbolKind != symboltable.TYPE_SYMBOL {
+			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("`%s` is not a type", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
+			return nil
+		}
+
+		fmt.Printf("Unwrapped sym: %T\n", unwrappedSym)
+
+		//check if the symbol is a struct
+		if _, ok := unwrappedSym.(*symboltable.StructType); !ok {
+			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("struct %s is not a struct", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
+			return nil
 		}
 	}
 
@@ -93,19 +89,12 @@ func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable
 
 	fmt.Printf("Struct name: %s\n", structLiteral.StructName.Name)
 
-	checkPropsType(structLiteral.StructName.Name, sym.SymbolType.(*symboltable.StructType), structType, fieldLocations, table)
+	checkPropsType(structLiteral.StructName.Name, unwrappedSym.(*symboltable.StructType), structType, fieldLocations, table)
 
-	return &symboltable.Symbol{
-		Name:       structLiteral.StructName.Name,
-		SymbolKind: symboltable.TYPE_SYMBOL,
-		IsMutable:  false,
-		FilePath:   table.Filepath,
-		Location:   structLiteral.Loc(),
-		SymbolType: structType,
-	}
+	return structType
 }
 
-//check if the props are defined in the declared struct and the types match
+// check if the props are defined in the declared struct and the types match
 func checkPropsType(structName string, declared, provided *symboltable.StructType, locs map[string]*source.Location, table *symboltable.SymbolTable) {
 
 	for _, field := range provided.Scope.Symbols {
@@ -116,17 +105,17 @@ func checkPropsType(structName string, declared, provided *symboltable.StructTyp
 		}
 
 		//check if types match
-		if ok, err := isCompatible(fieldType, field); !ok {
+		if ok, err := isCompatible(fieldType.SymbolType, field.SymbolType); !ok {
 			report.Add(table.Filepath, locs[field.Name], fmt.Sprintf("error in struct literal `@%s`: field %s: %s", structName, field.Name, err.Error())).SetLevel(report.NORMAL_ERROR)
 		}
 	}
 }
 
-func checkStructType(structType *ast.StructType, table *symboltable.SymbolTable) *symboltable.Symbol {
+func checkStructType(structType *ast.StructType, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	scope := table.EnterScope(symboltable.STRUCT_SCOPE)
 
-	for _, field := range structType.Fields {		
+	for _, field := range structType.Fields {
 		fieldValue := ASTNodeToAnalyzerNode(field.FieldType, scope)
 		scope.Define(&symboltable.Symbol{
 			Name:       field.FieldIdentifier.Name,
@@ -134,19 +123,12 @@ func checkStructType(structType *ast.StructType, table *symboltable.SymbolTable)
 			IsMutable:  true,
 			FilePath:   table.Filepath,
 			Location:   field.FieldIdentifier.Loc(),
-			SymbolType: fieldValue.SymbolType,
+			SymbolType: fieldValue,
 		})
 	}
 
-	return &symboltable.Symbol{
-		Name:       string(structType.TypeName),
-		SymbolKind: symboltable.TYPE_SYMBOL,
-		IsMutable:  false,
-		FilePath:   table.Filepath,
-		Location:   structType.Loc(),
-		SymbolType: &symboltable.StructType{
-			TypeName: types.STRUCT,
-			Scope:    scope,
-		},
+	return &symboltable.StructType{
+		TypeName: types.STRUCT,
+		Scope:    scope,
 	}
 }

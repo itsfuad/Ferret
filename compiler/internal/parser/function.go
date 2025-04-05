@@ -167,7 +167,7 @@ func parseFunctionLiteral(p *Parser, start *source.Position, isAnonymous, parseN
 	return &ast.FunctionLiteral{
 		Params:     params,
 		ReturnType: returnTypes,
-		Body:       &block,
+		Body:       block,
 		Location:   location,
 	}
 }

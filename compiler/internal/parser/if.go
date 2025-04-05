@@ -35,7 +35,7 @@ func parseIfStatement(p *Parser) ast.BlockConstruct {
 
 	ifStmt := &ast.IfStmt{
 		Condition: condition,
-		Body:      &body,
+		Body:      body,
 		Location:  *source.NewLocation(&start.Start, body.Loc().End),
 	}
 
