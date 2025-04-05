@@ -34,7 +34,7 @@ type Rectangle2 Rectangle;
 
 let rect = @Rectangle2{width: 10, height: 20};
 
-let rect2: Rectangle2 = @struct{radius: 10};
+let rect2: Rectangle2 = @Rectangle{width: 10, height: 20};
 
 //let aa: i32 = rect.widths + 1;
 

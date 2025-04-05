@@ -31,12 +31,12 @@ func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.Sy
 
 	fmt.Printf("Function decl: %s\n", functionDecl.Identifier.Name)
 
-	table.EnterScope(symboltable.FUNCTION_SCOPE)
+	scope := table.EnterScope(symboltable.FUNCTION_SCOPE)
+	defer scope.ExitScope()
 	//check function params
 	for _, param := range functionDecl.Function.Params {
-
-		paramType := ASTNodeToAnalyzerNode(param.Type, table)
-		table.Define(&symboltable.Symbol{
+		paramType := ASTNodeToAnalyzerNode(param.Type, scope)
+		scope.Define(&symboltable.Symbol{
 			Name:       param.Identifier.Name,
 			SymbolKind: symboltable.VARIABLE_SYMBOL,
 			IsMutable:  true,
@@ -46,6 +46,30 @@ func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.Sy
 		})
 	}
 
+	body := functionDecl.Function.Body
+
+	ASTNodeToAnalyzerNode(*body, scope)
+
+	//check return types
+	returnTypes := make([]*symboltable.AnalyzerNode, 0)
+
+	for _, returnType := range functionDecl.Function.ReturnType {
+		returnType := ASTNodeToAnalyzerNode(returnType, scope)
+		returnTypes = append(returnTypes, &returnType.SymbolType)
+	}
+
+	funcSymbol := &symboltable.Symbol{
+		Name:       functionDecl.Identifier.Name,
+		SymbolKind: symboltable.VARIABLE_SYMBOL,
+		IsMutable:  false,
+		FilePath:   table.Filepath,
+		Location:   functionDecl.Loc(),
+		SymbolType: &symboltable.FunctionType{
+			TypeName: types.FUNCTION,
+		},
+	}
+
+	scope.Define(funcSymbol)
 
 	return nil
 }

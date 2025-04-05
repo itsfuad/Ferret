@@ -1010,7 +1010,7 @@
                     },
                     "End": {
                         "Line": 37,
-                        "Column": 45,
+                        "Column": 59,
                         "Index": 465
                     }
                 },
@@ -1032,7 +1032,7 @@
         "Initializers": [
             {
                 "StructName": {
-                    "Name": "struct",
+                    "Name": "Rectangle",
                     "Start": {
                         "Line": 37,
                         "Column": 26,
@@ -1040,23 +1040,23 @@
                     },
                     "End": {
                         "Line": 37,
-                        "Column": 32,
-                        "Index": 487
+                        "Column": 35,
+                        "Index": 490
                     }
                 },
                 "Fields": [
                     {
                         "FieldIdentifier": {
-                            "Name": "radius",
+                            "Name": "width",
                             "Start": {
                                 "Line": 37,
-                                "Column": 33,
-                                "Index": 488
+                                "Column": 36,
+                                "Index": 491
                             },
                             "End": {
                                 "Line": 37,
-                                "Column": 39,
-                                "Index": 494
+                                "Column": 41,
+                                "Index": 496
                             }
                         },
                         "FieldType": null,
@@ -1066,28 +1066,69 @@
                             "Base": 10,
                             "Start": {
                                 "Line": 37,
-                                "Column": 41,
-                                "Index": 496
+                                "Column": 43,
+                                "Index": 498
                             },
                             "End": {
                                 "Line": 37,
-                                "Column": 43,
-                                "Index": 498
+                                "Column": 45,
+                                "Index": 500
                             }
                         },
                         "Start": {
                             "Line": 37,
-                            "Column": 33,
-                            "Index": 488
+                            "Column": 36,
+                            "Index": 491
                         },
                         "End": {
                             "Line": 37,
-                            "Column": 43,
-                            "Index": 498
+                            "Column": 45,
+                            "Index": 500
+                        }
+                    },
+                    {
+                        "FieldIdentifier": {
+                            "Name": "height",
+                            "Start": {
+                                "Line": 37,
+                                "Column": 47,
+                                "Index": 502
+                            },
+                            "End": {
+                                "Line": 37,
+                                "Column": 53,
+                                "Index": 508
+                            }
+                        },
+                        "FieldType": null,
+                        "FieldValue": {
+                            "Value": 20,
+                            "Raw": "20",
+                            "Base": 10,
+                            "Start": {
+                                "Line": 37,
+                                "Column": 55,
+                                "Index": 510
+                            },
+                            "End": {
+                                "Line": 37,
+                                "Column": 57,
+                                "Index": 512
+                            }
+                        },
+                        "Start": {
+                            "Line": 37,
+                            "Column": 47,
+                            "Index": 502
+                        },
+                        "End": {
+                            "Line": 37,
+                            "Column": 57,
+                            "Index": 512
                         }
                     }
                 ],
-                "IsAnonymous": true,
+                "IsAnonymous": false,
                 "Start": {
                     "Line": 37,
                     "Column": 25,
@@ -1095,8 +1136,8 @@
                 },
                 "End": {
                     "Line": 37,
-                    "Column": 44,
-                    "Index": 499
+                    "Column": 58,
+                    "Index": 513
                 }
             }
         ],
@@ -1108,7 +1149,7 @@
         },
         "End": {
             "Line": 37,
-            "Column": 45,
+            "Column": 59,
             "Index": 465
         }
     }
