@@ -20,8 +20,6 @@ func checkFunctionLiteral(functionLiteral *ast.FunctionLiteral, table *symboltab
 
 func checkFunctionDeclNode(functionDecl *ast.FunctionDecl, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
-	fmt.Printf("Function decl: %s\n", functionDecl.Identifier.Name)
-
 	scope := table.EnterScope(symboltable.FUNCTION_SCOPE)
 	defer scope.ExitScope()
 	//check function params

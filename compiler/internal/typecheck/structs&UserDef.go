@@ -14,9 +14,6 @@ func checkUserDefinedType(userDefinedType *ast.UserDefinedType, table *symboltab
 
 	sym, ok := table.Resolve(string(userDefinedType.TypeName))
 
-	fmt.Printf("User defined type: %s\n", string(sym.Name))
-	fmt.Printf("User defined type Symbol: %T\n", sym.SymbolType)
-
 	if !ok {
 		report.Add(table.Filepath, userDefinedType.Loc(), "type "+string(userDefinedType.TypeName)+" not found").SetLevel(report.NORMAL_ERROR)
 		return nil
@@ -75,8 +72,6 @@ func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable
 			return nil
 		}
 
-		fmt.Printf("Unwrapped sym: %T\n", unwrappedSym)
-
 		//check if the symbol is a struct
 		if _, ok := unwrappedSym.(*symboltable.StructType); !ok {
 			report.Add(table.Filepath, structLiteral.StructName.Loc(), fmt.Sprintf("struct %s is not a struct", structLiteral.StructName.Name)).SetLevel(report.CRITICAL_ERROR)
@@ -88,8 +83,6 @@ func checkStructLiteral(structLiteral *ast.StructLiteralExpr, table *symboltable
 		TypeName: types.STRUCT,
 		Scope:    scope,
 	}
-
-	fmt.Printf("Struct name: %s\n", structLiteral.StructName.Name)
 
 	checkPropsType(structLiteral.StructName.Name, unwrappedSym.(*symboltable.StructType), structType, fieldLocations, table)
 
@@ -145,7 +138,7 @@ func checkStructCompatibility(first, second *symboltable.AnalyzerNode) (bool, er
 	missingFields, extraFields, allFirstFields, allSecondFields := compareStructFields(firstStruct, secondStruct)
 
 	if errorString := buildFieldErrorString(missingFields, extraFields); errorString != "" {
-		return false, fmt.Errorf("incompatible structs: %s and %s\n%s", (*first).ToString(), (*second).ToString(), errorString)
+		return false, fmt.Errorf("incompatible structs:\n%s\n\tand\n%s\n%s", (*first).ToString(), (*second).ToString(), errorString)
 	}
 
 	return checkFieldTypeCompatibility(allFirstFields, allSecondFields)

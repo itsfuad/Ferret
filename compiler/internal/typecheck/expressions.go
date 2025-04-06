@@ -27,9 +27,6 @@ func checkFieldAccessExpr(fieldAccessExpr *ast.FieldAccessExpr, table *symboltab
 
 	objType := ASTNodeToAnalyzerNode(fieldAccessExpr.Object, table)
 
-	fmt.Printf("Object type: %v\n", fieldAccessExpr.Object)
-	fmt.Printf("Field access expr: %s\n", objType.ToString())
-
 	unwrappedObjType := symboltable.UnwrapUserDefType(&objType)
 
 	if unwrappedObjType.ANode() != types.STRUCT {
@@ -74,8 +71,6 @@ func ckeckIdentifierNode(identifier *ast.IdentifierExpr, table *symboltable.Symb
 	if symbol.SymbolType == nil {
 		panic(fmt.Sprintf("Symbol %s is nil. Implement table update", identifier.Name))
 	}
-
-	fmt.Printf("Identifier %s Symbol type: %T\n", identifier.Name, symbol.SymbolType)
 
 	return symbol.SymbolType
 }

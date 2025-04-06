@@ -20,8 +20,18 @@ type Rectangle2 Rectangle;
 
 let rect = @Rectangle2{width: 10, height: 20};
 
-let rect2: Rectangle2 = @struct{width: 10, height: 20, area: 200};
+let rect2: Rectangle2 = @Rectangle{width: 10, height: 20};
 
 let aa: i32 = rect.width + 1;
 
 //rect.area();
+
+type User struct {
+    name: str,
+    address: struct {
+        street: str,
+        city: str
+    }
+};
+
+let xxx: Rectangle = @User{name: "John", address: @Rectangle{width: 10, height: 20}};

@@ -1,7 +1,6 @@
 package typecheck
 
 import (
-	"ferret/compiler/colors"
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
@@ -48,11 +47,7 @@ func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.Symbo
 	for i, variableNode := range varDeclStmt.Variables {
 		if variableNode.ExplicitType != nil {
 			// match the type of the initializer to the explicit type
-			fmt.Printf("Explicit type: %T\n", variableNode.ExplicitType)
 			explicitType := ASTNodeToAnalyzerNode(variableNode.ExplicitType, table)
-
-			colors.PURPLE.Printf("Got explicit type: %T\n", explicitType)
-			colors.PURPLE.Printf("Got initializer type: %T\n", inits[i])
 
 			if ok, err := isCompatible(explicitType, inits[i]); !ok {
 				report.Add(table.Filepath, initializerNodes[i].Loc(), err.Error()).SetLevel(report.NORMAL_ERROR)
@@ -60,14 +55,12 @@ func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.Symbo
 
 			//when explicit type is provided, the initializer must use that type
 			//so we update the initializer type to the explicit type
-			colors.BLUE.Printf("Updated initializer type: %T to %T\n", inits[i], explicitType)
 			inits[i] = explicitType
 		}
 	}
 
 	//all ok now update the table
 	for i, variableNode := range varDeclStmt.Variables {
-		fmt.Printf("Defining variable: %s with type: %s\n", variableNode.Identifier.Name, inits[i].ToString())
 		symbol := &symboltable.Symbol{
 			Name:       variableNode.Identifier.Name,
 			SymbolKind: symboltable.VARIABLE_SYMBOL,

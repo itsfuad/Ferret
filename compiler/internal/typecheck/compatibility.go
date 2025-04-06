@@ -10,8 +10,6 @@ import (
 
 func isCompatible(first, second symboltable.AnalyzerNode) (bool, error) {
 
-	fmt.Printf("first: %s, second: %s\n", reflect.TypeOf(first), reflect.TypeOf(second))
-
 	unwrappedFirst := symboltable.UnwrapUserDefType(&first)
 	unwrappedSecond := symboltable.UnwrapUserDefType(&second)
 	if reflect.TypeOf(unwrappedFirst) == reflect.TypeOf(unwrappedSecond) {

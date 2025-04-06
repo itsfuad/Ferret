@@ -5,12 +5,9 @@ import (
 	"ferret/compiler/internal/ast"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
-	"fmt"
 )
 
 func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
-
-	fmt.Printf("Node: %T\n", node)
 
 	// Check if the node is a type
 	if t := checkTypeNames(node, table); t != nil {
