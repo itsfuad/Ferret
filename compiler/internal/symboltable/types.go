@@ -121,5 +121,15 @@ type UserDefType struct {
 
 func (t *UserDefType) ANode() types.TYPE_NAME { return t.TypeName }
 func (t *UserDefType) ToString() string {
-	return fmt.Sprintf("%s -> %s", t.TypeName, t.UnderlyingType.ToString())
+	var deepestType AnalyzerNode
+	var currentType *UserDefType = t
+	for {
+		if _, ok := currentType.UnderlyingType.(*UserDefType); !ok {
+			deepestType = currentType.UnderlyingType
+			break
+		}
+		currentType = currentType.UnderlyingType.(*UserDefType)
+	}
+
+	return fmt.Sprintf("%s (infered from %s)", deepestType.ToString(), t.TypeName)
 }
