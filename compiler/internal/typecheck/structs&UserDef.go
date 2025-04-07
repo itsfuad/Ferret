@@ -138,7 +138,9 @@ func checkStructCompatibility(first, second *symboltable.AnalyzerNode) (bool, er
 	missingFields, extraFields, allFirstFields, allSecondFields := compareStructFields(firstStruct, secondStruct)
 
 	if errorString := buildFieldErrorString(missingFields, extraFields); errorString != "" {
-		return false, fmt.Errorf("incompatible structs:\n%s\n\tand\n%s\n%s", (*first).ToString(), (*second).ToString(), errorString)
+		firstString := (*first).ToString()
+		secondString := (*second).ToString()
+		return false, fmt.Errorf("cannot use %s as %s\nReason:\n%s", firstString, secondString, errorString)
 	}
 
 	return checkFieldTypeCompatibility(allFirstFields, allSecondFields)

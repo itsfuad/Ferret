@@ -131,5 +131,5 @@ func (t *UserDefType) ToString() string {
 		currentType = currentType.UnderlyingType.(*UserDefType)
 	}
 
-	return fmt.Sprintf("%s (infered from %s)", deepestType.ToString(), t.TypeName)
+	return fmt.Sprintf("`%s` --> `%s`", t.TypeName, deepestType.ToString())
 }

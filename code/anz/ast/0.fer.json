@@ -1185,12 +1185,12 @@
                     },
                     "End": {
                         "Line": 37,
-                        "Column": 86,
+                        "Column": 110,
                         "Index": 505
                     }
                 },
                 "ExplicitType": {
-                    "TypeName": "Rectangle",
+                    "TypeName": "User",
                     "Start": {
                         "Line": 37,
                         "Column": 10,
@@ -1198,8 +1198,8 @@
                     },
                     "End": {
                         "Line": 37,
-                        "Column": 19,
-                        "Index": 516
+                        "Column": 14,
+                        "Index": 511
                     }
                 }
             }
@@ -1210,13 +1210,13 @@
                     "Name": "User",
                     "Start": {
                         "Line": 37,
-                        "Column": 23,
-                        "Index": 520
+                        "Column": 18,
+                        "Index": 515
                     },
                     "End": {
                         "Line": 37,
-                        "Column": 27,
-                        "Index": 524
+                        "Column": 22,
+                        "Index": 519
                     }
                 },
                 "Fields": [
@@ -1225,13 +1225,13 @@
                             "Name": "name",
                             "Start": {
                                 "Line": 37,
-                                "Column": 28,
-                                "Index": 525
+                                "Column": 23,
+                                "Index": 520
                             },
                             "End": {
                                 "Line": 37,
-                                "Column": 32,
-                                "Index": 529
+                                "Column": 27,
+                                "Index": 524
                             }
                         },
                         "FieldType": null,
@@ -1239,24 +1239,24 @@
                             "Value": "John",
                             "Start": {
                                 "Line": 37,
-                                "Column": 34,
-                                "Index": 531
+                                "Column": 29,
+                                "Index": 526
                             },
                             "End": {
                                 "Line": 37,
-                                "Column": 40,
-                                "Index": 537
+                                "Column": 35,
+                                "Index": 532
                             }
                         },
                         "Start": {
                             "Line": 37,
-                            "Column": 28,
-                            "Index": 525
+                            "Column": 23,
+                            "Index": 520
                         },
                         "End": {
                             "Line": 37,
-                            "Column": 40,
-                            "Index": 537
+                            "Column": 35,
+                            "Index": 532
                         }
                     },
                     {
@@ -1264,148 +1264,144 @@
                             "Name": "address",
                             "Start": {
                                 "Line": 37,
-                                "Column": 42,
-                                "Index": 539
+                                "Column": 37,
+                                "Index": 534
                             },
                             "End": {
                                 "Line": 37,
-                                "Column": 49,
-                                "Index": 546
+                                "Column": 44,
+                                "Index": 541
                             }
                         },
                         "FieldType": null,
                         "FieldValue": {
                             "StructName": {
-                                "Name": "Rectangle",
+                                "Name": "struct",
                                 "Start": {
                                     "Line": 37,
-                                    "Column": 52,
-                                    "Index": 549
+                                    "Column": 47,
+                                    "Index": 544
                                 },
                                 "End": {
                                     "Line": 37,
-                                    "Column": 61,
-                                    "Index": 558
+                                    "Column": 53,
+                                    "Index": 550
                                 }
                             },
                             "Fields": [
                                 {
                                     "FieldIdentifier": {
-                                        "Name": "width",
+                                        "Name": "street",
                                         "Start": {
                                             "Line": 37,
-                                            "Column": 62,
-                                            "Index": 559
+                                            "Column": 55,
+                                            "Index": 552
                                         },
                                         "End": {
                                             "Line": 37,
-                                            "Column": 67,
-                                            "Index": 564
+                                            "Column": 61,
+                                            "Index": 558
                                         }
                                     },
                                     "FieldType": null,
                                     "FieldValue": {
-                                        "Value": 10,
-                                        "Raw": "10",
-                                        "Base": 10,
+                                        "Value": "Park Avenue, Wall street",
                                         "Start": {
                                             "Line": 37,
-                                            "Column": 69,
-                                            "Index": 566
+                                            "Column": 63,
+                                            "Index": 560
                                         },
                                         "End": {
                                             "Line": 37,
-                                            "Column": 71,
-                                            "Index": 568
+                                            "Column": 89,
+                                            "Index": 586
                                         }
                                     },
                                     "Start": {
                                         "Line": 37,
-                                        "Column": 62,
-                                        "Index": 559
+                                        "Column": 55,
+                                        "Index": 552
                                     },
                                     "End": {
                                         "Line": 37,
-                                        "Column": 71,
-                                        "Index": 568
+                                        "Column": 89,
+                                        "Index": 586
                                     }
                                 },
                                 {
                                     "FieldIdentifier": {
-                                        "Name": "height",
+                                        "Name": "city",
                                         "Start": {
                                             "Line": 37,
-                                            "Column": 73,
-                                            "Index": 570
+                                            "Column": 91,
+                                            "Index": 588
                                         },
                                         "End": {
                                             "Line": 37,
-                                            "Column": 79,
-                                            "Index": 576
+                                            "Column": 95,
+                                            "Index": 592
                                         }
                                     },
                                     "FieldType": null,
                                     "FieldValue": {
-                                        "Value": 20,
-                                        "Raw": "20",
-                                        "Base": 10,
+                                        "Value": "New York",
                                         "Start": {
                                             "Line": 37,
-                                            "Column": 81,
-                                            "Index": 578
+                                            "Column": 97,
+                                            "Index": 594
                                         },
                                         "End": {
                                             "Line": 37,
-                                            "Column": 83,
-                                            "Index": 580
+                                            "Column": 107,
+                                            "Index": 604
                                         }
                                     },
                                     "Start": {
                                         "Line": 37,
-                                        "Column": 73,
-                                        "Index": 570
+                                        "Column": 91,
+                                        "Index": 588
                                     },
                                     "End": {
                                         "Line": 37,
-                                        "Column": 83,
-                                        "Index": 580
+                                        "Column": 107,
+                                        "Index": 604
                                     }
                                 }
                             ],
-                            "IsAnonymous": false,
+                            "IsAnonymous": true,
                             "Start": {
                                 "Line": 37,
-                                "Column": 51,
-                                "Index": 548
+                                "Column": 46,
+                                "Index": 543
                             },
                             "End": {
                                 "Line": 37,
-                                "Column": 84,
-                                "Index": 581
+                                "Column": 108,
+                                "Index": 605
                             }
                         },
                         "Start": {
                             "Line": 37,
-                            "Column": 42,
-                            "Index": 539
+                            "Column": 37,
+                            "Index": 534
                         },
                         "End": {
                             "Line": 37,
-                            "Column": 84,
-                            "Index": 581
+                            "Column": 108,
+                            "Index": 605
                         }
                     }
                 ],
                 "IsAnonymous": false,
                 "Start": {
                     "Line": 37,
-                    "Column": 22,
-                    "Index": 519
+                    "Column": 17,
+                    "Index": 514
                 },
                 "End": {
                     "Line": 37,
-                    "Column": 85,
-                    "Index": 582
+                    "Column": 109,
+                    "Index": 606
                 }
             }
         ],
@@ -1417,7 +1413,7 @@
         },
         "End": {
             "Line": 37,
-            "Column": 86,
+            "Column": 110,
             "Index": 505
         }
     }

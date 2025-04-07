@@ -34,4 +34,4 @@ type User struct {
     }
 };
 
-let xxx: Rectangle = @User{name: "John", address: @Rectangle{width: 10, height: 20}};
+let xxx: User = @User{name: "John", address: @struct{ street: "Park Avenue, Wall street", city: "New York"}};
