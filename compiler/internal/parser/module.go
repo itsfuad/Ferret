@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-// parsePackage parses a package declaration
-func parsePackage(p *Parser) ast.Node {
+// parseModule parses a package declaration
+func parseModule(p *Parser) ast.Node {
 	// Check if this is the first statement in the file
 
 	valid := p.tokenNo == 0
 
-	start := p.consume(lexer.PACKAGE_TOKEN, report.EXPECTED_PACKAGE_KEYWORD)
+	start := p.consume(lexer.MODULE_TOKEN, report.EXPECTED_PACKAGE_KEYWORD)
 
 	name := p.consume(lexer.IDENTIFIER_TOKEN, report.EXPECTED_PACKAGE_NAME)
 
@@ -22,12 +22,11 @@ func parsePackage(p *Parser) ast.Node {
 		report.Add(p.filePath, source.NewLocation(&start.Start, &name.End), report.INVALID_SCOPE).AddHint("Package declarations must be at the top level of the file").SetLevel(report.SYNTAX_ERROR)
 	}
 
-	return &ast.PackageDeclStmt{
-		Package: &ast.IdentifierExpr{
+	return &ast.ModuleDeclStmt{
+		ModuleName: &ast.IdentifierExpr{
 			Name:     name.Value,
 			Location: *source.NewLocation(&name.Start, &name.End),
 		},
-		Location: *source.NewLocation(&start.Start, &name.End),
 	}
 }
 

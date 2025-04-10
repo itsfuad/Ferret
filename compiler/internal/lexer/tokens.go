@@ -25,7 +25,7 @@ const (
 	PRIVATE_TOKEN    TOKEN = "priv"
 	RETURN_TOKEN     TOKEN = "return"
 	IMPORT_TOKEN     TOKEN = "import"
-	PACKAGE_TOKEN    TOKEN = "package"
+	MODULE_TOKEN     TOKEN = "mod"
 	//data types
 	NUMBER_TOKEN    TOKEN = "numeric literal"
 	STRING_TOKEN    TOKEN = "string literal"
@@ -106,7 +106,7 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	FUNCTION_TOKEN:  true,
 	RETURN_TOKEN:    true,
 	IMPORT_TOKEN:    true,
-	PACKAGE_TOKEN:   true,
+	MODULE_TOKEN:    true,
 }
 
 func IsKeyword(token string) bool {

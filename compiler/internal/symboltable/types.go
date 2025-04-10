@@ -5,11 +5,6 @@ import (
 	"fmt"
 )
 
-type AnalyzerNode interface {
-	ANode() types.TYPE_NAME
-	ToString() string
-}
-
 type IntegerType struct {
 	TypeName   types.TYPE_NAME
 	IsUnsigned bool

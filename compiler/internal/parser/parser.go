@@ -175,8 +175,8 @@ func parseReturnStmt(p *Parser) ast.Statement {
 func parseNode(p *Parser) ast.Node {
 	var node ast.Node
 	switch p.peek().Kind {
-	case lexer.PACKAGE_TOKEN:
-		node = parsePackage(p)
+	case lexer.MODULE_TOKEN:
+		node = parseModule(p)
 	case lexer.IMPORT_TOKEN:
 		node = parseImport(p)
 	case lexer.LET_TOKEN, lexer.CONST_TOKEN:
@@ -226,7 +226,8 @@ func parseNode(p *Parser) ast.Node {
 }
 
 // Parse is the entry point for parsing
-func (p *Parser) Parse() []ast.Node {
+func (p *Parser) Parse() ast.Program {
+
 	var nodes []ast.Node
 
 	for !p.isAtEnd() {
@@ -240,5 +241,8 @@ func (p *Parser) Parse() []ast.Node {
 		}
 	}
 
-	return nodes
+	return ast.Program{
+		Nodes:    nodes,
+		Location: *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
+	}
 }

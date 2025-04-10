@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"ferret/compiler/internal/parser"
-	"ferret/compiler/internal/symboltable"
-	"ferret/compiler/internal/typecheck"
 	"ferret/compiler/report"
 	"ferret/compiler/wio"
 	"fmt"
@@ -24,6 +22,10 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 		//panic(":(")
 	}()
 
+	return compileModule(filePath, showTokenDebug, saveToJson)
+}
+
+func compileModule(filePath string, showTokenDebug, saveToJson bool) (reports report.Reports, e error) {
 	//must have .fer file
 	if len(filePath) < 5 || filePath[len(filePath)-4:] != ".fer" {
 		e = errors.New("error: file must have .fer extension")
@@ -38,15 +40,9 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 	if saveToJson {
 		//write the tree to a file named 'expressions.json' in 'code/ast' folder
 		e = wio.Serialize(&tree, folder, fileName)
-		if reports != nil {
+		if e != nil {
 			return report.GetReports(), e
 		}
-	}
-
-	table := symboltable.NewSymbolTable(nil, symboltable.GLOBAL_SCOPE, filePath)
-
-	for _, node := range tree {
-		typecheck.ASTNodeToAnalyzerNode(node, table)
 	}
 
 	reports = report.GetReports()

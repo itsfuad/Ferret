@@ -8,7 +8,7 @@ import (
 	"ferret/compiler/internal/ast"
 )
 
-func Serialize(contents *[]ast.Node, folder, filename string) error {
+func Serialize(contents *ast.Program, folder, filename string) error {
 
 	//create the folder if it does not exist
 	if _, err := os.Stat(folder + "/ast"); os.IsNotExist(err) {

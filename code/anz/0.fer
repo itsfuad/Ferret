@@ -1,3 +1,5 @@
+
+
 let x, y: i32, byte = 1, 'a';
 
 let point = @struct{x: 1, y: 2};
