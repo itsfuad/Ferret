@@ -241,6 +241,10 @@ func (p *Parser) Parse() ast.Program {
 		}
 	}
 
+	if len(nodes) == 0 {
+		return ast.Program{}
+	}
+
 	return ast.Program{
 		Nodes:    nodes,
 		Location: *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
