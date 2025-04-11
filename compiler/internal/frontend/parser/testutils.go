@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"ferret/compiler/internal/ast"
+	"ferret/compiler/internal/frontend/ast"
 	"ferret/compiler/test"
 	"ferret/compiler/testUtils"
 	"fmt"

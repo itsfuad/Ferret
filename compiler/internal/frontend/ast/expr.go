@@ -1,7 +1,7 @@
 package ast
 
 import (
-	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/frontend/lexer"
 	"ferret/compiler/internal/source"
 )
 

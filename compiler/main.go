@@ -2,7 +2,24 @@ package main
 
 import (
 	"ferret/compiler/colors"
+	"ferret/compiler/internal/module"
+	"ferret/compiler/report"
+	"fmt"
 )
+
+func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.Reports, e error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			e = fmt.Errorf("%v", r)
+			reports = report.GetReports()
+		}
+		report.ClearReports()
+		//panic(":(")
+	}()
+
+	return report.GetReports(), module.CompileModule(filePath, showTokenDebug, saveToJson)
+}
 
 func main() {
 

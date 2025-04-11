@@ -2,8 +2,8 @@ package parser
 
 import (
 	"ferret/compiler/colors"
-	"ferret/compiler/internal/ast"
-	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/internal/utils"
 	"ferret/compiler/report"

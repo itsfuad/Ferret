@@ -2,7 +2,7 @@ package typecheck
 
 import (
 	"ferret/compiler/colors"
-	"ferret/compiler/internal/ast"
+	"ferret/compiler/internal/frontend/ast"
 	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/report"
 )

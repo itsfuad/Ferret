@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"ferret/compiler/internal/ast"
-	"ferret/compiler/internal/lexer"
+	"ferret/compiler/internal/frontend/ast"
+	"ferret/compiler/internal/frontend/lexer"
 	"ferret/compiler/internal/source"
 	"ferret/compiler/report"
 	"strings"
@@ -27,6 +27,7 @@ func parseModule(p *Parser) ast.Node {
 			Name:     name.Value,
 			Location: *source.NewLocation(&name.Start, &name.End),
 		},
+		Location: *source.NewLocation(&start.Start, &name.End),
 	}
 }
 

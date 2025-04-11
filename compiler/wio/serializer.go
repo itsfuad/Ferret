@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"ferret/compiler/internal/ast"
+	"ferret/compiler/internal/frontend/ast"
 )
 
 func Serialize(contents *ast.Program, folder, filename string) error {
