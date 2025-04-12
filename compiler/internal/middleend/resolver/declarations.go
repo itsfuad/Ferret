@@ -1,4 +1,4 @@
-package typecheck
+package resolver
 
 import (
 	"ferret/compiler/internal/frontend/ast"
@@ -33,7 +33,7 @@ func checkTypeDeclStmtNode(typeDeclStmt *ast.TypeDeclStmt, table *symboltable.Sy
 	return nil
 }
 
-func checkVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
+func resolveVarDeclStmtNode(varDeclStmt *ast.VarDeclStmt, table *symboltable.SymbolTable) symboltable.AnalyzerNode {
 
 	initializerNodes := varDeclStmt.Initializers
 

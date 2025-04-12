@@ -1,4 +1,4 @@
-package typecheck
+package resolver
 
 import (
 	"ferret/compiler/colors"

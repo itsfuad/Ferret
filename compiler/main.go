@@ -2,7 +2,7 @@ package main
 
 import (
 	"ferret/compiler/colors"
-	"ferret/compiler/internal/module"
+	"ferret/compiler/internal/middleend"
 	"ferret/compiler/report"
 	"fmt"
 )
@@ -18,7 +18,9 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 		//panic(":(")
 	}()
 
-	return report.GetReports(), module.CompileModule(filePath, showTokenDebug, saveToJson)
+	_, _, err := middleend.CompileModule(filePath, showTokenDebug, saveToJson)
+
+	return report.GetReports(), err
 }
 
 func main() {

@@ -1,4 +1,4 @@
-package typecheck
+package resolver
 
 import (
 	"ferret/compiler/colors"
@@ -27,7 +27,7 @@ func ASTNodeToAnalyzerNode(node ast.Node, table *symboltable.SymbolTable) symbol
 	case *ast.BinaryExpr:
 		return checkBinaryExprNode(n, table)
 	case *ast.VarDeclStmt:
-		return checkVarDeclStmtNode(n, table)
+		return resolveVarDeclStmtNode(n, table)
 	case *ast.TypeDeclStmt:
 		return checkTypeDeclStmtNode(n, table)
 	case *ast.FunctionDecl:
