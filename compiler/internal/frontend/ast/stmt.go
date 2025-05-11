@@ -4,15 +4,22 @@ import (
 	"ferret/compiler/internal/source"
 )
 
-type Program struct {
+type Module struct {
 	FilePath string
-	Nodes    []Node
+	Nodes []Node
 	source.Location
+}
+func (m *Module) INode() Node           { return m }
+func (m *Module) Stmt()                 {} // Stmt is a marker interface for all statements
+func (m *Module) Loc() *source.Location { return &m.Location }
+
+type Program struct {
+	Modules    []Module
 }
 
 func (m *Program) INode() Node           { return m }
 func (m *Program) Stmt()                 {} // Stmt is a marker interface for all statements
-func (m *Program) Loc() *source.Location { return &m.Location }
+func (m *Program) Loc() *source.Location { return nil }
 
 // Statement nodes
 type VarDeclStmt struct {

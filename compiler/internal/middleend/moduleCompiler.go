@@ -5,16 +5,14 @@ import (
 	"ferret/compiler/colors"
 	"ferret/compiler/internal/frontend/ast"
 	"ferret/compiler/internal/frontend/parser"
-	"ferret/compiler/internal/middleend/collector"
-	"ferret/compiler/internal/symboltable"
 	"ferret/compiler/wio"
 	"path/filepath"
 )
 
-func CompileModule(filePath string, showTokenDebug, saveToJson bool) (*ast.Program, *symboltable.SymbolTable, error) {
+func CompileModule(filePath string, showTokenDebug, saveToJson bool) (*ast.Module, error) {
 	//must have .fer file
 	if len(filePath) < 5 || filePath[len(filePath)-4:] != ".fer" {
-		return nil, nil, errors.New("error: file must have .fer extension")
+		return nil, errors.New("error: file must have .fer extension")
 	}
 
 	//get the folder and file name
@@ -28,11 +26,9 @@ func CompileModule(filePath string, showTokenDebug, saveToJson bool) (*ast.Progr
 		//write the tree to a file named 'expressions.json' in 'code/ast' folder
 		err := wio.Serialize(tree, folder, fileName)
 		if err != nil {
-			return tree, nil, err
+			return tree, err
 		}
 	}
 
-	st := collector.CollectSymbols(&tree.Nodes, filePath)
-
-	return tree, st, nil
+	return tree, nil
 }

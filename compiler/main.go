@@ -18,7 +18,7 @@ func compile(filePath string, showTokenDebug, saveToJson bool) (reports report.R
 		//panic(":(")
 	}()
 
-	_, _, err := middleend.CompileModule(filePath, showTokenDebug, saveToJson)
+	_, err := middleend.CompileModule(filePath, showTokenDebug, saveToJson)
 
 	return report.GetReports(), err
 }

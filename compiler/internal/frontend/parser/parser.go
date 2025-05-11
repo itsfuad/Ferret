@@ -226,7 +226,7 @@ func parseNode(p *Parser) ast.Node {
 }
 
 // Parse is the entry point for parsing
-func (p *Parser) Parse() *ast.Program {
+func (p *Parser) Parse() *ast.Module {
 
 	var nodes []ast.Node
 
@@ -242,10 +242,11 @@ func (p *Parser) Parse() *ast.Program {
 	}
 
 	if len(nodes) == 0 {
-		return &ast.Program{}
+		return &ast.Module{}
 	}
 
-	return &ast.Program{
+	return &ast.Module{
+		FilePath: p.filePath,
 		Nodes:    nodes,
 		Location: *source.NewLocation(&p.tokens[0].Start, nodes[len(nodes)-1].Loc().End),
 	}
