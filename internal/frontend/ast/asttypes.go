@@ -1,0 +1,140 @@
+package ast
+
+import (
+	"compiler/internal/source"
+)
+
+// DataType is a marker interface for type expressions
+// Types are NOT expressions - they are a separate syntactic category
+type DataType interface {
+	Node
+	TypeExpr()
+}
+
+type Invalid struct {
+	source.Location
+}
+
+func (i *Invalid) INode()                {} // Implements Node interface
+func (i *Invalid) Expr()                 {} // Can be used as expression (for error recovery)
+func (i *Invalid) TypeExpr()             {} // Type nodes implement TypeExpr
+func (i *Invalid) Loc() *source.Location { return &i.Location }
+
+// UserDefinedType represents an identifier (can be a type name or variable name)
+type UserDefinedType struct {
+	Name string
+	source.Location
+}
+
+func (i *UserDefinedType) INode()                {} // Implements Node interface
+func (i *UserDefinedType) Expr()                 {} // Can be used as expression (variable reference)
+func (i *UserDefinedType) TypeExpr()             {} // Can be used as type (type name)
+func (i *UserDefinedType) Loc() *source.Location { return &i.Location }
+
+// ArrayType represents array type [size]ElementType or []ElementType
+type ArrayType struct {
+	Len    Expression // nil means dynamic array []T, otherwise [N]T
+	ElType TypeNode   // element type
+	source.Location
+}
+
+func (a *ArrayType) INode()                {} // Implements Node interface
+func (a *ArrayType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (a *ArrayType) Loc() *source.Location { return &a.Location }
+
+// OptionalType represents optional/nullable type T?
+type OptionalType struct {
+	Base TypeNode // The base type that is optional
+	source.Location
+}
+
+func (o *OptionalType) INode()                {} // Implements Node interface
+func (o *OptionalType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (o *OptionalType) Loc() *source.Location { return &o.Location }
+
+// ReferenceType represents reference type &T (C#-style reference)
+type ReferenceType struct {
+	Base TypeNode // The base type being referenced
+	source.Location
+}
+
+func (r *ReferenceType) INode()                {} // Implements Node interface
+func (r *ReferenceType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (r *ReferenceType) Loc() *source.Location { return &r.Location }
+
+// ErrorType represents error-returning type T ! E
+type ErrorType struct {
+	Value TypeNode // The value type
+	Error TypeNode // The error type
+	source.Location
+}
+
+func (e *ErrorType) INode()                {} // Implements Node interface
+func (e *ErrorType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (e *ErrorType) Loc() *source.Location { return &e.Location }
+
+// Field represents a single field in a struct or parameter in a function
+type Field struct {
+	Name       *IdentifierExpr // field/parameter names (can be nil for anonymous fields)
+	Type       TypeNode        // field type
+	Value      Expression      // initial value (for struct literals), nil otherwise
+	IsVariadic bool            // true if this is a variadic parameter (...type)
+	source.Location
+}
+
+func (f *Field) INode()                {} // Implements Node interface
+func (f *Field) Loc() *source.Location { return &f.Location }
+
+
+// StructType represents a struct type definition
+type StructType struct {
+	Fields []Field
+	source.Location
+}
+
+func (s *StructType) INode()                {} // Implements Node interface
+func (s *StructType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (s *StructType) Loc() *source.Location { return &s.Location }
+
+// InterfaceType represents an interface type definition
+type InterfaceType struct {
+	Methods []Field // interface methods
+	source.Location
+}
+
+func (i *InterfaceType) INode()                {} // Implements Node interface
+func (i *InterfaceType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (i *InterfaceType) Loc() *source.Location { return &i.Location }
+
+// FuncType represents a function type signature
+type FuncType struct {
+	Params []Field    // function parameters
+	Result TypeNode   // return types (can be nil for no return)
+	source.Location
+}
+
+func (f *FuncType) INode()                {} // Implements Node interface
+func (f *FuncType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (f *FuncType) Loc() *source.Location { return &f.Location }
+
+// MapType represents a map type map[KeyType]ValueType
+type MapType struct {
+	Key   TypeNode // key type
+	Value TypeNode // value type
+	source.Location
+}
+
+func (m *MapType) INode()                {} // Implements Node interface
+func (m *MapType) Expr()                 {} // Can be used in expression context (for composite literals)
+func (m *MapType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (m *MapType) Loc() *source.Location { return &m.Location }
+
+// EnumType represents an enum type definition
+type EnumType struct {
+	Variants []Field
+	source.Location
+}
+
+func (e *EnumType) INode()                {} // Implements Node interface
+func (e *EnumType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (e *EnumType) Loc() *source.Location { return &e.Location }

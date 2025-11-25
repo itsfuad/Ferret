@@ -1,0 +1,9 @@
+// This file has imports after declarations - should fail
+
+const x = 42;
+
+import "test_project/utils";  // ERROR: import must come before declarations
+
+func main() {
+    print(x);
+}

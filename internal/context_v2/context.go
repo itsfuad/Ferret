@@ -1,0 +1,524 @@
+// Package context_v2 provides the central compilation context for the Ferret compiler.
+//
+// ARCHITECTURE:
+// This implements a per-module phase tracking system where each module (source file)
+// progresses through compilation phases independently. This design:
+// - Handles multi-file imports correctly (same file imported multiple times)
+// - Enables incremental compilation
+// - Prevents redundant parsing/analysis
+// - Matches production compiler architectures (Rustc, TypeScript, Zig)
+//
+// DESIGN PRINCIPLES:
+// 1. Import paths are semantic identifiers (not file system paths)
+// 2. Each module tracks its own compilation phase
+// 3. Cycle detection prevents circular imports
+// 4. Module types (Local, Builtin, Remote) enable flexible resolution
+package context_v2
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"compiler/internal/diagnostics"
+	"compiler/internal/frontend/ast"
+	"compiler/internal/source"
+	"compiler/internal/types"
+	"compiler/internal/utils/fs"
+)
+
+// ModulePhase tracks the compilation phase of an individual module
+type ModulePhase int
+
+const (
+	PhaseNotStarted  ModulePhase = iota // Module discovered but not processed
+	PhaseLexed                          // Tokens generated
+	PhaseParsed                         // AST built
+	PhaseCollected                      // Symbols collected (first pass)
+	PhaseResolved                       // Imports and symbols resolved
+	PhaseTypeChecked                    // Type checking complete
+	PhaseCodeGen                        // Code generation complete
+)
+
+func (p ModulePhase) String() string {
+	switch p {
+	case PhaseNotStarted:
+		return "NotStarted"
+	case PhaseLexed:
+		return "Lexed"
+	case PhaseParsed:
+		return "Parsed"
+	case PhaseCollected:
+		return "Collected"
+	case PhaseResolved:
+		return "Resolved"
+	case PhaseTypeChecked:
+		return "TypeChecked"
+	case PhaseCodeGen:
+		return "CodeGen"
+	default:
+		return "Unknown"
+	}
+}
+
+// ModuleType categorizes how a module is resolved
+type ModuleType int
+
+const (
+	ModuleLocal    ModuleType = iota // Local project module
+	ModuleBuiltin                    // Standard library module
+	ModuleRemote                     // Remote dependency (github.com/...)
+	ModuleNeighbor                   // Neighbor project module
+	ModuleUnknown                    // Unknown/unresolved
+)
+
+func (mt ModuleType) String() string {
+	switch mt {
+	case ModuleLocal:
+		return "Local"
+	case ModuleBuiltin:
+		return "Builtin"
+	case ModuleRemote:
+		return "Remote"
+	case ModuleNeighbor:
+		return "Neighbor"
+	default:
+		return "Unknown"
+	}
+}
+
+// Module represents a single compiled module with its semantic information
+type Module struct {
+	// Core data
+	ImportPath string      // Logical import path (e.g., "myproject/utils/math")
+	FilePath   string      // Physical file path
+	Type       ModuleType  // How this module was resolved
+	AST        *ast.Module // Parsed syntax tree
+
+	// Compilation state
+	Phase ModulePhase // Current compilation phase
+
+	// Semantic data
+	Symbols *SymbolTable // Module-level symbols
+	Imports []*Import    // Resolved imports
+
+	// Source metadata
+	Content string // Raw source code (for diagnostics)
+}
+
+// Import represents a resolved import statement
+type Import struct {
+	Path         string           // Import path as written in source
+	Alias        string           // Optional alias (e.g., "import math as m")
+	ResolvedPath string           // Resolved to actual module import path
+	Module       *Module          // Resolved module (set during resolution phase)
+	Location     *source.Location // Source location for diagnostics
+	Symbols      []string         // Specific symbols if selective import
+}
+
+// SymbolTable holds symbols declared in a module or scope
+// For now this is a placeholder - will be expanded with proper symbol resolution
+type SymbolTable struct {
+	parent  *SymbolTable
+	symbols map[string]*Symbol
+}
+
+// Symbol represents a declared entity (variable, function, type, etc.)
+type Symbol struct {
+	Name     string
+	Kind     SymbolKind
+	Type     types.TYPE_NAME
+	Exported bool     // Whether symbol is accessible from other modules
+	Decl     ast.Node // AST node that declared this symbol
+}
+
+// SymbolKind categorizes symbols
+type SymbolKind int
+
+const (
+	SymbolVariable SymbolKind = iota
+	SymbolConstant
+	SymbolFunction
+	SymbolType
+	SymbolParameter
+)
+
+// NewSymbolTable creates a new symbol table with optional parent scope
+func NewSymbolTable(parent *SymbolTable) *SymbolTable {
+	return &SymbolTable{
+		parent:  parent,
+		symbols: make(map[string]*Symbol),
+	}
+}
+
+// Declare adds a symbol to the table
+func (st *SymbolTable) Declare(name string, symbol *Symbol) error {
+	if _, exists := st.symbols[name]; exists {
+		return fmt.Errorf("symbol '%s' already declared", name)
+	}
+	st.symbols[name] = symbol
+	return nil
+}
+
+// Lookup finds a symbol in this scope or parent scopes
+func (st *SymbolTable) Lookup(name string) (*Symbol, bool) {
+	if sym, ok := st.symbols[name]; ok {
+		return sym, true
+	}
+	if st.parent != nil {
+		return st.parent.Lookup(name)
+	}
+	return nil, false
+}
+
+// CompilerContext is the central compilation state manager
+type CompilerContext struct {
+	// Module registry: import path -> Module
+	// This is the authoritative source for all compiled modules
+	Modules map[string]*Module
+
+	// Entry point
+	EntryPoint  string // Full path to entry file
+	EntryModule string // Import path of entry module
+
+	// Universe scope: built-in types and functions
+	Universe *SymbolTable
+
+	// Diagnostics: centralized error collection
+	Diagnostics *diagnostics.DiagnosticBag
+
+	// Dependency graph: import path -> list of imported paths
+	// Used for cycle detection and build ordering
+	DepGraph map[string][]string
+
+	// Configuration
+	Config *Config
+
+	// Debug mode
+	Debug bool
+}
+
+// Config holds compiler configuration
+type Config struct {
+	// Project information
+	ProjectName string // Name of the project
+	ProjectRoot string // Root directory of the project
+
+	// Build configuration
+	OutputPath string // Where to write compiled output
+	Extension  string // Source file extension (default: ".fer")
+
+	// Module resolution
+	BuiltinModulesPath string            // Path to standard library
+	BuiltinModules     map[string]string // name -> path mapping
+
+	// Remote modules (future)
+	RemoteCachePath string // Cache directory for remote dependencies (.ferret)
+}
+
+// New creates a new compiler context
+func New(config *Config, debug bool) *CompilerContext {
+	if config == nil {
+		config = &Config{
+			Extension: ".fer",
+		}
+	}
+
+	// Set up remote cache path if not specified
+	if config.RemoteCachePath == "" && config.ProjectRoot != "" {
+		config.RemoteCachePath = filepath.Join(config.ProjectRoot, ".ferret")
+		os.MkdirAll(config.RemoteCachePath, 0755)
+	}
+
+	// Create universe scope with built-in types
+	universe := NewSymbolTable(nil)
+	registerBuiltins(universe)
+
+	ctx := &CompilerContext{
+		Modules:     make(map[string]*Module),
+		Universe:    universe,
+		Diagnostics: diagnostics.NewDiagnosticBag(""),
+		DepGraph:    make(map[string][]string),
+		Config:      config,
+		Debug:       debug,
+	}
+
+	return ctx
+}
+
+// registerBuiltins populates the universe scope with built-in types
+func registerBuiltins(universe *SymbolTable) {
+	builtinTypes := []types.TYPE_NAME{
+		types.TYPE_I8, types.TYPE_I16, types.TYPE_I32, types.TYPE_I64,
+		types.TYPE_U8, types.TYPE_U16, types.TYPE_U32, types.TYPE_U64,
+		types.TYPE_F32, types.TYPE_F64,
+		types.TYPE_STRING, types.TYPE_BOOL, types.TYPE_NONE, types.TYPE_VOID,
+		types.TYPE_BYTE,
+	}
+
+	for _, typeName := range builtinTypes {
+		universe.Declare(typeName.String(), &Symbol{
+			Name:     typeName.String(),
+			Kind:     SymbolType,
+			Type:     typeName,
+			Exported: true,
+		})
+	}
+
+	// Built-in constants
+	universe.Declare("true", &Symbol{
+		Name:     "true",
+		Kind:     SymbolConstant,
+		Type:     types.TYPE_BOOL,
+		Exported: true,
+	})
+	universe.Declare("false", &Symbol{
+		Name:     "false",
+		Kind:     SymbolConstant,
+		Type:     types.TYPE_BOOL,
+		Exported: true,
+	})
+}
+
+// SetEntryPoint sets the entry point for compilation
+func (ctx *CompilerContext) SetEntryPoint(filePath string) error {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve entry point: %w", err)
+	}
+
+	if !fs.IsValidFile(absPath) {
+		return fmt.Errorf("entry point does not exist: %s", absPath)
+	}
+
+	ctx.EntryPoint = filepath.ToSlash(absPath)
+
+	// Derive import path from file path
+	ctx.EntryModule = ctx.FilePathToImportPath(absPath)
+
+	return nil
+}
+
+// FilePathToImportPath converts a file path to a logical import path
+func (ctx *CompilerContext) FilePathToImportPath(filePath string) string {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return ""
+	}
+
+	absPath = filepath.ToSlash(absPath)
+	projectRoot := filepath.ToSlash(ctx.Config.ProjectRoot)
+
+	// Get relative path from project root
+	relPath, err := filepath.Rel(projectRoot, absPath)
+	if err != nil {
+		// If not under project root, use filename
+		return strings.TrimSuffix(filepath.Base(filePath), ctx.Config.Extension)
+	}
+
+	relPath = filepath.ToSlash(relPath)
+	// Remove extension
+	relPath = strings.TrimSuffix(relPath, ctx.Config.Extension)
+
+	// Build import path: projectname/path/to/module
+	if ctx.Config.ProjectName != "" {
+		return ctx.Config.ProjectName + "/" + relPath
+	}
+	return relPath
+}
+
+// ImportPathToFilePath converts an import path to a file path
+func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, ModuleType, error) {
+	// Determine module type
+	packageName := fs.FirstPart(importPath)
+	cleanPath := strings.TrimPrefix(importPath, packageName+"/")
+
+	// Check if it's a local module
+	if packageName == ctx.Config.ProjectName {
+		filePath := filepath.Join(ctx.Config.ProjectRoot, cleanPath+ctx.Config.Extension)
+		if fs.IsValidFile(filePath) {
+			return filepath.ToSlash(filePath), ModuleLocal, nil
+		}
+		return "", ModuleUnknown, fmt.Errorf("module not found: %s", importPath)
+	}
+
+	// Check if it's a builtin module
+	if builtinPath, ok := ctx.Config.BuiltinModules[packageName]; ok {
+		filePath := filepath.Join(builtinPath, cleanPath+ctx.Config.Extension)
+		if fs.IsValidFile(filePath) {
+			return filepath.ToSlash(filePath), ModuleBuiltin, nil
+		}
+		return "", ModuleUnknown, fmt.Errorf("builtin module not found: %s", importPath)
+	}
+
+	// Check if it's a remote module (future implementation)
+	if ctx.isRemoteImport(importPath) {
+		// TODO: Implement remote module resolution
+		return "", ModuleRemote, fmt.Errorf("remote imports not yet implemented: %s", importPath)
+	}
+
+	return "", ModuleUnknown, fmt.Errorf("cannot resolve import: %s", importPath)
+}
+
+// isRemoteImport checks if an import path is a remote module
+func (ctx *CompilerContext) isRemoteImport(importPath string) bool {
+	return strings.HasPrefix(importPath, "github.com/") ||
+		strings.HasPrefix(importPath, "gitlab.com/") ||
+		strings.HasPrefix(importPath, "bitbucket.org/")
+}
+
+// AddModule registers a module in the context
+func (ctx *CompilerContext) AddModule(importPath string, module *Module) {
+	if module == nil {
+		panic(fmt.Sprintf("cannot add nil module for %q", importPath))
+	}
+
+	// Don't overwrite existing modules
+	if _, exists := ctx.Modules[importPath]; exists {
+		return
+	}
+
+	module.ImportPath = importPath
+	ctx.Modules[importPath] = module
+}
+
+// GetModule retrieves a module by import path
+func (ctx *CompilerContext) GetModule(importPath string) (*Module, bool) {
+	module, exists := ctx.Modules[importPath]
+	return module, exists
+}
+
+// HasModule checks if a module exists in the context
+func (ctx *CompilerContext) HasModule(importPath string) bool {
+	_, exists := ctx.Modules[importPath]
+	return exists
+}
+
+// GetModulePhase returns the current phase of a module
+func (ctx *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+	if module, exists := ctx.Modules[importPath]; exists {
+		return module.Phase
+	}
+	return PhaseNotStarted
+}
+
+// SetModulePhase updates the phase of a module
+func (ctx *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+	if module, exists := ctx.Modules[importPath]; exists {
+		module.Phase = phase
+	}
+}
+
+// CanProcessPhase checks if a module is ready for a specific phase
+// Phases must be processed sequentially
+func (ctx *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+	currentPhase := ctx.GetModulePhase(importPath)
+	return currentPhase == requiredPhase-1
+}
+
+// IsModuleParsed checks if a module has been parsed (at least)
+func (ctx *CompilerContext) IsModuleParsed(importPath string) bool {
+	return ctx.GetModulePhase(importPath) >= PhaseParsed
+}
+
+// AddDependency registers an import relationship
+// Returns error if adding this dependency would create a cycle
+func (ctx *CompilerContext) AddDependency(importer, imported string) error {
+	// Normalize paths
+	importer = filepath.ToSlash(importer)
+	imported = filepath.ToSlash(imported)
+
+	// Check for cycle before adding
+	if cycle := ctx.findCycle(imported, importer); cycle != nil {
+		return fmt.Errorf("circular import detected: %s", formatCycle(cycle))
+	}
+
+	// Add dependency
+	ctx.DepGraph[importer] = append(ctx.DepGraph[importer], imported)
+	return nil
+}
+
+// findCycle uses DFS to detect if adding edge (from -> to) creates a cycle
+func (ctx *CompilerContext) findCycle(from, to string) []string {
+	visited := make(map[string]bool)
+	path := []string{}
+
+	if ctx.hasCyclePath(from, to, visited, &path) {
+		// Construct cycle path
+		cycle := append([]string{to}, path...)
+		cycle = append(cycle, to)
+		return cycle
+	}
+	return nil
+}
+
+// hasCyclePath performs DFS to find path from start to target
+func (ctx *CompilerContext) hasCyclePath(start, target string, visited map[string]bool, path *[]string) bool {
+	if start == target {
+		return true
+	}
+
+	if visited[start] {
+		return false
+	}
+
+	visited[start] = true
+	*path = append(*path, start)
+
+	for _, dep := range ctx.DepGraph[start] {
+		dep = filepath.ToSlash(dep)
+		if ctx.hasCyclePath(dep, target, visited, path) {
+			return true
+		}
+	}
+
+	// Backtrack
+	*path = (*path)[:len(*path)-1]
+	return false
+}
+
+// formatCycle formats a cycle path for error messages
+func formatCycle(cycle []string) string {
+	parts := make([]string, len(cycle))
+	for i, path := range cycle {
+		parts[i] = filepath.Base(path)
+	}
+	return strings.Join(parts, " -> ")
+}
+
+// HasErrors returns true if any errors have been reported
+func (ctx *CompilerContext) HasErrors() bool {
+	return ctx.Diagnostics.HasErrors()
+}
+
+// ReportError adds an error diagnostic
+func (ctx *CompilerContext) ReportError(message string, location *source.Location) {
+	diag := &diagnostics.Diagnostic{
+		Severity: diagnostics.Error,
+		Message:  message,
+		Labels: []diagnostics.Label{
+			{Location: location, Message: "", Style: diagnostics.Primary},
+		},
+	}
+	ctx.Diagnostics.Add(diag)
+}
+
+// EmitDiagnostics outputs all collected diagnostics
+func (ctx *CompilerContext) EmitDiagnostics() {
+	ctx.Diagnostics.EmitAll()
+}
+
+// ModuleCount returns the number of modules in the context
+func (ctx *CompilerContext) ModuleCount() int {
+	return len(ctx.Modules)
+}
+
+// GetModuleNames returns all module import paths
+func (ctx *CompilerContext) GetModuleNames() []string {
+	names := make([]string, 0, len(ctx.Modules))
+	for name := range ctx.Modules {
+		names = append(names, name)
+	}
+	return names
+}

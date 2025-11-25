@@ -1,0 +1,9 @@
+// Valid: all imports at the top
+
+import "test_project/utils";
+
+const x := 42;
+
+func main() -> i32 {
+    return x;
+}
