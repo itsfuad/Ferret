@@ -13,8 +13,10 @@ import (
 
 const (
 	STR_MULTIPLIER = "%*d | "
-	LINE_POS       = "  --> %s:%d:%d\n"
+	LINE_POS       = "%s--> %s:%d:%d\n"
 )
+
+
 
 // SourceCache caches source file contents for error reporting
 type SourceCache struct {
@@ -64,8 +66,9 @@ func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 
 // Emitter handles the rendering and output of diagnostics
 type Emitter struct {
-	cache  *SourceCache
-	writer io.Writer // Where to write output (os.Stdout, string builder, etc.)
+	cache               *SourceCache
+	writer              io.Writer         // Where to write output (os.Stdout, string builder, etc.)
+	currentLineNumWidth int               // Line number width for current diagnostic
 }
 
 // labelContext groups parameters for printing labels to reduce parameter count
@@ -89,12 +92,53 @@ func NewEmitter(w io.Writer) *Emitter {
 	}
 }
 
-// SetSourceLines pre-populates the cache with source code lines (for WASM/in-memory sources)
-func (e *Emitter) SetSourceLines(filepath string, lines []string) {
-	e.cache.files[filepath] = lines
+// calculateLineNumWidthForDiagnostic calculates the line number width needed for all lines displayed in this diagnostic
+func (e *Emitter) calculateLineNumWidthForDiagnostic(diag *Diagnostic) int {
+	lineNumbers := make(map[int]bool)
+
+	// Collect all line numbers that will be displayed
+	for _, label := range diag.Labels {
+		if label.Location == nil || label.Location.Start == nil {
+			continue
+		}
+
+		start := label.Location.Start
+		end := label.Location.End
+		if end == nil {
+			end = start
+		}
+
+		// Add the label lines
+		for line := start.Line; line <= end.Line; line++ {
+			lineNumbers[line] = true
+		}
+
+		// Add context lines (previous line if it exists and isn't empty)
+		if start.Line > 1 {
+			// We would need to check if the previous line has content, but for width calculation
+			// we can just include it if it might be shown
+			lineNumbers[start.Line-1] = true
+		}
+	}
+
+	// Find the maximum line number
+	maxLine := 0
+	for line := range lineNumbers {
+		if line > maxLine {
+			maxLine = line
+		}
+	}
+
+	// Return the width needed for this line number
+	if maxLine == 0 {
+		return 1
+	}
+	return len(fmt.Sprintf("%d", maxLine))
 }
 
 func (e *Emitter) Emit(diag *Diagnostic) {
+	// Calculate line number width based on all lines that will be displayed for this diagnostic
+	e.currentLineNumWidth = e.calculateLineNumWidthForDiagnostic(diag)
 
 	// Print severity and message
 	e.printHeader(diag)
@@ -198,11 +242,10 @@ func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
 		end = start
 	}
 
-	// Print location header
-	colors.BLUE.Fprintf(e.writer, LINE_POS, filepath, start.Line, start.Column)
-
 	// Print line number gutter width
 	lineNumWidth := len(fmt.Sprintf("%d", start.Line))
+	// Print location header
+	colors.BLUE.Fprintf(e.writer, LINE_POS, strings.Repeat(" ", lineNumWidth), filepath, start.Line, start.Column)
 	if end.Line > start.Line {
 		endWidth := len(fmt.Sprintf("%d", end.Line))
 		if endWidth > lineNumWidth {
@@ -403,15 +446,24 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 	lineNumColor.Fprint(e.writer, strings.Repeat(" ", ctx.lineNumWidth))
 	pipeColor.Fprintln(e.writer, " |")
 }
-const NEED_TO_USE_THE_SAME_PADDING = 2
+
 func (e *Emitter) printNote(note Note) {
-	fmt.Fprintf(e.writer, strings.Repeat(" ", NEED_TO_USE_THE_SAME_PADDING))
+	padding := 0
+	if e.currentLineNumWidth > 0 {
+		padding = e.currentLineNumWidth + 1 // +1 for the space before |
+	}
+	fmt.Fprint(e.writer, strings.Repeat(" ", padding))
 	colors.CYAN.Fprint(e.writer, "= note: ")
 	fmt.Fprintln(e.writer, note.Message)
 }
 
 func (e *Emitter) printHelp(help string) {
-	colors.GREEN.Fprint(e.writer, "  = help: ")
+	padding := 2
+	if e.currentLineNumWidth > 0 {
+		padding = e.currentLineNumWidth + 1 // +1 for the space before |
+	}
+	fmt.Fprint(e.writer, strings.Repeat(" ", padding))
+	colors.GREEN.Fprint(e.writer, "= help: ")
 	fmt.Fprintln(e.writer, help)
 }
 
@@ -457,10 +509,10 @@ func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondar
 		rightStart, rightEnd = primaryStart, primaryEnd
 	}
 
-	// Print location header (point to rightmost/inline label)
-	colors.BLUE.Fprintf(e.writer, LINE_POS, filepath, line, rightStart.Column)
-
 	lineNumWidth := len(fmt.Sprintf("%d", line))
+
+	// Print location header (point to rightmost/inline label)
+	colors.BLUE.Fprintf(e.writer, LINE_POS, strings.Repeat(" ", lineNumWidth), filepath, line, rightStart.Column)
 
 	// Print separator
 	colors.GREY.Fprint(e.writer, strings.Repeat(" ", lineNumWidth))
@@ -583,8 +635,6 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 	primaryLine := primary.Location.Start.Line
 	primaryCol := primary.Location.Start.Column
 
-	// Print location header
-	colors.BLUE.Fprintf(e.writer, LINE_POS, filepath, primaryLine, primaryCol)
 
 	// Collect all line numbers we need to show
 	lineNumbers := []int{primaryLine}
@@ -615,6 +665,9 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 	}
 
 	lineNumWidth := len(fmt.Sprintf("%d", lineNumbers[len(lineNumbers)-1]))
+
+	// Print location header
+	colors.BLUE.Fprintf(e.writer, LINE_POS, strings.Repeat(" ", lineNumWidth), filepath, primaryLine, primaryCol)
 
 	// Print separator
 	colors.GREY.Fprint(e.writer, strings.Repeat(" ", lineNumWidth))
@@ -754,99 +807,4 @@ func (e *Emitter) getSeverityColor(severity Severity) colors.COLOR {
 	default:
 		return colors.RED
 	}
-}
-
-// FormatDiagnostic formats a single diagnostic with ANSI codes (for WASM fallback)
-func FormatDiagnostic(filepath string, diag *Diagnostic, sourceLines []string) string {
-	var output strings.Builder
-
-	// Get severity color codes
-	var colorCode string
-	switch diag.Severity {
-	case Error:
-		colorCode = "\x1b[31m" // Red
-	case Warning:
-		colorCode = "\x1b[33m" // Yellow
-	case Info:
-		colorCode = "\x1b[36m" // Cyan
-	case Hint:
-		colorCode = "\x1b[35m" // Magenta
-	default:
-		colorCode = "\x1b[31m" // Red
-	}
-	resetCode := "\x1b[0m"
-	greyCode := "\x1b[90m"
-
-	// Print header: error[CODE]: message
-	severityStr := diag.Severity.String()
-	if diag.Code != "" {
-		output.WriteString(fmt.Sprintf("%s%s[%s]%s: %s\n", colorCode, severityStr, diag.Code, resetCode, diag.Message))
-	} else {
-		output.WriteString(fmt.Sprintf("%s%s%s: %s\n", colorCode, severityStr, resetCode, diag.Message))
-	}
-
-	// Print location if we have labels
-	if len(diag.Labels) > 0 && diag.Labels[0].Location != nil && diag.Labels[0].Location.Start != nil {
-		loc := diag.Labels[0].Location.Start
-		output.WriteString(fmt.Sprintf("  %s-->%s %s:%d:%d\n", greyCode, resetCode, filepath, loc.Line, loc.Column))
-
-		// Show source code snippet if available
-		if loc.Line > 0 && loc.Line <= len(sourceLines) {
-			lineNum := loc.Line
-			sourceLine := sourceLines[lineNum-1]
-
-			// Calculate line number width
-			lineNumWidth := len(fmt.Sprintf("%d", lineNum))
-
-			// Print separator
-			output.WriteString(fmt.Sprintf("%s%*s |%s\n", greyCode, lineNumWidth, "", resetCode))
-
-			// Print source line
-			output.WriteString(fmt.Sprintf("%s%*d |%s %s\n", greyCode, lineNumWidth, lineNum, resetCode, sourceLine))
-
-			// Print error indicator
-			output.WriteString(fmt.Sprintf("%s%*s |%s ", greyCode, lineNumWidth, "", resetCode))
-
-			// Add padding and underline
-			label := diag.Labels[0]
-			startCol := label.Location.Start.Column
-			endCol := startCol + 1
-			if label.Location.End != nil {
-				endCol = label.Location.End.Column
-			}
-			if endCol <= startCol {
-				endCol = startCol + 1
-			}
-
-			padding := startCol - 1
-			length := endCol - startCol
-			if length <= 0 {
-				length = 1
-			}
-
-			output.WriteString(strings.Repeat(" ", padding))
-			output.WriteString(fmt.Sprintf("%s%s%s", colorCode, strings.Repeat("^", length), resetCode))
-
-			if diag.Labels[0].Message != "" {
-				output.WriteString(fmt.Sprintf(" %s", diag.Labels[0].Message))
-			}
-			output.WriteString("\n")
-
-			// Print closing separator
-			output.WriteString(fmt.Sprintf("%s%*s |%s\n", greyCode, lineNumWidth, "", resetCode))
-		}
-	}
-
-	// Print notes
-	for _, note := range diag.Notes {
-		output.WriteString(fmt.Sprintf("  %snote%s: %s\n", greyCode, resetCode, note.Message))
-	}
-
-	// Print help
-	if diag.Help != "" {
-		output.WriteString(fmt.Sprintf("  %shelp%s: %s\n", greyCode, resetCode, diag.Help))
-	}
-
-	output.WriteString("\n")
-	return output.String()
 }
