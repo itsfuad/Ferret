@@ -103,6 +103,14 @@ func (e *Emitter) printBlankGutter() {
 	colors.GREY.Fprintf(e.writer, GUTTER_BLANK, e.currentLineNumWidth, "")
 }
 
+func (e *Emitter) printBlankGutterWithColor(color colors.COLOR) {
+	color.Fprintf(e.writer, GUTTER_BLANK, e.currentLineNumWidth, "")
+}
+
+func (e *Emitter) printBlankPad() {
+	colors.GREY.Fprintf(e.writer, "%*s   ", e.currentLineNumWidth, "")
+}
+
 // printPipeOnly prints a separator line aligned under the gutter.
 func (e *Emitter) printPipeOnly() {
 	e.printBlankGutter()
@@ -388,13 +396,11 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 		return
 	}
 
-	pipeColor := colors.GREY
-
 	e.printCurrentGutter(ctx.startLine)
 	fmt.Fprintln(e.writer, startSourceLine)
 
 	// Print underline for start
-	e.printBlankGutter()
+	e.printBlankGutterWithColor(colors.WHITE)
 
 	var underlineColor colors.COLOR
 	if ctx.label.Style == Primary {
@@ -426,8 +432,7 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 
 	// Middle lines
 	if ctx.endLine-ctx.startLine > 5 {
-		e.printBlankGutter()
-		pipeColor.Fprintln(e.writer, "...")
+		colors.WHITE.Fprintln(e.writer, fmt.Sprintf("%*s...", e.currentLineNumWidth, ""))
 	} else {
 		for i := ctx.startLine + 1; i < ctx.endLine; i++ {
 			line, err := e.cache.GetLine(ctx.filepath, i)
@@ -642,8 +647,7 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 		if idx > 0 {
 			prevLine := lineNumbers[idx-1]
 			if lineNum-prevLine > 1 {
-				e.printBlankGutter()
-				colors.GREY.Fprintln(e.writer, "...")
+				colors.GREY.Fprintln(e.writer, fmt.Sprintf("%*s...", e.currentLineNumWidth, ""))
 				e.printPipeOnly()
 			}
 		}

@@ -4,6 +4,11 @@ fn multiply(a: i32, b: i32) -> i32 {
 // const
      const MAX : i32;
     struct{
+
         .x: i32,
+
+
         .y: i32
+
+        
     };
