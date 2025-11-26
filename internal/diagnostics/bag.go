@@ -21,13 +21,20 @@ type DiagnosticBag struct {
 	mu          sync.Mutex
 	errorCount  int
 	warnCount   int
+	sourceCache *SourceCache
 }
 
 // NewDiagnosticBag creates a new diagnostic bag for a file
 func NewDiagnosticBag(filepath string) *DiagnosticBag {
 	return &DiagnosticBag{
 		diagnostics: make([]*Diagnostic, 0),
+		sourceCache: NewSourceCache(),
 	}
+}
+
+// AddSourceContent adds source content for a file path (for in-memory compilation)
+func (db *DiagnosticBag) AddSourceContent(filepath, content string) {
+	db.sourceCache.AddSource(filepath, content)
 }
 
 // Add adds a diagnostic to the bag
@@ -96,7 +103,10 @@ func (db *DiagnosticBag) EmitAll() {
 func (db *DiagnosticBag) EmitAllToString() string {
 
 	var buf bytes.Buffer
-	emitter := NewEmitter(&buf)
+	emitter := &Emitter{
+		cache:  db.sourceCache,
+		writer: &buf,
+	}
 
 	db.mu.Lock()
 	diagnostics := make([]*Diagnostic, len(db.diagnostics))

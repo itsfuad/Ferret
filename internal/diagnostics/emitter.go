@@ -28,6 +28,12 @@ func NewSourceCache() *SourceCache {
 	return &SourceCache{files: make(map[string][]string)}
 }
 
+// AddSource adds source content to the cache for a virtual file path
+func (sc *SourceCache) AddSource(filepath, content string) {
+	lines := strings.Split(content, "\n")
+	sc.files[filepath] = lines
+}
+
 // GetLine retrieves a specific line from a source file
 func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 	if lines, ok := sc.files[filepath]; ok {

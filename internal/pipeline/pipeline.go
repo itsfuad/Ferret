@@ -227,41 +227,57 @@ func (p *Pipeline) discoverModules() error {
 		}
 		discovered[importPath] = true
 
-		// Resolve import path to file path
-		filePath, modType, err := p.ctx.ImportPathToFilePath(importPath)
-		if err != nil {
-			p.ctx.ReportError(
-				fmt.Sprintf("cannot resolve module %q: %v", importPath, err),
-				nil,
-			)
-			continue
-		}
+		// Check if module already exists (e.g., entry module with code)
+		existingModule, exists := p.ctx.GetModule(importPath)
+		var content string
+		var filePath string
+		var modType context_v2.ModuleType
 
-		// Read source file (for WASM, this could be abstracted)
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			p.ctx.ReportError(
-				fmt.Sprintf("cannot read file %s: %v", filePath, err),
-				nil,
-			)
-			continue
+		if exists && existingModule.Content != "" {
+			// Module already loaded (in-memory code)
+			content = existingModule.Content
+			filePath = existingModule.FilePath
+			modType = existingModule.Type
+		} else {
+			// Resolve import path to file path
+			filePath, modTyp, err := p.ctx.ImportPathToFilePath(importPath)
+			if err != nil {
+				p.ctx.ReportError(
+					fmt.Sprintf("cannot resolve module %q: %v", importPath, err),
+					nil,
+				)
+				continue
+			}
+
+			modType = modTyp
+
+			// Read source file
+			contentBytes, err := os.ReadFile(filePath)
+			if err != nil {
+				p.ctx.ReportError(
+					fmt.Sprintf("cannot read file %s: %v", filePath, err),
+					nil,
+				)
+				continue
+			}
+			content = string(contentBytes)
 		}
 
 		// Quick scan to extract imports (minimal parsing)
-		imports := p.quickScanImports(filePath, string(content))
+		imports := p.quickScanImports(filePath, content)
 
-		// Create module stub (not yet lexed/parsed)
-		module := &context_v2.Module{
-			FilePath: filePath,
-			Type:     modType,
-			Phase:    context_v2.PhaseNotStarted,
-			Symbols:  context_v2.NewSymbolTable(p.ctx.Universe),
-			Content:  string(content),
+		// Create or update module stub (not yet lexed/parsed)
+		if !exists {
+			module := &context_v2.Module{
+				FilePath: filePath,
+				Type:     modType,
+				Phase:    context_v2.PhaseNotStarted,
+				Symbols:  context_v2.NewSymbolTable(p.ctx.Universe),
+				Content:  content,
+			}
+			p.ctx.AddModule(importPath, module)
+			moduleCount++
 		}
-
-		// Add to context
-		p.ctx.AddModule(importPath, module)
-		moduleCount++
 
 		if p.debug {
 			colors.PURPLE.Printf("  [%d] %s (%s)\n", moduleCount, importPath, modType)

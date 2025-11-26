@@ -128,7 +128,7 @@ async function initWasm() {
     }
     
     console.log('📥 Fetching ferret.wasm...');
-    const wasmVersion = '8.39.00'; // Update this each build
+    const wasmVersion = '10.0.0'; // Clean architecture with internal/compiler package
     const response = await fetch('/ferret.wasm?v=' + wasmVersion, {
       cache: 'no-store' // Force no cache
     });
@@ -467,13 +467,13 @@ monaco.languages.register({ id: 'ferret' });
         status.setAttribute('data-status', 'success');
         statusText.textContent = 'Success';
         // Output is already HTML-formatted from the compiler
-        output.innerHTML = `<pre>${result.output || 'Program executed successfully'}</pre>`;
+        output.innerHTML = result.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>';
       } else {
-        //console.error('Compilation failed:', result.error);
+        //console.error('Compilation failed');
         status.setAttribute('data-status', 'error');
         statusText.textContent = 'Error';
-        // Error is already HTML-formatted from the compiler
-        output.innerHTML = `<pre>${result.error}</pre>`;
+        // Output is already HTML-formatted from the compiler
+        output.innerHTML = result.output || '<p style="color: #ef4444;">Compilation failed</p>';
       }
       
     } catch (error) {
@@ -506,11 +506,11 @@ monaco.languages.register({ id: 'ferret' });
             if (retryResult.success) {
               status.setAttribute('data-status', 'success');
               statusText.textContent = 'Success';
-              output.innerHTML = `<pre>${retryResult.output || 'Program executed successfully'}</pre>`;
+              output.innerHTML = retryResult.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>';
             } else {
               status.setAttribute('data-status', 'error');
               statusText.textContent = 'Error';
-              output.innerHTML = `<pre>${retryResult.error}</pre>`;
+              output.innerHTML = retryResult.output || '<p style="color: #ef4444;">Compilation failed</p>';
             }
           } catch (retryError) {
             console.error('Retry compilation also failed:', retryError);

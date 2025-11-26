@@ -3,6 +3,7 @@ package colors
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Print methods (default to stdout)
@@ -88,9 +89,9 @@ func StripANSI(s string) string {
 // ConvertANSIToHTML converts ANSI color codes to HTML span tags
 func ConvertANSIToHTML(text string) string {
 	// First, escape HTML entities
-	result := replaceAll(text, "&", "&amp;")
-	result = replaceAll(result, "<", "&lt;")
-	result = replaceAll(result, ">", "&gt;")
+	result := strings.ReplaceAll(text, "&", "&amp;")
+	result = strings.ReplaceAll(result, "<", "&lt;")
+	result = strings.ReplaceAll(result, ">", "&gt;")
 
 	// Then replace ANSI codes with HTML
 	ansiToHTMLColors := map[string]string{
@@ -134,23 +135,12 @@ func ConvertANSIToHTML(text string) string {
 	}
 
 	for ansi, html := range ansiToHTMLColors {
-		result = replaceAll(result, ansi, html)
+		result = strings.ReplaceAll(result, ansi, html)
 	}
 
-	return result
-}
+	// Convert newlines to <br> and spaces to &nbsp; for proper formatting
+	result = strings.ReplaceAll(result, "\n", "<br>")
+	result = strings.ReplaceAll(result, "  ", "&nbsp;&nbsp;") // Preserve double spaces
 
-// Helper function for string replacement
-func replaceAll(s, old, new string) string {
-	result := ""
-	for i := 0; i < len(s); {
-		if i+len(old) <= len(s) && s[i:i+len(old)] == old {
-			result += new
-			i += len(old)
-		} else {
-			result += string(s[i])
-			i++
-		}
-	}
 	return result
 }

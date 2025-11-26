@@ -300,6 +300,29 @@ func (ctx *CompilerContext) SetEntryPoint(filePath string) error {
 	return nil
 }
 
+// SetEntryPointWithCode sets the entry point with in-memory code (for WASM/playground)
+func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error {
+	// For in-memory compilation, use a virtual path
+	virtualPath := filepath.Join(ctx.Config.ProjectRoot, moduleName+ctx.Config.Extension)
+	ctx.EntryPoint = filepath.ToSlash(virtualPath)
+	ctx.EntryModule = ctx.Config.ProjectName + "/" + moduleName
+
+	// Add source content to diagnostic bag's cache so it can display source lines
+	ctx.Diagnostics.AddSourceContent(virtualPath, code)
+
+	// Create the entry module directly with the provided code
+	module := &Module{
+		FilePath: virtualPath,
+		Type:     ModuleLocal,
+		Phase:    PhaseNotStarted,
+		Symbols:  NewSymbolTable(ctx.Universe),
+		Content:  code,
+	}
+
+	ctx.AddModule(ctx.EntryModule, module)
+	return nil
+}
+
 // FilePathToImportPath converts a file path to a logical import path
 func (ctx *CompilerContext) FilePathToImportPath(filePath string) string {
 	absPath, err := filepath.Abs(filePath)
