@@ -92,6 +92,12 @@ func (e *Emitter) printGutter(line int) {
 	colors.GREY.Fprintf(e.writer, GUTTER_FMT, e.currentLineNumWidth, line)
 }
 
+// printCurrentGutter prints " <line> | " in white (for main/source lines).
+func (e *Emitter) printCurrentGutter(line int) {
+	// if your colors package uses BOLD_WHITE, swap it in here
+	colors.WHITE.Fprintf(e.writer, GUTTER_FMT, e.currentLineNumWidth, line)
+}
+
 // printBlankGutter prints "     | " with consistent width/color.
 func (e *Emitter) printBlankGutter() {
 	colors.GREY.Fprintf(e.writer, GUTTER_BLANK, e.currentLineNumWidth, "")
@@ -280,7 +286,7 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 		return
 	}
 
-	e.printGutter(ctx.line)
+	e.printCurrentGutter(ctx.line)
 	fmt.Fprintln(e.writer, sourceLine)
 
 	// Underline leader
@@ -336,10 +342,9 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 		return
 	}
 
-	lineNumColor := colors.GREY
 	pipeColor := colors.GREY
 
-	lineNumColor.Fprintf(e.writer, GUTTER_FMT, e.currentLineNumWidth, ctx.startLine)
+	e.printCurrentGutter(ctx.startLine)
 	fmt.Fprintln(e.writer, startSourceLine)
 
 	// Print underline for start
@@ -381,7 +386,7 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 			if err != nil {
 				continue
 			}
-			e.printGutter(i)
+			e.printCurrentGutter(i)
 			fmt.Fprintln(e.writer, line)
 		}
 	}
@@ -474,7 +479,7 @@ func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondar
 	if err != nil {
 		return
 	}
-	e.printGutter(line)
+	e.printCurrentGutter(line)
 	fmt.Fprintln(e.writer, sourceLine)
 
 	leftPadding := leftStart.Column - 1
@@ -616,7 +621,7 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 			continue
 		}
 
-		e.printGutter(lineNum)
+		e.printCurrentGutter(lineNum)
 		fmt.Fprintln(e.writer, sourceLine)
 
 		hasSecondary := false
