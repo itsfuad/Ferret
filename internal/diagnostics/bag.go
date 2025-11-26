@@ -125,13 +125,13 @@ func (db *DiagnosticBag) printSummary(w io.Writer) {
 	defer db.mu.Unlock()
 
 	if db.errorCount > 0 {
-		fmt.Fprintf(w, compileFailedMsg, db.errorCount)
+		colors.RED.Fprintf(w, compileFailedMsg, db.errorCount)
 		if db.warnCount > 0 {
-			fmt.Fprintf(w, andWarningMsg, db.warnCount)
+			colors.RED.Fprintf(w, andWarningMsg, db.warnCount)
 		}
 		fmt.Fprintln(w)
 	} else if db.warnCount > 0 {
-		fmt.Fprintf(w, compileSuccessWithWarning, db.warnCount)
+		colors.ORANGE.Fprintf(w, compileSuccessWithWarning, db.warnCount)
 	}
 }
 

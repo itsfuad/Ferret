@@ -107,10 +107,6 @@ func (e *Emitter) printBlankGutterWithColor(color colors.COLOR) {
 	color.Fprintf(e.writer, GUTTER_BLANK, e.currentLineNumWidth, "")
 }
 
-func (e *Emitter) printBlankPad() {
-	colors.GREY.Fprintf(e.writer, "%*s   ", e.currentLineNumWidth, "")
-}
-
 // printPipeOnly prints a separator line aligned under the gutter.
 func (e *Emitter) printPipeOnly() {
 	e.printBlankGutter()
@@ -173,47 +169,75 @@ func (e *Emitter) calculateLineNumWidthForDiagnostic(diag *Diagnostic) int {
 func (e *Emitter) Emit(diag *Diagnostic) {
 	e.currentLineNumWidth = e.calculateLineNumWidthForDiagnostic(diag)
 
-	// Print file/position first, then severity/message under it (Rust-style)
-	e.printArrowHeader(diag)
+	// Print severity/message first (before file locations)
+	e.printDiagnosticHeader(diag)
 
 	if len(diag.Labels) > 0 {
-		primaryCount := 0
-		var primaryLabel Label
-		secondaryLabels := []Label{}
+		// Group labels by filepath
+		labelsByFile := make(map[string][]Label)
+		var files []string
 
 		for _, label := range diag.Labels {
-			if label.Style == Primary {
-				primaryCount++
-				primaryLabel = label
-			} else {
-				secondaryLabels = append(secondaryLabels, label)
+			filepath := label.FilePath
+			if filepath == "" {
+				filepath = diag.FilePath
 			}
+
+			if _, exists := labelsByFile[filepath]; !exists {
+				files = append(files, filepath)
+			}
+			labelsByFile[filepath] = append(labelsByFile[filepath], label)
 		}
 
-		if primaryCount == 0 {
-			for _, label := range diag.Labels {
-				e.printLabel(diag.FilePath, label, diag.Severity)
+		// Emit labels grouped by file
+		for _, filepath := range files {
+			labels := labelsByFile[filepath]
+
+			// Count primary labels for this file
+			primaryCount := 0
+			var primaryLabel Label
+			secondaryLabels := []Label{}
+
+			for _, label := range labels {
+				if label.Style == Primary {
+					primaryCount++
+					primaryLabel = label
+				} else {
+					secondaryLabels = append(secondaryLabels, label)
+				}
 			}
-		} else if primaryCount > 1 {
-			labels := []string{}
-			for _, label := range diag.Labels {
-				labels = append(labels, fmt.Sprintf("%v", label))
-			}
-			panic("INTERNAL COMPILER ERROR: Multiple primary labels in diagnostic!: " + strings.Join(labels, ", "))
-		} else {
-			if len(secondaryLabels) == 0 {
-				e.printLabel(diag.FilePath, primaryLabel, diag.Severity)
-			} else if len(secondaryLabels) == 1 &&
-				primaryLabel.Location != nil &&
-				primaryLabel.Location.Start != nil &&
-				secondaryLabels[0].Location != nil &&
-				secondaryLabels[0].Location.Start != nil &&
-				primaryLabel.Location.Start.Line == secondaryLabels[0].Location.Start.Line {
-				e.printCompactDualLabel(diag.FilePath, primaryLabel, secondaryLabels[0], diag.Severity)
+
+			// Print file location header
+			e.printFileLocationHeader(filepath, labels)
+
+			if primaryCount == 0 {
+				for _, label := range labels {
+					e.printLabel(filepath, label, diag.Severity)
+				}
+			} else if primaryCount > 1 {
+				labelStrs := []string{}
+				for _, label := range labels {
+					labelStrs = append(labelStrs, fmt.Sprintf("%v", label))
+				}
+				panic("INTERNAL COMPILER ERROR: Multiple primary labels in diagnostic!: " + strings.Join(labelStrs, ", "))
 			} else {
-				e.printRoutedLabels(diag.FilePath, primaryLabel, secondaryLabels, diag.Severity)
+				if len(secondaryLabels) == 0 {
+					e.printLabel(filepath, primaryLabel, diag.Severity)
+				} else if len(secondaryLabels) == 1 &&
+					primaryLabel.Location != nil &&
+					primaryLabel.Location.Start != nil &&
+					secondaryLabels[0].Location != nil &&
+					secondaryLabels[0].Location.Start != nil &&
+					primaryLabel.Location.Start.Line == secondaryLabels[0].Location.Start.Line {
+					e.printCompactDualLabel(filepath, primaryLabel, secondaryLabels[0], diag.Severity)
+				} else {
+					e.printRoutedLabels(filepath, primaryLabel, secondaryLabels, diag.Severity)
+				}
 			}
 		}
+	} else {
+		// No labels, print a simple arrow header
+		e.printSimpleArrowHeader(diag)
 	}
 
 	for _, note := range diag.Notes {
@@ -244,28 +268,11 @@ func (e *Emitter) headerPosition(diag *Diagnostic) (line, col int) {
 	return 1, 1
 }
 
-// printArrowHeader prints file position first and then severity/message under it.
+// printDiagnosticHeader prints the severity and message first (before any file locations)
 // Example:
-//  --> file:line:col
-//   : warning[CODE]: message
-func (e *Emitter) printArrowHeader(diag *Diagnostic) {
-	line, col := e.headerPosition(diag)
-
-	// Arrow position line aligned to gutter width
-	colors.BLUE.Fprintf(
-		e.writer,
-		LINE_POS,
-		strings.Repeat(" ", e.currentLineNumWidth),
-		diag.FilePath,
-		line,
-		col,
-	)
-
-	// Severity/message line aligned under arrow
-	indent := strings.Repeat(" ", e.currentLineNumWidth+1)
-	fmt.Fprint(e.writer, indent)
-	fmt.Fprint(e.writer, ": ")
-
+//
+//	error[CODE]: message
+func (e *Emitter) printDiagnosticHeader(diag *Diagnostic) {
 	var color colors.COLOR
 	var severityStr string
 
@@ -290,6 +297,64 @@ func (e *Emitter) printArrowHeader(diag *Diagnostic) {
 	}
 	fmt.Fprint(e.writer, ": ")
 	color.Fprintln(e.writer, diag.Message)
+}
+
+// printSimpleArrowHeader prints arrow and file location for diagnostics without labels
+func (e *Emitter) printSimpleArrowHeader(diag *Diagnostic) {
+	line, col := e.headerPosition(diag)
+
+	colors.BLUE.Fprintf(
+		e.writer,
+		LINE_POS,
+		strings.Repeat(" ", e.currentLineNumWidth),
+		diag.FilePath,
+		line,
+		col,
+	)
+}
+
+// printFileLocationHeader prints the file location arrow for a group of labels
+// Example:
+//
+//	--> /path/to/file.fer:5:21
+//
+// or for secondary files:
+//
+//	--> file.fer:3:1
+func (e *Emitter) printFileLocationHeader(filepath string, labels []Label) {
+	// Find the primary label in this group for positioning
+	var line, col int
+	found := false
+
+	for _, label := range labels {
+		if label.Style == Primary && label.Location != nil && label.Location.Start != nil {
+			line = label.Location.Start.Line
+			col = label.Location.Start.Column
+			found = true
+			break
+		}
+	}
+
+	// If no primary, use first label
+	if !found {
+		for _, label := range labels {
+			if label.Location != nil && label.Location.Start != nil {
+				line = label.Location.Start.Line
+				col = label.Location.Start.Column
+				break
+			}
+		}
+	}
+
+	// Arrow position line aligned to gutter width
+	colors.BLUE.Fprintf(
+		e.writer,
+		LINE_POS,
+		strings.Repeat(" ", e.currentLineNumWidth),
+		filepath,
+		line,
+		col,
+	)
 }
 
 func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
@@ -331,6 +396,19 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 
 	sourceLine, err := e.cache.GetLine(ctx.filepath, ctx.line)
 	if err != nil {
+		// If we can't get the source line, show the label message anyway
+		if ctx.label.Message != "" {
+			e.printBlankGutter()
+			var color colors.COLOR
+			if ctx.label.Style == Primary {
+				color = e.getSeverityColor(ctx.severity)
+			} else {
+				color = colors.BLUE
+			}
+			color.Fprintf(e.writer, "^ %s", ctx.label.Message)
+			fmt.Fprintln(e.writer)
+		}
+		e.printPipeOnly()
 		return
 	}
 
@@ -517,7 +595,7 @@ func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondar
 		rightStart, rightEnd = primaryStart, primaryEnd
 	}
 
-	colors.BLUE.Fprintf(e.writer, LINE_POS, strings.Repeat(" ", e.currentLineNumWidth), filepath, line, rightStart.Column)
+	// Header already printed by caller
 	e.printPipeOnly()
 
 	// Previous non-empty line in grey (context)
@@ -610,7 +688,6 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 	}
 
 	primaryLine := primary.Location.Start.Line
-	primaryCol := primary.Location.Start.Column
 
 	lineNumbers := []int{primaryLine}
 	for _, sec := range secondaries {
@@ -637,7 +714,7 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 		}
 	}
 
-	colors.BLUE.Fprintf(e.writer, LINE_POS, strings.Repeat(" ", e.currentLineNumWidth), filepath, primaryLine, primaryCol)
+	// Header already printed by caller
 	e.printPipeOnly()
 
 	primaryColor := e.getSeverityColor(severity)

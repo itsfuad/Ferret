@@ -31,6 +31,7 @@ func (s Severity) String() string {
 
 // Label represents a labeled section of code in a diagnostic
 type Label struct {
+	FilePath string
 	Location *source.Location
 	Message  string
 	Style    LabelStyle
@@ -101,6 +102,7 @@ func (d *Diagnostic) WithLabel(filepath string, loc *source.Location, message st
 		d.FilePath = filepath
 	}
 	d.Labels = append(d.Labels, Label{
+		FilePath: filepath,
 		Location: loc,
 		Message:  message,
 		Style:    style,
@@ -122,6 +124,7 @@ func (d *Diagnostic) WithPrimaryLabel(filepath string, loc *source.Location, mes
 		}
 		// We have secondary labels but no primary - insert at beginning
 		d.Labels = append([]Label{{
+			FilePath: filepath,
 			Location: loc,
 			Message:  message,
 			Style:    Primary,

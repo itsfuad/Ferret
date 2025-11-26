@@ -2,7 +2,7 @@ fn multiply(a: i32, b: i32) -> i32 {
     return a * b;
 }
 // const
-     const MAX : i32;
+     const MAX : i32 = 0;
     struct{
 
         .x: i32,
@@ -10,5 +10,5 @@ fn multiply(a: i32, b: i32) -> i32 {
 
         .y: i32
 
-        
+
     };

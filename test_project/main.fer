@@ -7,7 +7,7 @@ const PI := 3.14;
 struct{
     .x: i32,
     .y: i32,
-}
+};
 
 //import "s";
 
