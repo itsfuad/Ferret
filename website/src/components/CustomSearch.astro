@@ -29,11 +29,17 @@ import Search from '@astrojs/starlight/components/Search.astro';
         color: var(--muted-foreground);
         transition: all 0.15s ease;
         white-space: nowrap;
+        border: 2px solid var(--border);
     }
 
     .search-wrapper :global(button:hover) {
         background: var(--muted);
         color: var(--foreground);
+        border-color: transparent;
+    }
+
+    .search-wrapper :global(button:focus-visible) {
+        border-color: transparent;
     }
 
     /* Prevent search modal from being hidden */

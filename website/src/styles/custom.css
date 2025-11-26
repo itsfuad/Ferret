@@ -46,10 +46,10 @@
 }
 
 :root[data-theme='dark'] {
-  --border: hsl(217.2 32.6% 17.5%);
+  --border: hsl(225deg 14.63% 16.08%);
   --background: #14161c;
   --foreground: hsl(210 40% 98%);
-  --muted: hsl(217.2 32.6% 17.5%);
+  --muted: hsl(225deg 14.63% 16.08%);
   --muted-foreground: hsl(215 20.2% 65.1%);
   --accent: hsl(210 40% 98%);
 
@@ -172,12 +172,28 @@ footer:not(.custom-footer) .pagination-links {
   flex-direction: row;
   justify-content: space-between;
   border-top: 2px solid var(--border);
+  gap: 1rem;
+}
+
+/* When only one link present, align based on rel attribute */
+footer:not(.custom-footer) .pagination-links a[rel="prev"]:only-child {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+footer:not(.custom-footer) .pagination-links a[rel="next"]:only-child {
+  margin-left: auto;
+  margin-right: 0;
 }
 
 .sl-link-button {
   font-size: 0.8rem;
   padding: 0.5rem 0.75rem;
 }
+
+details .toggle {
+    border-color: transparent;
+} 
 
 /* Pagination link cards - solid backgrounds */
 .pagination-links a {
