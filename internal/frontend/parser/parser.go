@@ -55,7 +55,6 @@ func (p *Parser) parseModule() *ast.Module {
 // parseTopLevel parses a single top-level declaration
 func (p *Parser) parseTopLevel() ast.Node {
 	tok := p.peek()
-	start := tok.Start
 	switch tok.Kind {
 	case lexer.IMPORT_TOKEN:
 		imp := p.parseImport()
@@ -88,24 +87,36 @@ func (p *Parser) parseTopLevel() ast.Node {
 		return p.parseExprOrAssign()
 	// Allow anonymous type declarations at top-level, e.g.:
 	// struct { .name: str, .age: i32, };
+	// interface { method1(...), ...}
+	// enum { A, B, C }
 	// We'll parse the type and return a TypeDecl with a nil Name.
 	case lexer.STRUCT_TOKEN, lexer.INTERFACE_TOKEN, lexer.ENUM_TOKEN:
 		p.seenNonImport = true
-		// parse the type expression (parseType handles STRUCT_TOKEN)
-		typ := p.parseType()
-
-		p.expect(lexer.SEMICOLON_TOKEN)
-
-		return &ast.TypeDecl{
-			Name:     &ast.IdentifierExpr{Name: "<anonymous>"},
-			Type:     typ,
-			Location: p.makeLocation(start),
-		}
-
+		return p.parseAnnonType()
 	default:
 		p.error(fmt.Sprintf("unexpected token at top level: %s", tok.Value))
 		p.advance()
 		return nil
+	}
+}
+
+func (p *Parser) parseAnnonType() *ast.TypeDecl {
+	
+	typ := p.parseType()
+
+	p.diagnostics.Add(
+		diagnostics.NewWarning("annonymous type defined").
+		WithPrimaryLabel(p.filepath, typ.Loc(), "remove this type").
+		WithNote("types has to be declared with a name to be used"),
+	)
+
+	p.expect(lexer.SEMICOLON_TOKEN)
+
+
+	return &ast.TypeDecl{
+		Name:     &ast.IdentifierExpr{Name: "<anonymous>"},
+		Type:     typ,
+		Location: *source.NewLocation(typ.Loc().Start, typ.Loc().End),
 	}
 }
 

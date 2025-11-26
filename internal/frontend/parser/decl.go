@@ -74,10 +74,10 @@ func (p *Parser) parseDeclItem(isConst bool) ast.DeclItem {
 			// Constants MUST have an initializer
 			peek := p.peek()
 			p.diagnostics.Add(
-				diagnostics.NewError("expected = after constant type").
+				diagnostics.NewError("missing values for constant").
 					WithCode(diagnostics.ErrUnexpectedToken).
-					WithHelp("Constants must have an initializer").
-					WithPrimaryLabel(p.filepath, source.NewLocation(&peek.Start, &peek.End), "missing initializer for constant"),
+					WithNote("Constants must have an initializer").
+					WithPrimaryLabel(p.filepath, source.NewLocation(&peek.Start, &peek.End), "add initial value"),
 			)
 			// Continue parsing to gather more errors
 		}

@@ -109,6 +109,23 @@ func (e *Emitter) printPipeOnly() {
 	colors.GREY.Fprintln(e.writer)
 }
 
+// printPrevNonEmptyLine prints the previous non-empty line (if any) in grey.
+// Used for single-line, multi-line, routed, compact, etc.
+func (e *Emitter) printPrevNonEmptyLine(filepath string, line int) {
+	if line <= 1 {
+		return
+	}
+	prevLine, err := e.cache.GetLine(filepath, line-1)
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(prevLine) == "" {
+		return
+	}
+	e.printGutter(line - 1)
+	colors.GREY.Fprintln(e.writer, prevLine)
+}
+
 // calculateLineNumWidthForDiagnostic calculates the gutter width needed for all lines displayed in this diagnostic
 func (e *Emitter) calculateLineNumWidthForDiagnostic(diag *Diagnostic) int {
 	lineNumbers := make(map[int]bool)
@@ -273,13 +290,8 @@ func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
 }
 
 func (e *Emitter) printSingleLineLabel(ctx labelContext) {
-	if ctx.line > 1 {
-		prevLine, err := e.cache.GetLine(ctx.filepath, ctx.line-1)
-		if err == nil && strings.TrimSpace(prevLine) != "" {
-			e.printGutter(ctx.line - 1)
-			colors.GREY.Fprintln(e.writer, prevLine)
-		}
-	}
+	// Previous non-empty line in grey (context)
+	e.printPrevNonEmptyLine(ctx.filepath, ctx.line)
 
 	sourceLine, err := e.cache.GetLine(ctx.filepath, ctx.line)
 	if err != nil {
@@ -337,6 +349,9 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 }
 
 func (e *Emitter) printMultiLineLabel(ctx labelContext) {
+	// Previous non-empty line in grey (context)
+	e.printPrevNonEmptyLine(ctx.filepath, ctx.startLine)
+
 	startSourceLine, err := e.cache.GetLine(ctx.filepath, ctx.startLine)
 	if err != nil {
 		return
@@ -394,7 +409,8 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 	// End line
 	endSourceLine, err := e.cache.GetLine(ctx.filepath, ctx.endLine)
 	if err == nil {
-		e.printGutter(ctx.endLine)
+		// FIX: end line should be white like other displayed source lines
+		e.printCurrentGutter(ctx.endLine)
 		fmt.Fprintln(e.writer, endSourceLine)
 
 		e.printBlankGutter()
@@ -467,13 +483,8 @@ func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondar
 	colors.BLUE.Fprintf(e.writer, LINE_POS, strings.Repeat(" ", e.currentLineNumWidth), filepath, line, rightStart.Column)
 	e.printPipeOnly()
 
-	if line > 1 {
-		prevLine, err := e.cache.GetLine(filepath, line-1)
-		if err == nil && strings.TrimSpace(prevLine) != "" {
-			e.printGutter(line - 1)
-			colors.GREY.Fprintln(e.writer, prevLine)
-		}
-	}
+	// Previous non-empty line in grey (context)
+	e.printPrevNonEmptyLine(filepath, line)
 
 	sourceLine, err := e.cache.GetLine(filepath, line)
 	if err != nil {
@@ -605,14 +616,11 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 			}
 		}
 
+		// Previous non-empty line in grey (context)
 		if lineNum > 1 {
 			isPrevShown := idx > 0 && lineNumbers[idx-1] == lineNum-1
 			if !isPrevShown {
-				prevLine, err := e.cache.GetLine(filepath, lineNum-1)
-				if err == nil && strings.TrimSpace(prevLine) != "" {
-					e.printGutter(lineNum - 1)
-					colors.GREY.Fprintln(e.writer, prevLine)
-				}
+				e.printPrevNonEmptyLine(filepath, lineNum)
 			}
 		}
 
@@ -639,14 +647,20 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 			if hasPrimary {
 				primaryStart := primary.Location.Start
 				primaryEnd := primary.Location.End
-				if primaryEnd == nil { primaryEnd = primaryStart }
+				if primaryEnd == nil {
+					primaryEnd = primaryStart
+				}
 
 				padding := primaryStart.Column - 1
 				length := primaryEnd.Column - primaryStart.Column
-				if length <= 0 { length = 1 }
+				if length <= 0 {
+					length = 1
+				}
 
 				char := "^"
-				if length > 1 { char = "~" }
+				if length > 1 {
+					char = "~"
+				}
 
 				fmt.Fprint(e.writer, strings.Repeat(" ", padding))
 				primaryColor.Fprint(e.writer, strings.Repeat(char, length))
@@ -659,11 +673,15 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 					if sec.Location != nil && sec.Location.Start != nil && sec.Location.Start.Line == lineNum {
 						secStart := sec.Location.Start
 						secEnd := sec.Location.End
-						if secEnd == nil { secEnd = secStart }
+						if secEnd == nil {
+							secEnd = secStart
+						}
 
 						padding := secStart.Column - 1
 						length := secEnd.Column - secStart.Column
-						if length <= 0 { length = 1 }
+						if length <= 0 {
+							length = 1
+						}
 
 						fmt.Fprint(e.writer, strings.Repeat(" ", padding))
 						secondaryColor.Fprint(e.writer, strings.Repeat("-", length))
