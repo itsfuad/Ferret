@@ -50,6 +50,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/source"
 )
 
 // Pipeline coordinates the compilation process
@@ -209,7 +210,14 @@ func (p *Pipeline) lexParseModule(module *context_v2.Module) error {
 // discoverModules discovers all modules by following imports (sequential BFS)
 // This phase MUST be sequential because we discover imports on-the-fly
 func (p *Pipeline) discoverModules() error {
-	queue := []string{p.ctx.EntryModule}
+	type queueItem struct {
+		importPath string
+		// Track where this import was requested (for error reporting)
+		requestedFrom     string // file path
+		requestedLocation *source.Location
+	}
+
+	queue := []queueItem{{importPath: p.ctx.EntryModule}}
 	discovered := make(map[string]bool)
 
 	if p.debug {
@@ -219,16 +227,16 @@ func (p *Pipeline) discoverModules() error {
 	moduleCount := 0
 
 	for len(queue) > 0 {
-		importPath := queue[0]
+		item := queue[0]
 		queue = queue[1:]
 
-		if discovered[importPath] {
+		if discovered[item.importPath] {
 			continue
 		}
-		discovered[importPath] = true
+		discovered[item.importPath] = true
 
 		// Check if module already exists (e.g., entry module with code)
-		existingModule, exists := p.ctx.GetModule(importPath)
+		existingModule, exists := p.ctx.GetModule(item.importPath)
 		var content string
 		var filePath string
 		var modType context_v2.ModuleType
@@ -241,11 +249,12 @@ func (p *Pipeline) discoverModules() error {
 		} else {
 			// Resolve import path to file path
 			var err error
-			filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
+			filePath, modType, err = p.ctx.ImportPathToFilePath(item.importPath)
 			if err != nil {
-				p.ctx.ReportError(
-					fmt.Sprintf("cannot resolve module %q: %v", importPath, err),
-					nil,
+				// Report error with the location where the import was requested
+				p.ctx.Diagnostics.Add(
+					diagnostics.NewError(err.Error()).
+						WithPrimaryLabel(item.requestedFrom, item.requestedLocation, ""),
 				)
 				continue
 			}
@@ -253,9 +262,9 @@ func (p *Pipeline) discoverModules() error {
 			// Read source file
 			contentBytes, err := os.ReadFile(filePath)
 			if err != nil {
-				p.ctx.ReportError(
-					fmt.Sprintf("cannot read file %s: %v", filePath, err),
-					nil,
+				p.ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot read file %s: %v", filePath, err)).
+						WithPrimaryLabel(item.requestedFrom, item.requestedLocation, ""),
 				)
 				continue
 			}
@@ -277,25 +286,29 @@ func (p *Pipeline) discoverModules() error {
 				Symbols:  context_v2.NewSymbolTable(p.ctx.Universe),
 				Content:  content,
 			}
-			p.ctx.AddModule(importPath, module)
+			p.ctx.AddModule(item.importPath, module)
 			moduleCount++
 		}
 
 		if p.debug {
-			colors.PURPLE.Printf("  [%d] %s (%s)\n", moduleCount, importPath, modType)
+			colors.PURPLE.Printf("  [%d] %s (%s)\n", moduleCount, item.importPath, modType)
 		}
 
 		// Queue imports and build dependency graph
 		for _, imp := range imports {
 			// Add dependency (checks for cycles)
-			if err := p.ctx.AddDependency(importPath, imp); err != nil {
-				p.ctx.ReportError(err.Error(), nil)
+			if err := p.ctx.AddDependency(item.importPath, imp.path); err != nil {
+				p.ctx.ReportError(err.Error(), imp.location)
 				continue
 			}
 
 			// Queue for discovery
-			if !discovered[imp] {
-				queue = append(queue, imp)
+			if !discovered[imp.path] {
+				queue = append(queue, queueItem{
+					importPath:        imp.path,
+					requestedFrom:     filePath,
+					requestedLocation: imp.location,
+				})
 			}
 		}
 	}
@@ -307,10 +320,16 @@ func (p *Pipeline) discoverModules() error {
 	return nil
 }
 
-// quickScanImports does a quick scan to extract import paths
+// importInfo holds import path and its source location
+type importInfo struct {
+	path     string
+	location *source.Location
+}
+
+// quickScanImports does a quick scan to extract import paths with their locations
 // Uses minimal lexing - just looking for 'import "path"' patterns
 // This avoids full parsing during discovery phase
-func (p *Pipeline) quickScanImports(filePath, content string) []string {
+func (p *Pipeline) quickScanImports(filePath, content string) []importInfo {
 	// For now, do full lex+parse to get imports reliably
 	// TODO: Optimize with regex-based scanning if needed
 	tokenizer := lexer.New(filePath, content)
@@ -324,9 +343,9 @@ func (p *Pipeline) quickScanImports(filePath, content string) []string {
 	return p.extractImports(astModule)
 }
 
-// extractImports extracts import paths from an AST module
-func (p *Pipeline) extractImports(astModule *ast.Module) []string {
-	var imports []string
+// extractImports extracts import paths with locations from an AST module
+func (p *Pipeline) extractImports(astModule *ast.Module) []importInfo {
+	var imports []importInfo
 
 	for _, node := range astModule.Nodes {
 		if impStmt, ok := node.(*ast.ImportStmt); ok {
@@ -336,7 +355,10 @@ func (p *Pipeline) extractImports(astModule *ast.Module) []string {
 				// Remove quotes from string literal
 				importPath = strings.Trim(importPath, "\"")
 				if importPath != "" {
-					imports = append(imports, importPath)
+					imports = append(imports, importInfo{
+						path:     importPath,
+						location: &impStmt.Location,
+					})
 				}
 			}
 		}

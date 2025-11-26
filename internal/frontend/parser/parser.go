@@ -62,7 +62,7 @@ func (p *Parser) parseTopLevel() ast.Node {
 		if p.seenNonImport {
 			p.diagnostics.Add(
 				diagnostics.NewError("import statements must appear before other declarations").
-				WithPrimaryLabel(p.filepath, source.NewLocation(imp.Location.Start, imp.Location.End), "cannot import here"),
+					WithPrimaryLabel(p.filepath, source.NewLocation(imp.Location.Start, imp.Location.End), "cannot import here"),
 			)
 			return nil
 		}
@@ -101,17 +101,16 @@ func (p *Parser) parseTopLevel() ast.Node {
 }
 
 func (p *Parser) parseAnnonType() *ast.TypeDecl {
-	
+
 	typ := p.parseType()
 
 	p.diagnostics.Add(
 		diagnostics.NewWarning("annonymous type defined").
-		WithPrimaryLabel(p.filepath, typ.Loc(), "remove this type").
-		WithNote("types has to be declared with a name to be used"),
+			WithPrimaryLabel(p.filepath, typ.Loc(), "remove this type").
+			WithNote("types has to be declared with a name to be used"),
 	)
 
 	p.expect(lexer.SEMICOLON_TOKEN)
-
 
 	return &ast.TypeDecl{
 		Name:     &ast.IdentifierExpr{Name: "<anonymous>"},
@@ -182,12 +181,20 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 		}
 	}
 
-	p.expect(lexer.SEMICOLON_TOKEN)
+	endToken := p.expect(lexer.SEMICOLON_TOKEN)
+
+	// Calculate end position - use result if available, otherwise use semicolon
+	var endPos *source.Position
+	if result != nil && result.Loc() != nil && result.Loc().End != nil {
+		endPos = result.Loc().End
+	} else {
+		endPos = &endToken.End
+	}
 
 	return &ast.ReturnStmt{
 		Result:   result,
 		IsError:  isError,
-		Location: *source.NewLocation(&start, result.Loc().End),
+		Location: *source.NewLocation(&start, endPos),
 	}
 }
 
@@ -226,6 +233,7 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 	if p.match(lexer.EQUALS_TOKEN) {
 		p.advance()
 		rhs := p.parseExpr()
+
 		p.expect(lexer.SEMICOLON_TOKEN)
 
 		return &ast.AssignStmt{
@@ -235,7 +243,8 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 		}
 	}
 
-	//defer p.expect(lexer.SEMICOLON_TOKEN) // consume semicolon at end of expression statement
+	// Expression statements need semicolons
+	p.expect(lexer.SEMICOLON_TOKEN)
 
 	return &ast.ExprStmt{
 		X:        lhs,
@@ -859,7 +868,7 @@ func (p *Parser) expectError(kind lexer.TOKEN, msg string) lexer.Token {
 				WithPrimaryLabel(p.filepath, loc, "add semicolon here").
 				WithNote("Every statement must end with a semicolon"),
 		)
-		
+
 		return p.peek()
 	}
 

@@ -34,7 +34,7 @@ fn (r: Rectangle) perimeter() -> f64 {
 }
 
 type Circle struct {
-    .radius: f64
+    .radius: f64,
 };
 fn (c: Circle) area() -> f64 {
     return 3.14159 * c.radius * c.radius;
