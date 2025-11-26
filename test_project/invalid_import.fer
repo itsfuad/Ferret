@@ -4,6 +4,6 @@ const x = 42;
 
 import "test_project/utils";  // ERROR: import must come before declarations
 
-func main() {
+fn main() {
     print(x);
 }

@@ -2,8 +2,8 @@
 
 import "test_project/utils";
 
-const x := 42;
+const x := 42
 
-func main() -> i32 {
+fn main() -> i32 {
     return x;
 }

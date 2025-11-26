@@ -467,13 +467,13 @@ monaco.languages.register({ id: 'ferret' });
         status.setAttribute('data-status', 'success');
         statusText.textContent = 'Success';
         // Output is already HTML-formatted from the compiler
-        output.innerHTML = result.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>';
+        output.innerHTML = `<pre>${result.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>'}</pre>`;
       } else {
         //console.error('Compilation failed');
         status.setAttribute('data-status', 'error');
         statusText.textContent = 'Error';
         // Output is already HTML-formatted from the compiler
-        output.innerHTML = result.output || '<p style="color: #ef4444;">Compilation failed</p>';
+        output.innerHTML = `<pre>${result.output || '<p style="color: #ef4444;">Compilation failed</p>'}</pre>`;
       }
       
     } catch (error) {
@@ -506,11 +506,11 @@ monaco.languages.register({ id: 'ferret' });
             if (retryResult.success) {
               status.setAttribute('data-status', 'success');
               statusText.textContent = 'Success';
-              output.innerHTML = retryResult.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>';
+              output.innerHTML = `<pre>${retryResult.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>'}</pre>`;
             } else {
               status.setAttribute('data-status', 'error');
               statusText.textContent = 'Error';
-              output.innerHTML = retryResult.output || '<p style="color: #ef4444;">Compilation failed</p>';
+              output.innerHTML = `<pre>${retryResult.output || '<p style="color: #ef4444;">Compilation failed</p>'}</pre>`;
             }
           } catch (retryError) {
             console.error('Retry compilation also failed:', retryError);
@@ -1030,6 +1030,7 @@ monaco.languages.register({ id: 'ferret' });
     font-size: 0.8125rem;
     line-height: 1.6;
     color: #374151;
+    margin-right: 10px;
   }
 
   :global([data-theme='dark']) .output-content {
