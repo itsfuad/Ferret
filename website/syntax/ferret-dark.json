@@ -1,0 +1,25 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "ferret-dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4",
+    "editor.lineHighlightBackground": "#2a2a2a",
+    "editorLineNumber.foreground": "#858585",
+    "editorLineNumber.activeForeground": "#c6c6c6",
+    "editorCursor.foreground": "#f44597",
+    "editor.selectionBackground": "#264f78",
+    "editor.inactiveSelectionBackground": "#3a3d41",
+    "editorIndentGuide.background": "#404040",
+    "editorIndentGuide.activeBackground": "#707070"
+  },
+  "tokenColors": [
+    { "scope": ["keyword"], "settings": { "foreground": "#C586C0", "fontStyle": "bold" } },
+    { "scope": ["type", "type.identifier"], "settings": { "foreground": "#4EC9B0" } },
+    { "scope": ["string"], "settings": { "foreground": "#CE9178" } },
+    { "scope": ["comment"], "settings": { "foreground": "#6A9955", "fontStyle": "italic" } },
+    { "scope": ["number"], "settings": { "foreground": "#B5CEA8" } },
+    { "scope": ["operator"], "settings": { "foreground": "#D4D4D4" } }
+  ]
+}

@@ -1,0 +1,35 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import config from 'virtual:starlight/user-config';
+import ferretLogo from '../assets/ferret.webp';
+---
+
+<a href="/" class="site-title">
+	<img src={ferretLogo.src} alt="Ferret" class="ferret-logo" />
+	<span class="sr-only">{config.title}</span>
+</a>
+
+<style>
+	.site-title {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		text-decoration: none;
+		font-weight: 600;
+		font-size: 1.25rem;
+		color: var(--accent-color);
+	}
+
+	/* Screen reader only text */
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
+	}
+</style>

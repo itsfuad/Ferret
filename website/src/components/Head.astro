@@ -1,0 +1,21 @@
+---
+import StarlightHead from '@astrojs/starlight/components/Head.astro';
+// import { ViewTransitions } from 'astro:transitions';
+// import ProgressBar from './ProgressBar.astro';
+---
+
+<StarlightHead {...Astro.props}>
+<slot />
+</StarlightHead>
+<!-- View Transitions: Uncomment to enable -->
+<!-- <ViewTransitions /> -->
+<!-- <ProgressBar /> -->
+
+<script is:inline>
+  console.log('Head component loaded');
+  // Set dark theme as default
+  if (!localStorage.getItem('starlight-theme')) {
+    localStorage.setItem('starlight-theme', 'dark');
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+</script>

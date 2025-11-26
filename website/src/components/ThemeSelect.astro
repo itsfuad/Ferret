@@ -1,0 +1,87 @@
+---
+// Simple theme toggle button - toggles between dark ↔ light
+---
+
+<starlight-theme-select>
+	<button type="button" aria-label="Toggle theme">
+		<!-- Sun icon for light theme -->
+		<svg class="theme-icon light-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<circle cx="12" cy="12" r="4"/>
+			<path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+		</svg>
+		<!-- Moon icon for dark theme -->
+		<svg class="theme-icon dark-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+		</svg>
+	</button>
+</starlight-theme-select>
+
+<style>
+	starlight-theme-select {
+		display: flex;
+		align-items: center;
+	}
+
+	button {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		padding: 0.5rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--sl-color-gray-5);
+		background: var(--sl-color-black);
+		transition: all 150ms ease;
+		color: var(--sl-color-gray-3);
+	}
+
+	button:hover {
+		background: var(--sl-color-gray-6);
+		border-color: var(--sl-color-gray-4);
+		color: var(--sl-color-white);
+	}
+
+	/* Modern shadcn-style focus ring */
+	button:focus-visible {
+		outline: 2px solid var(--accent-color);
+		outline-offset: 2px;
+	}
+
+	/* Icon styling */
+	.theme-icon {
+		width: 1.125rem;
+		height: 1.125rem;
+		transition: all 150ms ease;
+	}
+
+	/* Show only the active theme icon */
+	:global([data-theme='light']) .dark-icon {
+		display: none;
+	}
+	
+	:global([data-theme='dark']) .light-icon {
+		display: none;
+	}
+
+	/* Modern subtle shadow */
+	button {
+		box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+	}
+
+	button:hover {
+		box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+	}
+
+	/* Mobile adjustments */
+	@media (max-width: 50rem) {
+		button {
+			padding: 0.4rem;
+		}
+		
+		.theme-icon {
+			width: 1rem;
+			height: 1rem;
+		}
+	}
+</style>

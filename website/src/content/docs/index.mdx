@@ -1,0 +1,131 @@
+---
+title: Ferret Programming Language
+description: A modern, type-safe programming language with optional types and powerful error handling.
+template: splash
+hero:
+  tagline: A modern, type-safe programming language designed for clarity, safety, and developer productivity.
+  image:
+    file: ../../assets/ferret.svg
+  actions:
+    - text: Get Started
+      link: /getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: Source Code
+      link: https://github.com/itsfuad/FCCIMPL
+      icon: github
+      variant: secondary
+banner:
+  content: |
+    Ferret is currently in early development. Expect breaking changes!
+---
+
+import CustomFooter from '../../components/CustomFooter.astro';
+import HomepageAnimations from '../../components/HomepageAnimations.astro';
+
+<HomepageAnimations />
+
+<div class="modern-layout" id="homepage-content">
+
+<section class="features-modern scroll-animate">
+  <div class="section-label scroll-fade-in">Features</div>
+  
+  <div class="feature-item scroll-slide-up" data-delay="0">
+    <div class="feature-header">
+      <span class="feature-marker">01</span>
+      <h2>Type Safety</h2>
+    </div>
+    <p class="feature-description">
+      Powerful type system with flow-sensitive type narrowing catches errors at compile-time, not runtime.
+    </p>
+  </div>
+
+  <div class="feature-item scroll-slide-up" data-delay="100">
+    <div class="feature-header">
+      <span class="feature-marker">02</span>
+      <h2>Optional Types</h2>
+    </div>
+    <p class="feature-description">
+      No more null pointer exceptions! Optional types <code>T?</code> make handling missing values safe and elegant.
+    </p>
+  </div>
+
+  <div class="feature-item scroll-slide-up" data-delay="200">
+    <div class="feature-header">
+      <span class="feature-marker">03</span>
+      <h2>Error Handling</h2>
+    </div>
+    <p class="feature-description">
+      First-class error handling with error types <code>T ! E</code> that make dealing with failures explicit.
+    </p>
+  </div>
+
+  <div class="feature-item scroll-slide-up" data-delay="300">
+    <div class="feature-header">
+      <span class="feature-marker">04</span>
+      <h2>Modern Syntax</h2>
+    </div>
+    <p class="feature-description">
+      Clean, expressive syntax that's easy to learn and pleasant to write.
+    </p>
+  </div>
+</section>
+
+<section class="example-modern scroll-animate">
+  <div class="section-label scroll-fade-in">Quick Look</div>
+  <div class="scroll-fade-in" data-delay="200">
+  
+```ferret
+// Variables with type inference
+let name: str = "Ferret";
+let version := 1;
+
+// Optional types with type narrowing
+let maybeValue: i32? = 42;
+
+if maybeValue != none {
+    let doubled: i32 = maybeValue * 2;
+}
+
+// Functions
+fn greet(name: str) -> str {
+    return "Hello, " + name + "!";
+}
+```
+  </div>
+</section>
+
+<section class="paths-modern scroll-animate">
+  <div class="section-label scroll-fade-in">Learning Paths</div>
+  
+  <a href="/getting-started/installation/" class="path-link scroll-slide-up" data-delay="0">
+    <div class="path-content">
+      <span class="path-step">Step 1</span>
+      <h3>Installation</h3>
+      <p>Install Ferret and set up your development environment</p>
+    </div>
+    <span class="path-icon">→</span>
+  </a>
+
+  <a href="/getting-started/hello-world/" class="path-link scroll-slide-up" data-delay="100">
+    <div class="path-content">
+      <span class="path-step">Step 2</span>
+      <h3>Hello World</h3>
+      <p>Write your first Ferret program in minutes</p>
+    </div>
+    <span class="path-icon">→</span>
+  </a>
+
+  <a href="/variables/" class="path-link scroll-slide-up" data-delay="200">
+    <div class="path-content">
+      <span class="path-step">Step 3</span>
+      <h3>Language Guide</h3>
+      <p>Learn about Ferret's syntax and type system</p>
+    </div>
+    <span class="path-icon">→</span>
+  </a>
+</section>
+
+</div>
+
+<CustomFooter />

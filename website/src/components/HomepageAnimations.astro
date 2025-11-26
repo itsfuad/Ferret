@@ -1,0 +1,168 @@
+---
+// Homepage animations component
+---
+
+<script>
+// Homepage scroll animations and mouse effects
+
+// Intersection Observer for scroll animations
+const observerOptions = {
+  threshold: 0.1,
+  rootMargin: '0px 0px -50px 0px'
+};
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, observerOptions);
+
+// Observe all elements with scroll animation classes
+function initScrollAnimations() {
+  const animatedElements = document.querySelectorAll('.scroll-fade-in, .scroll-slide-up');
+  animatedElements.forEach(el => observer.observe(el));
+}
+
+// Mouse position tracking for interactive background
+function initMouseTracking() {
+  const modernLayout = document.querySelector('.modern-layout') as HTMLElement;
+  
+  if (!modernLayout) return;
+  
+  let rafId: number | null = null;
+  let isOverContent = false;
+  
+  // Track mouse over the entire document
+  document.addEventListener('mousemove', (e) => {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+    
+    rafId = requestAnimationFrame(() => {
+      // Use clientX/Y directly since the background is fixed positioned
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+      
+      modernLayout.style.setProperty('--mouse-x', `${mouseX}px`);
+      modernLayout.style.setProperty('--mouse-y', `${mouseY}px`);
+    });
+  });
+  
+  // Show effect when hovering over modern-layout
+  modernLayout.addEventListener('mouseenter', () => {
+    isOverContent = true;
+    modernLayout.style.setProperty('--show-effect', '1');
+  });
+  
+  modernLayout.addEventListener('mouseleave', () => {
+    isOverContent = false;
+    modernLayout.style.setProperty('--show-effect', '0');
+  });
+}
+
+// Subtle parallax effect disabled to prevent overflow
+function initParallax() {
+  // Disabled to prevent content overflow over hero
+  return;
+}
+
+// Add magnetic effect to action buttons
+function initMagneticButtons() {
+  const buttons = document.querySelectorAll('.hero .action, .path-link') as NodeListOf<HTMLElement>;
+  
+  buttons.forEach(button => {
+    button.addEventListener('mousemove', (e: MouseEvent) => {
+      const rect = button.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      const deltaX = (x - centerX) / centerX;
+      const deltaY = (y - centerY) / centerY;
+      
+      const moveX = deltaX * 5;
+      
+      button.style.transform = `translate(${moveX}px)`;
+    });
+    
+    button.addEventListener('mouseleave', () => {
+      button.style.transform = '';
+    });
+  });
+}
+
+// Add ripple effect on click
+function initRippleEffect() {
+  const clickableElements = document.querySelectorAll('.path-link, .hero .action, .feature-item') as NodeListOf<HTMLElement>;
+  
+  clickableElements.forEach(element => {
+    element.addEventListener('click', function(e) {
+      const ripple = document.createElement('span');
+      const rect = this.getBoundingClientRect();
+      
+      const size = Math.max(rect.width, rect.height);
+      const x = e.clientX - rect.left - size / 2;
+      const y = e.clientY - rect.top - size / 2;
+      
+      ripple.style.cssText = `
+        position: absolute;
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 50%;
+        background: rgba(244, 69, 151, 0.3);
+        left: ${x}px;
+        top: ${y}px;
+        pointer-events: none;
+        animation: ripple-animation 0.6s ease-out;
+      `;
+      
+      this.style.position = 'relative';
+      this.style.overflow = 'hidden';
+      this.appendChild(ripple);
+      
+      setTimeout(() => ripple.remove(), 600);
+    });
+  });
+  
+  // Add ripple animation to document if not exists
+  if (!document.getElementById('ripple-styles')) {
+    const style = document.createElement('style');
+    style.id = 'ripple-styles';
+    style.textContent = `
+      @keyframes ripple-animation {
+        from {
+          transform: scale(0);
+          opacity: 1;
+        }
+        to {
+          transform: scale(2);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+// Initialize on DOM ready
+function init() {
+  initScrollAnimations();
+  initMouseTracking();
+  initMagneticButtons();
+  initRippleEffect();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+// Re-initialize on View Transitions navigation (Astro)
+document.addEventListener('astro:page-load', init);
+document.addEventListener('astro:after-swap', init);
+</script>

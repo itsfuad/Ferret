@@ -1,0 +1,45 @@
+---
+import Search from '@astrojs/starlight/components/Search.astro';
+---
+
+<div class="search-wrapper">
+    <Search {...Astro.props} />
+</div>
+
+<style>
+    .search-wrapper {
+        display: flex;
+        align-items: center;
+        width: 100%;
+    }
+
+    /* Style Starlight's search to match our navbar */
+    .search-wrapper :global(site-search) {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        width: 100%;
+    }
+
+    .search-wrapper :global(button) {
+        padding: 0.5rem 0.875rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        background: var(--background);
+        color: var(--muted-foreground);
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .search-wrapper :global(button:hover) {
+        background: var(--muted);
+        color: var(--foreground);
+    }
+
+    /* Prevent search modal from being hidden */
+    :global(dialog[open]) {
+        display: flex !important;
+    }
+
+    
+</style>

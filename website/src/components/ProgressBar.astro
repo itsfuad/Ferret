@@ -1,0 +1,61 @@
+---
+// Progress bar component for View Transitions
+---
+
+<style>
+  #progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #7c3aed, #3b82f6, #06b6d4);
+    transform: scaleX(0);
+    transform-origin: left;
+    z-index: 9999;
+    transition: transform 0.2s ease;
+  }
+
+  #progress-bar.loading {
+    animation: progress 1s ease-in-out;
+  }
+
+  @keyframes progress {
+    0% {
+      transform: scaleX(0);
+    }
+    50% {
+      transform: scaleX(0.7);
+    }
+    100% {
+      transform: scaleX(1);
+    }
+  }
+</style>
+
+<div id="progress-bar"></div>
+
+<script>
+  // Show progress bar on navigation
+  document.addEventListener('astro:before-preparation', () => {
+    const bar = document.getElementById('progress-bar');
+    if (bar) {
+      bar.classList.add('loading');
+    }
+  });
+
+  document.addEventListener('astro:after-swap', () => {
+    const bar = document.getElementById('progress-bar');
+    if (bar) {
+      bar.classList.remove('loading');
+    }
+  });
+
+  // Also handle page load completion
+  document.addEventListener('astro:page-load', () => {
+    const bar = document.getElementById('progress-bar');
+    if (bar) {
+      bar.classList.remove('loading');
+    }
+  });
+</script>
