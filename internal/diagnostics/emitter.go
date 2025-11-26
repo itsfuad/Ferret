@@ -110,7 +110,6 @@ func (e *Emitter) printPipeOnly() {
 }
 
 // printPrevNonEmptyLine prints the previous non-empty line (if any) in grey.
-// Used for single-line, multi-line, routed, compact, etc.
 func (e *Emitter) printPrevNonEmptyLine(filepath string, line int) {
 	if line <= 1 {
 		return
@@ -166,7 +165,8 @@ func (e *Emitter) calculateLineNumWidthForDiagnostic(diag *Diagnostic) int {
 func (e *Emitter) Emit(diag *Diagnostic) {
 	e.currentLineNumWidth = e.calculateLineNumWidthForDiagnostic(diag)
 
-	e.printHeader(diag)
+	// Print file/position first, then severity/message under it (Rust-style)
+	e.printArrowHeader(diag)
 
 	if len(diag.Labels) > 0 {
 		primaryCount := 0
@@ -219,7 +219,45 @@ func (e *Emitter) Emit(diag *Diagnostic) {
 	fmt.Fprintln(e.writer)
 }
 
-func (e *Emitter) printHeader(diag *Diagnostic) {
+// headerPosition picks the best position to show in the header.
+func (e *Emitter) headerPosition(diag *Diagnostic) (line, col int) {
+	// Prefer primary label start
+	for _, l := range diag.Labels {
+		if l.Style == Primary && l.Location != nil && l.Location.Start != nil {
+			return l.Location.Start.Line, l.Location.Start.Column
+		}
+	}
+	// Otherwise use first label start
+	for _, l := range diag.Labels {
+		if l.Location != nil && l.Location.Start != nil {
+			return l.Location.Start.Line, l.Location.Start.Column
+		}
+	}
+	return 1, 1
+}
+
+// printArrowHeader prints file position first and then severity/message under it.
+// Example:
+//  --> file:line:col
+//   : warning[CODE]: message
+func (e *Emitter) printArrowHeader(diag *Diagnostic) {
+	line, col := e.headerPosition(diag)
+
+	// Arrow position line aligned to gutter width
+	colors.BLUE.Fprintf(
+		e.writer,
+		LINE_POS,
+		strings.Repeat(" ", e.currentLineNumWidth),
+		diag.FilePath,
+		line,
+		col,
+	)
+
+	// Severity/message line aligned under arrow
+	indent := strings.Repeat(" ", e.currentLineNumWidth+1)
+	fmt.Fprint(e.writer, indent)
+	fmt.Fprint(e.writer, ": ")
+
 	var color colors.COLOR
 	var severityStr string
 
@@ -257,19 +295,6 @@ func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
 		end = start
 	}
 
-	// Location header aligned to current gutter width
-	colors.BLUE.Fprintf(
-		e.writer,
-		LINE_POS,
-		strings.Repeat(" ", e.currentLineNumWidth),
-		filepath,
-		start.Line,
-		start.Column,
-	)
-
-	// Separator aligned to gutter width
-	e.printPipeOnly()
-
 	ctx := labelContext{
 		filepath:     filepath,
 		startLine:    start.Line,
@@ -290,6 +315,9 @@ func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
 }
 
 func (e *Emitter) printSingleLineLabel(ctx labelContext) {
+	// One blank separator line under header
+	e.printPipeOnly()
+
 	// Previous non-empty line in grey (context)
 	e.printPrevNonEmptyLine(ctx.filepath, ctx.line)
 
@@ -349,6 +377,9 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 }
 
 func (e *Emitter) printMultiLineLabel(ctx labelContext) {
+	// One blank separator line under header
+	e.printPipeOnly()
+
 	// Previous non-empty line in grey (context)
 	e.printPrevNonEmptyLine(ctx.filepath, ctx.startLine)
 
@@ -364,7 +395,6 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 
 	// Print underline for start
 	e.printBlankGutter()
-	pipeColor.Fprint(e.writer, " ")
 
 	var underlineColor colors.COLOR
 	if ctx.label.Style == Primary {
@@ -386,8 +416,11 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 
 	padding := ctx.startCol - 1
 	fmt.Fprint(e.writer, strings.Repeat(" ", padding))
-	if ctx.startCol < len(startSourceLine) {
-		underlineColor.Fprint(e.writer, strings.Repeat("~", len(strings.TrimSpace(startSourceLine))-(ctx.startCol-1)))
+	if ctx.startCol <= len(startSourceLine) {
+		underlineColor.Fprint(
+			e.writer,
+			strings.Repeat("~", len(startSourceLine)-(ctx.startCol-1)),
+		)
 	}
 	fmt.Fprintln(e.writer)
 
@@ -409,12 +442,11 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 	// End line
 	endSourceLine, err := e.cache.GetLine(ctx.filepath, ctx.endLine)
 	if err == nil {
-		// FIX: end line should be white like other displayed source lines
+		// End line should be white like other displayed source lines
 		e.printCurrentGutter(ctx.endLine)
 		fmt.Fprintln(e.writer, endSourceLine)
 
 		e.printBlankGutter()
-		pipeColor.Fprint(e.writer, " ")
 		endPadding := ctx.endCol - 1
 		fmt.Fprint(e.writer, strings.Repeat(" ", endPadding))
 		underlineColor.Fprint(e.writer, "^")
