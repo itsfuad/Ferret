@@ -1,0 +1,55 @@
+// Welcome to Ferret Playground!
+// Try editing this code and click "Run" to see the results
+
+type Point struct {
+    .x: f64,
+    .y: f64
+};
+
+fn (p: Point) distance() -> f64 {
+    return (p.x * p.x + p.y * p.y);
+}
+
+let origin := {.x = 0.0, .y = 0.0} as Point;
+let point := {.x = 3.0, .y = 4.0} as Point;
+
+let dist := point.distance();
+
+type Shape interface {
+    area() -> f64,
+    perimeter() -> f64,
+    lol() // Remove this line to fix the error
+};
+
+type Rectangle struct {
+    .width: f64,
+    .height: f64
+};
+
+fn (r: Rectangle) area() -> f64 {
+    return r.width * r.height;
+}
+fn (r: Rectangle) perimeter() -> f64 {
+    return 2.0 * (r.width + r.height);
+}
+
+type Circle struct {
+    .radius: f64
+};
+fn (c: Circle) area() -> f64 {
+    return 3.14159 * c.radius * c.radius;
+}
+fn (c: Circle) perimeter() -> f64 {
+    return 2.0 * 3.14159 * c.radius;
+}
+
+let rect := {.width = 10.0, .height = 5.0} as Rectangle;
+let circle := {.radius = 3.0} as Circle;
+
+fn printShapeInfo(s: Shape) -> str {
+    return "Area: " + s.area().to_str() + ", Perimeter: " + s.perimeter().to_str();
+}
+
+printShapeInfo(rect);
+printShapeInfo(circle);
+printShapeInfo(2);

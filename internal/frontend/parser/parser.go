@@ -150,8 +150,6 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 // parseStmt parses a statement
 func (p *Parser) parseStmt() ast.Node {
 	tok := p.peek()
-	// DEBUG
-	// fmt.Printf("DEBUG parseStmt peek: %v %q\n", tok.Kind, tok.Value)
 	switch tok.Kind {
 	case lexer.LET_TOKEN:
 		return p.parseVarDecl()
@@ -447,6 +445,7 @@ func (p *Parser) parseCallExpr(fun ast.Expression) *ast.CallExpr {
 	var catchClause *ast.CatchClause
 	if p.match(lexer.CATCH_TOKEN) {
 		catchClause = p.parseCatchClause()
+		end = *catchClause.End
 	}
 
 	return &ast.CallExpr{

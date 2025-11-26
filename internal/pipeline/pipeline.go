@@ -240,7 +240,8 @@ func (p *Pipeline) discoverModules() error {
 			modType = existingModule.Type
 		} else {
 			// Resolve import path to file path
-			filePath, modTyp, err := p.ctx.ImportPathToFilePath(importPath)
+			var err error
+			filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
 			if err != nil {
 				p.ctx.ReportError(
 					fmt.Sprintf("cannot resolve module %q: %v", importPath, err),
@@ -248,8 +249,6 @@ func (p *Pipeline) discoverModules() error {
 				)
 				continue
 			}
-
-			modType = modTyp
 
 			// Read source file
 			contentBytes, err := os.ReadFile(filePath)
@@ -265,6 +264,9 @@ func (p *Pipeline) discoverModules() error {
 
 		// Quick scan to extract imports (minimal parsing)
 		imports := p.quickScanImports(filePath, content)
+
+		// Add source content to diagnostics cache for error reporting
+		p.ctx.Diagnostics.AddSourceContent(filePath, content)
 
 		// Create or update module stub (not yet lexed/parsed)
 		if !exists {

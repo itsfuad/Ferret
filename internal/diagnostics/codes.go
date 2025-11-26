@@ -20,6 +20,7 @@ const (
 	ErrMissingIdentifier  = "P0006"
 	ErrMissingType        = "P0007"
 	ErrMissingInitializer = "P0008"
+	ErrMissingSemiCol	  = "P0009"
 
 	// Type checker errors (T prefix)
 	ErrTypeMismatch            = "T0001"
