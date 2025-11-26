@@ -21,7 +21,7 @@ export default defineConfig({
 				baseUrl: 'https://github.com/itsfuad/Ferret/edit/main/website/',
 			},
             social: [
-                { icon: 'github', label: 'GitHub', href: 'https://github.com/itsfuad/FCCIMPL' }
+                { icon: 'github', label: 'GitHub', href: 'https://github.com/itsfuad/Ferret' }
             ],
             customCss: [
                 './src/styles/custom.css',

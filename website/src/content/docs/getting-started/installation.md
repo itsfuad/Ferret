@@ -9,8 +9,8 @@ Currently, Ferret is best installed by building from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/itsfuad/FCCIMPL.git
-cd FCCIMPL
+git clone https://github.com/itsfuad/Ferret.git
+cd Ferret
 
 # Switch to the type checking branch
 git checkout tc
