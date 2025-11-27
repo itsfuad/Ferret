@@ -79,7 +79,7 @@ func (p *Pipeline) Run() error {
 		return err
 	}
 
-	// TODO: Future phases
+	// Future phases
 	// Phase 3: Symbol Collection
 	// Phase 4: Resolution
 	// Phase 5: Type Checking
@@ -182,13 +182,24 @@ func (p *Pipeline) lexParseModule(module *context_v2.Module) {
 	tokenizer := lexer.New(module.FilePath, module.Content)
 	tokens := tokenizer.Tokenize(false)
 
+	// Advance to PhaseLexed with validation
+	if !p.ctx.AdvanceModulePhase(module.ImportPath, context_v2.PhaseLexed) {
+		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", module.ImportPath), nil)
+		return
+	}
+
 	// Parse
 	diag := diagnostics.NewDiagnosticBag(module.FilePath)
 	astModule := parser.Parse(tokens, module.FilePath, diag)
 
 	// Update module
 	module.AST = astModule
-	module.Phase = context_v2.PhaseParsed
+
+	// Advance to PhaseParsed with validation
+	if !p.ctx.AdvanceModulePhase(module.ImportPath, context_v2.PhaseParsed) {
+		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", module.ImportPath), nil)
+		return
+	}
 
 	// Merge diagnostics (thread-safe)
 	p.mergeDiagnostics(diag)
@@ -259,7 +270,7 @@ func (p *Pipeline) discoverModules() error {
 		}
 
 		// Quick scan to extract imports and parse AST (done once during discovery)
-		imports, astModule, _ := p.quickScanImports(filePath, content, item.importPath)
+		imports, astModule, _ := p.quickScanImports(filePath, content)
 
 		// Add source content to diagnostics cache for error reporting
 		p.ctx.Diagnostics.AddSourceContent(filePath, content)
@@ -274,16 +285,32 @@ func (p *Pipeline) discoverModules() error {
 				Content:  content,
 				AST:      astModule, // Store AST to avoid re-parsing in Phase 2
 			}
-			// Properly advance through phases to maintain invariants
-			module.Phase = context_v2.PhaseLexed  // Tokens were generated
-			module.Phase = context_v2.PhaseParsed // AST was built
 			p.ctx.AddModule(item.importPath, module)
+
+			// Advance through phases with proper validation
+			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseLexed) {
+				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", item.importPath), nil)
+				continue
+			}
+			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseParsed) {
+				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", item.importPath), nil)
+				continue
+			}
+
 			moduleCount++
 		} else if existingModule.AST == nil {
 			// Update existing module with AST if it didn't have one
 			existingModule.AST = astModule
-			existingModule.Phase = context_v2.PhaseLexed
-			existingModule.Phase = context_v2.PhaseParsed
+
+			// Advance through phases with proper validation
+			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseLexed) {
+				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", item.importPath), nil)
+				continue
+			}
+			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseParsed) {
+				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", item.importPath), nil)
+				continue
+			}
 		}
 
 		if p.debug {
@@ -326,9 +353,9 @@ type importInfo struct {
 // Does full lex+parse during discovery, then stores the AST so Phase 2 can skip it
 // This ensures each file is parsed exactly once
 //
-// TODO: Discovery currently advances Phase directly to Parsed (via Lexed).
-// When phase validation is enforced, ensure CanProcessPhase checks are satisfied.
-func (p *Pipeline) quickScanImports(filePath, content string, importPath string) ([]importInfo, *ast.Module, *diagnostics.DiagnosticBag) {
+// Phase advancement is done with proper validation via AdvanceModulePhase() to ensure
+// all phase prerequisites are satisfied before transitioning.
+func (p *Pipeline) quickScanImports(filePath, content string) ([]importInfo, *ast.Module, *diagnostics.DiagnosticBag) {
 	tokenizer := lexer.New(filePath, content)
 	tokens := tokenizer.Tokenize(false)
 

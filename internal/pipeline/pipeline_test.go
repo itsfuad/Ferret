@@ -346,7 +346,6 @@ const B := 2;`
 // TestPhasePrerequisites validates phase ordering (future-proofing for
 // when symbol collection, resolution, and typechecking are added).
 // Currently validates basic Lexed -> Parsed ordering.
-// TODO: Add checks for Collected, Resolved, TypeChecked once implemented.
 func TestPhasePrerequisites(t *testing.T) {
 	tmpDir := t.TempDir()
 

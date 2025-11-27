@@ -34,6 +34,9 @@ import (
 // - NotStarted -> Lexed -> Parsed (currently implemented)
 // - Parsed -> Collected -> Resolved -> TypeChecked -> CodeGen (future)
 //
+// Phase transitions are validated using AdvanceModulePhase() which checks
+// that prerequisites are satisfied via the phasePrerequisites map.
+//
 // Phase prerequisites (enforced by tests in pipeline_test.go):
 // - A module at PhaseResolved requires all its imports at least PhaseParsed
 // - A module at PhaseTypeChecked requires all its imports at least PhaseResolved
@@ -526,6 +529,16 @@ func (ctx *CompilerContext) SetModulePhase(importPath string, phase ModulePhase)
 	if module, exists := ctx.Modules[importPath]; exists {
 		module.Phase = phase
 	}
+}
+
+// AdvanceModulePhase advances a module to the next phase with validation
+// Returns false if the phase transition is invalid (prerequisites not met)
+func (ctx *CompilerContext) AdvanceModulePhase(importPath string, targetPhase ModulePhase) bool {
+	if !ctx.CanProcessPhase(importPath, targetPhase) {
+		return false
+	}
+	ctx.SetModulePhase(importPath, targetPhase)
+	return true
 }
 
 // CanProcessPhase checks if a module is ready for a specific phase
