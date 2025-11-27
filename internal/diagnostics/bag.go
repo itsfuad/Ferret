@@ -73,11 +73,14 @@ func (db *DiagnosticBag) WarningCount() int {
 	return db.warnCount
 }
 
-// Diagnostics returns all diagnostics
+// Diagnostics returns a copy of all diagnostics (thread-safe)
 func (db *DiagnosticBag) Diagnostics() []*Diagnostic {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	return db.diagnostics
+	// Return a copy to prevent races if caller iterates while other goroutines append
+	result := make([]*Diagnostic, len(db.diagnostics))
+	copy(result, db.diagnostics)
+	return result
 }
 
 func (db *DiagnosticBag) EmitAll() {

@@ -10,6 +10,13 @@ import (
 	"compiler/internal/pipeline"
 )
 
+type FORMAT int
+
+const (
+	ANSI FORMAT = iota
+	HTML
+)
+
 // Options for compilation
 type Options struct {
 	// For file-based compilation
@@ -19,7 +26,7 @@ type Options struct {
 	// Debug output
 	Debug bool
 	// Output format: "ansi" or "html"
-	Format string
+	Format FORMAT
 }
 
 // Result of compilation
@@ -71,7 +78,7 @@ func Compile(opts Options) Result {
 
 	if err != nil {
 		ctx.ReportError(fmt.Sprintf("Failed to set entry point: %v", err), nil)
-		if opts.Format == "html" {
+		if opts.Format == HTML {
 			return Result{Success: false, Output: ctx.Diagnostics.EmitAllToString()}
 		}
 		ctx.EmitDiagnostics()
@@ -83,7 +90,7 @@ func Compile(opts Options) Result {
 	p.Run()
 
 	// Emit diagnostics and return result
-	if opts.Format == "html" {
+	if opts.Format == HTML {
 		output := ctx.Diagnostics.EmitAllToString()
 		return Result{Success: !ctx.HasErrors(), Output: colors.ConvertANSIToHTML(output)}
 	}

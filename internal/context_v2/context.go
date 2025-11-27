@@ -29,6 +29,14 @@ import (
 )
 
 // ModulePhase tracks the compilation phase of an individual module
+//
+// Phase progression must be sequential and respect dependencies:
+// - NotStarted -> Lexed -> Parsed (currently implemented)
+// - Parsed -> Collected -> Resolved -> TypeChecked -> CodeGen (future)
+//
+// Phase prerequisites (enforced by tests in pipeline_test.go):
+// - A module at PhaseResolved requires all its imports at least PhaseParsed
+// - A module at PhaseTypeChecked requires all its imports at least PhaseResolved
 type ModulePhase int
 
 const (
@@ -40,6 +48,17 @@ const (
 	PhaseTypeChecked                    // Type checking complete
 	PhaseCodeGen                        // Code generation complete
 )
+
+// phasePrerequisites maps each phase to its required predecessor phase
+// This explicit mapping is safer than arithmetic and allows for non-linear phase progressions
+var phasePrerequisites = map[ModulePhase]ModulePhase{
+	PhaseLexed:       PhaseNotStarted,
+	PhaseParsed:      PhaseLexed,
+	PhaseCollected:   PhaseParsed,
+	PhaseResolved:    PhaseCollected,
+	PhaseTypeChecked: PhaseResolved,
+	PhaseCodeGen:     PhaseTypeChecked,
+}
 
 func (p ModulePhase) String() string {
 	switch p {
@@ -244,7 +263,46 @@ func New(config *Config, debug bool) *CompilerContext {
 		Debug:       debug,
 	}
 
+	// Auto-load builtin modules if path is provided
+	if config.BuiltinModulesPath != "" {
+		ctx.loadBuiltinModules()
+	}
+
 	return ctx
+}
+
+// loadBuiltinModules discovers and registers all builtin modules from the builtin path
+func (ctx *CompilerContext) loadBuiltinModules() {
+	if ctx.Config.BuiltinModules == nil {
+		ctx.Config.BuiltinModules = make(map[string]string)
+	}
+
+	builtinPath := ctx.Config.BuiltinModulesPath
+
+	// Check if builtin path exists
+	if !fs.IsDir(builtinPath) {
+		// Silently skip if builtin path doesn't exist (for testing/minimal setups)
+		return
+	}
+
+	// Scan for .fer files in builtin directory
+	entries, err := os.ReadDir(builtinPath)
+	if err != nil {
+		// Non-critical error - just skip builtin loading
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// For directories, register as module package
+			dirPath := filepath.Join(builtinPath, entry.Name())
+			ctx.Config.BuiltinModules[entry.Name()] = dirPath
+		} else if strings.HasSuffix(entry.Name(), ctx.Config.Extension) {
+			// For individual .fer files, register as standalone module
+			moduleName := strings.TrimSuffix(entry.Name(), ctx.Config.Extension)
+			ctx.Config.BuiltinModules[moduleName] = builtinPath
+		}
+	}
 }
 
 // registerBuiltins populates the universe scope with built-in types
@@ -305,7 +363,9 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 	// For in-memory compilation, use a virtual path
 	virtualPath := filepath.Join(ctx.Config.ProjectRoot, moduleName+ctx.Config.Extension)
 	ctx.EntryPoint = filepath.ToSlash(virtualPath)
-	ctx.EntryModule = ctx.Config.ProjectName + "/" + moduleName
+
+	// Derive import path consistently with file mode
+	ctx.EntryModule = ctx.FilePathToImportPath(virtualPath)
 
 	// Add source content to diagnostic bag's cache so it can display source lines
 	ctx.Diagnostics.AddSourceContent(virtualPath, code)
@@ -351,8 +411,43 @@ func (ctx *CompilerContext) FilePathToImportPath(filePath string) string {
 	return relPath
 }
 
+// NormalizeImportPath normalizes an import path for semantic use
+//
+// Import paths are semantic identifiers, not file system paths. This function
+// ensures consistent representation by:
+// - Trimming leading/trailing whitespace
+// - Trimming leading/trailing slashes
+// - Collapsing multiple consecutive slashes into one
+// - Using forward slashes only (no backslashes)
+//
+// Examples:
+//   - " myproject/utils " -> "myproject/utils"
+//   - "myproject//utils"  -> "myproject/utils"
+//   - "/myproject/utils/" -> "myproject/utils"
+//   - "myproject\utils"   -> "myproject/utils"
+func (ctx *CompilerContext) NormalizeImportPath(importPath string) string {
+	// Trim whitespace
+	importPath = strings.TrimSpace(importPath)
+
+	// Replace backslashes with forward slashes (handle Windows-style paths in source)
+	importPath = strings.ReplaceAll(importPath, "\\", "/")
+
+	// Collapse multiple slashes into one
+	for strings.Contains(importPath, "//") {
+		importPath = strings.ReplaceAll(importPath, "//", "/")
+	}
+
+	// Trim leading/trailing slashes
+	importPath = strings.Trim(importPath, "/")
+
+	return importPath
+}
+
 // ImportPathToFilePath converts an import path to a file path
 func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, ModuleType, error) {
+	// Normalize import path to ensure consistent lookup
+	importPath = ctx.NormalizeImportPath(importPath)
+
 	// Determine module type
 	packageName := fs.FirstPart(importPath)
 	cleanPath := strings.TrimPrefix(importPath, packageName+"/")
@@ -434,10 +529,15 @@ func (ctx *CompilerContext) SetModulePhase(importPath string, phase ModulePhase)
 }
 
 // CanProcessPhase checks if a module is ready for a specific phase
-// Phases must be processed sequentially
+// Uses explicit prerequisite map for safe phase transitions
 func (ctx *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
 	currentPhase := ctx.GetModulePhase(importPath)
-	return currentPhase == requiredPhase-1
+	prerequisite, exists := phasePrerequisites[requiredPhase]
+	if !exists {
+		// Unknown phase - cannot process
+		return false
+	}
+	return currentPhase == prerequisite
 }
 
 // IsModuleParsed checks if a module has been parsed (at least)

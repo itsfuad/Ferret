@@ -157,28 +157,16 @@ func (p *Pipeline) runLexParsePhase() error {
 // lexParseParallel processes multiple modules in parallel
 func (p *Pipeline) lexParseParallel(modules []*context_v2.Module) error {
 	var wg sync.WaitGroup
-	errorChan := make(chan error, len(modules))
 
 	for _, module := range modules {
 		wg.Add(1)
 		go func(m *context_v2.Module) {
 			defer wg.Done()
-
-			if err := p.lexParseModule(m); err != nil {
-				errorChan <- err
-			}
+			p.lexParseModule(m)
 		}(module)
 	}
 
 	wg.Wait()
-	close(errorChan)
-
-	// Collect errors
-	for err := range errorChan {
-		if err != nil {
-			p.ctx.ReportError(err.Error(), nil)
-		}
-	}
 
 	if p.debug {
 		colors.BLUE.Printf("  Processed %d module(s)\n", len(modules))
@@ -188,7 +176,8 @@ func (p *Pipeline) lexParseParallel(modules []*context_v2.Module) error {
 }
 
 // lexParseModule lexes and parses a single module
-func (p *Pipeline) lexParseModule(module *context_v2.Module) error {
+// All errors are reported through diagnostics, not returned
+func (p *Pipeline) lexParseModule(module *context_v2.Module) {
 	// Lex
 	tokenizer := lexer.New(module.FilePath, module.Content)
 	tokens := tokenizer.Tokenize(false)
@@ -201,10 +190,8 @@ func (p *Pipeline) lexParseModule(module *context_v2.Module) error {
 	module.AST = astModule
 	module.Phase = context_v2.PhaseParsed
 
-	// Merge diagnostics
+	// Merge diagnostics (thread-safe)
 	p.mergeDiagnostics(diag)
-
-	return nil
 }
 
 // discoverModules discovers all modules by following imports (sequential BFS)
@@ -271,13 +258,13 @@ func (p *Pipeline) discoverModules() error {
 			content = string(contentBytes)
 		}
 
-		// Quick scan to extract imports (minimal parsing)
-		imports := p.quickScanImports(filePath, content)
+		// Quick scan to extract imports and parse AST (done once during discovery)
+		imports, astModule, _ := p.quickScanImports(filePath, content, item.importPath)
 
 		// Add source content to diagnostics cache for error reporting
 		p.ctx.Diagnostics.AddSourceContent(filePath, content)
 
-		// Create or update module stub (not yet lexed/parsed)
+		// Create or update module with parsed AST
 		if !exists {
 			module := &context_v2.Module{
 				FilePath: filePath,
@@ -285,9 +272,18 @@ func (p *Pipeline) discoverModules() error {
 				Phase:    context_v2.PhaseNotStarted,
 				Symbols:  context_v2.NewSymbolTable(p.ctx.Universe),
 				Content:  content,
+				AST:      astModule, // Store AST to avoid re-parsing in Phase 2
 			}
+			// Properly advance through phases to maintain invariants
+			module.Phase = context_v2.PhaseLexed  // Tokens were generated
+			module.Phase = context_v2.PhaseParsed // AST was built
 			p.ctx.AddModule(item.importPath, module)
 			moduleCount++
+		} else if existingModule.AST == nil {
+			// Update existing module with AST if it didn't have one
+			existingModule.AST = astModule
+			existingModule.Phase = context_v2.PhaseLexed
+			existingModule.Phase = context_v2.PhaseParsed
 		}
 
 		if p.debug {
@@ -327,11 +323,12 @@ type importInfo struct {
 }
 
 // quickScanImports does a quick scan to extract import paths with their locations
-// Uses minimal lexing - just looking for 'import "path"' patterns
-// This avoids full parsing during discovery phase
-func (p *Pipeline) quickScanImports(filePath, content string) []importInfo {
-	// For now, do full lex+parse to get imports reliably
-	// TODO: Optimize with regex-based scanning if needed
+// Does full lex+parse during discovery, then stores the AST so Phase 2 can skip it
+// This ensures each file is parsed exactly once
+//
+// TODO: Discovery currently advances Phase directly to Parsed (via Lexed).
+// When phase validation is enforced, ensure CanProcessPhase checks are satisfied.
+func (p *Pipeline) quickScanImports(filePath, content string, importPath string) ([]importInfo, *ast.Module, *diagnostics.DiagnosticBag) {
 	tokenizer := lexer.New(filePath, content)
 	tokens := tokenizer.Tokenize(false)
 
@@ -340,7 +337,8 @@ func (p *Pipeline) quickScanImports(filePath, content string) []importInfo {
 
 	p.mergeDiagnostics(diag)
 
-	return p.extractImports(astModule)
+	imports := p.extractImports(astModule)
+	return imports, astModule, diag
 }
 
 // extractImports extracts import paths with locations from an AST module
@@ -354,6 +352,8 @@ func (p *Pipeline) extractImports(astModule *ast.Module) []importInfo {
 				importPath := impStmt.Path.Value
 				// Remove quotes from string literal
 				importPath = strings.Trim(importPath, "\"")
+				// Normalize import path semantically (handles whitespace, multiple slashes, etc.)
+				importPath = p.ctx.NormalizeImportPath(importPath)
 				if importPath != "" {
 					imports = append(imports, importInfo{
 						path:     importPath,
@@ -409,7 +409,13 @@ func (p *Pipeline) PrintModuleDetails(importPath string) {
 	fmt.Printf("File Path: %s\n", module.FilePath)
 	fmt.Printf("Type: %s\n", module.Type)
 	fmt.Printf("Phase: %s\n", module.Phase)
-	fmt.Printf("AST Nodes: %d\n", len(module.AST.Nodes))
+
+	// Nil-safe AST node count
+	nodes := 0
+	if module.AST != nil {
+		nodes = len(module.AST.Nodes)
+	}
+	fmt.Printf("AST Nodes: %d\n", nodes)
 
 	fmt.Println()
 }
