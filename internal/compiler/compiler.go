@@ -26,7 +26,7 @@ type Options struct {
 	// Debug output
 	Debug bool
 	// Output format: "ansi" or "html"
-	Format FORMAT
+	LogFormat FORMAT
 }
 
 // Result of compilation
@@ -56,14 +56,14 @@ func Compile(opts Options) Result {
 	}
 
 	execPath, _ := os.Executable()
-	builtinPath := filepath.Join(filepath.Dir(execPath), "../modules")
+	builtinPath := filepath.Join(filepath.Dir(execPath), "../ferret_libs")
 
 	config := &context_v2.Config{
 		ProjectName:        projectName,
 		ProjectRoot:        projectRoot,
 		Extension:          ".fer",
 		BuiltinModulesPath: builtinPath,
-		OutputPath:         filepath.Join(projectRoot, "build", projectName),
+		OutputPath:         filepath.Join(projectRoot, "bin", projectName),
 	}
 
 	ctx := context_v2.New(config, opts.Debug)
@@ -78,7 +78,7 @@ func Compile(opts Options) Result {
 
 	if err != nil {
 		ctx.ReportError(fmt.Sprintf("Failed to set entry point: %v", err), nil)
-		if opts.Format == HTML {
+		if opts.LogFormat == HTML {
 			return Result{Success: false, Output: ctx.Diagnostics.EmitAllToString()}
 		}
 		ctx.EmitDiagnostics()
@@ -86,11 +86,11 @@ func Compile(opts Options) Result {
 	}
 
 	// Run pipeline
-	p := pipeline.New(ctx, opts.Debug)
+	p := pipeline.New(ctx)
 	p.Run()
 
 	// Emit diagnostics and return result
-	if opts.Format == HTML {
+	if opts.LogFormat == HTML {
 		output := ctx.Diagnostics.EmitAllToString()
 		return Result{Success: !ctx.HasErrors(), Output: colors.ConvertANSIToHTML(output)}
 	}

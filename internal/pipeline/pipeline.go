@@ -1,45 +1,9 @@
-// Package pipeline orchestrates the compilation phases for the Ferret compiler.
-//
-// Architecture follows industry-standard multi-pass compiler design:
-//
-// Phase 1: Discovery (Sequential)
-//   - Start from entry point
-//   - Follow import statements to discover all modules
-//   - Build dependency graph
-//   - Detect circular dependencies
-//   - IMPORTANT: Requires imports to be at top-level and before other declarations
-//     This is enforced by the parser to enable deterministic discovery
-//
-// Phase 2: Lexing + Parsing (Parallel where safe)
-//   - Can parallelize files without unresolved imports
-//   - Produces AST for each module
-//   - No cross-file dependencies in this phase
-//
-// Phase 3: Symbol Collection (Future)
-//   - Build symbol tables for each module
-//   - Collect top-level declarations
-//
-// Phase 4: Resolution (Future)
-//   - Resolve import statements
-//   - Link symbols across modules
-//
-// Phase 5: Type Checking (Future)
-//   - Validate type correctness
-//
-// Phase 6: Code Generation (Future)
-//   - Emit target code (native, WASM, etc.)
-//
-// Design considerations:
-//   - WASM compatibility: All file I/O abstracted through context
-//   - Per-module phase tracking prevents redundant work
-//   - Dependency graph enables parallel compilation where safe
-//   - Import validation: Like Go, imports MUST be at the top and before declarations
-//     This makes discovery deterministic and prevents import order issues
 package pipeline
 
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -53,294 +17,201 @@ import (
 	"compiler/internal/source"
 )
 
+// moduleState tracks the 3 states: Unseen -> Parsing -> Done
+type moduleState int
+
+const (
+	stateUnseen moduleState = iota
+	stateParsing
+	stateDone
+)
+
 // Pipeline coordinates the compilation process
 type Pipeline struct {
-	ctx   *context_v2.CompilerContext
-	debug bool
+	ctx    *context_v2.CompilerContext
+	mu     sync.Mutex              // protects states map
+	states map[string]moduleState // tracks module states: Unseen -> Parsing -> Done
+	wg     sync.WaitGroup          // tracks all parsing tasks
+	sem    chan struct{}           // semaphore for bounded parallelism
 }
 
 // New creates a new compilation pipeline
-func New(ctx *context_v2.CompilerContext, debug bool) *Pipeline {
+func New(ctx *context_v2.CompilerContext) *Pipeline {
+	// Bound parallelism to number of CPU cores
+	numWorkers := runtime.NumCPU()
 	return &Pipeline{
-		ctx:   ctx,
-		debug: debug,
+		ctx:    ctx,
+		states: make(map[string]moduleState),
+		sem:    make(chan struct{}, numWorkers),
 	}
 }
 
 // Run executes the full compilation pipeline
 func (p *Pipeline) Run() error {
-	// Phase 1: Discovery - sequential, follows imports
-	if err := p.runDiscoveryPhase(); err != nil {
-		return err
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 1] Lex + Parse\n")
 	}
 
-	// Phase 2: Lex + Parse - can parallelize known files
-	if err := p.runLexParsePhase(); err != nil {
-		return err
+	// Start with entry module and recursively process imports
+	p.processModule(p.ctx.EntryModule, "", nil)
+
+	// Wait for all parsing tasks to complete
+	p.wg.Wait()
+
+	if p.ctx.HasErrors() {
+		return fmt.Errorf("compilation failed with errors")
 	}
 
 	// Future phases
-	// Phase 3: Symbol Collection
-	// Phase 4: Resolution
-	// Phase 5: Type Checking
-	// Phase 6: Code Generation
+	// Phase 2: Symbol Collection
+	// Phase 3: Resolution
+	// Phase 4: Type Checking
+	// Phase 5: Code Generation
 
-	if p.debug {
+	if p.ctx.Debug {
 		colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
 	}
 
 	return nil
 }
 
-// runDiscoveryPhase discovers all modules by following imports (sequential)
-func (p *Pipeline) runDiscoveryPhase() error {
-	if p.debug {
-		colors.CYAN.Printf("\n[Phase 1] Discovery\n")
+// processModule processes a single module: lex, parse, and recursively handle imports
+func (p *Pipeline) processModule(importPath, requestedFrom string, requestedLocation *source.Location) {
+	// Check module state (3-state: Unseen -> Parsing -> Done)
+	p.mu.Lock()
+	state := p.states[importPath]
+	if state == stateParsing || state == stateDone {
+		p.mu.Unlock()
+		return // Already being processed or done
 	}
-
-	if err := p.discoverModules(); err != nil {
-		return fmt.Errorf("discovery phase failed: %w", err)
-	}
-
-	if p.ctx.HasErrors() {
-		return fmt.Errorf("discovery phase completed with errors")
-	}
-
-	if p.debug {
-		colors.GREEN.Printf("✓ Discovery completed\n")
-	}
-
-	return nil
+	
+	// Mark as Parsing
+	p.states[importPath] = stateParsing
+	p.mu.Unlock()
+	
+	// Register this task
+	p.wg.Add(1)
+	
+	// Acquire semaphore (bounded parallelism)
+	p.sem <- struct{}{}
+	
+	go func() {
+		defer func() {
+			<-p.sem         // Release semaphore
+			p.wg.Done()      // Mark task done
+			
+			// Mark module as Done
+			p.mu.Lock()
+			p.states[importPath] = stateDone
+			p.mu.Unlock()
+		}()
+		
+		p.parseModule(importPath, requestedFrom, requestedLocation)
+	}()
 }
 
-// runLexParsePhase lexes and parses all discovered modules
-// For now sequential, but architecture supports parallel processing
-func (p *Pipeline) runLexParsePhase() error {
-	if p.debug {
-		colors.CYAN.Printf("\n[Phase 2] Lex + Parse\n")
-	}
-
-	moduleNames := p.ctx.GetModuleNames()
-
-	// Get modules that need lex+parse
-	var toParse []*context_v2.Module
-	for _, name := range moduleNames {
-		module, _ := p.ctx.GetModule(name)
-		if module.Phase < context_v2.PhaseParsed {
-			toParse = append(toParse, module)
+// parseModule does the actual parsing work
+func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocation *source.Location) {
+	// Get or create module
+	module, exists := p.ctx.GetModule(importPath)
+	if !exists {
+		module = &context_v2.Module{
+			FilePath:   "",
+			ImportPath: importPath,
+			Type:       context_v2.ModuleLocal,
+			Phase:      context_v2.PhaseNotStarted,
+			Symbols:    context_v2.NewSymbolTable(p.ctx.Universe),
+			Content:    "",
+			AST:        nil,
 		}
+		p.ctx.AddModule(importPath, module)
 	}
 
-	if len(toParse) == 0 {
-		if p.debug {
-			colors.BLUE.Printf("  All modules already parsed\n")
+	// Resolve import path to file path
+	var content string
+	var filePath string
+	var modType context_v2.ModuleType
+
+	if module.Content != "" {
+		// Module already has content (in-memory code)
+		content = module.Content
+		filePath = module.FilePath
+		modType = module.Type
+	} else {
+		// Resolve and read file
+		var err error
+		filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
+		if err != nil {
+			p.ctx.Diagnostics.Add(
+				diagnostics.NewError(err.Error()).
+					WithPrimaryLabel(requestedFrom, requestedLocation, ""),
+			)
+			return // Fail but mark as done
 		}
-		return nil
+
+		contentBytes, err := os.ReadFile(filePath)
+		if err != nil {
+			errMsg := fmt.Sprintf("cannot read file %s: %v", filePath, err)
+			p.ctx.Diagnostics.Add(
+				diagnostics.NewError(errMsg).
+					WithPrimaryLabel(requestedFrom, requestedLocation, ""),
+			)
+			return // Fail but mark as done
+		}
+		content = string(contentBytes)
+
+		// Update module info
+		module.FilePath = filePath
+		module.Type = modType
+		module.Content = content
 	}
 
-	// Process in parallel (all files already discovered)
-	if err := p.lexParseParallel(toParse); err != nil {
-		return fmt.Errorf("lex/parse phase failed: %w", err)
-	}
+	// Add source content for diagnostics
+	p.ctx.Diagnostics.AddSourceContent(filePath, content)
 
-	if p.ctx.HasErrors() {
-		return fmt.Errorf("lex/parse phase completed with errors")
-	}
-
-	if p.debug {
-		colors.GREEN.Printf("✓ Lex + Parse completed\n")
-	}
-
-	return nil
-}
-
-// lexParseParallel processes multiple modules in parallel
-func (p *Pipeline) lexParseParallel(modules []*context_v2.Module) error {
-	var wg sync.WaitGroup
-
-	for _, module := range modules {
-		wg.Add(1)
-		go func(m *context_v2.Module) {
-			defer wg.Done()
-			p.lexParseModule(m)
-		}(module)
-	}
-
-	wg.Wait()
-
-	if p.debug {
-		colors.BLUE.Printf("  Processed %d module(s)\n", len(modules))
-	}
-
-	return nil
-}
-
-// lexParseModule lexes and parses a single module
-// All errors are reported through diagnostics, not returned
-func (p *Pipeline) lexParseModule(module *context_v2.Module) {
 	// Lex
-	tokenizer := lexer.New(module.FilePath, module.Content)
+	tokenizer := lexer.New(filePath, content)
 	tokens := tokenizer.Tokenize(false)
 
-	// Advance to PhaseLexed with validation
-	if !p.ctx.AdvanceModulePhase(module.ImportPath, context_v2.PhaseLexed) {
-		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", module.ImportPath), nil)
-		return
+	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseLexed) {
+		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", importPath), nil)
+		return // Fail but mark as done
 	}
 
 	// Parse
-	diag := diagnostics.NewDiagnosticBag(module.FilePath)
-	astModule := parser.Parse(tokens, module.FilePath, diag)
-
-	// Update module
+	diag := diagnostics.NewDiagnosticBag(filePath)
+	astModule := parser.Parse(tokens, filePath, diag)
 	module.AST = astModule
 
-	// Advance to PhaseParsed with validation
-	if !p.ctx.AdvanceModulePhase(module.ImportPath, context_v2.PhaseParsed) {
-		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", module.ImportPath), nil)
-		return
+	// Merge diagnostics
+	for _, d := range diag.Diagnostics() {
+		p.ctx.Diagnostics.Add(d)
 	}
 
-	// Merge diagnostics (thread-safe)
-	p.mergeDiagnostics(diag)
-}
-
-// discoverModules discovers all modules by following imports (sequential BFS)
-// This phase MUST be sequential because we discover imports on-the-fly
-func (p *Pipeline) discoverModules() error {
-	type queueItem struct {
-		importPath string
-		// Track where this import was requested (for error reporting)
-		requestedFrom     string // file path
-		requestedLocation *source.Location
+	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseParsed) {
+		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
+		return // Fail but mark as done
 	}
 
-	queue := []queueItem{{importPath: p.ctx.EntryModule}}
-	discovered := make(map[string]bool)
-
-	if p.debug {
-		colors.BLUE.Printf("  Entry point: %s\n", p.ctx.EntryModule)
+	if p.ctx.Debug {
+		colors.PURPLE.Printf("  ✓ %s\n", importPath)
 	}
 
-	moduleCount := 0
+	// Extract top-level imports (stop at first non-import statement)
+	imports := p.extractTopLevelImports(astModule)
 
-	for len(queue) > 0 {
-		item := queue[0]
-		queue = queue[1:]
-
-		if discovered[item.importPath] {
+	// Add dependencies and check for cycles
+	for _, imp := range imports {
+		if err := p.ctx.AddDependency(importPath, imp.path); err != nil {
+			p.ctx.ReportError(err.Error(), imp.location)
 			continue
 		}
-		discovered[item.importPath] = true
-
-		// Check if module already exists (e.g., entry module with code)
-		existingModule, exists := p.ctx.GetModule(item.importPath)
-		var content string
-		var filePath string
-		var modType context_v2.ModuleType
-
-		if exists && existingModule.Content != "" {
-			// Module already loaded (in-memory code)
-			content = existingModule.Content
-			filePath = existingModule.FilePath
-			modType = existingModule.Type
-		} else {
-			// Resolve import path to file path
-			var err error
-			filePath, modType, err = p.ctx.ImportPathToFilePath(item.importPath)
-			if err != nil {
-				// Report error with the location where the import was requested
-				p.ctx.Diagnostics.Add(
-					diagnostics.NewError(err.Error()).
-						WithPrimaryLabel(item.requestedFrom, item.requestedLocation, ""),
-				)
-				continue
-			}
-
-			// Read source file
-			contentBytes, err := os.ReadFile(filePath)
-			if err != nil {
-				p.ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot read file %s: %v", filePath, err)).
-						WithPrimaryLabel(item.requestedFrom, item.requestedLocation, ""),
-				)
-				continue
-			}
-			content = string(contentBytes)
-		}
-
-		// Quick scan to extract imports and parse AST (done once during discovery)
-		imports, astModule, _ := p.quickScanImports(filePath, content)
-
-		// Add source content to diagnostics cache for error reporting
-		p.ctx.Diagnostics.AddSourceContent(filePath, content)
-
-		// Create or update module with parsed AST
-		if !exists {
-			module := &context_v2.Module{
-				FilePath: filePath,
-				Type:     modType,
-				Phase:    context_v2.PhaseNotStarted,
-				Symbols:  context_v2.NewSymbolTable(p.ctx.Universe),
-				Content:  content,
-				AST:      astModule, // Store AST to avoid re-parsing in Phase 2
-			}
-			p.ctx.AddModule(item.importPath, module)
-
-			// Advance through phases with proper validation
-			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseLexed) {
-				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", item.importPath), nil)
-				continue
-			}
-			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseParsed) {
-				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", item.importPath), nil)
-				continue
-			}
-
-			moduleCount++
-		} else if existingModule.AST == nil {
-			// Update existing module with AST if it didn't have one
-			existingModule.AST = astModule
-
-			// Advance through phases with proper validation
-			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseLexed) {
-				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", item.importPath), nil)
-				continue
-			}
-			if !p.ctx.AdvanceModulePhase(item.importPath, context_v2.PhaseParsed) {
-				p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", item.importPath), nil)
-				continue
-			}
-		}
-
-		if p.debug {
-			colors.PURPLE.Printf("  [%d] %s (%s)\n", moduleCount, item.importPath, modType)
-		}
-
-		// Queue imports and build dependency graph
-		for _, imp := range imports {
-			// Add dependency (checks for cycles)
-			if err := p.ctx.AddDependency(item.importPath, imp.path); err != nil {
-				p.ctx.ReportError(err.Error(), imp.location)
-				continue
-			}
-
-			// Queue for discovery
-			if !discovered[imp.path] {
-				queue = append(queue, queueItem{
-					importPath:        imp.path,
-					requestedFrom:     filePath,
-					requestedLocation: imp.location,
-				})
-			}
-		}
 	}
 
-	if p.debug {
-		colors.BLUE.Printf("  Discovered %d module(s)\n", moduleCount)
+	// Schedule imports for processing (they will run in parallel via worker pool)
+	for _, imp := range imports {
+		p.processModule(imp.path, filePath, imp.location)
 	}
-
-	return nil
 }
 
 // importInfo holds import path and its source location
@@ -349,57 +220,33 @@ type importInfo struct {
 	location *source.Location
 }
 
-// quickScanImports does a quick scan to extract import paths with their locations
-// Does full lex+parse during discovery, then stores the AST so Phase 2 can skip it
-// This ensures each file is parsed exactly once
-//
-// Phase advancement is done with proper validation via AdvanceModulePhase() to ensure
-// all phase prerequisites are satisfied before transitioning.
-func (p *Pipeline) quickScanImports(filePath, content string) ([]importInfo, *ast.Module, *diagnostics.DiagnosticBag) {
-	tokenizer := lexer.New(filePath, content)
-	tokens := tokenizer.Tokenize(false)
-
-	diag := diagnostics.NewDiagnosticBag(filePath)
-	astModule := parser.Parse(tokens, filePath, diag)
-
-	p.mergeDiagnostics(diag)
-
-	imports := p.extractImports(astModule)
-	return imports, astModule, diag
-}
-
-// extractImports extracts import paths with locations from an AST module
-func (p *Pipeline) extractImports(astModule *ast.Module) []importInfo {
+// extractTopLevelImports extracts only top-level imports (stops at first non-import)
+func (p *Pipeline) extractTopLevelImports(astModule *ast.Module) []importInfo {
 	var imports []importInfo
 
 	for _, node := range astModule.Nodes {
-		if impStmt, ok := node.(*ast.ImportStmt); ok {
-			// Import path is a BasicLit (string literal)
-			if impStmt.Path != nil {
-				importPath := impStmt.Path.Value
-				// Remove quotes from string literal
-				importPath = strings.Trim(importPath, "\"")
-				// Normalize import path semantically (handles whitespace, multiple slashes, etc.)
-				importPath = p.ctx.NormalizeImportPath(importPath)
-				if importPath != "" {
-					imports = append(imports, importInfo{
-						path:     importPath,
-						location: &impStmt.Location,
-					})
-				}
+		impStmt, ok := node.(*ast.ImportStmt)
+		if !ok {
+			// First non-import statement, stop scanning
+			break
+		}
+
+		if impStmt.Path != nil {
+			importPath := impStmt.Path.Value
+			// Remove quotes from string literal
+			importPath = strings.Trim(importPath, "\"")
+			// Normalize import path
+			importPath = p.ctx.NormalizeImportPath(importPath)
+			if importPath != "" {
+				imports = append(imports, importInfo{
+					path:     importPath,
+					location: &impStmt.Location,
+				})
 			}
 		}
 	}
 
 	return imports
-}
-
-// mergeDiagnostics merges diagnostics from parser into context
-func (p *Pipeline) mergeDiagnostics(diag *diagnostics.DiagnosticBag) {
-	// Get all diagnostics from parser
-	for _, d := range diag.Diagnostics() {
-		p.ctx.Diagnostics.Add(d)
-	}
 }
 
 // PrintSummary prints a summary of the compilation

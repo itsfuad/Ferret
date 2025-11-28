@@ -9,9 +9,9 @@ import (
 
 func TestCompile_InMemorySimpleCode(t *testing.T) {
 	opts := Options{
-		Code:   "let x := 42;",
-		Debug:  false,
-		Format: ANSI,
+		Code:      "let x := 42;",
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -23,9 +23,9 @@ func TestCompile_InMemorySimpleCode(t *testing.T) {
 
 func TestCompile_InMemoryWithSyntaxError(t *testing.T) {
 	opts := Options{
-		Code:   "let x := ;", // Missing value
-		Debug:  false,
-		Format: ANSI,
+		Code:      "let x := ;", // Missing value
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -40,8 +40,8 @@ func TestCompile_InMemoryMultipleStatements(t *testing.T) {
 		Code: `let x := 42;
 let y := 100;
 let z := x + y;`,
-		Debug:  false,
-		Format: ANSI,
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -53,9 +53,9 @@ let z := x + y;`,
 
 func TestCompile_HTMLFormat(t *testing.T) {
 	opts := Options{
-		Code:   "let x := 42;",
-		Debug:  false,
-		Format: HTML,
+		Code:      "let x := 42;",
+		Debug:     false,
+		LogFormat: HTML,
 	}
 
 	result := Compile(opts)
@@ -71,9 +71,9 @@ func TestCompile_HTMLFormat(t *testing.T) {
 
 func TestCompile_HTMLFormatWithError(t *testing.T) {
 	opts := Options{
-		Code:   "let x := ;", // Syntax error
-		Debug:  false,
-		Format: HTML,
+		Code:      "let x := ;", // Syntax error
+		Debug:     false,
+		LogFormat: HTML,
 	}
 
 	result := Compile(opts)
@@ -97,7 +97,7 @@ func TestCompile_FileMode_NonExistentFile(t *testing.T) {
 	opts := Options{
 		EntryFile: "/nonexistent/path/to/file.fer",
 		Debug:     false,
-		Format:    ANSI,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -124,7 +124,7 @@ func TestCompile_FileMode_ValidFile(t *testing.T) {
 	opts := Options{
 		EntryFile: testFile,
 		Debug:     false,
-		Format:    ANSI,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -156,7 +156,7 @@ let x := 42;`
 	opts := Options{
 		EntryFile: mainPath,
 		Debug:     false,
-		Format:    ANSI,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -168,9 +168,9 @@ let x := 42;`
 
 func TestCompile_DebugMode(t *testing.T) {
 	opts := Options{
-		Code:   "let x := 42;",
-		Debug:  true, // Enable debug mode
-		Format: ANSI,
+		Code:      "let x := 42;",
+		Debug:     true, // Enable debug mode
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -182,9 +182,9 @@ func TestCompile_DebugMode(t *testing.T) {
 
 func TestCompile_EmptyCode(t *testing.T) {
 	opts := Options{
-		Code:   " ", // Whitespace-only (truly empty causes entry point error)
-		Debug:  false,
-		Format: ANSI,
+		Code:      " ", // Whitespace-only (truly empty causes entry point error)
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -200,8 +200,8 @@ func TestCompile_ComplexExpression(t *testing.T) {
 		Code: `let a := 10;
 let b := 20;
 let c := (a + b) * 2 - 5;`,
-		Debug:  false,
-		Format: ANSI,
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -216,8 +216,8 @@ func TestCompile_FunctionDeclaration(t *testing.T) {
 		Code: `fn add(x: i32, y: i32) -> i32 {
 	return x + y;
 }`,
-		Debug:  false,
-		Format: ANSI,
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -240,7 +240,7 @@ func TestCompile_FileMode_WithSyntaxError(t *testing.T) {
 	opts := Options{
 		EntryFile: testFile,
 		Debug:     false,
-		Format:    ANSI,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -252,9 +252,9 @@ func TestCompile_FileMode_WithSyntaxError(t *testing.T) {
 
 func TestCompile_ResultStructure(t *testing.T) {
 	opts := Options{
-		Code:   "let x := 42;",
-		Debug:  false,
-		Format: ANSI,
+		Code:      "let x := 42;",
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -270,9 +270,9 @@ func TestCompile_ResultStructure(t *testing.T) {
 
 func TestCompile_ANSIFormat(t *testing.T) {
 	opts := Options{
-		Code:   "let x := 42;",
-		Debug:  false,
-		Format: ANSI,
+		Code:      "let x := 42;",
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)
@@ -292,8 +292,8 @@ func TestCompile_ImportOrderValidation(t *testing.T) {
 	opts := Options{
 		Code: `let x := 42;
 import "std/io";`, // Import after declaration - should error
-		Debug:  false,
-		Format: HTML,
+		Debug:     false,
+		LogFormat: HTML,
 	}
 
 	result := Compile(opts)
@@ -312,8 +312,8 @@ func TestCompile_MultipleImports(t *testing.T) {
 		Code: `import "std/io";
 import "std/math";
 let x := 42;`,
-		Debug:  false,
-		Format: ANSI,
+		Debug:     false,
+		LogFormat: ANSI,
 	}
 
 	result := Compile(opts)

@@ -33,7 +33,7 @@ func TestPipelineBasic(t *testing.T) {
 	}
 
 	// Create and run pipeline
-	p := New(ctx, false)
+	p := New(ctx)
 	if err := p.Run(); err != nil {
 		t.Errorf("Pipeline failed: %v", err)
 	}
@@ -111,7 +111,7 @@ fn square(x: f64) -> f64 {
 		}
 
 		// Run pipeline
-		p := New(ctx, false)
+		p := New(ctx)
 		_ = p.Run() // Expected to fail due to syntax error
 
 		// Collect diagnostics
@@ -249,7 +249,7 @@ const B := 2;`
 			t.Fatalf("Run %d: Failed to set entry point: %v", run, err)
 		}
 
-		p := New(ctx, false)
+		p := New(ctx)
 		if err := p.Run(); err != nil {
 			t.Fatalf("Run %d: Pipeline failed: %v", run, err)
 		}
@@ -372,7 +372,7 @@ let result := 42;`
 		t.Fatalf("Failed to set entry point: %v", err)
 	}
 
-	p := New(ctx, false)
+	p := New(ctx)
 	if err := p.Run(); err != nil {
 		t.Fatalf("Pipeline failed: %v", err)
 	}
@@ -518,7 +518,7 @@ func TestImportPathNormalization(t *testing.T) {
 			}
 
 			// Create and run pipeline
-			p := New(ctx, false)
+			p := New(ctx)
 			err := p.Run()
 
 			// If there were errors, print diagnostics to understand the issue

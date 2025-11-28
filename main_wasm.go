@@ -24,9 +24,9 @@ func compile(this js.Value, args []js.Value) interface{} {
 	}
 
 	result := compiler.Compile(compiler.Options{
-		Code:   args[0].String(),
-		Debug:  args[1].Bool(),
-		Format: compiler.HTML,
+		Code:      args[0].String(),
+		Debug:     args[1].Bool(),
+		LogFormat: compiler.HTML,
 	})
 
 	return map[string]interface{}{

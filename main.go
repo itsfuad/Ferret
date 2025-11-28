@@ -42,7 +42,7 @@ func main() {
 	result := compiler.Compile(compiler.Options{
 		EntryFile: entryFile,
 		Debug:     *debug,
-		Format:    compiler.ANSI,
+		LogFormat: compiler.ANSI,
 	})
 
 	// Exit code

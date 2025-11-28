@@ -17,6 +17,7 @@ package context_v2
 
 import (
 	"fmt"
+	"sync"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,6 +200,7 @@ type CompilerContext struct {
 	// Module registry: import path -> Module
 	// This is the authoritative source for all compiled modules
 	Modules map[string]*Module
+	mu      sync.RWMutex // protects Modules and DepGraph during parallel parse
 
 	// Entry point
 	EntryPoint  string // Full path to entry file
@@ -495,6 +497,9 @@ func (ctx *CompilerContext) AddModule(importPath string, module *Module) {
 		panic(fmt.Sprintf("cannot add nil module for %q", importPath))
 	}
 
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
 	// Don't overwrite existing modules
 	if _, exists := ctx.Modules[importPath]; exists {
 		return
@@ -506,12 +511,16 @@ func (ctx *CompilerContext) AddModule(importPath string, module *Module) {
 
 // GetModule retrieves a module by import path
 func (ctx *CompilerContext) GetModule(importPath string) (*Module, bool) {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
 	module, exists := ctx.Modules[importPath]
 	return module, exists
 }
 
 // HasModule checks if a module exists in the context
 func (ctx *CompilerContext) HasModule(importPath string) bool {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
 	_, exists := ctx.Modules[importPath]
 	return exists
 }
@@ -564,6 +573,9 @@ func (ctx *CompilerContext) AddDependency(importer, imported string) error {
 	// Normalize paths
 	importer = filepath.ToSlash(importer)
 	imported = filepath.ToSlash(imported)
+
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
 
 	// Check for cycle before adding
 	if cycle := ctx.findCycle(imported, importer); cycle != nil {

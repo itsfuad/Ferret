@@ -1,793 +1,967 @@
 <div class="playground-container">
-  <!-- Header with macOS-style dots and actions -->
-  <div class="playground-header">
-    <div class="header-left">
-      <div class="window-dots">
-        <span class="dot dot-red"></span>
-        <span class="dot dot-yellow"></span>
-        <span class="dot dot-green"></span>
-      </div>
-      <span class="file-name">main.fer</span>
+    <!-- Header with macOS-style dots and actions -->
+    <div class="playground-header">
+        <div class="header-left">
+            <div class="window-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+            </div>
+            <span class="file-name">main.fer</span>
+        </div>
+        <div class="playground-actions">
+            <button id="copy-btn" class="icon-button" title="Copy Code">
+                <span class="copyicon">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"
+                        ></rect>
+                        <path
+                            d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        ></path>
+                    </svg>
+                </span>
+                <span class="copytext">Copy</span>
+            </button>
+            <button id="export-btn" class="icon-button" title="Export Code">
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Export</span>
+            </button>
+            <button id="clear-btn" class="icon-button" title="Clear">
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path
+                        d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    ></path>
+                </svg>
+                <span>Clear</span>
+            </button>
+            <button
+                id="run-btn"
+                class="icon-button run-button"
+                title="Run Code (Ctrl+Enter)"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"></path>
+                </svg>
+                <span>Run</span>
+            </button>
+        </div>
     </div>
-    <div class="playground-actions">
-      <button id="copy-btn" class="icon-button" title="Copy Code">
-        <span class="copyicon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-        </span>
-        <span class="copytext">Copy</span>
-      </button>
-      <button id="export-btn" class="icon-button" title="Export Code">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="7 10 12 15 17 10"></polyline>
-          <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-        <span>Export</span>
-      </button>
-      <button id="clear-btn" class="icon-button" title="Clear">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-        </svg>
-        <span>Clear</span>
-      </button>
-      <button id="run-btn" class="icon-button run-button" title="Run Code (Ctrl+Enter)">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
-        <span>Run</span>
-      </button>
-    </div>
-  </div>
-  
-  <!-- Main content area with resizable panels -->
-  <div class="playground-content">
-    <div class="editor-panel">
-      <div id="editor" class="editor">
 
-      </div>
-      <div class="editor-footer">
-        <span id="output-info">Ln 1, Col 1</span>
-        <span>UTF-8</span>
-        <span>Ferret</span>
-      </div>
+    <!-- Main content area with resizable panels -->
+    <div class="playground-content">
+        <div class="editor-panel">
+            <div id="editor" class="editor"></div>
+            <div class="editor-footer">
+                <span id="output-info">Ln 1, Col 1</span>
+                <span>UTF-8</span>
+                <span>
+                   Ferret<span id="ferret-version"></span>
+                 </span>
+            </div>
+        </div>
+
+        <!-- Resize handle (desktop only) -->
+        <div class="resize-handle" id="resize-handle">
+            <div class="resize-handle-bar"></div>
+        </div>
+
+        <!-- Output panel -->
+        <div class="output-panel">
+            <div class="output-header">
+                <span>Output</span>
+                <span
+                    id="output-status"
+                    class="output-status"
+                    data-status="loading"
+                >
+                    <span class="status-dot"></span>
+                    <span class="status-text">Loading...</span>
+                </span>
+            </div>
+            <div id="output" class="output-content">
+                <p class="output-placeholder">
+                    ✓ Ready to run your code...<br /><span class="keyboard-tip"
+                        >💡 Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run</span>
+                </p>
+            </div>
+        </div>
     </div>
-    
-    <!-- Resize handle (desktop only) -->
-    <div class="resize-handle" id="resize-handle">
-      <div class="resize-handle-bar"></div>
-    </div>
-    
-    <!-- Output panel -->
-    <div class="output-panel">
-      <div class="output-header">
-        <span>Output</span>
-        <span id="output-status" class="output-status" data-status="loading">
-          <span class="status-dot"></span>
-          <span class="status-text">Loading...</span>
-        </span>
-      </div>
-      <div id="output" class="output-content">
-        <p class="output-placeholder">✓ Ready to run your code...<br><span class="keyboard-tip">💡 Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run</span></p>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- Go WASM Support -->
 <script defer is:inline src="/wasm_exec.js"></script>
 
 <script>
+    // NOTE: Monaco theme definitions below must match the custom Shiki/Expressive Code themes in src/syntax/ferret-dark.json and ferret-light.json.
+    // If you update the color palette or token rules here, update the JSON files as well for unified appearance.
 
+    import * as monaco from "monaco-editor";
+    import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
-// NOTE: Monaco theme definitions below must match the custom Shiki/Expressive Code themes in src/syntax/ferret-dark.json and ferret-light.json.
-// If you update the color palette or token rules here, update the JSON files as well for unified appearance.
+    // Setup Monaco environment
+    self.MonacoEnvironment = {
+        getWorker() {
+            return new editorWorker();
+        },
+    };
 
-import * as monaco from 'monaco-editor';
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-
-// Setup Monaco environment
-self.MonacoEnvironment = {
-  getWorker() {
-    return new editorWorker();
-  }
-};
-
-declare global {
-  interface Window {
-    ferretCompile?: (code: string, debug: boolean) => { success: boolean; output?: string; error?: string };
-    ferretWasmVersion?: string;
-    ferretEditor?: monaco.editor.IStandaloneCodeEditor;
-  }
-  class Go {
-    importObject: any;
-    run(instance: WebAssembly.Instance): Promise<void>;
-  }
-}
-
-// Initialize Go WASM
-let wasmReady = false;
-let wasmGo = null;
-
-async function initWasm() {
-  try {
-    console.log('🔄 Loading Ferret WASM compiler...');
-    
-    const go = new Go();
-    wasmGo = go;
-    
-    // Clear any service worker cache
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (let registration of registrations) {
-        registration.unregister();
-      }
+    declare global {
+        interface Window {
+            ferretCompile?: (
+                code: string,
+                debug: boolean,
+            ) => { success: boolean; output?: string; error?: string };
+            ferretWasmVersion?: string;
+            ferretEditor?: monaco.editor.IStandaloneCodeEditor;
+        }
+        class Go {
+            importObject: any;
+            run(instance: WebAssembly.Instance): Promise<void>;
+        }
     }
-    
-    console.log('📥 Fetching ferret.wasm...');
-    const wasmVersion = '10.0.0'; // Clean architecture with internal/compiler package
-    const response = await fetch('/ferret.wasm?v=' + wasmVersion, {
-      cache: 'no-store' // Force no cache
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`);
-    }
-    
-    console.log('📦 Instantiating WASM module...');
-    const buffer = await response.arrayBuffer();
-    const result = await WebAssembly.instantiate(buffer, go.importObject);
-    
-    console.log('▶️ Running Go program...');
-    // Run the Go program in background (don't await it, it runs forever)
-    go.run(result.instance);
-    
-    // Wait a bit for Go to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Check if ferretCompile function is available
-    if (typeof window.ferretCompile === 'function') {
-      wasmReady = true;
-      const version = window.ferretWasmVersion || 'unknown';
-      console.log('Ferret WASM compiler loaded successfully!');
-      console.log('📌 WASM Version:', version);
-      
-      // Update status to ready
-      const status = document.getElementById('output-status') as HTMLElement;
-      const statusText = status.querySelector('.status-text') as HTMLElement;
-      status.setAttribute('data-status', 'ready');
-      statusText.textContent = 'Ready';
-    } else {
-      throw new Error('ferretCompile function not found after WASM initialization');
-    }
-  } catch (error) {
-    console.error('Failed to load WASM:', error);
-    console.error('Error details:', (error as Error).stack);
-    wasmReady = false;
-    
-    // Update status to error and show in output
-    const status = document.getElementById('output-status') as HTMLElement;
-    const statusText = status.querySelector('.status-text') as HTMLElement;
-    const output = document.getElementById('output') as HTMLElement;
-    
-    status.setAttribute('data-status', 'error');
-    statusText.textContent = 'Error';
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    output.innerHTML = `<p style="color: #ef4444;">Failed to load compiler: ${escapeHtml(errorMessage)}</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Please refresh the page to try again.</p>`;
-  }
-}
 
-// Initialize WASM on page load
-initWasm();
+    // Initialize Go WASM
+    let wasmReady = false;
+    let wasmGo = null;
 
-// Register Ferret language
-monaco.languages.register({ id: 'ferret' });
+    async function initWasm() {
+        try {
+            console.log("🔄 Loading Ferret WASM compiler...");
 
-  // Define Ferret syntax highlighting
-  monaco.languages.setMonarchTokensProvider('ferret', {
-    keywords: [
-      'let', 'const', 'type', 'struct', 'fn', 'interface', 'enum', 'map',
-      'if', 'else', 'for', 'while', 'break', 'continue', 'when',
-      'true', 'false', 'none',
-      'defer', 'import', 'catch', 'as', 'return', 'fork'
-    ],
-    
-    typeKeywords: [
-      'i8', 'i16', 'i32', 'i64',
-      'u8', 'u16', 'u32', 'u64',
-      'f32', 'f64',
-      'bool', 'str', 'void'
-    ],
+            const go = new Go();
+            wasmGo = go;
 
-    operators: [
-      '=', '>', '<', '!', '~', '?', ':',
-      '==', '<=', '>=', '!=', '&&', '||', '++', '--',
-      '+', '-', '*', '/', '&', '|', '^', '%',
-      '<<', '>>', '>>>', '+=', '-=', '*=', '/=',
-      '&=', '|=', '^=', '%=', '<<=', '>>=', '>>>=',
-      '=>', ':=', '?:', '::'
-    ],
-
-    symbols: /[=><!~?:&|+\-*\/\^%]+/,
-    escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
-
-    tokenizer: {
-      root: [
-        // Identifiers and keywords
-        [/[a-z_$][\w$]*/, {
-          cases: {
-            '@keywords': 'keyword',
-            '@typeKeywords': 'type',
-            '@default': 'identifier'
-          }
-        }],
-        [/[A-Z][\w\$]*/, 'type.identifier'],
-
-        // Whitespace
-        { include: '@whitespace' },
-
-        // Delimiters and operators
-        [/[{}()\[\]]/, '@brackets'],
-        [/[<>](?!@symbols)/, '@brackets'],
-        [/@symbols/, {
-          cases: {
-            '@operators': 'operator',
-            '@default': ''
-          }
-        }],
-
-        // Numbers
-        [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
-        [/0[xX][0-9a-fA-F]+/, 'number.hex'],
-        [/\d+/, 'number'],
-
-        // Strings
-        [/"([^"\\]|\\.)*$/, 'string.invalid'],
-        [/"/, 'string', '@string'],
-
-        // Characters
-        [/'[^\\']'/, 'string'],
-        [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
-        [/'/, 'string.invalid']
-      ],
-
-      whitespace: [
-        [/[ \t\r\n]+/, ''],
-        [/\/\*/, 'comment', '@comment'],
-        [/\/\/.*$/, 'comment'],
-      ],
-
-      comment: [
-        [/[^\/*]+/, 'comment'],
-        [/\*\//, 'comment', '@pop'],
-        [/[\/*]/, 'comment']
-      ],
-
-      string: [
-        [/[^\\"]+/, 'string'],
-        [/@escapes/, 'string.escape'],
-        [/\\./, 'string.escape.invalid'],
-        [/"/, 'string', '@pop']
-      ],
-    },
-  });
-
-
-  // Use a single theme for both Monaco and code snippets: 'one-dark-pro' palette
-  // (This is a close approximation; Monaco and Shiki have different theme engines)
-  monaco.editor.defineTheme('ferret-one-dark-pro', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [
-      { token: 'keyword', foreground: 'C678DD', fontStyle: 'bold' },
-      { token: 'type', foreground: '56B6C2' },
-      { token: 'type.identifier', foreground: '56B6C2' },
-      { token: 'string', foreground: '98C379' },
-      { token: 'comment', foreground: '5C6370', fontStyle: 'italic' },
-      { token: 'number', foreground: 'D19A66' },
-      { token: 'operator', foreground: 'ABB2BF' },
-    ],
-    colors: {
-      'editor.background': 'var(--editor-bg)',
-      'editor.foreground': '#ABB2BF',
-      'editor.lineHighlightBackground': '#2C313C',
-      'editorLineNumber.foreground': '#636D83',
-      'editorLineNumber.activeForeground': '#ABB2BF',
-      'editorCursor.foreground': '#528BFF',
-      'editor.selectionBackground': '#3E4451',
-      'editor.inactiveSelectionBackground': '#3E4451',
-      'editorIndentGuide.background': '#3B4048',
-      'editorIndentGuide.activeBackground': '#ABB2BF',
-    }
-  });
-
-  // Detect theme
-
-
-  // Dynamic theme switching for Monaco
-  const editorContainer = document.getElementById('editor') as HTMLElement;
-  editorContainer.offsetHeight;
-  
-  // Load default code from file
-  let defaultCode = '// Loading...';
-  try {
-    const response = await fetch('/examples/default.fer');
-    if (response.ok) {
-      defaultCode = await response.text();
-    } else {
-      console.warn('Failed to load default code, using fallback');
-      defaultCode = 'let name := "Ferret";\nname = 10;';
-    }
-  } catch (error) {
-    console.error('Error loading default code:', error);
-    defaultCode = 'let name := "Ferret";\nname = 10;';
-  }
-
-  // Define both dark and light themes
-  monaco.editor.defineTheme('ferret-one-dark-pro', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [
-      { token: 'keyword', foreground: 'C678DD', fontStyle: 'bold' },
-      { token: 'type', foreground: '56B6C2' },
-      { token: 'type.identifier', foreground: '56B6C2' },
-      { token: 'string', foreground: '98C379' },
-      { token: 'comment', foreground: '5C6370', fontStyle: 'italic' },
-      { token: 'number', foreground: 'D19A66' },
-      { token: 'operator', foreground: 'ABB2BF' },
-    ],
-    colors: {
-      'editor.background': '#282C34',
-      'editor.foreground': '#ABB2BF',
-      'editor.lineHighlightBackground': '#2C313C',
-      'editorLineNumber.foreground': '#636D83',
-      'editorLineNumber.activeForeground': '#ABB2BF',
-      'editorCursor.foreground': '#528BFF',
-      'editor.selectionBackground': '#3E4451',
-      'editor.inactiveSelectionBackground': '#3E4451',
-      'editorIndentGuide.background': '#3B4048',
-      'editorIndentGuide.activeBackground': '#ABB2BF',
-    }
-  });
-  monaco.editor.defineTheme('ferret-one-light', {
-    base: 'vs',
-    inherit: true,
-    rules: [
-      { token: 'keyword', foreground: 'C678DD', fontStyle: 'bold' },
-      { token: 'type', foreground: '56B6C2' },
-      { token: 'type.identifier', foreground: '56B6C2' },
-      { token: 'string', foreground: '98C379' },
-      { token: 'comment', foreground: '5C6370', fontStyle: 'italic' },
-      { token: 'number', foreground: 'D19A66' },
-      { token: 'operator', foreground: 'ABB2BF' },
-    ],
-    colors: {
-      'editor.background': '#fafafa',
-      'editor.foreground': '#23272e',
-      'editor.lineHighlightBackground': '#f0f0f0',
-      'editorLineNumber.foreground': '#a0a0a0',
-      'editorLineNumber.activeForeground': '#23272e',
-      'editorCursor.foreground': '#528BFF',
-      'editor.selectionBackground': '#add6ff',
-      'editor.inactiveSelectionBackground': '#e5ebf1',
-      'editorIndentGuide.background': '#d3d3d3',
-      'editorIndentGuide.activeBackground': '#939393',
-    }
-  });
-
-  // Detect initial theme
-  function getCurrentTheme() {
-    const themeAttr = document.documentElement.getAttribute('data-theme');
-    if (themeAttr === 'light') return 'ferret-one-light';
-    return 'ferret-one-dark-pro';
-  }
-
-  let currentTheme = getCurrentTheme();
-  const editor = monaco.editor.create(editorContainer, {
-    value: defaultCode,
-    language: 'ferret',
-    theme: currentTheme,
-    automaticLayout: true,
-  });
-
-  // Listen for theme changes
-  const observer = new MutationObserver(() => {
-    const newTheme = getCurrentTheme();
-    if (newTheme !== currentTheme) {
-      monaco.editor.setTheme(newTheme);
-      currentTheme = newTheme;
-    }
-  });
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-  // Force immediate layout update after creation
-  requestAnimationFrame(() => {
-    editor.layout();
-  });
-
-  // Update cursor position
-  editor.onDidChangeCursorPosition((e) => {
-    (document.getElementById('output-info') as HTMLElement).textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
-  });
-
-  // Add keyboard shortcut: Ctrl+Enter to run code
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-    (document.getElementById('run-btn') as HTMLElement).click();
-  });
-
-  // No theme switching: always use 'ferret-one-dark-pro' for consistency with code snippets
-
-  // Button handlers
-  (document.getElementById('run-btn') as HTMLButtonElement).addEventListener('click', async function() {
-    const code = editor.getValue();
-    const output = document.getElementById('output') as HTMLElement;
-    const status = document.getElementById('output-status') as HTMLElement;
-    const statusText = status.querySelector('.status-text') as HTMLElement;
-    const runBtn = this;
-    
-    console.log('WASM Ready:', wasmReady);
-    
-    // Check if WASM is ready
-    if (!wasmReady) {
-      console.warn('⚠️ WASM not ready yet');
-      status.setAttribute('data-status', 'error');
-      statusText.textContent = 'Loading...';
-      output.innerHTML = '<p style="color: #f59e0b;">⏳ Loading compiler... Please wait a few seconds and try again.</p>';
-      return;
-    }
-    
-    // Check if ferretCompile function is available
-    if (typeof window.ferretCompile !== 'function') {
-      console.error('ferretCompile function not available');
-      console.log('window.ferretCompile:', window.ferretCompile);
-      status.setAttribute('data-status', 'error');
-      statusText.textContent = 'Error';
-      output.innerHTML = '<p style="color: #ef4444;">Compiler function not available. Please check console and refresh the page.</p>';
-      return;
-    }
-    
-    // Disable button and show running state
-    runBtn.disabled = true;
-    status.setAttribute('data-status', 'running');
-    statusText.textContent = 'Running...';
-    output.innerHTML = '<p class="output-info">⏳ Compiling and running your code...</p>';
-    
-    try {
-      //console.log('📝 Calling ferretCompile with code:', code.substring(0, 100) + '...');
-      
-      // Call the WASM compiler
-      const result = window.ferretCompile(code, false);
-      
-      //console.log('📊 Compilation result:', result);
-      
-      if (result.success) {
-        //console.log('Compilation successful');
-        status.setAttribute('data-status', 'success');
-        statusText.textContent = 'Success';
-        // Output is already HTML-formatted from the compiler
-        output.innerHTML = `<pre>${result.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>'}</pre>`;
-      } else {
-        //console.error('Compilation failed');
-        status.setAttribute('data-status', 'error');
-        statusText.textContent = 'Error';
-        // Output is already HTML-formatted from the compiler
-        output.innerHTML = `<pre>${result.output || '<p style="color: #ef4444;">Compilation failed</p>'}</pre>`;
-      }
-      
-    } catch (error) {
-      console.error('💥 Exception during compilation:', error);
-      console.error('Error stack:', (error as Error).stack);
-      
-      // Mark WASM as not ready (it may have crashed)
-      wasmReady = false;
-      
-      // Attempt to restart WASM
-      console.log('🔄 Attempting to restart WASM compiler...');
-      try {
-        // Reset status to loading
-        status.setAttribute('data-status', 'loading');
-        statusText.textContent = 'Restarting...';
-        output.innerHTML = '<p class="output-info">🔄 Restarting compiler...</p>';
-        
-        // Reinitialize WASM
-        await initWasm();
-        
-        // If restart successful, try compilation again
-        if (wasmReady && typeof window.ferretCompile === 'function') {
-          console.log('WASM restarted successfully, retrying compilation...');
-          status.setAttribute('data-status', 'running');
-          statusText.textContent = 'Running...';
-          output.innerHTML = '<p class="output-info">⏳ Retrying compilation...</p>';
-          
-          try {
-            const retryResult = window.ferretCompile(code, false);
-            if (retryResult.success) {
-              status.setAttribute('data-status', 'success');
-              statusText.textContent = 'Success';
-              output.innerHTML = `<pre>${retryResult.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>'}</pre>`;
-            } else {
-              status.setAttribute('data-status', 'error');
-              statusText.textContent = 'Error';
-              output.innerHTML = `<pre>${retryResult.output || '<p style="color: #ef4444;">Compilation failed</p>'}</pre>`;
+            // Clear any service worker cache
+            if ("serviceWorker" in navigator) {
+                const registrations =
+                    await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    registration.unregister();
+                }
             }
-          } catch (retryError) {
-            console.error('Retry compilation also failed:', retryError);
-            status.setAttribute('data-status', 'error');
-            statusText.textContent = 'Error';
-            output.innerHTML = `<p style="color: #ef4444;">Compiler crashed and restart failed. Please refresh the page.</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Error: ${escapeHtml((retryError as Error).message || String(retryError))}</p>`;
-          }
-        } else {
-          // Restart failed
-          status.setAttribute('data-status', 'error');
-          statusText.textContent = 'Error';
-          output.innerHTML = `<p style="color: #ef4444;">Compiler crashed and could not be restarted. Please refresh the page.</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Original error: ${escapeHtml((error as Error).message || String(error))}</p>`;
+
+            console.log("📥 Fetching ferret.wasm...");
+            const wasmVersion = "10.0.0"; // Clean architecture with internal/compiler package
+            const response = await fetch("/ferret.wasm?v=" + wasmVersion, {
+                cache: "no-store", // Force no cache
+            });
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to fetch WASM: ${response.status} ${response.statusText}`,
+                );
+            }
+
+            console.log("📦 Instantiating WASM module...");
+            const buffer = await response.arrayBuffer();
+            const result = await WebAssembly.instantiate(
+                buffer,
+                go.importObject,
+            );
+
+            console.log("▶️ Running Go program...");
+            // Run the Go program in background (don't await it, it runs forever)
+            go.run(result.instance);
+
+            // Wait a bit for Go to initialize
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Check if ferretCompile function is available
+            if (typeof window.ferretCompile === "function") {
+                wasmReady = true;
+                const version = window.ferretWasmVersion || "unknown";
+                console.log("Ferret WASM compiler loaded successfully!");
+                console.log("📌 WASM Version:", version);
+                
+                // Update footer version text (client only)
+                const versionEl = document.getElementById("ferret-version");
+                if (versionEl) {
+                  versionEl.textContent = version ? ` • v${version}` : "";
+                }
+
+
+                // Update status to ready
+                const status = document.getElementById(
+                    "output-status",
+                ) as HTMLElement;
+                const statusText = status.querySelector(
+                    ".status-text",
+                ) as HTMLElement;
+                status.setAttribute("data-status", "ready");
+                statusText.textContent = "Ready";
+            } else {
+                throw new Error(
+                    "ferretCompile function not found after WASM initialization",
+                );
+            }
+        } catch (error) {
+            console.error("Failed to load WASM:", error);
+            console.error("Error details:", (error as Error).stack);
+            wasmReady = false;
+
+            // Update status to error and show in output
+            const status = document.getElementById(
+                "output-status",
+            ) as HTMLElement;
+            const statusText = status.querySelector(
+                ".status-text",
+            ) as HTMLElement;
+            const output = document.getElementById("output") as HTMLElement;
+
+            status.setAttribute("data-status", "error");
+            statusText.textContent = "Error";
+            const errorMessage =
+                error instanceof Error ? error.message : String(error);
+            output.innerHTML = `<p style="color: #ef4444;">Failed to load compiler: ${escapeHtml(errorMessage)}</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Please refresh the page to try again.</p>`;
         }
-      } catch (restartError) {
-        console.error('WASM restart failed:', restartError);
-        status.setAttribute('data-status', 'error');
-        statusText.textContent = 'Error';
-        output.innerHTML = `<p style="color: #ef4444;">Compiler crashed and restart failed. Please refresh the page.</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Restart error: ${escapeHtml((restartError as Error).message || String(restartError))}</p>`;
-      }
-    } finally {
-      runBtn.disabled = false;
-      setTimeout(() => {
-        const currentStatus = status.getAttribute('data-status');
-        if (currentStatus === 'success' || currentStatus === 'error') {
-          status.setAttribute('data-status', 'ready');
-          statusText.textContent = 'Ready';
-        }
-      }, 3000);
     }
-  });
 
-  // Helper function to escape HTML
-  function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
+    // Initialize WASM on page load
+    initWasm();
 
-  (document.getElementById('copy-btn') as HTMLButtonElement).addEventListener('click', function() {
-    const code = editor.getValue();
-    navigator.clipboard.writeText(code).then(() => {
-      const btnIcon = this.querySelector('.copyicon') as HTMLElement;
-      const btnText = this.querySelector('.copytext') as HTMLElement;
-      console.log(btnIcon, btnText);
-      const originalBtnHTML = btnIcon.innerHTML;
-      const originalText = btnText.textContent;
-      // Show checkmark icon in green
-      btnIcon.innerHTML = `
+    // Register Ferret language
+    monaco.languages.register({ id: "ferret" });
+
+    // Define Ferret syntax highlighting
+    monaco.languages.setMonarchTokensProvider("ferret", {
+        keywords: [
+            "let",
+            "const",
+            "type",
+            "struct",
+            "fn",
+            "interface",
+            "enum",
+            "map",
+            "if",
+            "else",
+            "for",
+            "while",
+            "break",
+            "continue",
+            "when",
+            "true",
+            "false",
+            "none",
+            "defer",
+            "import",
+            "catch",
+            "as",
+            "return",
+            "fork",
+        ],
+
+        typeKeywords: [
+            "i8",
+            "i16",
+            "i32",
+            "i64",
+            "u8",
+            "u16",
+            "u32",
+            "u64",
+            "f32",
+            "f64",
+            "bool",
+            "str",
+            "void",
+        ],
+
+        operators: [
+            "=",
+            ">",
+            "<",
+            "!",
+            "~",
+            "?",
+            ":",
+            "==",
+            "<=",
+            ">=",
+            "!=",
+            "&&",
+            "||",
+            "++",
+            "--",
+            "+",
+            "-",
+            "*",
+            "/",
+            "&",
+            "|",
+            "^",
+            "%",
+            "<<",
+            ">>",
+            ">>>",
+            "+=",
+            "-=",
+            "*=",
+            "/=",
+            "&=",
+            "|=",
+            "^=",
+            "%=",
+            "<<=",
+            ">>=",
+            ">>>=",
+            "=>",
+            ":=",
+            "?:",
+            "::",
+        ],
+
+        symbols: /[=><!~?:&|+\-*\/\^%]+/,
+        escapes:
+            /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+        tokenizer: {
+            root: [
+                // Identifiers and keywords
+                [
+                    /[a-z_$][\w$]*/,
+                    {
+                        cases: {
+                            "@keywords": "keyword",
+                            "@typeKeywords": "type",
+                            "@default": "identifier",
+                        },
+                    },
+                ],
+                [/[A-Z][\w\$]*/, "type.identifier"],
+
+                // Whitespace
+                { include: "@whitespace" },
+
+                // Delimiters and operators
+                [/[{}()\[\]]/, "@brackets"],
+                [/[<>](?!@symbols)/, "@brackets"],
+                [
+                    /@symbols/,
+                    {
+                        cases: {
+                            "@operators": "operator",
+                            "@default": "",
+                        },
+                    },
+                ],
+
+                // Numbers
+                [/\d*\.\d+([eE][\-+]?\d+)?/, "number.float"],
+                [/0[xX][0-9a-fA-F]+/, "number.hex"],
+                [/\d+/, "number"],
+
+                // Strings
+                [/"([^"\\]|\\.)*$/, "string.invalid"],
+                [/"/, "string", "@string"],
+
+                // Characters
+                [/'[^\\']'/, "string"],
+                [/(')(@escapes)(')/, ["string", "string.escape", "string"]],
+                [/'/, "string.invalid"],
+            ],
+
+            whitespace: [
+                [/[ \t\r\n]+/, ""],
+                [/\/\*/, "comment", "@comment"],
+                [/\/\/.*$/, "comment"],
+            ],
+
+            comment: [
+                [/[^\/*]+/, "comment"],
+                [/\*\//, "comment", "@pop"],
+                [/[\/*]/, "comment"],
+            ],
+
+            string: [
+                [/[^\\"]+/, "string"],
+                [/@escapes/, "string.escape"],
+                [/\\./, "string.escape.invalid"],
+                [/"/, "string", "@pop"],
+            ],
+        },
+    });
+
+    // Use a single theme for both Monaco and code snippets: 'one-dark-pro' palette
+    // (This is a close approximation; Monaco and Shiki have different theme engines)
+    monaco.editor.defineTheme("ferret-one-dark-pro", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+            { token: "keyword", foreground: "C678DD", fontStyle: "bold" },
+            { token: "type", foreground: "56B6C2" },
+            { token: "type.identifier", foreground: "56B6C2" },
+            { token: "string", foreground: "98C379" },
+            { token: "comment", foreground: "5C6370", fontStyle: "italic" },
+            { token: "number", foreground: "D19A66" },
+            { token: "operator", foreground: "ABB2BF" },
+        ],
+        colors: {
+            "editor.background": "var(--editor-bg)",
+            "editor.foreground": "#ABB2BF",
+            "editor.lineHighlightBackground": "#2C313C",
+            "editorLineNumber.foreground": "#636D83",
+            "editorLineNumber.activeForeground": "#ABB2BF",
+            "editorCursor.foreground": "#528BFF",
+            "editor.selectionBackground": "#3E4451",
+            "editor.inactiveSelectionBackground": "#3E4451",
+            "editorIndentGuide.background": "#3B4048",
+            "editorIndentGuide.activeBackground": "#ABB2BF",
+        },
+    });
+
+    // Detect theme
+
+    // Dynamic theme switching for Monaco
+    const editorContainer = document.getElementById("editor") as HTMLElement;
+    editorContainer.offsetHeight;
+
+    // Load default code from file
+    let defaultCode = "// Loading...";
+    try {
+        const response = await fetch("/examples/default.fer");
+        if (response.ok) {
+            defaultCode = await response.text();
+        } else {
+            console.warn("Failed to load default code, using fallback");
+            defaultCode = 'let name := "Ferret";\nname = 10;';
+        }
+    } catch (error) {
+        console.error("Error loading default code:", error);
+        defaultCode = 'let name := "Ferret";\nname = 10;';
+    }
+
+    // Define both dark and light themes
+    monaco.editor.defineTheme("ferret-one-dark-pro", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+            { token: "keyword", foreground: "C678DD", fontStyle: "bold" },
+            { token: "type", foreground: "56B6C2" },
+            { token: "type.identifier", foreground: "56B6C2" },
+            { token: "string", foreground: "98C379" },
+            { token: "comment", foreground: "5C6370", fontStyle: "italic" },
+            { token: "number", foreground: "D19A66" },
+            { token: "operator", foreground: "ABB2BF" },
+        ],
+        colors: {
+            "editor.background": "#282C34",
+            "editor.foreground": "#ABB2BF",
+            "editor.lineHighlightBackground": "#2C313C",
+            "editorLineNumber.foreground": "#636D83",
+            "editorLineNumber.activeForeground": "#ABB2BF",
+            "editorCursor.foreground": "#528BFF",
+            "editor.selectionBackground": "#3E4451",
+            "editor.inactiveSelectionBackground": "#3E4451",
+            "editorIndentGuide.background": "#3B4048",
+            "editorIndentGuide.activeBackground": "#ABB2BF",
+        },
+    });
+    monaco.editor.defineTheme("ferret-one-light", {
+        base: "vs",
+        inherit: true,
+        rules: [
+            { token: "keyword", foreground: "C678DD", fontStyle: "bold" },
+            { token: "type", foreground: "56B6C2" },
+            { token: "type.identifier", foreground: "56B6C2" },
+            { token: "string", foreground: "98C379" },
+            { token: "comment", foreground: "5C6370", fontStyle: "italic" },
+            { token: "number", foreground: "D19A66" },
+            { token: "operator", foreground: "ABB2BF" },
+        ],
+        colors: {
+            "editor.background": "#fafafa",
+            "editor.foreground": "#23272e",
+            "editor.lineHighlightBackground": "#f0f0f0",
+            "editorLineNumber.foreground": "#a0a0a0",
+            "editorLineNumber.activeForeground": "#23272e",
+            "editorCursor.foreground": "#528BFF",
+            "editor.selectionBackground": "#add6ff",
+            "editor.inactiveSelectionBackground": "#e5ebf1",
+            "editorIndentGuide.background": "#d3d3d3",
+            "editorIndentGuide.activeBackground": "#939393",
+        },
+    });
+
+    // Detect initial theme
+    function getCurrentTheme() {
+        const themeAttr = document.documentElement.getAttribute("data-theme");
+        if (themeAttr === "light") return "ferret-one-light";
+        return "ferret-one-dark-pro";
+    }
+
+    let currentTheme = getCurrentTheme();
+    const editor = monaco.editor.create(editorContainer, {
+        value: defaultCode,
+        language: "ferret",
+        theme: currentTheme,
+        automaticLayout: true,
+    });
+
+    // Listen for theme changes
+    const observer = new MutationObserver(() => {
+        const newTheme = getCurrentTheme();
+        if (newTheme !== currentTheme) {
+            monaco.editor.setTheme(newTheme);
+            currentTheme = newTheme;
+        }
+    });
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+    });
+
+    // Force immediate layout update after creation
+    requestAnimationFrame(() => {
+        editor.layout();
+    });
+
+    // Update cursor position
+    editor.onDidChangeCursorPosition((e) => {
+        (document.getElementById("output-info") as HTMLElement).textContent =
+            `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+    });
+
+    // Add keyboard shortcut: Ctrl+Enter to run code
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+        (document.getElementById("run-btn") as HTMLElement).click();
+    });
+
+    // No theme switching: always use 'ferret-one-dark-pro' for consistency with code snippets
+
+    // Button handlers
+    (document.getElementById("run-btn") as HTMLButtonElement).addEventListener(
+        "click",
+        async function () {
+            const code = editor.getValue();
+            const output = document.getElementById("output") as HTMLElement;
+            const status = document.getElementById(
+                "output-status",
+            ) as HTMLElement;
+            const statusText = status.querySelector(
+                ".status-text",
+            ) as HTMLElement;
+            const runBtn = this;
+
+            console.log("WASM Ready:", wasmReady);
+
+            // Check if WASM is ready
+            if (!wasmReady) {
+                console.warn("⚠️ WASM not ready yet");
+                status.setAttribute("data-status", "error");
+                statusText.textContent = "Loading...";
+                output.innerHTML =
+                    '<p style="color: #f59e0b;">⏳ Loading compiler... Please wait a few seconds and try again.</p>';
+                return;
+            }
+
+            // Check if ferretCompile function is available
+            if (typeof window.ferretCompile !== "function") {
+                console.error("ferretCompile function not available");
+                console.log("window.ferretCompile:", window.ferretCompile);
+                status.setAttribute("data-status", "error");
+                statusText.textContent = "Error";
+                output.innerHTML =
+                    '<p style="color: #ef4444;">Compiler function not available. Please check console and refresh the page.</p>';
+                return;
+            }
+
+            // Disable button and show running state
+            runBtn.disabled = true;
+            status.setAttribute("data-status", "running");
+            statusText.textContent = "Running...";
+            output.innerHTML =
+                '<p class="output-info">⏳ Compiling and running your code...</p>';
+
+            try {
+                //console.log('📝 Calling ferretCompile with code:', code.substring(0, 100) + '...');
+
+                // Call the WASM compiler
+                const result = window.ferretCompile(code, false);
+
+                //console.log('📊 Compilation result:', result);
+
+                if (result.success) {
+                    //console.log('Compilation successful');
+                    status.setAttribute("data-status", "success");
+                    statusText.textContent = "Success";
+                    // Output is already HTML-formatted from the compiler
+                    output.innerHTML = `<pre>${result.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>'}</pre>`;
+                } else {
+                    //console.error('Compilation failed');
+                    status.setAttribute("data-status", "error");
+                    statusText.textContent = "Error";
+                    // Output is already HTML-formatted from the compiler
+                    output.innerHTML = `<pre>${result.output || '<p style="color: #ef4444;">Compilation failed</p>'}</pre>`;
+                }
+            } catch (error) {
+                console.error("💥 Exception during compilation:", error);
+                console.error("Error stack:", (error as Error).stack);
+
+                // Mark WASM as not ready (it may have crashed)
+                wasmReady = false;
+
+                // Attempt to restart WASM
+                console.log("🔄 Attempting to restart WASM compiler...");
+                try {
+                    // Reset status to loading
+                    status.setAttribute("data-status", "loading");
+                    statusText.textContent = "Restarting...";
+                    output.innerHTML =
+                        '<p class="output-info">🔄 Restarting compiler...</p>';
+
+                    // Reinitialize WASM
+                    await initWasm();
+
+                    // If restart successful, try compilation again
+                    if (
+                        wasmReady &&
+                        typeof window.ferretCompile === "function"
+                    ) {
+                        console.log(
+                            "WASM restarted successfully, retrying compilation...",
+                        );
+                        status.setAttribute("data-status", "running");
+                        statusText.textContent = "Running...";
+                        output.innerHTML =
+                            '<p class="output-info">⏳ Retrying compilation...</p>';
+
+                        try {
+                            const retryResult = window.ferretCompile(
+                                code,
+                                false,
+                            );
+                            if (retryResult.success) {
+                                status.setAttribute("data-status", "success");
+                                statusText.textContent = "Success";
+                                output.innerHTML = `<pre>${retryResult.output || '<p style="color: #10b981;">✓ Program compiled successfully</p>'}</pre>`;
+                            } else {
+                                status.setAttribute("data-status", "error");
+                                statusText.textContent = "Error";
+                                output.innerHTML = `<pre>${retryResult.output || '<p style="color: #ef4444;">Compilation failed</p>'}</pre>`;
+                            }
+                        } catch (retryError) {
+                            console.error(
+                                "Retry compilation also failed:",
+                                retryError,
+                            );
+                            status.setAttribute("data-status", "error");
+                            statusText.textContent = "Error";
+                            output.innerHTML = `<p style="color: #ef4444;">Compiler crashed and restart failed. Please refresh the page.</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Error: ${escapeHtml((retryError as Error).message || String(retryError))}</p>`;
+                        }
+                    } else {
+                        // Restart failed
+                        status.setAttribute("data-status", "error");
+                        statusText.textContent = "Error";
+                        output.innerHTML = `<p style="color: #ef4444;">Compiler crashed and could not be restarted. Please refresh the page.</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Original error: ${escapeHtml((error as Error).message || String(error))}</p>`;
+                    }
+                } catch (restartError) {
+                    console.error("WASM restart failed:", restartError);
+                    status.setAttribute("data-status", "error");
+                    statusText.textContent = "Error";
+                    output.innerHTML = `<p style="color: #ef4444;">Compiler crashed and restart failed. Please refresh the page.</p><p style="color: #6b7280; font-size: 0.75rem; margin-top: 0.5rem;">Restart error: ${escapeHtml((restartError as Error).message || String(restartError))}</p>`;
+                }
+            } finally {
+                runBtn.disabled = false;
+                setTimeout(() => {
+                    const currentStatus = status.getAttribute("data-status");
+                    if (
+                        currentStatus === "success" ||
+                        currentStatus === "error"
+                    ) {
+                        status.setAttribute("data-status", "ready");
+                        statusText.textContent = "Ready";
+                    }
+                }, 3000);
+            }
+        },
+    );
+
+    // Helper function to escape HTML
+    function escapeHtml(text: string): string {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    (document.getElementById("copy-btn") as HTMLButtonElement).addEventListener(
+        "click",
+        function () {
+            const code = editor.getValue();
+            navigator.clipboard.writeText(code).then(() => {
+                const btnIcon = this.querySelector(".copyicon") as HTMLElement;
+                const btnText = this.querySelector(".copytext") as HTMLElement;
+                console.log(btnIcon, btnText);
+                const originalBtnHTML = btnIcon.innerHTML;
+                const originalText = btnText.textContent;
+                // Show checkmark icon in green
+                btnIcon.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
       `;
-      btnText.textContent = 'Copied';
-      this.style.color = '#10b981';
-      this.disabled = true;
-      setTimeout(() => {
-        btnIcon.innerHTML = originalBtnHTML;
-        btnText.textContent = originalText;
-        this.style.color = '';
-        this.disabled = false;
-      }, 1200);
+                btnText.textContent = "Copied";
+                this.style.color = "#10b981";
+                this.disabled = true;
+                setTimeout(() => {
+                    btnIcon.innerHTML = originalBtnHTML;
+                    btnText.textContent = originalText;
+                    this.style.color = "";
+                    this.disabled = false;
+                }, 1200);
+            });
+        },
+    );
+
+    (
+        document.getElementById("export-btn") as HTMLButtonElement
+    ).addEventListener("click", function () {
+        const code = editor.getValue();
+        const blob = new Blob([code], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "main.fer";
+        a.click();
+        URL.revokeObjectURL(url);
     });
-  });
 
-  (document.getElementById('export-btn') as HTMLButtonElement).addEventListener('click', function() {
-    const code = editor.getValue();
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'main.fer';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
+    (
+        document.getElementById("clear-btn") as HTMLButtonElement
+    ).addEventListener("click", function () {
+        if (confirm("Are you sure you want to clear the editor?")) {
+            editor.setValue("");
+            (document.getElementById("output") as HTMLElement).innerHTML =
+                '<p class="output-placeholder">Editor cleared</p>';
+        }
+    });
 
-  (document.getElementById('clear-btn') as HTMLButtonElement).addEventListener('click', function() {
-    if (confirm('Are you sure you want to clear the editor?')) {
-      editor.setValue('');
-      (document.getElementById('output') as HTMLElement).innerHTML = '<p class="output-placeholder">Editor cleared</p>';
-    }
-  });
+    // Make editor globally accessible for future API integration
+    window.ferretEditor = editor;
 
-  // Make editor globally accessible for future API integration
-  window.ferretEditor = editor;
+    // Resize functionality
+    const resizeHandle = document.getElementById(
+        "resize-handle",
+    ) as HTMLElement;
+    const editorPanel = document.querySelector(".editor-panel") as HTMLElement;
+    const outputPanel = document.querySelector(".output-panel") as HTMLElement;
+    const playgroundContent = document.querySelector(
+        ".playground-content",
+    ) as HTMLElement;
 
-  // Resize functionality
-  const resizeHandle = document.getElementById('resize-handle') as HTMLElement;
-  const editorPanel = document.querySelector('.editor-panel') as HTMLElement;
-  const outputPanel = document.querySelector('.output-panel') as HTMLElement;
-  const playgroundContent = document.querySelector('.playground-content') as HTMLElement;
-  
-  let isResizing = false;
-  let startX = 0;
-  let startEditorWidth = 0;
+    let isResizing = false;
+    let startX = 0;
+    let startEditorWidth = 0;
 
-  resizeHandle.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startEditorWidth = editorPanel.offsetWidth;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  });
+    resizeHandle.addEventListener("mousedown", (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startEditorWidth = editorPanel.offsetWidth;
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+    });
 
-  document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
+    document.addEventListener("mousemove", (e) => {
+        if (!isResizing) return;
 
-    const deltaX = e.clientX - startX;
-    const containerWidth = playgroundContent.offsetWidth;
-    let newEditorWidth = startEditorWidth + deltaX;
+        const deltaX = e.clientX - startX;
+        const containerWidth = playgroundContent.offsetWidth;
+        let newEditorWidth = startEditorWidth + deltaX;
 
-    // Clamp between 40% and 60% of container width, but also respect minimum widths
-    const minWidth = Math.max(containerWidth * 0.4, 400); // Editor min 400px or 40%
-    const maxWidth = Math.min(containerWidth * 0.6, containerWidth - 350); // Leave at least 350px for output
-    newEditorWidth = Math.max(minWidth, Math.min(maxWidth, newEditorWidth));
+        // Clamp between 40% and 60% of container width, but also respect minimum widths
+        const minWidth = Math.max(containerWidth * 0.4, 400); // Editor min 400px or 40%
+        const maxWidth = Math.min(containerWidth * 0.6, containerWidth - 350); // Leave at least 350px for output
+        newEditorWidth = Math.max(minWidth, Math.min(maxWidth, newEditorWidth));
 
-    const editorPercent = (newEditorWidth / containerWidth) * 100;
-    editorPanel.style.flex = `0 0 calc(${editorPercent}% - 4px)`;
-    outputPanel.style.flex = `0 0 calc(${100 - editorPercent}% - 4px)`;
+        const editorPercent = (newEditorWidth / containerWidth) * 100;
+        editorPanel.style.flex = `0 0 calc(${editorPercent}% - 4px)`;
+        outputPanel.style.flex = `0 0 calc(${100 - editorPercent}% - 4px)`;
 
-    // Force Monaco to recalculate layout
-    editor.layout();
-  });
+        // Force Monaco to recalculate layout
+        editor.layout();
+    });
 
-
-  document.addEventListener('mouseup', () => {
-    if (isResizing) {
-      isResizing = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-  });
-
+    document.addEventListener("mouseup", () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+        }
+    });
 </script>
 
 <style>
-  .playground-container {
-    display: flex;
-    flex-direction: column;
-    margin: 2rem 0;
-    border-radius: 16px;
-    overflow: hidden;
-    background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 40px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-  }
+    .playground-container {
+        display: flex;
+        flex-direction: column;
+        margin: 2rem 0;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow:
+            0 1px 3px rgba(0, 0, 0, 0.05),
+            0 10px 40px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+    }
 
-  :global([data-theme='dark']) .playground-container {
-    background: var(--editor-bg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 10px 40px rgba(0, 0, 0, 0.4);
-    border-color: rgba(255, 255, 255, 0.05);
-  }
+    :global([data-theme="dark"]) .playground-container {
+        background: var(--editor-bg);
+        box-shadow:
+            0 1px 3px rgba(0, 0, 0, 0.3),
+            0 10px 40px rgba(0, 0, 0, 0.4);
+        border-color: rgba(255, 255, 255, 0.05);
+    }
 
-  /* Header */
-  .playground-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 1.25rem;
-    background: #f7f7f7;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  }
+    /* Header */
+    .playground-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 1.25rem;
+        background: #f7f7f7;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
 
-  :global([data-theme='dark']) .playground-header {
-    background: var(--editor-bg);
-    border-bottom-color: rgba(255, 255, 255, 0.05);
-  }
+    :global([data-theme="dark"]) .playground-header {
+        background: var(--editor-bg);
+        border-bottom-color: rgba(255, 255, 255, 0.05);
+    }
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
 
-  /* macOS-style window dots */
-  .window-dots {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
+    /* macOS-style window dots */
+    .window-dots {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
 
-  .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-  }
+    .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
 
-  .dot-red {
-    background: #ff5f57;
-  }
+    .dot-red {
+        background: #ff5f57;
+    }
 
-  .dot-yellow {
-    background: #ffbd2e;
-  }
+    .dot-yellow {
+        background: #ffbd2e;
+    }
 
-  .dot-green {
-    background: #28ca42;
-  }
+    .dot-green {
+        background: #28ca42;
+    }
 
-  .file-name {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #6b7280;
-  }
+    .file-name {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #6b7280;
+    }
 
-  :global([data-theme='dark']) .file-name {
-    color: #9ca3af;
-  }
+    :global([data-theme="dark"]) .file-name {
+        color: #9ca3af;
+    }
 
-  /* Actions */
-  .playground-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin: 0;
-  }
+    /* Actions */
+    .playground-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 0;
+    }
 
-  .playground-actions button {
-    margin: 0;
-  }
+    .playground-actions button {
+        margin: 0;
+    }
 
-  .icon-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 24px !important;
-    gap: 0.375rem;
-    padding: 0.5rem 0.875rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    line-height: 1;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: #4b5563;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-  }
+    .icon-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 24px !important;
+        gap: 0.375rem;
+        padding: 0.5rem 0.875rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        color: #4b5563;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
 
-  :global([data-theme='dark']) .icon-button {
-    color: #9ca3af;
-  }
+    :global([data-theme="dark"]) .icon-button {
+        color: #9ca3af;
+    }
 
-  .icon-button svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    display: block;
-  }
+    .icon-button svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        display: block;
+    }
 
-  .icon-button .copyicon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-  }
+    .icon-button .copyicon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+    }
 
-  .icon-button .copyicon svg {
-    width: 100%;
-    height: 100%;
-  }
+    .icon-button .copyicon svg {
+        width: 100%;
+        height: 100%;
+    }
 
-  .icon-button .copytext,
-  .icon-button > span {
-    display: block;
-    line-height: 1;
-  }
+    .icon-button .copytext,
+    .icon-button > span {
+        display: block;
+        line-height: 1;
+    }
 
-  .shortcut-hint {
-    font-size: 0.6875rem;
-    opacity: 0.7;
-    font-weight: 400;
-    margin-left: 0.25rem;
-  }
+    .shortcut-hint {
+        font-size: 0.6875rem;
+        opacity: 0.7;
+        font-weight: 400;
+        margin-left: 0.25rem;
+    }
 
-  /* 
-  - Run button background: black, color: white in light mode; background: white, color: black in dark mode 
+    /*
+  - Run button background: black, color: white in light mode; background: white, color: black in dark mode
   - Other button has no outline or border color. Just have hover color for background. Color: white on in dark mode, black in light mode
   - disabled state: opacity 0.5, cursor not-allowed
   */
@@ -801,7 +975,7 @@ monaco.languages.register({ id: 'ferret' });
         color: #ffffff !important;
     }
 
-    :global([data-theme='dark']) .run-button {
+    :global([data-theme="dark"]) .run-button {
         background: #ffffff;
         color: #000000;
     }
@@ -810,414 +984,414 @@ monaco.languages.register({ id: 'ferret' });
         background: rgba(0, 0, 0, 0.05);
     }
 
-    :global([data-theme='dark']) .icon-button:hover {
+    :global([data-theme="dark"]) .icon-button:hover {
         background: rgba(255, 255, 255, 0.1);
     }
 
-
-
-
-  .run-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* Content area - responsive layout */
-  .playground-content {
-    display: flex;
-    flex-direction: row; /* Horizontal on desktop */
-    height: 100%;
-    min-height: 400px; /* Ensure minimum height for proper flex behavior */
-    position: relative;
-  }
-
-  /* Editor panel - 60% width by default */
-  .editor-panel {
-    flex: 0 0 calc(60% - 4px);
-    min-width: 400px;
-    position: relative;
-    background: #ffffff;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-
-  :global([data-theme='dark']) .editor-panel {
-    background: var(--editor-bg);
-  }
-
-  /* Resize handle (desktop only) */
-  .resize-handle {
-    width: 8px;
-    background: rgba(0, 0, 0, 0.05);
-    cursor: col-resize;
-    position: relative;
-    flex-shrink: 0;
-    transition: background 0.15s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-  }
-
-  :global([data-theme='dark']) .resize-handle {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .resize-handle:hover {
-    background: rgba(0, 0, 0, 0.1);
-  }
-
-  :global([data-theme='dark']) .resize-handle:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .resize-handle-bar {
-    width: 2px;
-    height: 48px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 1px;
-  }
-
-  :global([data-theme='dark']) .resize-handle-bar {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .editor {
-    flex: 1;
-    width: 100%;
-    height: 100%;
-    min-height: 0; /* Critical for flex children */
-  }
-  
-  /* Ensure Monaco container has explicit dimensions */
-  .editor > div {
-    width: 100% !important;
-    height: 100% !important;
-  }
-
-  /* CRITICAL: Override Starlight's global styles that break Monaco */
-  /* Target Monaco's specific internal classes */
-  .editor :global(.view-lines),
-  .editor :global(.view-line),
-  .editor :global(.view-line) > span,
-  .editor :global(.mtk1),
-  .editor :global(.mtk2),
-  .editor :global(.mtk3),
-  .editor :global(.mtk4),
-  .editor :global(.mtk5),
-  .editor :global(.mtk6) {
-    font-family: Consolas, 'Courier New', monospace !important;
-    font-size: 14px !important;
-    line-height: 19px !important;
-    letter-spacing: 0 !important;
-  }
-
-  /* Editor footer */
-  .editor-footer {
-    display: flex;
-    gap: 1rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.6875rem;
-    color: #9ca3af;
-    background: rgba(0, 0, 0, 0.02);
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
-  }
-
-  :global([data-theme='dark']) .editor-footer {
-    color: #6b7280;
-    background: var(--editor-bg);
-    border-top-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .editor-footer #output-info {
-    font-weight: 500;
-  }
-
-  /* Output panel - 40% width by default */
-  .output-panel {
-    flex: 0 0 calc(40% - 4px);
-    min-height: 0;
-    min-width: 350px;
-    display: flex;
-    flex-direction: column;
-    background: #fafafa;
-    box-sizing: border-box;
-  }
-
-  :global([data-theme='dark']) .output-panel {
-    background: var(--editor-bg);
-    border-left-color: rgba(255, 255, 255, 0.05);
-  }
-
-  .output-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #6b7280;
-    background: rgba(0, 0, 0, 0.02);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-    min-width: 0; /* Allow shrinking */
-  }
-
-  :global([data-theme='dark']) .output-header {
-    color: #9ca3af;
-    background: rgba(255, 255, 255, 0.02);
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .output-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.6875rem;
-    text-transform: none;
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #10b981; /* Default green for ready */
-  }
-
-  /* Status colors based on data attribute */
-  .output-status[data-status="ready"] .status-dot {
-    background: #10b981; /* Green */
-  }
-
-  .output-status[data-status="loading"] .status-dot {
-    background: #f59e0b; /* Orange */
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .output-status[data-status="running"] .status-dot {
-    background: #f59e0b; /* Orange */
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .output-status[data-status="success"] .status-dot {
-    background: #06b6d4; /* Cyan */
-  }
-
-  .output-status[data-status="error"] .status-dot {
-    background: #ef4444; /* Red */
-  }
-
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
-  }
-
-  .output-content {
-    flex: 1;
-    padding: 1rem;
-    overflow-y: auto;
-    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
-    font-size: 0.8125rem;
-    line-height: 1.6;
-    color: #374151;
-    margin-right: 10px;
-  }
-
-  :global([data-theme='dark']) .output-content {
-    color: #d1d5db;
-  }
-
-  .output-placeholder {
-    color: #9ca3af;
-    margin: 0;
-  }
-
-  :global([data-theme='dark']) .output-placeholder {
-    color: #6b7280;
-  }
-
-  .keyboard-tip {
-    display: block;
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    opacity: 0.8;
-  }
-
-  .keyboard-tip kbd {
-    display: inline-block;
-    padding: 0.125rem 0.375rem;
-    font-size: 0.6875rem;
-    font-family: 'Consolas', 'Monaco', monospace;
-    background: rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
-    margin: 0 0.125rem;
-  }
-
-  :global([data-theme='dark']) .keyboard-tip kbd {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
-  }
-
-  .output-info {
-    color: #10b981;
-    margin: 0;
-  }
-
-  .output-content pre {
-    margin: 0;
-    white-space: pre;
-    overflow-x: auto;
-  }
-
-  /* Custom scrollbar */
-  .output-content::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  .output-content::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .output-content::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-  }
-
-  :global([data-theme='dark']) .output-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .output-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.15);
-  }
-
-  :global([data-theme='dark']) .output-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
-
-  .output-content::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-
-  /* Responsive - Mobile: Stack vertically, no resize */
-  @media (max-width: 768px) {
-    .playground-container {
-      margin: 1rem 0;
-      border-radius: 12px;
+    .run-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
-    .playground-header {
-      padding: 0.75rem 1rem;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
-
-    .header-left {
-      flex: 1;
-    }
-
-    .window-dots .dot {
-      width: 10px;
-      height: 10px;
-    }
-
-    .file-name {
-      font-size: 0.75rem;
-    }
-
-    .playground-actions {
-      flex-wrap: wrap;
-      width: 100%;
-      justify-content: flex-end;
-    }
-
-    .icon-button {
-      padding: 0.375rem 0.625rem;
-      font-size: 0.75rem;
-      aspect-ratio: 1 / 1;
-    }
-
-    .icon-button svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    .icon-button .copytext,
-    .icon-button span:not(.copyicon) {
-      display: none;
-    }
-
-    .shortcut-hint {
-      display: none;
-    }
-
-    /* Stack vertically on mobile */
+    /* Content area - responsive layout */
     .playground-content {
-      flex-direction: column !important;
-      height: auto;
-      flex: 1;
-      min-height: 0;
+        display: flex;
+        flex-direction: row; /* Horizontal on desktop */
+        height: 100%;
+        min-height: 400px; /* Ensure minimum height for proper flex behavior */
+        position: relative;
     }
 
+    /* Editor panel - 60% width by default */
     .editor-panel {
-      height: 50%;
-      min-width: unset !important;
-      flex: 0 0 auto !important;
-      min-height: 0;
+        flex: 0 0 calc(60% - 4px);
+        min-width: 400px;
+        position: relative;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-sizing: border-box;
     }
 
-    /* Hide resize handle on mobile */
+    :global([data-theme="dark"]) .editor-panel {
+        background: var(--editor-bg);
+    }
+
+    /* Resize handle (desktop only) */
     .resize-handle {
-      display: none !important;
+        width: 8px;
+        background: rgba(0, 0, 0, 0.05);
+        cursor: col-resize;
+        position: relative;
+        flex-shrink: 0;
+        transition: background 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
     }
 
+    :global([data-theme="dark"]) .resize-handle {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .resize-handle:hover {
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    :global([data-theme="dark"]) .resize-handle:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .resize-handle-bar {
+        width: 2px;
+        height: 48px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 1px;
+    }
+
+    :global([data-theme="dark"]) .resize-handle-bar {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .editor {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        min-height: 0; /* Critical for flex children */
+    }
+
+    /* Ensure Monaco container has explicit dimensions */
+    .editor > div {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* CRITICAL: Override Starlight's global styles that break Monaco */
+    /* Target Monaco's specific internal classes */
+    .editor :global(.view-lines),
+    .editor :global(.view-line),
+    .editor :global(.view-line) > span,
+    .editor :global(.mtk1),
+    .editor :global(.mtk2),
+    .editor :global(.mtk3),
+    .editor :global(.mtk4),
+    .editor :global(.mtk5),
+    .editor :global(.mtk6) {
+        font-family: Consolas, "Courier New", monospace !important;
+        font-size: 14px !important;
+        line-height: 19px !important;
+        letter-spacing: 0 !important;
+    }
+
+    /* Editor footer */
+    .editor-footer {
+        display: flex;
+        gap: 1rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.6875rem;
+        color: #9ca3af;
+        background: rgba(0, 0, 0, 0.02);
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    :global([data-theme="dark"]) .editor-footer {
+        color: #6b7280;
+        background: var(--editor-bg);
+        border-top-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .editor-footer #output-info {
+        font-weight: 500;
+    }
+
+    /* Output panel - 40% width by default */
     .output-panel {
-      width: 100% !important;
-      min-width: unset !important;
-      flex: 1 !important;
-      min-height: 0;
-      border-left: none;
-      border-top: 1px solid rgba(0, 0, 0, 0.08);
-      overflow: hidden;
+        flex: 0 0 calc(40% - 4px);
+        min-height: 0;
+        min-width: 350px;
+        display: flex;
+        flex-direction: column;
+        background: #fafafa;
+        box-sizing: border-box;
     }
 
-    :global([data-theme='dark']) .output-panel {
-      border-left: none;
-      border-top-color: rgba(255, 255, 255, 0.05);
+    :global([data-theme="dark"]) .output-panel {
+        background: var(--editor-bg);
+        border-left-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .output-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+        background: rgba(0, 0, 0, 0.02);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        min-width: 0; /* Allow shrinking */
+    }
+
+    :global([data-theme="dark"]) .output-header {
+        color: #9ca3af;
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .output-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.6875rem;
+        text-transform: none;
+        font-weight: 500;
+        flex-shrink: 0;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981; /* Default green for ready */
+    }
+
+    /* Status colors based on data attribute */
+    .output-status[data-status="ready"] .status-dot {
+        background: #10b981; /* Green */
+    }
+
+    .output-status[data-status="loading"] .status-dot {
+        background: #f59e0b; /* Orange */
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .output-status[data-status="running"] .status-dot {
+        background: #f59e0b; /* Orange */
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .output-status[data-status="success"] .status-dot {
+        background: #06b6d4; /* Cyan */
+    }
+
+    .output-status[data-status="error"] .status-dot {
+        background: #ef4444; /* Red */
+    }
+
+    @keyframes pulse {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
     }
 
     .output-content {
-      font-size: 0.75rem;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .icon-button {
-      padding: 0.375rem;
-    }
-
-    .icon-button svg {
-      width: 16px;
-      height: 16px;
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        font-family:
+            "Cascadia Code", "Fira Code", "Consolas", "Monaco", monospace;
+        font-size: 0.8125rem;
+        line-height: 1.6;
+        color: #374151;
+        margin-right: 10px;
     }
 
-    .editor-panel {
-      height: 350px;
+    :global([data-theme="dark"]) .output-content {
+        color: #d1d5db;
     }
-  }
+
+    .output-placeholder {
+        color: #9ca3af;
+        margin: 0;
+    }
+
+    :global([data-theme="dark"]) .output-placeholder {
+        color: #6b7280;
+    }
+
+    .keyboard-tip {
+        display: block;
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        opacity: 0.8;
+    }
+
+    .keyboard-tip kbd {
+        display: inline-block;
+        padding: 0.125rem 0.375rem;
+        font-size: 0.6875rem;
+        font-family: "Consolas", "Monaco", monospace;
+        background: rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+        margin: 0 0.125rem;
+    }
+
+    :global([data-theme="dark"]) .keyboard-tip kbd {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .output-info {
+        color: #10b981;
+        margin: 0;
+    }
+
+    .output-content pre {
+        margin: 0;
+        white-space: pre;
+        overflow-x: auto;
+    }
+
+    /* Custom scrollbar */
+    .output-content::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .output-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .output-content::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+
+    :global([data-theme="dark"]) .output-content::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .output-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.15);
+    }
+
+    :global([data-theme="dark"])
+        .output-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .output-content::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    /* Responsive - Mobile: Stack vertically, no resize */
+    @media (max-width: 768px) {
+        .playground-container {
+            margin: 1rem 0;
+            border-radius: 12px;
+        }
+
+        .playground-header {
+            padding: 0.75rem 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .header-left {
+            flex: 1;
+        }
+
+        .window-dots .dot {
+            width: 10px;
+            height: 10px;
+        }
+
+        .file-name {
+            font-size: 0.75rem;
+        }
+
+        .playground-actions {
+            flex-wrap: wrap;
+            width: 100%;
+            justify-content: flex-end;
+        }
+
+        .icon-button {
+            padding: 0.375rem 0.625rem;
+            font-size: 0.75rem;
+            aspect-ratio: 1 / 1;
+        }
+
+        .icon-button svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .icon-button .copytext,
+        .icon-button span:not(.copyicon) {
+            display: none;
+        }
+
+        .shortcut-hint {
+            display: none;
+        }
+
+        /* Stack vertically on mobile */
+        .playground-content {
+            flex-direction: column !important;
+            height: auto;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .editor-panel {
+            height: 50%;
+            min-width: unset !important;
+            flex: 0 0 auto !important;
+            min-height: 0;
+        }
+
+        /* Hide resize handle on mobile */
+        .resize-handle {
+            display: none !important;
+        }
+
+        .output-panel {
+            width: 100% !important;
+            min-width: unset !important;
+            flex: 1 !important;
+            min-height: 0;
+            border-left: none;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        :global([data-theme="dark"]) .output-panel {
+            border-left: none;
+            border-top-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .output-content {
+            font-size: 0.75rem;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .icon-button {
+            padding: 0.375rem;
+        }
+
+        .icon-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .editor-panel {
+            height: 350px;
+        }
+    }
 </style>
