@@ -43,7 +43,7 @@ func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 	sc.mu.RLock()
 	lines, ok := sc.files[filepath]
 	sc.mu.RUnlock()
-	
+
 	if ok {
 		if line > 0 && line <= len(lines) {
 			return lines[line-1], nil

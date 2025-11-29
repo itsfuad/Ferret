@@ -17,10 +17,10 @@ package context_v2
 
 import (
 	"fmt"
-	"sync"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"

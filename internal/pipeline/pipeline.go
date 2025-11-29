@@ -29,10 +29,10 @@ const (
 // Pipeline coordinates the compilation process
 type Pipeline struct {
 	ctx    *context_v2.CompilerContext
-	mu     sync.Mutex              // protects states map
+	mu     sync.Mutex             // protects states map
 	states map[string]moduleState // tracks module states: Unseen -> Parsing -> Done
-	wg     sync.WaitGroup          // tracks all parsing tasks
-	sem    chan struct{}           // semaphore for bounded parallelism
+	wg     sync.WaitGroup         // tracks all parsing tasks
+	sem    chan struct{}          // semaphore for bounded parallelism
 }
 
 // New creates a new compilation pipeline
@@ -84,28 +84,28 @@ func (p *Pipeline) processModule(importPath, requestedFrom string, requestedLoca
 		p.mu.Unlock()
 		return // Already being processed or done
 	}
-	
+
 	// Mark as Parsing
 	p.states[importPath] = stateParsing
 	p.mu.Unlock()
-	
+
 	// Register this task
 	p.wg.Add(1)
-	
+
 	// Acquire semaphore (bounded parallelism)
 	p.sem <- struct{}{}
-	
+
 	go func() {
 		defer func() {
-			<-p.sem         // Release semaphore
-			p.wg.Done()      // Mark task done
-			
+			<-p.sem     // Release semaphore
+			p.wg.Done() // Mark task done
+
 			// Mark module as Done
 			p.mu.Lock()
 			p.states[importPath] = stateDone
 			p.mu.Unlock()
 		}()
-		
+
 		p.parseModule(importPath, requestedFrom, requestedLocation)
 	}()
 }
