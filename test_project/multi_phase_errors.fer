@@ -1,0 +1,13 @@
+// Multi-phase error test
+
+// Collection phase errors
+let x: i32 = 10;
+
+// Type checking phase errors
+let overflow: i8 = 200;  // Overflow
+let mismatch: str = 42;  // Type mismatch
+let x: str = "hello";  // Redeclaration
+
+// More errors to verify all are caught
+let a: u8 = -1;  // Negative in unsigned
+let b: i16 = 50000;  // Overflow i16

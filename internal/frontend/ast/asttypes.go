@@ -62,16 +62,16 @@ func (r *ReferenceType) INode()                {} // Implements Node interface
 func (r *ReferenceType) TypeExpr()             {} // Type nodes implement TypeExpr
 func (r *ReferenceType) Loc() *source.Location { return &r.Location }
 
-// ErrorType represents error-returning type T ! E
-type ErrorType struct {
+// ResultType represents error-returning type T ! E
+type ResultType struct {
 	Value TypeNode // The value type
 	Error TypeNode // The error type
 	source.Location
 }
 
-func (e *ErrorType) INode()                {} // Implements Node interface
-func (e *ErrorType) TypeExpr()             {} // Type nodes implement TypeExpr
-func (e *ErrorType) Loc() *source.Location { return &e.Location }
+func (e *ResultType) INode()                {} // Implements Node interface
+func (e *ResultType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (e *ResultType) Loc() *source.Location { return &e.Location }
 
 // Field represents a single field in a struct or parameter in a function
 type Field struct {
@@ -84,7 +84,6 @@ type Field struct {
 
 func (f *Field) INode()                {} // Implements Node interface
 func (f *Field) Loc() *source.Location { return &f.Location }
-
 
 // StructType represents a struct type definition
 type StructType struct {
@@ -108,8 +107,8 @@ func (i *InterfaceType) Loc() *source.Location { return &i.Location }
 
 // FuncType represents a function type signature
 type FuncType struct {
-	Params []Field    // function parameters
-	Result TypeNode   // return types (can be nil for no return)
+	Params []Field  // function parameters
+	Result TypeNode // return types (can be nil for no return)
 	source.Location
 }
 

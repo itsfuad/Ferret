@@ -186,7 +186,7 @@ func TestSymbolTable(t *testing.T) {
 	parentSym := &Symbol{
 		Name:     "x",
 		Kind:     SymbolVariable,
-		Type:     types.TYPE_I32,
+		Type:     types.TypeI32,
 		Exported: true,
 	}
 
@@ -206,7 +206,7 @@ func TestSymbolTable(t *testing.T) {
 	}
 
 	// Lookup from child (should find in parent)
-	found, ok = child.Lookup("x")
+	_, ok = child.Lookup("x")
 	if !ok {
 		t.Error("Expected to find parent symbol from child")
 	}
@@ -221,7 +221,7 @@ func TestSymbolTable(t *testing.T) {
 	childSym := &Symbol{
 		Name:     "x",
 		Kind:     SymbolConstant,
-		Type:     types.TYPE_I64,
+		Type:     types.TypeI64,
 		Exported: false,
 	}
 

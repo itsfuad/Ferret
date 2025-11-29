@@ -1,0 +1,16 @@
+// Comparison: Old vs New Error Messages
+
+// Example 1: Small overflow
+let small: i8 = 200;
+
+// Example 2: Large overflow  
+let tiny: u8 = 1000;
+
+// Example 3: Negative in unsigned
+let unsigned: u16 = -50;
+
+// Example 4: Edge case (just over the limit)
+let edge: i8 = 128;
+
+
+small = 300;

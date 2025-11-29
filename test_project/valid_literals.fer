@@ -1,0 +1,15 @@
+// Test valid literal assignments
+
+// All these should work
+let a: i8 = 100;
+let b: i8 = -100;
+let c: u8 = 200;
+let d: i16 = 30000;
+let e: i32 = 2000000;
+let f: i64 = 9000000000;
+
+// Edge cases that should work
+let max_i8: i8 = 127;
+let min_i8: i8 = -128;
+let max_u8: u8 = 255;
+let zero: u8 = 0;

@@ -14,6 +14,9 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/semantics/collector"
+	"compiler/internal/semantics/resolver"
+	"compiler/internal/semantics/typechecker"
 	"compiler/internal/source"
 )
 
@@ -62,11 +65,31 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("compilation failed with errors")
 	}
 
-	// Future phases
 	// Phase 2: Symbol Collection
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 2] Symbol Collection\n")
+	}
+	if err := p.runCollectorPhase(); err != nil {
+		return err
+	}
+
 	// Phase 3: Resolution
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 3] Resolution\n")
+	}
+	if err := p.runResolverPhase(); err != nil {
+		return err
+	}
+
 	// Phase 4: Type Checking
-	// Phase 5: Code Generation
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 4] Type Checking\n")
+	}
+	if err := p.runTypeCheckerPhase(); err != nil {
+		return err
+	}
+
+	// Phase 5: Code Generation (future)
 
 	if p.ctx.Debug {
 		colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
@@ -313,4 +336,111 @@ func (p *Pipeline) PrintModuleDetails(importPath string) {
 	fmt.Printf("AST Nodes: %d\n", nodes)
 
 	fmt.Println()
+}
+
+// runCollectorPhase runs symbol collection on all parsed modules
+func (p *Pipeline) runCollectorPhase() error {
+	moduleNames := p.ctx.GetModuleNames()
+
+	for _, importPath := range moduleNames {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least parsed
+		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseParsed {
+			continue
+		}
+
+		// Run collector
+		collector.CollectModule(p.ctx, module)
+
+		// Advance to Collected phase
+		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseCollected) {
+			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCollected", importPath), nil)
+		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+		}
+	}
+
+	// Don't stop on collection errors - continue to type checking to find more errors
+	// if p.ctx.HasErrors() {
+	// 	return fmt.Errorf("symbol collection failed with errors")
+	// }
+
+	return nil
+}
+
+// runResolverPhase runs name resolution on all collected modules
+func (p *Pipeline) runResolverPhase() error {
+	moduleNames := p.ctx.GetModuleNames()
+
+	for _, importPath := range moduleNames {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least collected
+		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseCollected {
+			continue
+		}
+
+		// Run resolver
+		resolver.ResolveModule(p.ctx, module)
+
+		// Advance to Resolved phase
+		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseResolved) {
+			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseResolved", importPath), nil)
+		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+		}
+	}
+
+	// Don't stop on resolution errors - continue to type checking to find more errors
+	// if p.ctx.HasErrors() {
+	// 	return fmt.Errorf("resolution failed with errors")
+	// }
+
+	return nil
+}
+
+// runTypeCheckerPhase runs type checking on all resolved modules
+func (p *Pipeline) runTypeCheckerPhase() error {
+	moduleNames := p.ctx.GetModuleNames()
+
+	for _, importPath := range moduleNames {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least resolved
+		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseResolved {
+			continue
+		}
+
+		// Run type checker
+		typechecker.CheckModule(p.ctx, module)
+
+		// Advance to TypeChecked phase
+		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseTypeChecked) {
+			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseTypeChecked", importPath), nil)
+		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+		}
+	}
+
+	if p.ctx.HasErrors() {
+		return fmt.Errorf("type checking failed with errors")
+	}
+
+	return nil
 }

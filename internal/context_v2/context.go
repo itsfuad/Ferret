@@ -123,8 +123,9 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	Symbols *SymbolTable // Module-level symbols
-	Imports []*Import    // Resolved imports
+	Symbols   *SymbolTable                     // Module-level symbols
+	Imports   []*Import                        // Resolved imports
+	ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
 	Content string // Raw source code (for diagnostics)
@@ -138,9 +139,7 @@ type Import struct {
 	Path         string           // Import path as written in source
 	Alias        string           // Optional alias (e.g., "import math as m")
 	ResolvedPath string           // Resolved to actual module import path
-	Module       *Module          // Resolved module (set during resolution phase)
 	Location     *source.Location // Source location for diagnostics
-	Symbols      []string         // Specific symbols if selective import
 }
 
 // SymbolTable holds symbols declared in a module or scope
@@ -154,9 +153,9 @@ type SymbolTable struct {
 type Symbol struct {
 	Name     string
 	Kind     SymbolKind
-	Type     types.TYPE_NAME
-	Exported bool     // Whether symbol is accessible from other modules
-	Decl     ast.Node // AST node that declared this symbol
+	Type     types.SemType // Semantic type of the symbol
+	Exported bool          // Whether symbol is accessible from other modules
+	Decl     ast.Node      // AST node that declared this symbol
 }
 
 // SymbolKind categorizes symbols
@@ -315,19 +314,18 @@ func (ctx *CompilerContext) loadBuiltinModules() {
 
 // registerBuiltins populates the universe scope with built-in types
 func registerBuiltins(universe *SymbolTable) {
-	builtinTypes := []types.TYPE_NAME{
-		types.TYPE_I8, types.TYPE_I16, types.TYPE_I32, types.TYPE_I64,
-		types.TYPE_U8, types.TYPE_U16, types.TYPE_U32, types.TYPE_U64,
-		types.TYPE_F32, types.TYPE_F64,
-		types.TYPE_STRING, types.TYPE_BOOL, types.TYPE_NONE, types.TYPE_VOID,
-		types.TYPE_BYTE,
+	builtinTypes := []types.SemType{
+		types.TypeI8, types.TypeI16, types.TypeI32, types.TypeI64,
+		types.TypeU8, types.TypeU16, types.TypeU32, types.TypeU64,
+		types.TypeF32, types.TypeF64,
+		types.TypeString, types.TypeBool, types.TypeVoid,
 	}
 
-	for _, typeName := range builtinTypes {
-		universe.Declare(typeName.String(), &Symbol{
-			Name:     typeName.String(),
+	for _, typ := range builtinTypes {
+		universe.Declare(typ.String(), &Symbol{
+			Name:     typ.String(),
 			Kind:     SymbolType,
-			Type:     typeName,
+			Type:     typ,
 			Exported: true,
 		})
 	}
@@ -336,13 +334,13 @@ func registerBuiltins(universe *SymbolTable) {
 	universe.Declare("true", &Symbol{
 		Name:     "true",
 		Kind:     SymbolConstant,
-		Type:     types.TYPE_BOOL,
+		Type:     types.TypeBool,
 		Exported: true,
 	})
 	universe.Declare("false", &Symbol{
 		Name:     "false",
 		Kind:     SymbolConstant,
-		Type:     types.TYPE_BOOL,
+		Type:     types.TypeBool,
 		Exported: true,
 	})
 }

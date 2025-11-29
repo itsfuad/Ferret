@@ -1,0 +1,20 @@
+// Test literal overflow detection
+
+// Test 1: i8 overflow
+let a: i8 = 127;   // OK: max value for i8
+let b: i8 = 128;   // Error: overflows i8 (range: -128 to 127)
+let c: i8 = -128;  // OK: min value for i8
+let d: i8 = -129;  // Error: underflows i8
+
+// Test 2: u8 overflow (unsigned)
+let e: u8 = 255;   // OK: max value for u8
+let f: u8 = 256;   // Error: overflows u8 (range: 0 to 255)
+let g: u8 = -1;    // Error: u8 cannot hold negative values
+
+// Test 3: i16 overflow
+let h: i16 = 32767;   // OK: max value for i16
+let i: i16 = 32768;   // Error: overflows i16
+
+// Test 4: Values that fit
+let j: i32 = 1000;    // OK
+let k: i64 = 999999;  // OK

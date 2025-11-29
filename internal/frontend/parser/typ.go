@@ -87,7 +87,7 @@ func (p *Parser) parseType() ast.TypeNode {
 	if p.match(lexer.NOT_TOKEN) {
 		notToken := p.advance() // consume '!'
 
-		var errorType ast.TypeNode
+		var resultType ast.TypeNode
 		var endPos *source.Position
 
 		// Check if error type is provided (T ! E) or use default (T!)
@@ -95,24 +95,24 @@ func (p *Parser) parseType() ast.TypeNode {
 		// to Error struct or same type as success type
 		if !p.match(lexer.SEMICOLON_TOKEN, lexer.CLOSE_PAREN, lexer.COMMA_TOKEN, lexer.OPEN_CURLY) {
 			// Error type is explicitly provided
-			errorType = p.parseType()
-			if errorType != nil && errorType.Loc() != nil {
-				endPos = errorType.Loc().End
+			resultType = p.parseType()
+			if resultType != nil && resultType.Loc() != nil {
+				endPos = resultType.Loc().End
 			} else {
 				endPos = &notToken.End
 			}
 		} else {
 			// No error type provided, use default 'str'
-			errorType = &ast.IdentifierExpr{
+			resultType = &ast.IdentifierExpr{
 				Name:     "str",
 				Location: *source.NewLocation(&notToken.End, &notToken.End),
 			}
 			endPos = &notToken.End
 		}
 
-		t = &ast.ErrorType{
+		t = &ast.ResultType{
 			Value:    t,
-			Error:    errorType,
+			Error:    resultType,
 			Location: *source.NewLocation(t.Loc().Start, endPos),
 		}
 	}
@@ -269,7 +269,7 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 	methods := []ast.Field{}
 
 	for !(p.match(lexer.CLOSE_CURLY) || p.isAtEnd()) {
-		
+
 		// funcname (...) -> ...
 
 		name := p.parseIdentifier()

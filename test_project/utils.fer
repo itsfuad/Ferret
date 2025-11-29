@@ -12,3 +12,9 @@ fn multiply(a: i32, b: i32) -> i32 {
 
 
     };
+
+let a : i32 = 10;
+
+
+//let a := 10;
+let b : str = a;

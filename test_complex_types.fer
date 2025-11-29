@@ -1,0 +1,35 @@
+// Test complex types with the new Type system
+
+// Arrays
+let arr: []i32 = [];
+let nums: []i32 = [1, 2, 3];
+
+// Optional types (implicit wrapping)
+let opt: i32? = 42;
+let maybeStr: str? = "hello";
+
+// Struct literals (anonymous)
+let point: struct { .x: f64, .y: f64 } = { .x = 1.0, .y = 2.0 };
+
+// Named struct with cast
+type Point struct {
+    .x: f64,
+    .y: f64
+};
+
+let p: Point = { .x = 3.0, .y = 4.0 } as Point;
+
+// Nested complex types
+let matrix: [][]f64 = [];
+let optArray: []i32? = [];
+
+fn main() -> void {
+    let x: i32 = 10;
+    let y: i32 = 20;
+    
+    // Optional type implicit wrapping in function
+    let maybeNum: i32? = 100;
+    
+    // Array of structs
+    let points: []Point = [];
+}

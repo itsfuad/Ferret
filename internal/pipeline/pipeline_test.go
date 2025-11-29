@@ -43,10 +43,10 @@ func TestPipelineBasic(t *testing.T) {
 		t.Errorf("Expected 1 module, got %d", ctx.ModuleCount())
 	}
 
-	// Verify module is parsed
+	// Verify module has advanced through the pipeline (at least parsed, possibly further)
 	phase := ctx.GetModulePhase(ctx.EntryModule)
-	if phase != context_v2.PhaseParsed {
-		t.Errorf("Expected PhaseParsed, got %v", phase)
+	if phase < context_v2.PhaseParsed {
+		t.Errorf("Expected at least PhaseParsed, got %v", phase)
 	}
 }
 

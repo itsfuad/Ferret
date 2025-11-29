@@ -1,0 +1,50 @@
+// Test file with large struct to demonstrate parallel field processing
+
+type LargeStruct struct {
+    .field01: i32,
+    .field02: i32,
+    .field03: i32,
+    .field04: i32,
+    .field05: i32,
+    .field06: i32,
+    .field07: i32,
+    .field08: i32,
+    .field09: i32,
+    .field10: i32,
+    .field11: f64,
+    .field12: f64,
+    .field13: f64,
+    .field14: f64,
+    .field15: f64,
+    .field16: str,
+    .field17: str,
+    .field18: bool,
+    .field19: bool,
+    .field20: i64
+};
+
+// Function with many parameters to test parallel parameter processing
+fn calculate(
+    a: i32, b: i32, c: i32, d: i32, e: i32,
+    f: i32, g: i32, h: i32, i: i32, j: i32,
+    k: f64, l: f64, m: f64, n: f64, o: f64
+) -> i64 {
+    a;
+}
+
+// Nested struct types
+type Inner struct {
+    .x: i32,
+    .y: i32,
+    .z: i32
+};
+
+type Outer struct {
+    .a: Inner,
+    .b: Inner,
+    .c: Inner,
+    .d: i64,
+    .e: f64,
+    .f: str,
+    .g: bool
+};

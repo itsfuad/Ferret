@@ -1,0 +1,10 @@
+// Test redeclaration error handling
+
+let x: i32 = 10;
+let x: i32 = 20;  // Redeclaration error
+
+// This should still be checked
+let y: i8 = 300;  // Overflow error
+
+// This should also still be checked
+let z: str = 42;  // Type mismatch error

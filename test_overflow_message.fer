@@ -1,0 +1,7 @@
+// Test overflow error messages
+
+let a: i8 = 200;     // Needs at least u8 or i16
+let b: i8 = -200;    // Needs at least i16
+let c: i16 = 50000;  // Needs at least u16 or i32
+let d: u8 = -1;      // Needs at least i8
+let e: u16 = 70000;  // Needs at least u32 or i32
