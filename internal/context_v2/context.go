@@ -128,6 +128,9 @@ type Module struct {
 
 	// Source metadata
 	Content string // Raw source code (for diagnostics)
+
+	// Concurrency control
+	Mu sync.Mutex // Protects field updates during parallel parsing
 }
 
 // Import represents a resolved import statement
@@ -527,6 +530,8 @@ func (ctx *CompilerContext) HasModule(importPath string) bool {
 
 // GetModulePhase returns the current phase of a module
 func (ctx *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
 	if module, exists := ctx.Modules[importPath]; exists {
 		return module.Phase
 	}
@@ -535,8 +540,12 @@ func (ctx *CompilerContext) GetModulePhase(importPath string) ModulePhase {
 
 // SetModulePhase updates the phase of a module
 func (ctx *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
 	if module, exists := ctx.Modules[importPath]; exists {
+		module.Mu.Lock()
 		module.Phase = phase
+		module.Mu.Unlock()
 	}
 }
 
@@ -580,6 +589,13 @@ func (ctx *CompilerContext) AddDependency(importer, imported string) error {
 	// Check for cycle before adding
 	if cycle := ctx.findCycle(imported, importer); cycle != nil {
 		return fmt.Errorf("circular import detected: %s", formatCycle(cycle))
+	}
+
+	// Check if dependency already exists (deduplicate)
+	for _, existing := range ctx.DepGraph[importer] {
+		if existing == imported {
+			return nil // Already added, skip
+		}
 	}
 
 	// Add dependency

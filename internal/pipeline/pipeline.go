@@ -142,9 +142,14 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 		var err error
 		filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
 		if err != nil {
+			// Use current filePath for entry module errors (when requestedFrom is empty)
+			errorFile := requestedFrom
+			if errorFile == "" {
+				errorFile = filePath
+			}
 			p.ctx.Diagnostics.Add(
 				diagnostics.NewError(err.Error()).
-					WithPrimaryLabel(requestedFrom, requestedLocation, ""),
+					WithPrimaryLabel(errorFile, requestedLocation, ""),
 			)
 			return // Fail but mark as done
 		}
@@ -152,18 +157,25 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 		contentBytes, err := os.ReadFile(filePath)
 		if err != nil {
 			errMsg := fmt.Sprintf("cannot read file %s: %v", filePath, err)
+			// Use current filePath for entry module errors (when requestedFrom is empty)
+			errorFile := requestedFrom
+			if errorFile == "" {
+				errorFile = filePath
+			}
 			p.ctx.Diagnostics.Add(
 				diagnostics.NewError(errMsg).
-					WithPrimaryLabel(requestedFrom, requestedLocation, ""),
+					WithPrimaryLabel(errorFile, requestedLocation, ""),
 			)
 			return // Fail but mark as done
 		}
 		content = string(contentBytes)
 
-		// Update module info
+		// Update module info with lock
+		module.Mu.Lock()
 		module.FilePath = filePath
 		module.Type = modType
 		module.Content = content
+		module.Mu.Unlock()
 	}
 
 	// Add source content for diagnostics
@@ -173,6 +185,13 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	tokenizer := lexer.New(filePath, content)
 	tokens := tokenizer.Tokenize(false)
 
+	// Report lexer errors as diagnostics
+	for _, lexErr := range tokenizer.Errors {
+		p.ctx.Diagnostics.Add(
+			diagnostics.NewError(lexErr.Error()),
+		)
+	}
+
 	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseLexed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", importPath), nil)
 		return // Fail but mark as done
@@ -181,7 +200,9 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	// Parse
 	diag := diagnostics.NewDiagnosticBag(filePath)
 	astModule := parser.Parse(tokens, filePath, diag)
+	module.Mu.Lock()
 	module.AST = astModule
+	module.Mu.Unlock()
 
 	// Merge diagnostics
 	for _, d := range diag.Diagnostics() {

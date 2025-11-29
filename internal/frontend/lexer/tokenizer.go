@@ -190,7 +190,11 @@ func (lex *Lexer) Tokenize(debug bool) []Token {
 		}
 
 		if !matched {
-			panic(fmt.Errorf("Lexer error: Unrecognized token at %s:%d:%d\n%s", lex.FilePath, lex.Position.Line, lex.Position.Column, lex.remainder()))
+			// Add error diagnostic instead of panic
+			errMsg := fmt.Sprintf("unrecognized character '%c'", lex.remainder()[0])
+			lex.Errors = append(lex.Errors, fmt.Errorf("%s at %s:%d:%d", errMsg, lex.FilePath, lex.Position.Line, lex.Position.Column))
+			// Skip the bad character and continue tokenizing to find more errors
+			lex.advance(string(lex.remainder()[0]))
 		}
 	}
 

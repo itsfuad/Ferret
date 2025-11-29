@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"compiler/colors"
 	"compiler/internal/source"
@@ -22,6 +23,7 @@ const (
 // SourceCache caches source file contents for error reporting
 type SourceCache struct {
 	files map[string][]string
+	mu    sync.RWMutex // Protects files map during concurrent access
 }
 
 func NewSourceCache() *SourceCache {
@@ -31,12 +33,18 @@ func NewSourceCache() *SourceCache {
 // AddSource adds source content to the cache for a virtual file path
 func (sc *SourceCache) AddSource(filepath, content string) {
 	lines := strings.Split(content, "\n")
+	sc.mu.Lock()
 	sc.files[filepath] = lines
+	sc.mu.Unlock()
 }
 
 // GetLine retrieves a specific line from a source file
 func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
-	if lines, ok := sc.files[filepath]; ok {
+	sc.mu.RLock()
+	lines, ok := sc.files[filepath]
+	sc.mu.RUnlock()
+	
+	if ok {
 		if line > 0 && line <= len(lines) {
 			return lines[line-1], nil
 		}
@@ -49,7 +57,7 @@ func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 	}
 	defer file.Close()
 
-	lines := make([]string, 0)
+	lines = make([]string, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
@@ -58,7 +66,9 @@ func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 		return "", err
 	}
 
+	sc.mu.Lock()
 	sc.files[filepath] = lines
+	sc.mu.Unlock()
 
 	if line > 0 && line <= len(lines) {
 		return lines[line-1], nil
