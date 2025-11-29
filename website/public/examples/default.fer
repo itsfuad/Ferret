@@ -1,55 +1,23 @@
-// Welcome to Ferret Playground!
-// Try editing this code and click "Run" to see the results
 
-type Point struct {
-    .x: f64,
-    .y: f64
-};
+// Test 1: Lossless widening conversion (should work)
+let a: i32 = 10;
+let b: i64 = a;  // OK: i32 to i64 is lossless
 
-fn (p: Point) distance() -> f64 {
-    return (p.x * p.x + p.y * p.y);
-}
+// Test 2: Lossy conversion (should error with helpful message)
+let c: i64 = 1000000;
+let d: i32 = c;  // Error: requires explicit cast
+let a : str = "hi"; // Error: redeclaration
 
-let origin := {.x = 0.0, .y = 0.0} as Point;
-let point := {.x = 3.0, .y = 4.0} as Point;
+// Test 3: UNTYPED literal contextualization
+let e: i8 = 100;  // OK: literal 100 fits in i8
+let f: i8 = 200;  // Error: 200 doesn't fit in i8 (-128 to 127)
 
-let dist := point.distance();
+// Test 4: Binary expression with mixed types
+let g: i32 = 10;
+let h: i64 = 20;
+let i := g + h;  // OK: result is i64 (wider type)
 
-type Shape interface {
-    area() -> f64,
-    perimeter() -> f64,
-    lol() // Remove this line to fix the error
-};
-
-type Rectangle struct {
-    .width: f64,
-    .height: f64
-};
-
-fn (r: Rectangle) area() -> f64 {
-    return r.width * r.height;
-}
-fn (r: Rectangle) perimeter() -> f64 {
-    return 2.0 * (r.width + r.height);
-}
-
-type Circle struct {
-    .radius: f64
-};
-fn (c: Circle) area() -> f64 {
-    return 3.14159 * c.radius * c.radius;
-}
-fn (c: Circle) perimeter() -> f64 {
-    return 2.0 * 3.14159 * c.radius;
-}
-
-let rect := {.width = 10.0, .height = 5.0} as Rectangle;
-let circle := {.radius = 3.0} as Circle;
-
-fn printShapeInfo(s: Shape) -> str {
-    return "Area: " + s.area().to_str() + ", Perimeter: " + s.perimeter().to_str();
-}
-
-printShapeInfo(rect);
-printShapeInfo(circle);
-printShapeInfo(2);
+// Test 5: Incompatible types
+let s: str = "hello";
+let n: i32 = 42;
+let bad := s + n;  // Error: cannot add str and i32

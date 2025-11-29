@@ -7,6 +7,7 @@ let b: i64 = a;  // OK: i32 to i64 is lossless
 // Test 2: Lossy conversion (should error with helpful message)
 let c: i64 = 1000000;
 let d: i32 = c;  // Error: requires explicit cast
+let a : str = "hi"; // Error: redeclaration
 
 // Test 3: UNTYPED literal contextualization
 let e: i8 = 100;  // OK: literal 100 fits in i8
