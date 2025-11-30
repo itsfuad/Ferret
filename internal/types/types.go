@@ -36,7 +36,7 @@ type PrimitiveType struct {
 	size int // size in bytes
 }
 
-func NewPrimitive(name TYPE_NAME) SemType {
+func NewPrimitive(name TYPE_NAME) *PrimitiveType {
 	size := getPrimitiveSize(name)
 	return &PrimitiveType{name: name, size: size}
 }
@@ -89,7 +89,7 @@ type ArrayType struct {
 	Length  int // -1 for dynamic arrays []T
 }
 
-func NewArray(element SemType, length int) SemType {
+func NewArray(element SemType, length int) *ArrayType {
 	return &ArrayType{Element: element, Length: length}
 }
 
@@ -126,7 +126,7 @@ type MapType struct {
 	Value SemType
 }
 
-func NewMap(key, value SemType) SemType {
+func NewMap(key, value SemType) *MapType {
 	return &MapType{Key: key, Value: value}
 }
 
@@ -166,7 +166,7 @@ type FunctionType struct {
 	Return SemType
 }
 
-func NewFunction(params []ParamType, ret SemType) SemType {
+func NewFunction(params []ParamType, ret SemType) *FunctionType {
 	return &FunctionType{Params: params, Return: ret}
 }
 
@@ -217,7 +217,7 @@ type OptionalType struct {
 	Inner SemType
 }
 
-func NewOptional(inner SemType) SemType {
+func NewOptional(inner SemType) *OptionalType {
 	return &OptionalType{Inner: inner}
 }
 
@@ -248,7 +248,7 @@ type ResultType struct {
 	Err SemType
 }
 
-func NewResult(ok, err SemType) SemType {
+func NewResult(ok, err SemType) *ResultType {
 	return &ResultType{Ok: ok, Err: err}
 }
 
@@ -290,7 +290,7 @@ type StructType struct {
 	Fields []StructField
 }
 
-func NewStruct(name string, fields []StructField) SemType {
+func NewStruct(name string, fields []StructField) *StructType {
 	return &StructType{Name: name, Fields: fields}
 }
 
@@ -355,7 +355,7 @@ type EnumType struct {
 	Variants []EnumVariant
 }
 
-func NewEnum(name string, variants []EnumVariant) SemType {
+func NewEnum(name string, variants []EnumVariant) *EnumType {
 	return &EnumType{Name: name, Variants: variants}
 }
 

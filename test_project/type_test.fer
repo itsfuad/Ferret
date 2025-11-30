@@ -25,7 +25,7 @@ let bad := s + n;  // Error: cannot add str and i32
 
 // Test 6: Function call with return type
 fn getNumber() -> i32 {
-    return 42;
+    return "";
 }
 
 let result := getNumber();  // Should infer i32 from return type

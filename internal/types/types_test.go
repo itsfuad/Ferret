@@ -166,22 +166,22 @@ func TestFunctionTypeEquals(t *testing.T) {
 	fn1 := NewFunction([]ParamType{
 		{Name: "a", Type: TypeI32},
 		{Name: "b", Type: TypeString},
-	}, TypeBool).(*FunctionType)
+	}, TypeBool)
 	fn2 := NewFunction([]ParamType{
 		{Name: "a", Type: TypeI32},
-	}, TypeBool).(*FunctionType)
+	}, TypeBool)
 	fn3 := NewFunction([]ParamType{
 		{Name: "a", Type: TypeI32},
 		{Name: "b", Type: TypeI32},
-	}, TypeBool).(*FunctionType)
+	}, TypeBool)
 	fn4 := NewFunction([]ParamType{
 		{Name: "a", Type: TypeI32},
 		{Name: "b", Type: TypeString},
-	}, TypeBool).(*FunctionType)
+	}, TypeBool)
 	fn5 := NewFunction([]ParamType{
 		{Name: "x", Type: TypeI32},
 		{Name: "y", Type: TypeString},
-	}, TypeBool).(*FunctionType)
+	}, TypeBool)
 
 	tests := []struct {
 		name string
