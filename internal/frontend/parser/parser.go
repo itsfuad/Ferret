@@ -361,11 +361,29 @@ func (p *Parser) parseAdditive() ast.Expression {
 }
 
 func (p *Parser) parseMultiplicative() ast.Expression {
-	left := p.parseUnary()
+	left := p.parseExponentiation()
 
 	for p.match(lexer.MUL_TOKEN, lexer.DIV_TOKEN, lexer.MOD_TOKEN) {
 		op := p.advance()
-		right := p.parseUnary()
+		right := p.parseExponentiation()
+		left = &ast.BinaryExpr{
+			X:        left,
+			Op:       op,
+			Y:        right,
+			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+		}
+	}
+
+	return left
+}
+
+func (p *Parser) parseExponentiation() ast.Expression {
+	left := p.parseUnary()
+
+	// Right-associative: 2 ** 3 ** 2 = 2 ** (3 ** 2) = 512
+	if p.match(lexer.EXP_TOKEN) {
+		op := p.advance()
+		right := p.parseExponentiation() // Recursive call for right-associativity
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
