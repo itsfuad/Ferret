@@ -36,15 +36,6 @@ func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	}
 }
 
-// TODO: TYPE_NAME (string alias) is insufficient for complex types.
-// We need a proper Type interface hierarchy to represent:
-// - Generic types: Array<T>, Map<K,V>
-// - Function types: fn(i32, i32) -> i64
-// - Optional types: i32?
-// - Result types: i32 ! Error
-// - Struct/enum types with fields
-// This refactor should happen before implementing complex type features.
-
 // typeChecker holds state for type checking a module
 type typeChecker struct {
 	ctx          *context_v2.CompilerContext

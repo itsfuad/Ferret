@@ -17,4 +17,6 @@ let a : i32 = 10;
 
 
 //let a := 10;
-let b : str = a;
+//let b : str = a;
+
+let NAME := "Fuad";
