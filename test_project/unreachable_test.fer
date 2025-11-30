@@ -1,0 +1,9 @@
+// Test unreachable code range reporting
+
+fn test_unreachable() -> i32 {
+    return 42;
+    let x := 10;
+    let y := 20;
+    let z := x + y;
+    return z;
+}

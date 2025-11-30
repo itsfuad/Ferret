@@ -1,0 +1,18 @@
+// Test const and var validation
+
+// Valid: const with initializer
+const x := 42;
+const y: i32 = 100;
+
+fn test() {
+    const z : i32;     // Error: const must be initialized (semantic)
+    z = 20;            // Error: cannot reassign constant (semantic)
+    
+    let v: i32;        // OK: var with type, no initializer
+    v = 30;            // OK: assign to variable
+}
+
+// Valid: var without initializer and reassignment
+let a: i32;
+let b := 5;
+b = 10; // OK: variables can be reassigned

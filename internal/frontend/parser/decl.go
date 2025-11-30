@@ -70,18 +70,8 @@ func (p *Parser) parseDeclItem(isConst bool) ast.DeclItem {
 		if p.match(lexer.EQUALS_TOKEN) {
 			p.advance()
 			decl.Value = p.parseExpr()
-		} else if isConst {
-			// Constants MUST have an initializer
-			peek := p.peek()
-			p.diagnostics.Add(
-				diagnostics.NewError("missing values for constant").
-					WithCode(diagnostics.ErrUnexpectedToken).
-					WithNote("Constants must have an initializer").
-					WithPrimaryLabel(p.filepath, source.NewLocation(&peek.Start, &peek.End), "add initial value"),
-			)
-			// Continue parsing to gather more errors
 		}
-		// For variables, no initializer is OK (decl.Value remains nil)
+		// No initializer is OK at parse time - semantic phase will validate
 		return decl
 	}
 
@@ -103,12 +93,9 @@ func (p *Parser) parseDeclItem(isConst bool) ast.DeclItem {
 		return decl
 	}
 
-	if isConst {
-		p.error("expected ':' or ':=' in constant declaration")
-	} else {
-		p.error("expected ':' or ':=' in variable declaration")
-	}
-
+	// No type, no initializer - valid syntax, semantic phase will validate
+	// This allows: let a, b: i32, c := 5;
+	// where 'a' has neither type nor value (semantic error)
 	return decl
 }
 

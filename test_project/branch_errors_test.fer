@@ -1,0 +1,53 @@
+// Test branch-specific error messages
+
+// Case 1: Missing return in else
+fn test_else_missing(x: i32) -> i32 {
+    if x > 0 {
+        return 1;
+    } else {
+        // Missing return here - should say "missing return in else at line 7"
+    }
+}
+
+// Case 2: Missing return in then
+fn test_then_missing(x: i32) -> i32 {
+    if x > 0 {
+        // Missing return here
+    } else {
+        return -1;
+    }
+}
+
+// Case 3: Missing return in both branches
+fn test_both_missing(x: i32) -> i32 {
+    if x > 0 {
+        // Missing return
+    } else {
+        // Missing return
+    }
+}
+
+// Case 4: Missing return in nested else
+fn test_nested(x: i32, y: i32) -> i32 {
+    if x > 0 {
+        if y > 0 {
+            return 1;
+        } else {
+            // Missing return here
+        }
+    } else {
+        if x == 0 {
+
+        } else {
+            
+        }
+    }
+}
+
+// Case 5: No else clause (implicit fallthrough)
+fn test_no_else(x: i32) -> i32 {
+    if x > 0 {
+        return 1;
+    }
+    // Missing return here - should not blame a specific branch
+}

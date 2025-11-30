@@ -4,6 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/controlflow"
 	"compiler/internal/types"
 	"fmt"
 	"runtime"
@@ -117,9 +118,13 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 		sym, ok := tc.currentScope.Lookup(name)
 		if !ok {
 			// This is a local variable declaration - create a new symbol
+			kind := context_v2.SymbolVariable
+			if isConst {
+				kind = context_v2.SymbolConstant
+			}
 			sym = &context_v2.Symbol{
 				Name:     name,
-				Kind:     context_v2.SymbolVariable,
+				Kind:     kind,
 				Type:     types.TypeUnknown,
 				Exported: false,
 				Decl:     item.Name, // Use the identifier as the Decl node
@@ -143,6 +148,13 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 			if item.Value != nil {
 				// Pass item.Name for secondary label (variable location)
 				tc.checkAssignLike(declType, item.Name, item.Value)
+			} else if isConst {
+				// Constants must have an initializer even with explicit type
+				tc.ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
+						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "constants require an initializer").
+						WithHelp("provide a value: const x: i32 = 42"),
+				)
 			}
 		} else if item.Value != nil {
 			// Type inference from initializer
@@ -156,10 +168,19 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 			sym.Type = rhsType
 		} else {
 			// No type and no value - error
-			tc.ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("cannot infer type for '%s'", name)).
-					WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "missing type or initializer"),
-			)
+			if isConst {
+				// Constants must have an initializer
+				tc.ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
+						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "constants require an initializer").
+						WithHelp("provide a value: const x := 42 or const x: i32 = 42"),
+				)
+			} else {
+				tc.ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot infer type for '%s'", name)).
+						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "missing type or initializer"),
+				)
+			}
 			sym.Type = types.TypeUnknown
 		}
 	}
@@ -167,10 +188,13 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 
 // checkFuncDecl type checks a function declaration
 func (tc *typeChecker) checkFuncDecl(decl *ast.FuncDecl) {
+	// Validate function parameters (variadic rules, duplicates, etc.)
+	ValidateFunctionParams(tc.ctx, tc.mod, decl)
+
 	// Create a new scope for the function body
 	funcScope := context_v2.NewSymbolTable(tc.currentScope)
 
-	// Add parameters to the function scope
+	// Add parameters to the function scope with type information
 	if decl.Type != nil && decl.Type.Params != nil {
 		for _, param := range decl.Type.Params {
 			if param.Name != nil {
@@ -186,17 +210,40 @@ func (tc *typeChecker) checkFuncDecl(decl *ast.FuncDecl) {
 			}
 		}
 	}
+
 	// Check the body with the function scope
 	if decl.Body != nil {
 		prevScope := tc.currentScope
 		tc.currentScope = funcScope
 		tc.checkBlock(decl.Body)
 		tc.currentScope = prevScope
+
+		// Build control flow graph for the function
+		cfgBuilder := controlflow.NewCFGBuilder(tc.ctx, tc.mod)
+		cfg := cfgBuilder.BuildFunctionCFG(decl)
+
+		// Analyze return paths
+		controlflow.AnalyzeReturns(tc.ctx, tc.mod, decl, cfg)
 	}
 }
 
 // checkAssignStmt type checks an assignment statement
 func (tc *typeChecker) checkAssignStmt(stmt *ast.AssignStmt) {
+	// Check if we're trying to reassign a constant
+	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
+		if sym, found := tc.currentScope.Lookup(ident.Name); found {
+			if sym.Kind == context_v2.SymbolConstant {
+				tc.ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
+						WithPrimaryLabel(tc.mod.FilePath, stmt.Lhs.Loc(), "cannot modify constant").
+						WithSecondaryLabel(tc.mod.FilePath, sym.Decl.Loc(), "declared as constant here").
+						WithHelp("constants are immutable; use 'let' for mutable variables"),
+				)
+				return
+			}
+		}
+	}
+
 	// Get the type of the LHS
 	lhsType := tc.checkExpr(stmt.Lhs, types.TypeUnknown)
 
