@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"compiler/internal/frontend/ast"
+	"compiler/internal/table"
 	"compiler/internal/types"
 )
 
@@ -179,13 +180,13 @@ func TestCycleDetection(t *testing.T) {
 }
 
 func TestSymbolTable(t *testing.T) {
-	parent := NewSymbolTable(nil)
-	child := NewSymbolTable(parent)
+	parent := table.NewSymbolTable(nil)
+	child := table.NewSymbolTable(parent)
 
 	// Add symbol to parent
-	parentSym := &Symbol{
+	parentSym := &table.Symbol{
 		Name:     "x",
-		Kind:     SymbolVariable,
+		Kind:     table.SymbolVariable,
 		Type:     types.TypeI32,
 		Exported: true,
 	}
@@ -212,15 +213,15 @@ func TestSymbolTable(t *testing.T) {
 	}
 
 	// Try to redeclare in parent (should fail)
-	err = parent.Declare("x", &Symbol{Name: "x", Kind: SymbolConstant})
+	err = parent.Declare("x", &table.Symbol{Name: "x", Kind: table.SymbolConstant})
 	if err == nil {
 		t.Error("Expected error when redeclaring symbol")
 	}
 
 	// Add symbol to child (shadowing)
-	childSym := &Symbol{
+	childSym := &table.Symbol{
 		Name:     "x",
-		Kind:     SymbolConstant,
+		Kind:     table.SymbolConstant,
 		Type:     types.TypeI64,
 		Exported: false,
 	}
@@ -236,7 +237,7 @@ func TestSymbolTable(t *testing.T) {
 		t.Error("Expected to find symbol in child")
 	}
 
-	if found.Kind != SymbolConstant {
+	if found.Kind != table.SymbolConstant {
 		t.Errorf("Expected SymbolConstant, got %v", found.Kind)
 	}
 
@@ -246,7 +247,7 @@ func TestSymbolTable(t *testing.T) {
 		t.Error("Expected to find symbol in parent")
 	}
 
-	if found.Kind != SymbolVariable {
+	if found.Kind != table.SymbolVariable {
 		t.Errorf("Expected SymbolVariable, got %v", found.Kind)
 	}
 }
@@ -338,7 +339,7 @@ func TestAddModuleWithAST(t *testing.T) {
 		Type:     ModuleLocal,
 		Phase:    PhaseParsed,
 		AST:      astModule,
-		Symbols:  NewSymbolTable(ctx.Universe),
+		Scope:    table.NewSymbolTable(ctx.Universe),
 	}
 
 	ctx.AddModule("test/module", module)
@@ -352,7 +353,7 @@ func TestAddModuleWithAST(t *testing.T) {
 		t.Error("Expected AST to be set")
 	}
 
-	if retrieved.Symbols == nil {
+	if retrieved.Scope == nil {
 		t.Error("Expected symbol table to be set")
 	}
 }

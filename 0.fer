@@ -3,4 +3,13 @@ let difference := 10 - 5;   // 5
 let product := 10 * 5;      // 50
 let quotient := 10 / 5;     // 2
 let remainder := 10 % 3;    // 1 (10 divided by 3 is 3 remainder 1)
-let power := 2 ** 4;        // 16 (2 × 2 × 2 × 2
+let power := 2 ** 4;
+
+let a : str = "hi";
+
+fn add(a: i32, b: str) -> i32 {
+    let x : i32 = b;
+    return a + b;
+}
+
+//let pi : f32 = math::PI;

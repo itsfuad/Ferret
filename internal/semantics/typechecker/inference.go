@@ -1,6 +1,7 @@
 package typechecker
 
 import (
+	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
@@ -12,41 +13,41 @@ import (
 // inferExprType determines the type of an expression based on its structure and value.
 // This is pure type inference without any compatibility checking.
 // Returns TYPE_UNTYPED for literals that haven't been contextualized yet.
-func (tc *typeChecker) inferExprType(expr ast.Expression) types.SemType {
+func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) types.SemType {
 	if expr == nil {
 		return types.TypeUnknown
 	}
 
 	switch e := expr.(type) {
 	case *ast.BasicLit:
-		return tc.inferLiteralType(e)
+		return inferLiteralType(e)
 
 	case *ast.IdentifierExpr:
-		return tc.inferIdentifierType(e)
+		return inferIdentifierType(ctx, mod, e)
 
 	case *ast.BinaryExpr:
-		return tc.inferBinaryExprType(e)
+		return inferBinaryExprType(ctx, mod, e)
 
 	case *ast.UnaryExpr:
-		return tc.inferUnaryExprType(e)
+		return inferUnaryExprType(ctx, mod, e)
 
 	case *ast.CallExpr:
-		return tc.inferCallExprType(e)
+		return inferCallExprType(ctx, mod, e)
 
 	case *ast.IndexExpr:
-		return tc.inferIndexExprType(e)
+		return inferIndexExprType(e)
 
 	case *ast.SelectorExpr:
-		return tc.inferSelectorExprType(e)
+		return inferSelectorExprType(e)
 
 	case *ast.CastExpr:
-		return tc.inferCastExprType(e)
+		return inferCastExprType(e)
 
 	case *ast.ParenExpr:
-		return tc.inferExprType(e.X)
+		return inferExprType(ctx, mod, e.X)
 
 	case *ast.CompositeLit:
-		return tc.inferCompositeLitType(e)
+		return inferCompositeLitType(e)
 
 	default:
 		return types.TypeUnknown
@@ -54,7 +55,7 @@ func (tc *typeChecker) inferExprType(expr ast.Expression) types.SemType {
 }
 
 // inferLiteralType determines the type of a literal
-func (tc *typeChecker) inferLiteralType(lit *ast.BasicLit) types.SemType {
+func inferLiteralType(lit *ast.BasicLit) types.SemType {
 	switch lit.Kind {
 	case ast.INT:
 		// Integer literals are UNTYPED until contextualized
@@ -76,13 +77,13 @@ func (tc *typeChecker) inferLiteralType(lit *ast.BasicLit) types.SemType {
 }
 
 // inferIdentifierType looks up an identifier's declared type
-func (tc *typeChecker) inferIdentifierType(ident *ast.IdentifierExpr) types.SemType {
-	sym, ok := tc.currentScope.Lookup(ident.Name)
+func inferIdentifierType(ctx *context_v2.CompilerContext, mod *context_v2.Module, ident *ast.IdentifierExpr) types.SemType {
+	sym, ok := mod.Scope.Lookup(ident.Name)
 	if !ok {
 		// Report error with good context
-		tc.ctx.Diagnostics.Add(
+		ctx.Diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("undefined: %s", ident.Name)).
-				WithPrimaryLabel(tc.mod.FilePath, ident.Loc(), "not declared in this scope"),
+				WithPrimaryLabel(mod.FilePath, ident.Loc(), "not declared in this scope"),
 		)
 		return types.TypeUnknown
 	}
@@ -90,9 +91,9 @@ func (tc *typeChecker) inferIdentifierType(ident *ast.IdentifierExpr) types.SemT
 }
 
 // inferBinaryExprType determines the result type of a binary expression
-func (tc *typeChecker) inferBinaryExprType(expr *ast.BinaryExpr) types.SemType {
-	lhsType := tc.getOrInferType(expr.X)
-	rhsType := tc.getOrInferType(expr.Y)
+func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.BinaryExpr) types.SemType {
+	lhsType := inferExprType(ctx, mod, expr.X)
+	rhsType := inferExprType(ctx, mod, expr.Y)
 
 	// Handle UNTYPED operands
 	if lhsType.Equals(types.TypeUntyped) && rhsType.Equals(types.TypeUntyped) {
@@ -127,8 +128,8 @@ func (tc *typeChecker) inferBinaryExprType(expr *ast.BinaryExpr) types.SemType {
 }
 
 // inferUnaryExprType determines the result type of a unary expression
-func (tc *typeChecker) inferUnaryExprType(expr *ast.UnaryExpr) types.SemType {
-	xType := tc.getOrInferType(expr.X)
+func inferUnaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.UnaryExpr) types.SemType {
+	xType := inferExprType(ctx, mod, expr.X)
 
 	switch expr.Op.Kind {
 	case lexer.MINUS_TOKEN, lexer.PLUS_TOKEN:
@@ -145,10 +146,10 @@ func (tc *typeChecker) inferUnaryExprType(expr *ast.UnaryExpr) types.SemType {
 }
 
 // inferCallExprType determines the return type of a function call
-func (tc *typeChecker) inferCallExprType(expr *ast.CallExpr) types.SemType {
+func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
 	// Look up the function
 	if ident, ok := expr.Fun.(*ast.IdentifierExpr); ok {
-		sym, exists := tc.currentScope.Lookup(ident.Name)
+		sym, exists := mod.Scope.Lookup(ident.Name)
 		if !exists {
 			return types.TypeUnknown
 		}
@@ -156,7 +157,7 @@ func (tc *typeChecker) inferCallExprType(expr *ast.CallExpr) types.SemType {
 		// Get the function declaration
 		if funcDecl, ok := sym.Decl.(*ast.FuncDecl); ok {
 			if funcDecl.Type != nil && funcDecl.Type.Result != nil {
-				return tc.typeFromTypeNode(funcDecl.Type.Result)
+				return typeFromTypeNode(funcDecl.Type.Result)
 			}
 		}
 	}
@@ -165,36 +166,28 @@ func (tc *typeChecker) inferCallExprType(expr *ast.CallExpr) types.SemType {
 }
 
 // inferIndexExprType determines the element type of an index expression
-func (tc *typeChecker) inferIndexExprType(expr *ast.IndexExpr) types.SemType {
+func inferIndexExprType(expr *ast.IndexExpr) types.SemType {
 	// TODO: Implement array/map element type extraction
 	return types.TypeUnknown
 }
 
 // inferSelectorExprType determines the type of a field access
-func (tc *typeChecker) inferSelectorExprType(expr *ast.SelectorExpr) types.SemType {
+func inferSelectorExprType(expr *ast.SelectorExpr) types.SemType {
 	// TODO: Implement struct field type lookup
 	return types.TypeUnknown
 }
 
 // inferCastExprType determines the target type of a cast
-func (tc *typeChecker) inferCastExprType(expr *ast.CastExpr) types.SemType {
-	return tc.typeFromTypeNode(expr.Type)
+func inferCastExprType(expr *ast.CastExpr) types.SemType {
+	return typeFromTypeNode(expr.Type)
 }
 
 // inferCompositeLitType determines the type of a composite literal
-func (tc *typeChecker) inferCompositeLitType(lit *ast.CompositeLit) types.SemType {
+func inferCompositeLitType(lit *ast.CompositeLit) types.SemType {
 	if lit.Type != nil {
-		return tc.typeFromTypeNode(lit.Type)
+		return typeFromTypeNode(lit.Type)
 	}
 	return types.TypeUnknown
-}
-
-// getOrInferType gets the cached type or infers it
-func (tc *typeChecker) getOrInferType(expr ast.Expression) types.SemType {
-	if t, ok := tc.exprTypes[expr]; ok {
-		return t
-	}
-	return tc.inferExprType(expr)
 }
 
 
@@ -241,7 +234,7 @@ func widerType(a, b types.SemType) types.SemType {
 }
 
 // finalizeUntyped converts an UNTYPED literal to a concrete default type
-func (tc *typeChecker) finalizeUntyped(expr ast.Expression) types.SemType {
+func finalizeUntyped(expr ast.Expression) types.SemType {
 	if lit, ok := expr.(*ast.BasicLit); ok {
 		switch lit.Kind {
 		case ast.INT:
@@ -256,7 +249,7 @@ func (tc *typeChecker) finalizeUntyped(expr ast.Expression) types.SemType {
 }
 
 // contextualizeUntyped applies contextual typing to an UNTYPED literal
-func (tc *typeChecker) contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
+func contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
 	switch lit.Kind {
 	case ast.INT:
 		// Try to fit into expected type

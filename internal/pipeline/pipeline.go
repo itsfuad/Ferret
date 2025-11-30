@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +17,7 @@ import (
 	"compiler/internal/semantics/resolver"
 	"compiler/internal/semantics/typechecker"
 	"compiler/internal/source"
+	"compiler/internal/table"
 )
 
 // Pipeline coordinates the compilation process
@@ -29,17 +29,12 @@ type Pipeline struct {
 
 	// wg tracks all parsing tasks
 	wg sync.WaitGroup
-
-	// sem bounds parallel parsing to CPU count
-	sem chan struct{}
 }
 
 // New creates a new compilation pipeline
 func New(ctx *context_v2.CompilerContext) *Pipeline {
-	numWorkers := runtime.NumCPU()
 	return &Pipeline{
 		ctx: ctx,
-		sem: make(chan struct{}, numWorkers),
 	}
 }
 
@@ -100,11 +95,9 @@ func (p *Pipeline) processModule(importPath, requestedFrom string, requestedLoca
 	}
 
 	p.wg.Add(1)
-	p.sem <- struct{}{} // acquire semaphore
 
 	go func() {
 		defer func() {
-			<-p.sem     // release semaphore
 			p.wg.Done() // mark task done
 		}()
 
@@ -122,11 +115,14 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 			ImportPath: importPath,
 			Type:       context_v2.ModuleLocal,
 			Phase:      context_v2.PhaseNotStarted,
-			Symbols:    context_v2.NewSymbolTable(p.ctx.Universe),
+			Scope:      table.NewSymbolTable(p.ctx.Universe),
 			Content:    "",
 			AST:        nil,
 		}
 		p.ctx.AddModule(importPath, module)
+		if p.ctx.Debug {
+			fmt.Printf("module '%s' parsed and added", importPath)
+		}
 	}
 
 	// Resolve import path to file path

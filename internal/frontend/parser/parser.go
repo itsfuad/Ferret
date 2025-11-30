@@ -138,11 +138,21 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 		Location: *source.NewLocation(&pathTok.Start, &pathTok.End),
 	}
 
+	alias := &ast.IdentifierExpr{}
+
+	if p.match(lexer.AS_TOKEN) {
+		p.advance()
+		al := p.expect(lexer.IDENTIFIER_TOKEN)
+		alias.Name = al.Value
+		alias.Location = *source.NewLocation(&al.Start, &al.End)
+	}
+
 	p.expect(lexer.SEMICOLON_TOKEN)
 
 	return &ast.ImportStmt{
-		Path:     path,
-		Location: p.makeLocation(start),
+		Path:     	path,
+		Alias: 		alias,
+		Location: 	p.makeLocation(start),
 	}
 }
 

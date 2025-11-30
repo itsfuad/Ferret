@@ -6,6 +6,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/table"
 	"strings"
 	"testing"
 )
@@ -14,7 +15,7 @@ import (
 func createTestContext() *context_v2.CompilerContext {
 	return &context_v2.CompilerContext{
 		Diagnostics: diagnostics.NewDiagnosticBag("test.fer"),
-		Universe:    context_v2.NewSymbolTable(nil),
+		Universe:    table.NewSymbolTable(nil),
 	}
 }
 

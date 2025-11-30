@@ -5,9 +5,9 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/controlflow"
+	"compiler/internal/table"
 	"compiler/internal/types"
 	"fmt"
-	"runtime"
 	"strconv"
 	"sync"
 )
@@ -15,82 +15,62 @@ import (
 // CheckModule performs type checking on a module.
 // It fills Symbol.Type for declarations and creates ExprTypes map for expressions.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
-	// Initialize ExprTypes map
-	if mod.ExprTypes == nil {
-		mod.ExprTypes = make(map[ast.Expression]types.SemType)
-	}
-
-	// Create a type checker instance
-	tc := &typeChecker{
-		ctx:          ctx,
-		mod:          mod,
-		exprTypes:    mod.ExprTypes,
-		currentScope: mod.Symbols, // Start with module scope
-	}
 
 	// Check all declarations in the module
 	if mod.AST != nil {
 		for _, node := range mod.AST.Nodes {
-			tc.checkNode(node)
+			checkNode(ctx, mod, node)
 		}
 	}
 }
 
-// typeChecker holds state for type checking a module
-type typeChecker struct {
-	ctx          *context_v2.CompilerContext
-	mod          *context_v2.Module
-	exprTypes    map[ast.Expression]types.SemType
-	currentScope *context_v2.SymbolTable // Current scope for name lookups
-}
-
 // checkNode type checks a single AST node
-func (tc *typeChecker) checkNode(node ast.Node) {
+func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
 	if node == nil {
 		return
 	}
 
 	switch n := node.(type) {
 	case *ast.VarDecl:
-		tc.checkVarDecl(n, false)
+		checkVarDecl(ctx, mod, n, false)
 	case *ast.ConstDecl:
-		tc.checkVarDecl(n, true)
+		checkVarDecl(ctx, mod, n, true)
 	case *ast.FuncDecl:
-		tc.checkFuncDecl(n)
+		checkFuncDecl(ctx, mod, n)
 	case *ast.AssignStmt:
-		tc.checkAssignStmt(n)
+		checkAssignStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
 		if n.Result != nil {
-			tc.checkExpr(n.Result, types.TypeUnknown)
+			checkExpr(ctx, mod, n.Result, types.TypeUnknown)
 		}
 	case *ast.IfStmt:
-		tc.checkExpr(n.Cond, types.TypeBool)
-		tc.checkBlock(n.Body)
+		checkExpr(ctx, mod, n.Cond, types.TypeBool)
+		checkBlock(ctx, mod, n.Body)
 		if n.Else != nil {
-			tc.checkNode(n.Else)
+			checkNode(ctx, mod, n.Else)
 		}
 	case *ast.ForStmt:
 		if n.Init != nil {
-			tc.checkNode(n.Init)
+			checkNode(ctx, mod, n.Init)
 		}
 		if n.Cond != nil {
-			tc.checkExpr(n.Cond, types.TypeBool)
+			checkExpr(ctx, mod, n.Cond, types.TypeBool)
 		}
 		if n.Post != nil {
-			tc.checkNode(n.Post)
+			checkNode(ctx, mod, n.Post)
 		}
-		tc.checkBlock(n.Body)
+		checkBlock(ctx, mod, n.Body)
 	case *ast.Block:
-		tc.checkBlock(n)
+		checkBlock(ctx, mod, n)
 	case *ast.DeclStmt:
-		tc.checkNode(n.Decl)
+		checkNode(ctx, mod, n.Decl)
 	case *ast.ExprStmt:
-		tc.checkExpr(n.X, types.TypeUnknown)
+		checkExpr(ctx, mod, n.X, types.TypeUnknown)
 	}
 }
 
 // checkVarDecl type checks variable/constant declarations
-func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
+func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl interface{}, isConst bool) {
 	var declItems []ast.DeclItem
 
 	switch d := decl.(type) {
@@ -106,24 +86,24 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 		name := item.Name.Name
 
 		// Get or create the symbol (module-level or local)
-		sym, ok := tc.currentScope.Lookup(name)
+		sym, ok := mod.Scope.Lookup(name)
 		if !ok {
 			// This is a local variable declaration - create a new symbol
-			kind := context_v2.SymbolVariable
+			kind := table.SymbolVariable
 			if isConst {
-				kind = context_v2.SymbolConstant
+				kind = table.SymbolConstant
 			}
-			sym = &context_v2.Symbol{
+			sym = &table.Symbol{
 				Name:     name,
 				Kind:     kind,
 				Type:     types.TypeUnknown,
 				Exported: false,
 				Decl:     item.Name, // Use the identifier as the Decl node
 			}
-			if err := tc.currentScope.Declare(name, sym); err != nil {
-				tc.ctx.Diagnostics.Add(
+			if err := mod.Scope.Declare(name, sym); err != nil {
+				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
-						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "already declared in this scope"),
+						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "already declared in this scope"),
 				)
 				continue
 			}
@@ -132,28 +112,28 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 		// Determine the type
 		if item.Type != nil {
 			// Explicit type annotation
-			declType := tc.typeFromTypeNode(item.Type)
+			declType := typeFromTypeNode(item.Type)
 			sym.Type = declType
 
 			// Check initializer if present
 			if item.Value != nil {
 				// Pass item.Name for secondary label (variable location)
-				tc.checkAssignLike(declType, item.Name, item.Value)
+				checkAssignLike(ctx, mod, declType, item.Name, item.Value)
 			} else if isConst {
 				// Constants must have an initializer even with explicit type
-				tc.ctx.Diagnostics.Add(
+				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
-						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "constants require an initializer").
+						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "constants require an initializer").
 						WithHelp("provide a value: const x: i32 = 42"),
 				)
 			}
 		} else if item.Value != nil {
 			// Type inference from initializer
-			rhsType := tc.checkExpr(item.Value, types.TypeUnknown)
+			rhsType := checkExpr(ctx, mod, item.Value, types.TypeUnknown)
 
 			// If the RHS is UNTYPED, finalize it to a default type
 			if rhsType.Equals(types.TypeUntyped) {
-				rhsType = tc.finalizeUntyped(item.Value)
+				rhsType = finalizeUntyped(item.Value)
 			}
 
 			sym.Type = rhsType
@@ -161,15 +141,15 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 			// No type and no value - error
 			if isConst {
 				// Constants must have an initializer
-				tc.ctx.Diagnostics.Add(
+				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
-						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "constants require an initializer").
+						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "constants require an initializer").
 						WithHelp("provide a value: const x := 42 or const x: i32 = 42"),
 				)
 			} else {
-				tc.ctx.Diagnostics.Add(
+				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot infer type for '%s'", name)).
-						WithPrimaryLabel(tc.mod.FilePath, item.Name.Loc(), "missing type or initializer"),
+						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "missing type or initializer"),
 				)
 			}
 			sym.Type = types.TypeUnknown
@@ -178,56 +158,66 @@ func (tc *typeChecker) checkVarDecl(decl interface{}, isConst bool) {
 }
 
 // checkFuncDecl type checks a function declaration
-func (tc *typeChecker) checkFuncDecl(decl *ast.FuncDecl) {
-	// Validate function parameters (variadic rules, duplicates, etc.)
-	ValidateFunctionParams(tc.ctx, tc.mod, decl)
+func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
 
 	// Create a new scope for the function body
-	funcScope := context_v2.NewSymbolTable(tc.currentScope)
+	sym, ok := mod.Scope.Lookup(decl.Name.Name)
+	if !ok {
+		fmt.Printf("function %s not declared", decl.Name.Name)
+		return
+	}
+
+	funcScope := sym.Scope
+
+	oldScope := funcScope
+
+	mod.Scope = funcScope
 
 	// Add parameters to the function scope with type information
 	if decl.Type != nil && decl.Type.Params != nil {
 		for _, param := range decl.Type.Params {
 			if param.Name != nil {
-				paramType := tc.typeFromTypeNode(param.Type)
-				sym := &context_v2.Symbol{
-					Name:     param.Name.Name,
-					Kind:     context_v2.SymbolParameter,
-					Type:     paramType,
-					Exported: false,
-					Decl:     param.Name, // Use IdentifierExpr as Decl
+				paramType := typeFromTypeNode(param.Type)
+				// update the param type
+				psym, ok := funcScope.Lookup(param.Name.Name)
+				if !ok {
+					fmt.Printf("function param %s not declared", param.Name.Name)
+					continue
 				}
-				funcScope.Declare(param.Name.Name, sym)
+
+				psym.Type = paramType // Done
 			}
 		}
 	}
 
 	// Check the body with the function scope
 	if decl.Body != nil {
-		prevScope := tc.currentScope
-		tc.currentScope = funcScope
-		tc.checkBlock(decl.Body)
-		tc.currentScope = prevScope
+		oldScope := mod.Scope
+		mod.Scope = funcScope
+		checkBlock(ctx, mod, decl.Body)
+		mod.Scope = oldScope
 
 		// Build control flow graph for the function
-		cfgBuilder := controlflow.NewCFGBuilder(tc.ctx, tc.mod)
+		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
 		cfg := cfgBuilder.BuildFunctionCFG(decl)
 
 		// Analyze return paths
-		controlflow.AnalyzeReturns(tc.ctx, tc.mod, decl, cfg)
+		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
 	}
+
+	mod.Scope = oldScope // restore
 }
 
 // checkAssignStmt type checks an assignment statement
-func (tc *typeChecker) checkAssignStmt(stmt *ast.AssignStmt) {
+func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.AssignStmt) {
 	// Check if we're trying to reassign a constant
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-		if sym, found := tc.currentScope.Lookup(ident.Name); found {
-			if sym.Kind == context_v2.SymbolConstant {
-				tc.ctx.Diagnostics.Add(
+		if sym, found := mod.Scope.Lookup(ident.Name); found {
+			if sym.Kind == table.SymbolConstant {
+				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
-						WithPrimaryLabel(tc.mod.FilePath, stmt.Lhs.Loc(), "cannot modify constant").
-						WithSecondaryLabel(tc.mod.FilePath, sym.Decl.Loc(), "declared as constant here").
+						WithPrimaryLabel(mod.FilePath, stmt.Lhs.Loc(), "cannot modify constant").
+						WithSecondaryLabel(mod.FilePath, sym.Decl.Loc(), "declared as constant here").
 						WithHelp("constants are immutable; use 'let' for mutable variables"),
 				)
 				return
@@ -236,38 +226,33 @@ func (tc *typeChecker) checkAssignStmt(stmt *ast.AssignStmt) {
 	}
 
 	// Get the type of the LHS
-	lhsType := tc.checkExpr(stmt.Lhs, types.TypeUnknown)
+	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
 
 	// Check the RHS with the LHS type as context
 	// Pass stmt.Lhs for LHS location in error messages
-	tc.checkAssignLike(lhsType, stmt.Lhs, stmt.Rhs)
+	checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
 }
 
 // checkBlock type checks a block of statements
-func (tc *typeChecker) checkBlock(block *ast.Block) {
+func checkBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block) {
 	if block == nil {
 		return
 	}
 	for _, node := range block.Nodes {
-		tc.checkNode(node)
+		checkNode(ctx, mod, node)
 	}
 }
 
 // checkExpr type checks an expression and returns its type.
 // expected provides contextual type information (TypeUnknown if no context).
 // This function now uses the separate inference and compatibility modules.
-func (tc *typeChecker) checkExpr(expr ast.Expression, expected types.SemType) types.SemType {
+func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression, expected types.SemType) types.SemType {
 	if expr == nil {
 		return types.TypeUnknown
 	}
 
-	// Check if we already computed this expression's type
-	if t, ok := tc.exprTypes[expr]; ok {
-		return t
-	}
-
 	// First, infer the type based on the expression structure
-	inferredType := tc.inferExprType(expr)
+	inferredType := inferExprType(ctx, mod, expr)
 
 	// Apply contextual typing
 	resultType := inferredType
@@ -280,7 +265,7 @@ func (tc *typeChecker) checkExpr(expr ast.Expression, expected types.SemType) ty
 			if optType, ok := expected.(*types.OptionalType); ok {
 				expectedForLit = optType.Inner
 			}
-			resultType = tc.contextualizeUntyped(lit, expectedForLit)
+			resultType = contextualizeUntyped(lit, expectedForLit)
 		}
 	}
 
@@ -308,8 +293,6 @@ func (tc *typeChecker) checkExpr(expr ast.Expression, expected types.SemType) ty
 		// Keep as UNTYPED for now - will be finalized when needed
 	}
 
-	// Store the result
-	tc.exprTypes[expr] = resultType
 	return resultType
 }
 
@@ -317,11 +300,11 @@ func (tc *typeChecker) checkExpr(expr ast.Expression, expected types.SemType) ty
 // typeNode: optional AST node for the target type (for location info)
 // valueExpr: the value expression being assigned
 // targetType: the expected/target type
-func (tc *typeChecker) checkAssignLike(targetType types.SemType, typeNode ast.Node, valueExpr ast.Expression) {
-	rhsType := tc.checkExpr(valueExpr, targetType)
+func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, targetType types.SemType, typeNode ast.Node, valueExpr ast.Expression) {
+	rhsType := checkExpr(ctx, mod, valueExpr, targetType)
 
 	// Special check for integer literals: ensure they fit in the target type
-	if ok := checkFitness(tc, rhsType, targetType, valueExpr, typeNode); !ok {
+	if ok := checkFitness(ctx, mod, rhsType, targetType, valueExpr, typeNode); !ok {
 		return
 	}
 
@@ -331,10 +314,6 @@ func (tc *typeChecker) checkAssignLike(targetType types.SemType, typeNode ast.No
 	switch compatibility {
 	case Identical, Assignable, LosslessConvertible:
 		// OK - assignment is valid
-		// If RHS is UNTYPED, update its type to target
-		if rhsType.Equals(types.TypeUntyped) {
-			tc.exprTypes[valueExpr] = targetType
-		}
 		return
 
 	case LossyConvertible:
@@ -343,13 +322,13 @@ func (tc *typeChecker) checkAssignLike(targetType types.SemType, typeNode ast.No
 
 		// Add dual labels if we have type node location
 		if typeNode != nil {
-			diag = diag.WithPrimaryLabel(tc.mod.FilePath, valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(tc.mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+				WithSecondaryLabel(mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(tc.mod.FilePath, valueExpr.Loc(), "implicit conversion may lose precision")
+			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), "implicit conversion may lose precision")
 		}
 
-		tc.ctx.Diagnostics.Add(
+		ctx.Diagnostics.Add(
 			diag.WithHelp(fmt.Sprintf("use an explicit cast: %s(value)", targetType.String())),
 		)
 
@@ -359,17 +338,17 @@ func (tc *typeChecker) checkAssignLike(targetType types.SemType, typeNode ast.No
 
 		// Add dual labels if we have type node location
 		if typeNode != nil {
-			diag = diag.WithPrimaryLabel(tc.mod.FilePath, valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(tc.mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+				WithSecondaryLabel(mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(tc.mod.FilePath, valueExpr.Loc(), fmt.Sprintf("expected '%s', got '%s'", targetType.String(), rhsType.String()))
+			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("expected '%s', got '%s'", targetType.String(), rhsType.String()))
 		}
 
-		tc.ctx.Diagnostics.Add(diag)
+		ctx.Diagnostics.Add(diag)
 	}
 }
 
-func checkFitness(tc *typeChecker, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
+func checkFitness(ctx *context_v2.CompilerContext, mod *context_v2.Module, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
 	if rhsType.Equals(types.TypeUntyped) || rhsType.Equals(types.TypeI64) {
 		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
 			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
@@ -381,13 +360,13 @@ func checkFitness(tc *typeChecker, rhsType, targetType types.SemType, valueExpr 
 
 					if typeNode != nil {
 						// Show value location (primary) and variable/LHS location (secondary)
-						diag = diag.WithPrimaryLabel(tc.mod.FilePath, valueExpr.Loc(), fmt.Sprintf("need at least %s", minType)).
-							WithSecondaryLabel(tc.mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+						diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("need at least %s", minType)).
+							WithSecondaryLabel(mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 					} else {
-						diag = diag.WithPrimaryLabel(tc.mod.FilePath, valueExpr.Loc(), fmt.Sprintf("value %s doesn't fit in %s", lit.Value, targetType.String()))
+						diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("value %s doesn't fit in %s", lit.Value, targetType.String()))
 					}
 
-					tc.ctx.Diagnostics.Add(
+					ctx.Diagnostics.Add(
 						diag.WithHelp(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType))),
 					)
 					return false
@@ -399,7 +378,7 @@ func checkFitness(tc *typeChecker, rhsType, targetType types.SemType, valueExpr 
 }
 
 // typeFromTypeNode converts AST type nodes to semantic types
-func (tc *typeChecker) typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
+func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 	if typeNode == nil {
 		return types.TypeUnknown
 	}
@@ -416,7 +395,7 @@ func (tc *typeChecker) typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 	case *ast.ArrayType:
 		// Array type: [N]T or []T
-		elementType := tc.typeFromTypeNode(t.ElType)
+		elementType := typeFromTypeNode(t.ElType)
 		length := -1 // Dynamic array by default
 		if t.Len != nil {
 			// TODO: keep all array dynamic now
@@ -425,13 +404,13 @@ func (tc *typeChecker) typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 	case *ast.OptionalType:
 		// Optional type: T?
-		innerType := tc.typeFromTypeNode(t.Base)
+		innerType := typeFromTypeNode(t.Base)
 		return types.NewOptional(innerType)
 
 	case *ast.ResultType:
 		// Result type: T ! E
-		okType := tc.typeFromTypeNode(t.Value)
-		errType := tc.typeFromTypeNode(t.Error)
+		okType := typeFromTypeNode(t.Value)
+		errType := typeFromTypeNode(t.Error)
 		return types.NewResult(okType, errType)
 
 	case *ast.StructType:
@@ -440,14 +419,11 @@ func (tc *typeChecker) typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 		// Process struct fields in parallel with bounded concurrency
 		var wg sync.WaitGroup
-		semaphore := make(chan struct{}, runtime.NumCPU())
 
 		for i, f := range t.Fields {
 			wg.Add(1)
 			go func(idx int, field ast.Field) {
 				defer wg.Done()
-				semaphore <- struct{}{}        // Acquire semaphore
-				defer func() { <-semaphore }() // Release semaphore
 
 				fieldName := ""
 				if field.Name != nil {
@@ -455,7 +431,7 @@ func (tc *typeChecker) typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 				}
 				fields[idx] = types.StructField{
 					Name: fieldName,
-					Type: tc.typeFromTypeNode(field.Type),
+					Type: typeFromTypeNode(field.Type),
 				}
 			}(i, f)
 		}
@@ -470,23 +446,20 @@ func (tc *typeChecker) typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 		// Process parameters in parallel with bounded concurrency
 		var wg sync.WaitGroup
-		semaphore := make(chan struct{}, runtime.NumCPU())
 
 		for i, param := range t.Params {
 			wg.Add(1)
 			go func(idx int, par ast.Field) {
 				defer wg.Done()
-				semaphore <- struct{}{}        // Acquire semaphore
-				defer func() { <-semaphore }() // Release semaphore
 				param := &params[idx]
 				param.Name = par.Name.Name
-				param.Type = tc.typeFromTypeNode(par.Type)
+				param.Type = typeFromTypeNode(par.Type)
 			}(i, param)
 		}
 
 		wg.Wait()
 
-		returns := tc.typeFromTypeNode(t.Result)
+		returns := typeFromTypeNode(t.Result)
 
 		return types.NewFunction(params, returns)
 

@@ -25,6 +25,7 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/source"
+	"compiler/internal/table"
 	"compiler/internal/types"
 	"compiler/internal/utils/fs"
 )
@@ -123,9 +124,9 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	Symbols   *SymbolTable                     // Module-level symbols
+	Scope     *table.SymbolTable               // Module-level symbols
 	Imports   []*Import                        // Resolved imports
-	ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
+	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
 	Content string // Raw source code (for diagnostics)
@@ -136,65 +137,10 @@ type Module struct {
 
 // Import represents a resolved import statement
 type Import struct {
-	Path         string           // Import path as written in source
-	Alias        string           // Optional alias (e.g., "import math as m")
-	ResolvedPath string           // Resolved to actual module import path
-	Location     *source.Location // Source location for diagnostics
-}
-
-// SymbolTable holds symbols declared in a module or scope
-// For now this is a placeholder - will be expanded with proper symbol resolution
-type SymbolTable struct {
-	parent  *SymbolTable
-	symbols map[string]*Symbol
-}
-
-// Symbol represents a declared entity (variable, function, type, etc.)
-type Symbol struct {
-	Name     string
-	Kind     SymbolKind
-	Type     types.SemType // Semantic type of the symbol
-	Exported bool          // Whether symbol is accessible from other modules
-	Decl     ast.Node      // AST node that declared this symbol
-}
-
-// SymbolKind categorizes symbols
-type SymbolKind int
-
-const (
-	SymbolVariable SymbolKind = iota
-	SymbolConstant
-	SymbolFunction
-	SymbolType
-	SymbolParameter
-)
-
-// NewSymbolTable creates a new symbol table with optional parent scope
-func NewSymbolTable(parent *SymbolTable) *SymbolTable {
-	return &SymbolTable{
-		parent:  parent,
-		symbols: make(map[string]*Symbol),
-	}
-}
-
-// Declare adds a symbol to the table
-func (st *SymbolTable) Declare(name string, symbol *Symbol) error {
-	if _, exists := st.symbols[name]; exists {
-		return fmt.Errorf("symbol '%s' already declared", name)
-	}
-	st.symbols[name] = symbol
-	return nil
-}
-
-// Lookup finds a symbol in this scope or parent scopes
-func (st *SymbolTable) Lookup(name string) (*Symbol, bool) {
-	if sym, ok := st.symbols[name]; ok {
-		return sym, true
-	}
-	if st.parent != nil {
-		return st.parent.Lookup(name)
-	}
-	return nil, false
+	Path     string           // Import path as written in source
+	Alias    string           // Optional alias (e.g., "import math as m")
+	Location *source.Location // Source location for diagnostics
+	IsUsed   bool
 }
 
 // CompilerContext is the central compilation state manager
@@ -209,7 +155,7 @@ type CompilerContext struct {
 	EntryModule string // Import path of entry module
 
 	// Universe scope: built-in types and functions
-	Universe *SymbolTable
+	Universe *table.SymbolTable
 
 	// Diagnostics: centralized error collection
 	Diagnostics *diagnostics.DiagnosticBag
@@ -258,7 +204,7 @@ func New(config *Config, debug bool) *CompilerContext {
 	}
 
 	// Create universe scope with built-in types
-	universe := NewSymbolTable(nil)
+	universe := table.NewSymbolTable(nil)
 	registerBuiltins(universe)
 
 	ctx := &CompilerContext{
@@ -313,7 +259,7 @@ func (ctx *CompilerContext) loadBuiltinModules() {
 }
 
 // registerBuiltins populates the universe scope with built-in types
-func registerBuiltins(universe *SymbolTable) {
+func registerBuiltins(universe *table.SymbolTable) {
 	builtinTypes := []types.SemType{
 		types.TypeI8, types.TypeI16, types.TypeI32, types.TypeI64,
 		types.TypeU8, types.TypeU16, types.TypeU32, types.TypeU64,
@@ -322,24 +268,24 @@ func registerBuiltins(universe *SymbolTable) {
 	}
 
 	for _, typ := range builtinTypes {
-		universe.Declare(typ.String(), &Symbol{
+		universe.Declare(typ.String(), &table.Symbol{
 			Name:     typ.String(),
-			Kind:     SymbolType,
+			Kind:     table.SymbolType,
 			Type:     typ,
 			Exported: true,
 		})
 	}
 
 	// Built-in constants
-	universe.Declare("true", &Symbol{
+	universe.Declare("true", &table.Symbol{
 		Name:     "true",
-		Kind:     SymbolConstant,
+		Kind:     table.SymbolConstant,
 		Type:     types.TypeBool,
 		Exported: true,
 	})
-	universe.Declare("false", &Symbol{
+	universe.Declare("false", &table.Symbol{
 		Name:     "false",
-		Kind:     SymbolConstant,
+		Kind:     table.SymbolConstant,
 		Type:     types.TypeBool,
 		Exported: true,
 	})
@@ -381,7 +327,7 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 		FilePath: virtualPath,
 		Type:     ModuleLocal,
 		Phase:    PhaseNotStarted,
-		Symbols:  NewSymbolTable(ctx.Universe),
+		Scope:    table.NewSymbolTable(ctx.Universe),
 		Content:  code,
 	}
 
