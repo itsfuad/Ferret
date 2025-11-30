@@ -20,32 +20,26 @@ import (
 	"compiler/internal/source"
 )
 
-// moduleState tracks the 3 states: Unseen -> Parsing -> Done
-type moduleState int
-
-const (
-	stateUnseen moduleState = iota
-	stateParsing
-	stateDone
-)
-
 // Pipeline coordinates the compilation process
 type Pipeline struct {
-	ctx    *context_v2.CompilerContext
-	mu     sync.Mutex             // protects states map
-	states map[string]moduleState // tracks module states: Unseen -> Parsing -> Done
-	wg     sync.WaitGroup         // tracks all parsing tasks
-	sem    chan struct{}          // semaphore for bounded parallelism
+	ctx *context_v2.CompilerContext
+
+	// seen ensures each module is scheduled exactly once
+	seen sync.Map // map[string]struct{}
+
+	// wg tracks all parsing tasks
+	wg sync.WaitGroup
+
+	// sem bounds parallel parsing to CPU count
+	sem chan struct{}
 }
 
 // New creates a new compilation pipeline
 func New(ctx *context_v2.CompilerContext) *Pipeline {
-	// Bound parallelism to number of CPU cores
 	numWorkers := runtime.NumCPU()
 	return &Pipeline{
-		ctx:    ctx,
-		states: make(map[string]moduleState),
-		sem:    make(chan struct{}, numWorkers),
+		ctx: ctx,
+		sem: make(chan struct{}, numWorkers),
 	}
 }
 
@@ -98,42 +92,27 @@ func (p *Pipeline) Run() error {
 	return nil
 }
 
-// processModule processes a single module: lex, parse, and recursively handle imports
+// processModule schedules parsing for a module exactly once (thread-safe)
 func (p *Pipeline) processModule(importPath, requestedFrom string, requestedLocation *source.Location) {
-	// Check module state (3-state: Unseen -> Parsing -> Done)
-	p.mu.Lock()
-	state := p.states[importPath]
-	if state == stateParsing || state == stateDone {
-		p.mu.Unlock()
-		return // Already being processed or done
+	// Fast "do-once" gate. If already scheduled/parsed, return.
+	if _, loaded := p.seen.LoadOrStore(importPath, struct{}{}); loaded {
+		return
 	}
 
-	// Mark as Parsing
-	p.states[importPath] = stateParsing
-	p.mu.Unlock()
-
-	// Register this task
 	p.wg.Add(1)
-
-	// Acquire semaphore (bounded parallelism)
-	p.sem <- struct{}{}
+	p.sem <- struct{}{} // acquire semaphore
 
 	go func() {
 		defer func() {
-			<-p.sem     // Release semaphore
-			p.wg.Done() // Mark task done
-
-			// Mark module as Done
-			p.mu.Lock()
-			p.states[importPath] = stateDone
-			p.mu.Unlock()
+			<-p.sem     // release semaphore
+			p.wg.Done() // mark task done
 		}()
 
 		p.parseModule(importPath, requestedFrom, requestedLocation)
 	}()
 }
 
-// parseModule does the actual parsing work
+// parseModule does the actual parsing work and schedules imports
 func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocation *source.Location) {
 	// Get or create module
 	module, exists := p.ctx.GetModule(importPath)
@@ -153,19 +132,18 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	// Resolve import path to file path
 	var content string
 	var filePath string
-	var modType context_v2.ModuleType
 
 	if module.Content != "" {
 		// Module already has content (in-memory code)
 		content = module.Content
 		filePath = module.FilePath
-		modType = module.Type
 	} else {
 		// Resolve and read file
 		var err error
+		var modType context_v2.ModuleType
+
 		filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
 		if err != nil {
-			// Use current filePath for entry module errors (when requestedFrom is empty)
 			errorFile := requestedFrom
 			if errorFile == "" {
 				errorFile = filePath
@@ -174,13 +152,12 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 				diagnostics.NewError(err.Error()).
 					WithPrimaryLabel(errorFile, requestedLocation, ""),
 			)
-			return // Fail but mark as done
+			return
 		}
 
 		contentBytes, err := os.ReadFile(filePath)
 		if err != nil {
 			errMsg := fmt.Sprintf("cannot read file %s: %v", filePath, err)
-			// Use current filePath for entry module errors (when requestedFrom is empty)
 			errorFile := requestedFrom
 			if errorFile == "" {
 				errorFile = filePath
@@ -189,8 +166,9 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 				diagnostics.NewError(errMsg).
 					WithPrimaryLabel(errorFile, requestedLocation, ""),
 			)
-			return // Fail but mark as done
+			return
 		}
+
 		content = string(contentBytes)
 
 		// Update module info with lock
@@ -205,36 +183,24 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	p.ctx.Diagnostics.AddSourceContent(filePath, content)
 
 	// Lex
-	tokenizer := lexer.New(filePath, content)
+	tokenizer := lexer.New(filePath, content, p.ctx.Diagnostics)
 	tokens := tokenizer.Tokenize(false)
-
-	// Report lexer errors as diagnostics
-	for _, lexErr := range tokenizer.Errors {
-		p.ctx.Diagnostics.Add(
-			diagnostics.NewError(lexErr.Error()),
-		)
-	}
 
 	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseLexed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", importPath), nil)
-		return // Fail but mark as done
+		return
 	}
 
 	// Parse
-	diag := diagnostics.NewDiagnosticBag(filePath)
-	astModule := parser.Parse(tokens, filePath, diag)
+	astModule := parser.Parse(tokens, filePath, p.ctx.Diagnostics)
+
 	module.Mu.Lock()
 	module.AST = astModule
 	module.Mu.Unlock()
 
-	// Merge diagnostics
-	for _, d := range diag.Diagnostics() {
-		p.ctx.Diagnostics.Add(d)
-	}
-
 	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseParsed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
-		return // Fail but mark as done
+		return
 	}
 
 	if p.ctx.Debug {
@@ -252,7 +218,7 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 		}
 	}
 
-	// Schedule imports for processing (they will run in parallel via worker pool)
+	// Schedule imports for processing (they will run in parallel via sem)
 	for _, imp := range imports {
 		p.processModule(imp.path, filePath, imp.location)
 	}
@@ -271,15 +237,11 @@ func (p *Pipeline) extractTopLevelImports(astModule *ast.Module) []importInfo {
 	for _, node := range astModule.Nodes {
 		impStmt, ok := node.(*ast.ImportStmt)
 		if !ok {
-			// First non-import statement, stop scanning
 			break
 		}
 
 		if impStmt.Path != nil {
-			importPath := impStmt.Path.Value
-			// Remove quotes from string literal
-			importPath = strings.Trim(importPath, "\"")
-			// Normalize import path
+			importPath := strings.Trim(impStmt.Path.Value, "\"")
 			importPath = p.ctx.NormalizeImportPath(importPath)
 			if importPath != "" {
 				imports = append(imports, importInfo{
@@ -328,7 +290,6 @@ func (p *Pipeline) PrintModuleDetails(importPath string) {
 	fmt.Printf("Type: %s\n", module.Type)
 	fmt.Printf("Phase: %s\n", module.Phase)
 
-	// Nil-safe AST node count
 	nodes := 0
 	if module.AST != nil {
 		nodes = len(module.AST.Nodes)
@@ -353,10 +314,8 @@ func (p *Pipeline) runCollectorPhase() error {
 			continue
 		}
 
-		// Run collector
 		collector.CollectModule(p.ctx, module)
 
-		// Advance to Collected phase
 		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseCollected) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCollected", importPath), nil)
 		}
@@ -365,11 +324,6 @@ func (p *Pipeline) runCollectorPhase() error {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
-
-	// Don't stop on collection errors - continue to type checking to find more errors
-	// if p.ctx.HasErrors() {
-	// 	return fmt.Errorf("symbol collection failed with errors")
-	// }
 
 	return nil
 }
@@ -389,10 +343,8 @@ func (p *Pipeline) runResolverPhase() error {
 			continue
 		}
 
-		// Run resolver
 		resolver.ResolveModule(p.ctx, module)
 
-		// Advance to Resolved phase
 		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseResolved) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseResolved", importPath), nil)
 		}
@@ -401,11 +353,6 @@ func (p *Pipeline) runResolverPhase() error {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
-
-	// Don't stop on resolution errors - continue to type checking to find more errors
-	// if p.ctx.HasErrors() {
-	// 	return fmt.Errorf("resolution failed with errors")
-	// }
 
 	return nil
 }
@@ -425,10 +372,8 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 			continue
 		}
 
-		// Run type checker
 		typechecker.CheckModule(p.ctx, module)
 
-		// Advance to TypeChecked phase
 		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseTypeChecked) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseTypeChecked", importPath), nil)
 		}

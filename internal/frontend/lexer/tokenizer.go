@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"compiler/internal/diagnostics"
 	"compiler/internal/source"
 	"compiler/internal/utils/numeric"
 )
@@ -16,7 +17,8 @@ type regexPattern struct {
 }
 
 type Lexer struct {
-	Errors     []error
+//	Errors     []error
+	diagnostics *diagnostics.DiagnosticBag
 	Tokens     []Token
 	Position   source.Position
 	sourceCode []byte
@@ -40,7 +42,7 @@ func (lex *Lexer) atEOF() bool {
 	return lex.Position.Index >= len(lex.sourceCode)
 }
 
-func New(filepath, content string) *Lexer {
+func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 	//create the lexer
 	lex := &Lexer{
 		sourceCode: []byte(content),
@@ -50,6 +52,8 @@ func New(filepath, content string) *Lexer {
 			Column: 1,
 			Index:  0,
 		},
+
+		diagnostics: diag,
 
 		FilePath: filepath,
 
@@ -191,10 +195,16 @@ func (lex *Lexer) Tokenize(debug bool) []Token {
 
 		if !matched {
 			// Add error diagnostic instead of panic
-			errMsg := fmt.Sprintf("unrecognized character '%c'", lex.remainder()[0])
-			lex.Errors = append(lex.Errors, fmt.Errorf("%s at %s:%d:%d", errMsg, lex.FilePath, lex.Position.Line, lex.Position.Column))
+			tok := lex.remainder()[0]
+			errMsg := fmt.Sprintf("unrecognized character '%c'", tok)
+			lex.diagnostics.Add(
+				diagnostics.NewError(errMsg).WithPrimaryLabel(lex.FilePath, source.NewLocation(
+					&lex.Position,
+					&lex.Position,
+				), ""),
+			)
 			// Skip the bad character and continue tokenizing to find more errors
-			lex.advance(string(lex.remainder()[0]))
+			lex.advance(string(tok))
 		}
 	}
 

@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"compiler/internal/diagnostics"
 	"testing"
 )
 
@@ -24,7 +25,9 @@ func TestNumberTokenization(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 
-			lex := New(tt.desc, tt.input)
+			diag := diagnostics.NewDiagnosticBag("test")
+
+			lex := New(tt.desc, tt.input, diag)
 			tokens := lex.Tokenize(false)
 
 			if len(tokens) < 1 {

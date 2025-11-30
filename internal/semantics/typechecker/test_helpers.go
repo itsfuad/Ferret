@@ -26,13 +26,11 @@ func parseFunction(t *testing.T, src string) (*ast.FuncDecl, *context_v2.Module)
 		Content:  src,
 	}
 
-	lex := lexer.New(mod.FilePath, src)
-	tokens := lex.Tokenize(false)
-	if len(lex.Errors) > 0 {
-		t.Fatalf("Lexer errors: %v", lex.Errors)
-	}
-
 	diag := diagnostics.NewDiagnosticBag(mod.FilePath)
+
+	lex := lexer.New(mod.FilePath, src, diag)
+	tokens := lex.Tokenize(false)
+
 	astMod := parser.Parse(tokens, mod.FilePath, diag)
 
 	if len(astMod.Nodes) == 0 {
