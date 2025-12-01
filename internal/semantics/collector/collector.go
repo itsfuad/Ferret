@@ -8,6 +8,7 @@ import (
 	"compiler/internal/table"
 	"compiler/internal/types"
 	"fmt"
+	"strings"
 )
 
 // CollectModule builds the symbol table for a module by traversing its AST.
@@ -24,12 +25,20 @@ func CollectModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 		mod.Imports = make([]*context_v2.Import, 0)
 	}
 
+	// Initialize import alias map
+	if mod.ImportAliasMap == nil {
+		mod.ImportAliasMap = make(map[string]string)
+	}
+
 	// Traverse the AST and collect declarations
 	if mod.AST != nil {
 		for _, node := range mod.AST.Nodes {
 			collectNode(ctx, mod, node)
 		}
 	}
+
+	// Build import alias map after collecting all imports
+	buildImportAliasMap(ctx, mod)
 }
 
 // collectNode processes a single AST node and declares symbols
@@ -474,4 +483,39 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	if body != nil {
 		collectNode(ctx, mod, body)
 	}
+}
+
+// buildImportAliasMap creates a mapping from alias/module-name to import path
+// This enables module::symbol resolution in the resolver phase
+func buildImportAliasMap(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	for _, imp := range mod.Imports {
+		// If there's an alias, use it
+		if imp.Alias != "" {
+			mod.ImportAliasMap[imp.Alias] = imp.Path
+		} else {
+			// Extract the last component of the import path as the default name
+			// e.g., "test_project/utils" -> "utils"
+			//       "std/math" -> "math"
+			parts := splitImportPath(imp.Path)
+			if len(parts) > 0 {
+				defaultName := parts[len(parts)-1]
+				mod.ImportAliasMap[defaultName] = imp.Path
+			}
+		}
+	}
+}
+
+// splitImportPath splits an import path by '/' to get components
+func splitImportPath(path string) []string {
+	// Remove quotes if present
+	path = strings.Trim(path, "\"")
+
+	// Split by forward slash
+	parts := []string{}
+	for _, part := range strings.Split(path, "/") {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return parts
 }

@@ -125,8 +125,9 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	CurrentScope *table.SymbolTable // Module-level symbols
-	Imports      []*Import          // Resolved imports
+	CurrentScope   *table.SymbolTable // Module-level symbols
+	Imports        []*Import          // Resolved imports
+	ImportAliasMap map[string]string  // alias/name -> import path mapping for module access
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata

@@ -1,0 +1,8 @@
+// Test module::symbol access - error case for non-existent symbol
+
+import "test_project/utils";
+
+fn main() {
+    // This should error - 'DoesNotExist' is not defined in utils
+    let value := utils::DoesNotExist;
+}

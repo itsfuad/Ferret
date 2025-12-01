@@ -191,7 +191,75 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		// Sel is the field name, not checked here
 
 	case *ast.ScopeResolutionExpr:
-		resolveExpr(ctx, mod, e.X)
+		// Handle module::symbol resolution
+		// X should be an identifier representing the module name/alias
+		if ident, ok := e.X.(*ast.IdentifierExpr); ok {
+			moduleName := ident.Name
+			symbolName := e.Selector.Name
+
+			// Look up the import path from the alias/name
+			importPath, ok := mod.ImportAliasMap[moduleName]
+			if !ok {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleName)).
+						WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleName)).
+						WithNote("Make sure to import this module first"),
+				)
+				return
+			}
+
+			// Get the imported module from context
+			importedMod, exists := ctx.GetModule(importPath)
+
+			if !exists {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
+						WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleName)).
+						WithNote("This is likely a compiler bug"),
+				)
+				return
+			}
+
+			// Check if the symbol exists in the imported module and is exported
+			if importedMod.CurrentScope == nil {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("module '%s' has no symbols", moduleName)).
+						WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' is empty", moduleName)),
+				)
+				return
+			}
+
+			sym, ok := importedMod.CurrentScope.GetSymbol(symbolName)
+			if !ok {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, moduleName)).
+						WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)).
+						WithNote(fmt.Sprintf("Module '%s' does not export this symbol", moduleName)),
+				)
+				return
+			}
+
+			// Check if symbol is exported
+			if !sym.Exported {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, moduleName)).
+						WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
+						WithHelp("Only symbols starting with uppercase letters are exported"),
+				)
+				return
+			}
+
+			// Mark the import as used
+			for _, imp := range mod.Imports {
+				if imp.Path == importPath {
+					imp.IsUsed = true
+					break
+				}
+			}
+		} else {
+			// For now, just resolve the left side (could be enum::variant later)
+			resolveExpr(ctx, mod, e.X)
+		}
 
 	case *ast.CompositeLit:
 		for _, elem := range e.Elts {

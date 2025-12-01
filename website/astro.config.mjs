@@ -97,6 +97,7 @@ export default defineConfig({
                 items: [
                     { label: 'Error Handling', slug: 'advanced/errors' },
                     { label: 'Generics', slug: 'advanced/generics' },
+                    { label: 'Modules', slug: 'advanced/modules' },
                 ],
             },
         ],
