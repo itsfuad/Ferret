@@ -651,7 +651,7 @@ func (ctx *CompilerContext) ComputeTopologicalOrder() {
 		}
 	}
 
-	var queue []string
+	queue := make([]string, 0, len(ctx.Modules))
 	for module := range ctx.Modules {
 		if inDegree[module] == 0 {
 			queue = append(queue, module)
@@ -659,13 +659,13 @@ func (ctx *CompilerContext) ComputeTopologicalOrder() {
 	}
 	sort.Strings(queue)
 
-	var sorted []string
+	sorted := make([]string, 0, len(ctx.Modules))
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
 		sorted = append(sorted, current)
 
-		var next []string
+		next := make([]string, 0)
 		for importer, deps := range ctx.DepGraph {
 			for _, dep := range deps {
 				if dep == current {
@@ -676,8 +676,10 @@ func (ctx *CompilerContext) ComputeTopologicalOrder() {
 				}
 			}
 		}
-		sort.Strings(next)
-		queue = append(queue, next...)
+		if len(next) > 0 {
+			sort.Strings(next)
+			queue = append(queue, next...)
+		}
 	}
 
 	ctx.sortedModules = sorted

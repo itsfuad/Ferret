@@ -488,16 +488,39 @@ func TestComputeTopologicalOrder_CycleIgnored(t *testing.T) {
 	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: PhaseParsed})
 
 	// Add a dependency a -> b
-	ctx.AddDependency("a", "b")
+	if err := ctx.AddDependency("a", "b"); err != nil {
+		t.Fatalf("Expected no error for valid dependency a -> b, got: %v", err)
+	}
+
 	// Try to add a cycle b -> a (should be rejected)
-	_ = ctx.AddDependency("b", "a")
+	err := ctx.AddDependency("b", "a")
+	if err == nil {
+		t.Error("Expected error when adding cycle b -> a")
+	}
+	if err != nil && !contains(err.Error(), "circular import") {
+		t.Errorf("Expected 'circular import' error, got: %v", err)
+	}
 
 	ctx.ComputeTopologicalOrder()
 	order := ctx.GetModuleNames()
 
-	// Should still contain both modules
+	// Should contain both modules
 	if len(order) != 2 {
-		t.Errorf("Expected 2 modules, got %v", order)
+		t.Fatalf("Expected 2 modules, got %v", order)
+	}
+
+	// Verify b appears before a (since a depends on b)
+	index := func(name string) int {
+		for i, v := range order {
+			if v == name {
+				return i
+			}
+		}
+		return -1
+	}
+
+	if index("b") >= index("a") {
+		t.Errorf("Expected 'b' before 'a' in topological order, got %v", order)
 	}
 }
 

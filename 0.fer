@@ -8,7 +8,7 @@ let power := 2 ** 4;
 let a : str = "hi";
 
 fn add(a: i32, b: str) -> i32 {
-    let x : i32 = b;
+    //let x : i32 = b;
     return a + b;
 }
 
