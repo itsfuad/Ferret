@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -124,8 +125,8 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	Scope     *table.SymbolTable               // Module-level symbols
-	Imports   []*Import                        // Resolved imports
+	Scope   *table.SymbolTable // Module-level symbols
+	Imports []*Import          // Resolved imports
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
@@ -149,6 +150,9 @@ type CompilerContext struct {
 	// This is the authoritative source for all compiled modules
 	Modules map[string]*Module
 	mu      sync.RWMutex // protects Modules and DepGraph during parallel parse
+
+	// Sorted module keys in topological order
+	sortedModules []string
 
 	// Entry point
 	EntryPoint  string // Full path to entry file
@@ -208,12 +212,13 @@ func New(config *Config, debug bool) *CompilerContext {
 	registerBuiltins(universe)
 
 	ctx := &CompilerContext{
-		Modules:     make(map[string]*Module),
-		Universe:    universe,
-		Diagnostics: diagnostics.NewDiagnosticBag(""),
-		DepGraph:    make(map[string][]string),
-		Config:      config,
-		Debug:       debug,
+		Modules:       make(map[string]*Module),
+		sortedModules: []string{},
+		Universe:      universe,
+		Diagnostics:   diagnostics.NewDiagnosticBag(""),
+		DepGraph:      make(map[string][]string),
+		Config:        config,
+		Debug:         debug,
 	}
 
 	// Auto-load builtin modules if path is provided
@@ -624,9 +629,56 @@ func (ctx *CompilerContext) ModuleCount() int {
 
 // GetModuleNames returns all module import paths
 func (ctx *CompilerContext) GetModuleNames() []string {
-	names := make([]string, 0, len(ctx.Modules))
-	for name := range ctx.Modules {
-		names = append(names, name)
+	return ctx.sortedModules
+}
+
+// ComputeTopologicalOrder computes and stores the topological order of modules
+func (ctx *CompilerContext) ComputeTopologicalOrder() {
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
+	inDegree := make(map[string]int)
+
+	for modulePath := range ctx.Modules {
+		if _, exists := inDegree[modulePath]; !exists {
+			inDegree[modulePath] = 0
+		}
 	}
-	return names
+
+	for importer, deps := range ctx.DepGraph {
+		for range deps {
+			inDegree[importer]++
+		}
+	}
+
+	var queue []string
+	for module := range ctx.Modules {
+		if inDegree[module] == 0 {
+			queue = append(queue, module)
+		}
+	}
+	sort.Strings(queue)
+
+	var sorted []string
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		sorted = append(sorted, current)
+
+		var next []string
+		for importer, deps := range ctx.DepGraph {
+			for _, dep := range deps {
+				if dep == current {
+					inDegree[importer]--
+					if inDegree[importer] == 0 {
+						next = append(next, importer)
+					}
+				}
+			}
+		}
+		sort.Strings(next)
+		queue = append(queue, next...)
+	}
+
+	ctx.sortedModules = sorted
 }

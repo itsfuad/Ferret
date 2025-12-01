@@ -54,6 +54,9 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("compilation failed with errors")
 	}
 
+	// Compute topological order once after parsing
+	p.ctx.ComputeTopologicalOrder()
+
 	// Phase 2: Symbol Collection
 	if p.ctx.Debug {
 		colors.CYAN.Printf("\n[Phase 2] Symbol Collection\n")
@@ -297,9 +300,7 @@ func (p *Pipeline) PrintModuleDetails(importPath string) {
 
 // runCollectorPhase runs symbol collection on all parsed modules
 func (p *Pipeline) runCollectorPhase() error {
-	moduleNames := p.ctx.GetModuleNames()
-
-	for _, importPath := range moduleNames {
+	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
 			continue
@@ -326,9 +327,7 @@ func (p *Pipeline) runCollectorPhase() error {
 
 // runResolverPhase runs name resolution on all collected modules
 func (p *Pipeline) runResolverPhase() error {
-	moduleNames := p.ctx.GetModuleNames()
-
-	for _, importPath := range moduleNames {
+	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
 			continue
@@ -355,9 +354,7 @@ func (p *Pipeline) runResolverPhase() error {
 
 // runTypeCheckerPhase runs type checking on all resolved modules
 func (p *Pipeline) runTypeCheckerPhase() error {
-	moduleNames := p.ctx.GetModuleNames()
-
-	for _, importPath := range moduleNames {
+	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
 			continue

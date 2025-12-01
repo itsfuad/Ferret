@@ -402,6 +402,105 @@ func TestDepGraphNormalization(t *testing.T) {
 	}
 }
 
+func TestComputeTopologicalOrder(t *testing.T) {
+	ctx := New(&Config{Extension: ".fer"}, false)
+
+	// Add modules
+	ctx.AddModule("a", &Module{FilePath: "a.fer", Phase: PhaseParsed})
+	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: PhaseParsed})
+	ctx.AddModule("c", &Module{FilePath: "c.fer", Phase: PhaseParsed})
+	ctx.AddModule("d", &Module{FilePath: "d.fer", Phase: PhaseParsed})
+
+	// Add dependencies:
+	// a -> b, a -> c, b -> d, c -> d
+	ctx.AddDependency("a", "b")
+	ctx.AddDependency("a", "c")
+	ctx.AddDependency("b", "d")
+	ctx.AddDependency("c", "d")
+
+	ctx.ComputeTopologicalOrder()
+	order := ctx.GetModuleNames()
+
+	// The only valid topological orders are:
+	// d before b and c, b and c before a
+	index := func(name string) int {
+		for i, v := range order {
+			if v == name {
+				return i
+			}
+		}
+		return -1
+	}
+
+	if !(index("d") < index("b") && index("d") < index("c") &&
+		index("b") < index("a") && index("c") < index("a")) {
+		t.Errorf("Topological order incorrect: %v", order)
+	}
+
+	// All modules should be present
+	expected := map[string]bool{"a": true, "b": true, "c": true, "d": true}
+	for _, mod := range order {
+		if !expected[mod] {
+			t.Errorf("Unexpected module in order: %s", mod)
+		}
+		delete(expected, mod)
+	}
+	for missing := range expected {
+		t.Errorf("Missing module in order: %s", missing)
+	}
+}
+
+func TestComputeTopologicalOrder_NoDependencies(t *testing.T) {
+	ctx := New(&Config{Extension: ".fer"}, false)
+	ctx.AddModule("x", &Module{FilePath: "x.fer", Phase: PhaseParsed})
+	ctx.AddModule("y", &Module{FilePath: "y.fer", Phase: PhaseParsed})
+
+	ctx.ComputeTopologicalOrder()
+	order := ctx.GetModuleNames()
+
+	if len(order) != 2 {
+		t.Fatalf("Expected 2 modules in order, got %d", len(order))
+	}
+	found := map[string]bool{}
+	for _, mod := range order {
+		found[mod] = true
+	}
+	if !found["x"] || !found["y"] {
+		t.Errorf("Expected both 'x' and 'y' in order, got %v", order)
+	}
+}
+
+func TestComputeTopologicalOrder_SingleModule(t *testing.T) {
+	ctx := New(&Config{Extension: ".fer"}, false)
+	ctx.AddModule("main", &Module{FilePath: "main.fer", Phase: PhaseParsed})
+
+	ctx.ComputeTopologicalOrder()
+	order := ctx.GetModuleNames()
+
+	if len(order) != 1 || order[0] != "main" {
+		t.Errorf("Expected ['main'], got %v", order)
+	}
+}
+
+func TestComputeTopologicalOrder_CycleIgnored(t *testing.T) {
+	ctx := New(&Config{Extension: ".fer"}, false)
+	ctx.AddModule("a", &Module{FilePath: "a.fer", Phase: PhaseParsed})
+	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: PhaseParsed})
+
+	// Add a dependency a -> b
+	ctx.AddDependency("a", "b")
+	// Try to add a cycle b -> a (should be rejected)
+	_ = ctx.AddDependency("b", "a")
+
+	ctx.ComputeTopologicalOrder()
+	order := ctx.GetModuleNames()
+
+	// Should still contain both modules
+	if len(order) != 2 {
+		t.Errorf("Expected 2 modules, got %v", order)
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
