@@ -20,7 +20,6 @@ type Symbol struct {
 	Type     types.SemType // Semantic type of the symbol
 	Exported bool          // Whether symbol is accessible from other modules
 	Decl     ast.Node      // AST node that declared this symbol
-	Scope    *SymbolTable // nil except function, user defined type
 }
 
 // SymbolKind categorizes symbols
@@ -59,5 +58,13 @@ func (st *SymbolTable) Lookup(name string) (*Symbol, bool) {
 	if st.parent != nil {
 		return st.parent.Lookup(name)
 	}
+	return nil, false
+}
+
+func (st *SymbolTable) GetSymbol(name string) (*Symbol, bool) {
+	if sym, ok := st.symbols[name]; ok {
+		return sym, true
+	}
+
 	return nil, false
 }

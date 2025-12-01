@@ -47,40 +47,19 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.FuncDecl:
-		// 1) Validate parameters (variadic rules, duplicates, missing types)
-		validateFunctionParams(ctx, mod, n)
 
-		sym, ok := mod.Scope.Lookup(n.Name.Name)
-		if !ok {
-			fmt.Printf("function %s not declared", n.Name.Name)
-			return
-		}
-
-		funcScope := sym.Scope
+		funcScope := n.Scope.(*table.SymbolTable)
 
 		// switch to function scope
-		oldScope := mod.Scope
-		mod.Scope = funcScope
-
-		for _, param := range n.Type.Params {
-			psym := table.Symbol{
-				Name: param.Name.Name,
-				Kind: table.SymbolParameter,
-				Decl: &param,
-			}
-
-			err := mod.Scope.Declare(param.Name.Name, &psym)
-
-			if err != nil {
-				fmt.Printf("param %s alreary declared", param.Name.Name)
-			}
-		}
+		oldScope := mod.CurrentScope
+		mod.CurrentScope = funcScope
 
 		// 3) Bind names in function body
 		if n.Body != nil {
 			resolveBlock(ctx, mod, n.Body)
-			mod.Scope = oldScope // restore
 		}
+
+		mod.CurrentScope = oldScope // restore
 
 	case *ast.AssignStmt:
 		resolveExpr(ctx, mod, n.Lhs)
@@ -92,6 +71,15 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.IfStmt:
+		// Enter if scope if it exists
+		if n.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = n.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
 		resolveExpr(ctx, mod, n.Cond)
 		resolveBlock(ctx, mod, n.Body)
 		if n.Else != nil {
@@ -99,6 +87,15 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.ForStmt:
+		// Enter for loop scope if it exists
+		if n.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = n.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
 		if n.Init != nil {
 			resolveNode(ctx, mod, n.Init)
 		}
@@ -108,6 +105,19 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		if n.Post != nil {
 			resolveNode(ctx, mod, n.Post)
 		}
+		resolveBlock(ctx, mod, n.Body)
+
+	case *ast.WhileStmt:
+		// Enter while loop scope if it exists
+		if n.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = n.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
+		resolveExpr(ctx, mod, n.Cond)
 		resolveBlock(ctx, mod, n.Body)
 
 	case *ast.Block:
@@ -126,12 +136,22 @@ func resolveBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 	if block == nil {
 		return
 	}
+
+	// Enter block scope if it exists
+	if block.Scope != nil {
+		oldScope := mod.CurrentScope
+		mod.CurrentScope = block.Scope.(*table.SymbolTable)
+		defer func() {
+			mod.CurrentScope = oldScope
+		}()
+	}
+
 	for _, node := range block.Nodes {
 		resolveNode(ctx, mod, node)
 	}
 }
 
-// resolveExpr checks identifier references in expressions
+// resolveExpr checks identifier references in expressions// resolveExpr checks identifier references in expressions
 func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) {
 	if expr == nil {
 		return
@@ -141,7 +161,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	case *ast.IdentifierExpr:
 		// Check if the identifier is declared
 		name := e.Name
-		if _, ok := mod.Scope.Lookup(name); !ok {
+		if _, ok := mod.CurrentScope.Lookup(name); !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found", name)).
 					WithPrimaryLabel(mod.FilePath, &e.Location, "").
@@ -191,82 +211,23 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		resolveExpr(ctx, mod, e.Cond)
 		resolveExpr(ctx, mod, e.Default)
 
+	case *ast.FuncLit:
+		// Function literals have their own scope for parameters and body
+		if e.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = e.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
+		// Resolve function body
+		if e.Body != nil {
+			resolveNode(ctx, mod, e.Body)
+		}
+
 	// Literals don't need binding
 	case *ast.BasicLit:
 		// No binding needed
-	}
-}
-
-// validateFunctionParams validates function parameters including variadic rules
-func validateFunctionParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcDecl *ast.FuncDecl) {
-	if funcDecl.Type == nil || funcDecl.Type.Params == nil {
-		return
-	}
-
-	params := funcDecl.Type.Params
-	variadicCount := 0
-	variadicIndex := -1
-
-	// Check for variadic parameters and their position
-	for i, param := range params {
-		if param.IsVariadic {
-			variadicCount++
-			variadicIndex = i
-		}
-	}
-
-	// Rule: Maximum one variadic parameter
-	if variadicCount > 1 {
-		for _, param := range params {
-			if param.IsVariadic {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError("multiple variadic parameters").
-						WithPrimaryLabel(mod.FilePath, param.Loc(), "variadic parameter here").
-						WithHelp("a function can have at most one variadic parameter"),
-				)
-			}
-		}
-		return
-	}
-
-	// Rule: Variadic parameter must be last
-	if variadicCount == 1 && variadicIndex != len(params)-1 {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError("variadic parameter must be last").
-				WithPrimaryLabel(mod.FilePath, params[variadicIndex].Loc(), "variadic parameter not at end").
-				WithHelp(fmt.Sprintf("move this parameter to position %d (last)", len(params))),
-		)
-	}
-
-	// Check for duplicate parameter names
-	paramNames := make(map[string]*ast.Field)
-	for _, param := range params {
-		if param.Name != nil {
-			name := param.Name.Name
-			if existing, ok := paramNames[name]; ok {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("duplicate parameter name '%s'", name)).
-						WithPrimaryLabel(mod.FilePath, param.Loc(), fmt.Sprintf("'%s' already declared", name)).
-						WithSecondaryLabel(mod.FilePath, existing.Loc(), "previous declaration here"),
-				)
-			} else {
-				paramNames[name] = &param
-			}
-		}
-	}
-
-	// Check for missing parameter types
-	for _, param := range params {
-		if param.Type == nil {
-			paramName := "<unnamed>"
-			if param.Name != nil {
-				paramName = param.Name.Name
-			}
-			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("parameter '%s' missing type annotation", paramName)).
-					WithPrimaryLabel(mod.FilePath, param.Loc(), "type annotation required").
-					WithHelp("add type annotation (e.g., 'name: i32')"),
-			)
-		}
 	}
 }

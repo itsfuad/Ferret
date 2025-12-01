@@ -114,18 +114,15 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	module, exists := p.ctx.GetModule(importPath)
 	if !exists {
 		module = &context_v2.Module{
-			FilePath:   "",
-			ImportPath: importPath,
-			Type:       context_v2.ModuleLocal,
-			Phase:      context_v2.PhaseNotStarted,
-			Scope:      table.NewSymbolTable(p.ctx.Universe),
-			Content:    "",
-			AST:        nil,
+			FilePath:     "",
+			ImportPath:   importPath,
+			Type:         context_v2.ModuleLocal,
+			Phase:        context_v2.PhaseNotStarted,
+			CurrentScope: table.NewSymbolTable(p.ctx.Universe),
+			Content:      "",
+			AST:          nil,
 		}
 		p.ctx.AddModule(importPath, module)
-		if p.ctx.Debug {
-			fmt.Printf("module '%s' parsed and added", importPath)
-		}
 	}
 
 	// Resolve import path to file path
@@ -196,6 +193,10 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	module.Mu.Lock()
 	module.AST = astModule
 	module.Mu.Unlock()
+
+	if astModule != nil {
+		astModule.SaveAST()
+	}
 
 	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseParsed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)

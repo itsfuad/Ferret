@@ -125,8 +125,8 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	Scope   *table.SymbolTable // Module-level symbols
-	Imports []*Import          // Resolved imports
+	CurrentScope *table.SymbolTable // Module-level symbols
+	Imports      []*Import          // Resolved imports
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
@@ -329,11 +329,11 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 
 	// Create the entry module directly with the provided code
 	module := &Module{
-		FilePath: virtualPath,
-		Type:     ModuleLocal,
-		Phase:    PhaseNotStarted,
-		Scope:    table.NewSymbolTable(ctx.Universe),
-		Content:  code,
+		FilePath:     virtualPath,
+		Type:         ModuleLocal,
+		Phase:        PhaseNotStarted,
+		CurrentScope: table.NewSymbolTable(ctx.Universe),
+		Content:      code,
 	}
 
 	ctx.AddModule(ctx.EntryModule, module)

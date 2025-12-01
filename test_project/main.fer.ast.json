@@ -1,0 +1,623 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_project/main.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Path": {
+        "Kind": 2,
+        "Value": "test_project/utils",
+        "Start": {
+          "Line": 1,
+          "Column": 8,
+          "Index": 7
+        },
+        "End": {
+          "Line": 1,
+          "Column": 28,
+          "Index": 27
+        }
+      },
+      "Alias": {
+        "Name": "",
+        "Start": null,
+        "End": null
+      },
+      "LocationOnDisk": "",
+      "Start": {
+        "Line": 1,
+        "Column": 1,
+        "Index": 0
+      },
+      "End": {
+        "Line": 1,
+        "Column": 29,
+        "Index": 28
+      }
+    },
+    {
+      "Path": {
+        "Kind": 2,
+        "Value": "std/math",
+        "Start": {
+          "Line": 2,
+          "Column": 8,
+          "Index": 36
+        },
+        "End": {
+          "Line": 2,
+          "Column": 18,
+          "Index": 46
+        }
+      },
+      "Alias": {
+        "Name": "",
+        "Start": null,
+        "End": null
+      },
+      "LocationOnDisk": "",
+      "Start": {
+        "Line": 2,
+        "Column": 1,
+        "Index": 29
+      },
+      "End": {
+        "Line": 2,
+        "Column": 19,
+        "Index": 47
+      }
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "x",
+            "Start": {
+              "Line": 4,
+              "Column": 5,
+              "Index": 53
+            },
+            "End": {
+              "Line": 4,
+              "Column": 6,
+              "Index": 54
+            }
+          },
+          "Type": null,
+          "Value": {
+            "Kind": 0,
+            "Value": "42",
+            "Start": {
+              "Line": 4,
+              "Column": 10,
+              "Index": 58
+            },
+            "End": {
+              "Line": 4,
+              "Column": 12,
+              "Index": 60
+            }
+          }
+        }
+      ],
+      "Start": {
+        "Line": 4,
+        "Column": 1,
+        "Index": 49
+      },
+      "End": {
+        "Line": 4,
+        "Column": 13,
+        "Index": 61
+      }
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "PI",
+            "Start": {
+              "Line": 5,
+              "Column": 7,
+              "Index": 68
+            },
+            "End": {
+              "Line": 5,
+              "Column": 9,
+              "Index": 70
+            }
+          },
+          "Type": null,
+          "Value": {
+            "Kind": 1,
+            "Value": "3.14",
+            "Start": {
+              "Line": 5,
+              "Column": 13,
+              "Index": 74
+            },
+            "End": {
+              "Line": 5,
+              "Column": 17,
+              "Index": 78
+            }
+          }
+        }
+      ],
+      "Start": {
+        "Line": 5,
+        "Column": 1,
+        "Index": 62
+      },
+      "End": {
+        "Line": 5,
+        "Column": 18,
+        "Index": 79
+      }
+    },
+    {
+      "Name": {
+        "Name": "\u003canonymous\u003e",
+        "Start": null,
+        "End": null
+      },
+      "Type": {
+        "Fields": [
+          {
+            "Name": {
+              "Name": "x",
+              "Start": {
+                "Line": 9,
+                "Column": 6,
+                "Index": 95
+              },
+              "End": {
+                "Line": 9,
+                "Column": 7,
+                "Index": 96
+              }
+            },
+            "Type": {
+              "Name": "i32",
+              "Start": {
+                "Line": 9,
+                "Column": 9,
+                "Index": 98
+              },
+              "End": {
+                "Line": 9,
+                "Column": 12,
+                "Index": 101
+              }
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null
+          },
+          {
+            "Name": {
+              "Name": "y",
+              "Start": {
+                "Line": 10,
+                "Column": 6,
+                "Index": 108
+              },
+              "End": {
+                "Line": 10,
+                "Column": 7,
+                "Index": 109
+              }
+            },
+            "Type": {
+              "Name": "i32",
+              "Start": {
+                "Line": 10,
+                "Column": 9,
+                "Index": 111
+              },
+              "End": {
+                "Line": 10,
+                "Column": 12,
+                "Index": 114
+              }
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null
+          }
+        ],
+        "Start": {
+          "Line": 8,
+          "Column": 1,
+          "Index": 82
+        },
+        "End": {
+          "Line": 11,
+          "Column": 2,
+          "Index": 117
+        }
+      },
+      "Start": {
+        "Line": 8,
+        "Column": 1,
+        "Index": 82
+      },
+      "End": {
+        "Line": 11,
+        "Column": 2,
+        "Index": 117
+      }
+    },
+    {
+      "Name": {
+        "Name": "add",
+        "Start": {
+          "Line": 15,
+          "Column": 4,
+          "Index": 138
+        },
+        "End": {
+          "Line": 15,
+          "Column": 7,
+          "Index": 141
+        }
+      },
+      "Type": {
+        "Params": [
+          {
+            "Name": {
+              "Name": "a",
+              "Start": {
+                "Line": 15,
+                "Column": 8,
+                "Index": 142
+              },
+              "End": {
+                "Line": 15,
+                "Column": 9,
+                "Index": 143
+              }
+            },
+            "Type": {
+              "Name": "i32",
+              "Start": {
+                "Line": 15,
+                "Column": 11,
+                "Index": 145
+              },
+              "End": {
+                "Line": 15,
+                "Column": 14,
+                "Index": 148
+              }
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": {
+              "Line": 15,
+              "Column": 8,
+              "Index": 142
+            },
+            "End": {
+              "Line": 15,
+              "Column": 14,
+              "Index": 148
+            }
+          },
+          {
+            "Name": {
+              "Name": "b",
+              "Start": {
+                "Line": 15,
+                "Column": 16,
+                "Index": 150
+              },
+              "End": {
+                "Line": 15,
+                "Column": 17,
+                "Index": 151
+              }
+            },
+            "Type": {
+              "Name": "i32",
+              "Start": {
+                "Line": 15,
+                "Column": 19,
+                "Index": 153
+              },
+              "End": {
+                "Line": 15,
+                "Column": 22,
+                "Index": 156
+              }
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": {
+              "Line": 15,
+              "Column": 16,
+              "Index": 150
+            },
+            "End": {
+              "Line": 15,
+              "Column": 22,
+              "Index": 156
+            }
+          }
+        ],
+        "Result": {
+          "Name": "i32",
+          "Start": {
+            "Line": 15,
+            "Column": 27,
+            "Index": 161
+          },
+          "End": {
+            "Line": 15,
+            "Column": 30,
+            "Index": 164
+          }
+        },
+        "Start": {
+          "Line": 15,
+          "Column": 1,
+          "Index": 135
+        },
+        "End": {
+          "Line": 15,
+          "Column": 30,
+          "Index": 164
+        }
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Result": {
+              "X": {
+                "Name": "a",
+                "Start": {
+                  "Line": 16,
+                  "Column": 12,
+                  "Index": 178
+                },
+                "End": {
+                  "Line": 16,
+                  "Column": 13,
+                  "Index": 179
+                }
+              },
+              "Op": {
+                "Kind": "+",
+                "Value": "+",
+                "Start": {
+                  "Line": 16,
+                  "Column": 14,
+                  "Index": 180
+                },
+                "End": {
+                  "Line": 16,
+                  "Column": 15,
+                  "Index": 181
+                }
+              },
+              "Y": {
+                "Name": "b",
+                "Start": {
+                  "Line": 16,
+                  "Column": 16,
+                  "Index": 182
+                },
+                "End": {
+                  "Line": 16,
+                  "Column": 17,
+                  "Index": 183
+                }
+              },
+              "Start": {
+                "Line": 16,
+                "Column": 12,
+                "Index": 178
+              },
+              "End": {
+                "Line": 16,
+                "Column": 17,
+                "Index": 183
+              }
+            },
+            "IsError": false,
+            "Start": {
+              "Line": 16,
+              "Column": 5,
+              "Index": 171
+            },
+            "End": {
+              "Line": 16,
+              "Column": 17,
+              "Index": 183
+            }
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 15,
+          "Column": 31,
+          "Index": 165
+        },
+        "End": {
+          "Line": 17,
+          "Column": 2,
+          "Index": 186
+        }
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 15,
+        "Column": 1,
+        "Index": 135
+      },
+      "End": {
+        "Line": 17,
+        "Column": 2,
+        "Index": 186
+      }
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "result",
+            "Start": {
+              "Line": 19,
+              "Column": 5,
+              "Index": 192
+            },
+            "End": {
+              "Line": 19,
+              "Column": 11,
+              "Index": 198
+            }
+          },
+          "Type": null,
+          "Value": {
+            "Fun": {
+              "Name": "add",
+              "Start": {
+                "Line": 19,
+                "Column": 15,
+                "Index": 202
+              },
+              "End": {
+                "Line": 19,
+                "Column": 18,
+                "Index": 205
+              }
+            },
+            "Args": [
+              {
+                "Kind": 0,
+                "Value": "10",
+                "Start": {
+                  "Line": 19,
+                  "Column": 19,
+                  "Index": 206
+                },
+                "End": {
+                  "Line": 19,
+                  "Column": 21,
+                  "Index": 208
+                }
+              },
+              {
+                "Kind": 0,
+                "Value": "20",
+                "Start": {
+                  "Line": 19,
+                  "Column": 23,
+                  "Index": 210
+                },
+                "End": {
+                  "Line": 19,
+                  "Column": 25,
+                  "Index": 212
+                }
+              }
+            ],
+            "Catch": null,
+            "Start": {
+              "Line": 19,
+              "Column": 15,
+              "Index": 202
+            },
+            "End": {
+              "Line": 19,
+              "Column": 26,
+              "Index": 213
+            }
+          }
+        }
+      ],
+      "Start": {
+        "Line": 19,
+        "Column": 1,
+        "Index": 188
+      },
+      "End": {
+        "Line": 19,
+        "Column": 27,
+        "Index": 214
+      }
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "name",
+            "Start": {
+              "Line": 21,
+              "Column": 5,
+              "Index": 220
+            },
+            "End": {
+              "Line": 21,
+              "Column": 9,
+              "Index": 224
+            }
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Name": "utils",
+              "Start": {
+                "Line": 21,
+                "Column": 13,
+                "Index": 228
+              },
+              "End": {
+                "Line": 21,
+                "Column": 18,
+                "Index": 233
+              }
+            },
+            "Selector": {
+              "Name": "NAME",
+              "Start": {
+                "Line": 21,
+                "Column": 20,
+                "Index": 235
+              },
+              "End": {
+                "Line": 21,
+                "Column": 24,
+                "Index": 239
+              }
+            },
+            "Start": {
+              "Line": 21,
+              "Column": 13,
+              "Index": 228
+            },
+            "End": {
+              "Line": 21,
+              "Column": 24,
+              "Index": 239
+            }
+          }
+        }
+      ],
+      "Start": {
+        "Line": 21,
+        "Column": 1,
+        "Index": 216
+      },
+      "End": {
+        "Line": 21,
+        "Column": 25,
+        "Index": 240
+      }
+    }
+  ],
+  "Start": null,
+  "End": null
+}

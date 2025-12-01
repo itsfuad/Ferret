@@ -24,7 +24,8 @@ type Options struct {
 	// For in-memory compilation (WASM)
 	Code string
 	// Debug output
-	Debug bool
+	Debug   bool
+	SaveAST bool
 	// Output format: "ansi" or "html"
 	LogFormat FORMAT
 }

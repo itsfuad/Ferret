@@ -335,11 +335,11 @@ func TestAddModuleWithAST(t *testing.T) {
 	}
 
 	module := &Module{
-		FilePath: "/test/module.fer",
-		Type:     ModuleLocal,
-		Phase:    PhaseParsed,
-		AST:      astModule,
-		Scope:    table.NewSymbolTable(ctx.Universe),
+		FilePath:     "/test/module.fer",
+		Type:         ModuleLocal,
+		Phase:        PhaseParsed,
+		AST:          astModule,
+		CurrentScope: table.NewSymbolTable(ctx.Universe),
 	}
 
 	ctx.AddModule("test/module", module)
@@ -353,7 +353,7 @@ func TestAddModuleWithAST(t *testing.T) {
 		t.Error("Expected AST to be set")
 	}
 
-	if retrieved.Scope == nil {
+	if retrieved.CurrentScope == nil {
 		t.Error("Expected symbol table to be set")
 	}
 }

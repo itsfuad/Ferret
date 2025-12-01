@@ -2,9 +2,13 @@ package ast
 
 import "compiler/internal/source"
 
+// Forward declaration to avoid import cycle
+type SymbolTable interface{}
+
 // BlockStmt represents a block of statements
 type Block struct {
 	Nodes []Node
+	Scope SymbolTable // Symbol table for this block scope (filled during collection)
 	source.Location
 }
 
@@ -17,6 +21,7 @@ type FuncDecl struct {
 	Name *IdentifierExpr
 	Type *FuncType // Function signature
 	Body *Block    // Function body
+	Scope SymbolTable
 	source.Location
 }
 
@@ -28,10 +33,11 @@ func (f *FuncDecl) Loc() *source.Location { return &f.Location }
 // MethodDecl represents a method declaration with a receiver
 // Example: fn (r Rect) area() -> f64 { return r.width * r.height; }
 type MethodDecl struct {
-	Receiver *Field         // method receiver (e.g., r Rect)
+	Receiver *Field          // method receiver (e.g., r Rect)
 	Name     *IdentifierExpr // method name
 	Type     *FuncType       // function signature (parameters and return type)
 	Body     *Block          // method body
+	Scope	 SymbolTable
 	source.Location
 }
 
@@ -42,9 +48,10 @@ func (m *MethodDecl) Loc() *source.Location { return &m.Location }
 
 // IfStmt represents an if statement with optional else and else-if branches
 type IfStmt struct {
-	Cond Expression // condition
-	Body *Block     // then branch
-	Else Node       // else branch (can be another IfStmt or Block)
+	Cond  Expression  // condition
+	Body  *Block      // then branch
+	Else  Node        // else branch (can be another IfStmt or Block)
+	Scope SymbolTable // Symbol table for if scope (filled during collection)
 	source.Location
 }
 
@@ -54,10 +61,11 @@ func (i *IfStmt) Loc() *source.Location { return &i.Location }
 
 // ForStmt represents a for loop
 type ForStmt struct {
-	Init Expression // initialization (can be nil)
-	Cond Expression // condition (can be nil for infinite loop)
-	Post Expression // post iteration (can be nil)
-	Body *Block     // loop body
+	Init  Expression  // initialization (can be nil)
+	Cond  Expression  // condition (can be nil for infinite loop)
+	Post  Expression  // post iteration (can be nil)
+	Body  *Block      // loop body
+	Scope SymbolTable // Symbol table for for loop scope (filled during collection)
 	source.Location
 }
 
@@ -67,8 +75,9 @@ func (f *ForStmt) Loc() *source.Location { return &f.Location }
 
 // WhileStmt represents a while loop
 type WhileStmt struct {
-	Cond Expression // condition
-	Body *Block     // loop body
+	Cond  Expression  // condition
+	Body  *Block      // loop body
+	Scope SymbolTable // Symbol table for while loop scope (filled during collection)
 	source.Location
 }
 

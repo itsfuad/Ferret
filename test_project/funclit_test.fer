@@ -1,0 +1,41 @@
+// Test function literals (anonymous functions/lambdas)
+
+fn main() {
+    // Simple function literal assigned to variable
+    let add := fn(a: i32, b: i32) -> i32 {
+        return a + b;
+    };
+
+    // Function literal with local variables
+    let multiply := fn(x: i32, y: i32) -> i32 {
+        let result := x * y;
+        return result;
+    };
+
+    // Test parameter scoping - parameters should only be visible inside the function
+    // This should error: 'a' is not accessible here
+    // let test := a + 10;
+
+    // Test local variable scoping - locals should only be visible inside function
+    // This should error: 'result' is not accessible here
+    // let test2 := result + 5;
+
+    // Test closure - function literal capturing outer scope variable
+    let outer := 42;
+    let capturer := fn() -> i32 {
+        // This should work - 'outer' is in parent scope
+        return outer;
+    };
+
+    // Test nested scopes in function literal
+    let nested := fn(x: i32) -> i32 {
+        let a := x + 1;
+        {
+            let b := a + 2;
+            // 'b' should only be visible in this block
+        }
+        // This should error: 'b' not accessible here
+        // return b;
+        return a;
+    };
+}

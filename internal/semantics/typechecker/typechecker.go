@@ -44,12 +44,30 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			checkExpr(ctx, mod, n.Result, types.TypeUnknown)
 		}
 	case *ast.IfStmt:
+		// Enter if scope if it exists
+		if n.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = n.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 		checkBlock(ctx, mod, n.Body)
 		if n.Else != nil {
 			checkNode(ctx, mod, n.Else)
 		}
 	case *ast.ForStmt:
+		// Enter for loop scope if it exists
+		if n.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = n.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
 		if n.Init != nil {
 			checkNode(ctx, mod, n.Init)
 		}
@@ -59,6 +77,18 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		if n.Post != nil {
 			checkNode(ctx, mod, n.Post)
 		}
+		checkBlock(ctx, mod, n.Body)
+	case *ast.WhileStmt:
+		// Enter while loop scope if it exists
+		if n.Scope != nil {
+			oldScope := mod.CurrentScope
+			mod.CurrentScope = n.Scope.(*table.SymbolTable)
+			defer func() {
+				mod.CurrentScope = oldScope
+			}()
+		}
+
+		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 		checkBlock(ctx, mod, n.Body)
 	case *ast.Block:
 		checkBlock(ctx, mod, n)
@@ -86,7 +116,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		name := item.Name.Name
 
 		// Get or create the symbol (module-level or local)
-		sym, ok := mod.Scope.Lookup(name)
+		sym, ok := mod.CurrentScope.GetSymbol(name)
 		if !ok {
 			// This is a local variable declaration - create a new symbol
 			kind := table.SymbolVariable
@@ -100,7 +130,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				Exported: false,
 				Decl:     item.Name, // Use the identifier as the Decl node
 			}
-			if err := mod.Scope.Declare(name, sym); err != nil {
+			if err := mod.CurrentScope.Declare(name, sym); err != nil {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
 						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "already declared in this scope"),
@@ -160,18 +190,11 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 // checkFuncDecl type checks a function declaration
 func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
 
-	// Create a new scope for the function body
-	sym, ok := mod.Scope.Lookup(decl.Name.Name)
-	if !ok {
-		fmt.Printf("function %s not declared", decl.Name.Name)
-		return
-	}
-
-	funcScope := sym.Scope
+	funcScope := decl.Scope.(*table.SymbolTable)
 
 	oldScope := funcScope
 
-	mod.Scope = funcScope
+	mod.CurrentScope = funcScope
 
 	// Add parameters to the function scope with type information
 	if decl.Type != nil && decl.Type.Params != nil {
@@ -179,10 +202,9 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 			if param.Name != nil {
 				paramType := typeFromTypeNode(param.Type)
 				// update the param type
-				psym, ok := funcScope.Lookup(param.Name.Name)
+				psym, ok := funcScope.GetSymbol(param.Name.Name)
 				if !ok {
-					fmt.Printf("function param %s not declared", param.Name.Name)
-					continue
+					continue // should not happen but safe side
 				}
 
 				psym.Type = paramType // Done
@@ -192,10 +214,10 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	// Check the body with the function scope
 	if decl.Body != nil {
-		oldScope := mod.Scope
-		mod.Scope = funcScope
+		oldScope := mod.CurrentScope
+		mod.CurrentScope = funcScope
 		checkBlock(ctx, mod, decl.Body)
-		mod.Scope = oldScope
+		mod.CurrentScope = oldScope
 
 		// Build control flow graph for the function
 		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
@@ -205,14 +227,14 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
 	}
 
-	mod.Scope = oldScope // restore
+	mod.CurrentScope = oldScope // restore
 }
 
 // checkAssignStmt type checks an assignment statement
 func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.AssignStmt) {
 	// Check if we're trying to reassign a constant
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-		if sym, found := mod.Scope.Lookup(ident.Name); found {
+		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
 			if sym.Kind == table.SymbolConstant {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
@@ -238,6 +260,16 @@ func checkBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *
 	if block == nil {
 		return
 	}
+
+	// Enter block scope if it exists
+	if block.Scope != nil {
+		oldScope := mod.CurrentScope
+		mod.CurrentScope = block.Scope.(*table.SymbolTable)
+		defer func() {
+			mod.CurrentScope = oldScope
+		}()
+	}
+
 	for _, node := range block.Nodes {
 		checkNode(ctx, mod, node)
 	}

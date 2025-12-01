@@ -58,9 +58,10 @@ func (k *KeyValueExpr) Loc() *source.Location { return &k.Location }
 
 // FuncLit represents a function literal (anonymous function/lambda)
 type FuncLit struct {
-	ID   IdentifierExpr		 // unique identifier for the function literal
-	Type *FuncType // function signature
-	Body *Block    // function body
+	ID    IdentifierExpr // unique identifier for the function literal
+	Type  *FuncType      // function signature
+	Body  *Block         // function body
+	Scope SymbolTable    // Symbol table for function scope (filled during collection)
 	source.Location
 }
 
