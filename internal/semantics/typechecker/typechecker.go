@@ -5,7 +5,8 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/controlflow"
-	"compiler/internal/table"
+	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 	"fmt"
 	"strconv"
@@ -118,25 +119,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		// Get or create the symbol (module-level or local)
 		sym, ok := mod.CurrentScope.GetSymbol(name)
 		if !ok {
-			// This is a local variable declaration - create a new symbol
-			kind := table.SymbolVariable
-			if isConst {
-				kind = table.SymbolConstant
-			}
-			sym = &table.Symbol{
-				Name:     name,
-				Kind:     kind,
-				Type:     types.TypeUnknown,
-				Exported: false,
-				Decl:     item.Name, // Use the identifier as the Decl node
-			}
-			if err := mod.CurrentScope.Declare(name, sym); err != nil {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
-						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "already declared in this scope"),
-				)
-				continue
-			}
+			continue
 		}
 
 		// Determine the type
@@ -235,7 +218,7 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// Check if we're trying to reassign a constant
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
 		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-			if sym.Kind == table.SymbolConstant {
+			if sym.Kind == symbols.SymbolConstant {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
 						WithPrimaryLabel(mod.FilePath, stmt.Lhs.Loc(), "cannot modify constant").

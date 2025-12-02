@@ -6,7 +6,8 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
-	"compiler/internal/table"
+	"compiler/internal/semantics/table"
+
 	"testing"
 )
 

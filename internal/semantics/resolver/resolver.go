@@ -4,7 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/table"
+	"compiler/internal/semantics/table"
 
 	"fmt"
 )
@@ -216,15 +216,6 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 					diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
 						WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleName)).
 						WithNote("This is likely a compiler bug"),
-				)
-				return
-			}
-
-			// Check if the symbol exists in the imported module and is exported
-			if importedMod.CurrentScope == nil {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("module '%s' has no symbols", moduleName)).
-						WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' is empty", moduleName)),
 				)
 				return
 			}

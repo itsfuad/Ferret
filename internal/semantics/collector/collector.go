@@ -5,20 +5,17 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/table"
+	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 	"fmt"
 	"strings"
 )
 
 // CollectModule builds the symbol table for a module by traversing its AST.
-// It declares names for let/const/fn/type declarations and fills Module.Symbols.
+// It declares names for let/const/fn/type declarations and fills Module.table.
 // No type checking is performed - all symbols get TYPE_UNKNOWN initially.
 func CollectModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
-	// Initialize module symbol table if not exist
-	if mod.CurrentScope == nil {
-		mod.CurrentScope = table.NewSymbolTable(ctx.Universe)
-	}
 
 	// Initialize imports list if not exist
 	if mod.Imports == nil {
@@ -45,9 +42,9 @@ func CollectModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
 	switch n := node.(type) {
 	case *ast.VarDecl:
-		collectVarDecl(ctx, mod, n, table.SymbolVariable)
+		collectVarDecl(ctx, mod, n, symbols.SymbolVariable)
 	case *ast.ConstDecl:
-		collectVarDecl(ctx, mod, n, table.SymbolConstant)
+		collectVarDecl(ctx, mod, n, symbols.SymbolConstant)
 	case *ast.FuncDecl:
 		collectFuncDecl(ctx, mod, n)
 	case *ast.TypeDecl:
@@ -96,7 +93,7 @@ func collectBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 }
 
 // collectVarDecl handles variable and constant declarations
-func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl interface{}, kind table.SymbolKind) {
+func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl interface{}, kind symbols.SymbolKind) {
 	var declItems []ast.DeclItem
 
 	switch d := decl.(type) {
@@ -123,7 +120,7 @@ func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, dec
 		}
 
 		// Create symbol with TYPE_UNKNOWN (will be filled during type checking)
-		sym := &table.Symbol{
+		sym := &symbols.Symbol{
 			Name:     name,
 			Kind:     kind,
 			Type:     types.TypeUnknown,
@@ -161,9 +158,9 @@ func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	}
 
 	// Create symbol (type will be filled during type checking)
-	sym := &table.Symbol{
+	sym := &symbols.Symbol{
 		Name:     name,
-		Kind:     table.SymbolFunction,
+		Kind:     symbols.SymbolFunction,
 		Type:     types.NewFunction([]types.ParamType{}, types.TypeVoid), // Placeholder, will be filled during type checking
 		Exported: isExported(name),
 		Decl:     decl,
@@ -265,9 +262,9 @@ func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	}
 
 	// Create symbol
-	sym := &table.Symbol{
+	sym := &symbols.Symbol{
 		Name:     name,
-		Kind:     table.SymbolType,
+		Kind:     symbols.SymbolType,
 		Type:     types.TypeUnknown, // The actual type will be resolved later
 		Exported: isExported(name),
 		Decl:     decl,
@@ -462,9 +459,9 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
-			psym := &table.Symbol{
+			psym := &symbols.Symbol{
 				Name: param.Name.Name,
-				Kind: table.SymbolParameter,
+				Kind: symbols.SymbolParameter,
 				Decl: &param,
 				Type: types.TypeUnknown, // Will be filled during type checking
 			}

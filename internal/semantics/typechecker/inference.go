@@ -4,7 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/table"
+	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 
 	"strconv"

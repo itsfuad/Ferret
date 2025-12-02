@@ -1,9 +1,8 @@
 package ast
 
-import "compiler/internal/source"
-
-// Forward declaration to avoid import cycle
-type SymbolTable interface{}
+import (
+	"compiler/internal/source"
+)
 
 // BlockStmt represents a block of statements
 type Block struct {
@@ -18,9 +17,9 @@ func (b *Block) Loc() *source.Location { return &b.Location }
 
 // FuncDecl represents both named and anonymous function declarations
 type FuncDecl struct {
-	Name *IdentifierExpr
-	Type *FuncType // Function signature
-	Body *Block    // Function body
+	Name  *IdentifierExpr
+	Type  *FuncType // Function signature
+	Body  *Block    // Function body
 	Scope SymbolTable
 	source.Location
 }
@@ -37,7 +36,7 @@ type MethodDecl struct {
 	Name     *IdentifierExpr // method name
 	Type     *FuncType       // function signature (parameters and return type)
 	Body     *Block          // method body
-	Scope	 SymbolTable
+	Scope    SymbolTable
 	source.Location
 }
 

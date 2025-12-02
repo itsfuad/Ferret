@@ -22,20 +22,20 @@ The module name for `math.fer` would be `your_project/utils/math`.
 ## Importing Modules
 To use a module in another file, you use the `import` statement followed by the module path.
 ```ferret
-import your_project/utils/math;
+import "your_project/utils/math";
 ```
 To use access functions or variables from the imported module, you use the module name as a prefix followed by `::` and then the function or variable name.
 ```ferret
-let result := your_project/utils/math::Some_function();
+let result := math::Some_function();
 ```
 You can also use `as` to create an alias for the module to shorten the name or avoid naming conflicts.
 ```ferret 
-import your_project/utils/math as m;
+import "your_project/utils/math" as m;
 let result := m::Some_function();
 ```
 
 ## Exporting from Modules
-Exporting means, which symbols (functions, variables, types) are accessible from outside the module. The public symbols are usually written in UpperCase, while private symbols are in lowercase. We follow this convention to differentiate between public and private symbols.
+Exporting means, which symbols (functions, variables, types) are accessible from outside the module. The public symbols are usually written in UpperCase, while private symbols are in lowercase. We follow this convention to differentiate between public and private symbol_table.
 ```ferret
 // In your_project/utils/math.fer
 fn PublicFunction() {

@@ -6,7 +6,6 @@ import (
 	"compiler/internal/source"
 )
 
-// parseBlock: { ... }
 func (p *Parser) parseBlock() *ast.Block {
 
 	start := p.expect(lexer.OPEN_CURLY).Start

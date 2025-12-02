@@ -593,10 +593,10 @@ symbol := &Symbol{
     Kind: SymbolVar, // or SymbolFunc, SymbolType, etc.
     Node: astNode,
 }
-ctx.Symbols.Declare(symbol)
+ctx.symbol_table.Declare(symbol)
 
 // Resolve symbols during resolution phase
-resolved := ctx.Symbols.Lookup(identifier)
+resolved := ctx.symbol_table.Lookup(identifier)
 if resolved == nil {
     ctx.Diagnostics.Report(diagnostics.Diagnostic{
         Severity: diagnostics.Error,

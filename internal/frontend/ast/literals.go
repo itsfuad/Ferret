@@ -1,6 +1,8 @@
 package ast
 
-import "compiler/internal/source"
+import (
+	"compiler/internal/source"
+)
 
 type LiteralKind int
 

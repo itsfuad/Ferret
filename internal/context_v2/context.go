@@ -25,8 +25,9 @@ import (
 
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/table"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/source"
-	"compiler/internal/table"
 	"compiler/internal/types"
 	"compiler/internal/utils/fs"
 )
@@ -125,9 +126,11 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	CurrentScope   *table.SymbolTable // Module-level symbols
-	Imports        []*Import          // Resolved imports
-	ImportAliasMap map[string]string  // alias/name -> import path mapping for module access
+	ModuleScope  *table.SymbolTable // Module-level symbols
+	CurrentScope *table.SymbolTable // Current scope during scope switching
+
+	Imports        []*Import         // Resolved imports
+	ImportAliasMap map[string]string // alias/name -> import path mapping for module access
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
@@ -274,24 +277,24 @@ func registerBuiltins(universe *table.SymbolTable) {
 	}
 
 	for _, typ := range builtinTypes {
-		universe.Declare(typ.String(), &table.Symbol{
+		universe.Declare(typ.String(), &symbols.Symbol{
 			Name:     typ.String(),
-			Kind:     table.SymbolType,
+			Kind:     symbols.SymbolType,
 			Type:     typ,
 			Exported: true,
 		})
 	}
 
 	// Built-in constants
-	universe.Declare("true", &table.Symbol{
+	universe.Declare("true", &symbols.Symbol{
 		Name:     "true",
-		Kind:     table.SymbolConstant,
+		Kind:     symbols.SymbolConstant,
 		Type:     types.TypeBool,
 		Exported: true,
 	})
-	universe.Declare("false", &table.Symbol{
+	universe.Declare("false", &symbols.Symbol{
 		Name:     "false",
-		Kind:     table.SymbolConstant,
+		Kind:     symbols.SymbolConstant,
 		Type:     types.TypeBool,
 		Exported: true,
 	})
@@ -328,12 +331,15 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 	// Add source content to diagnostic bag's cache so it can display source lines
 	ctx.Diagnostics.AddSourceContent(virtualPath, code)
 
+	modScope := table.NewSymbolTable(ctx.Universe)
+
 	// Create the entry module directly with the provided code
 	module := &Module{
 		FilePath:     virtualPath,
 		Type:         ModuleLocal,
 		Phase:        PhaseNotStarted,
-		CurrentScope: table.NewSymbolTable(ctx.Universe),
+		ModuleScope:  modScope,
+		CurrentScope: modScope,
 		Content:      code,
 	}
 

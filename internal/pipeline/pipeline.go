@@ -15,9 +15,9 @@ import (
 	"compiler/internal/frontend/parser"
 	"compiler/internal/semantics/collector"
 	"compiler/internal/semantics/resolver"
+	"compiler/internal/semantics/table"
 	"compiler/internal/semantics/typechecker"
 	"compiler/internal/source"
-	"compiler/internal/table"
 )
 
 // Pipeline coordinates the compilation process
@@ -113,12 +113,14 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	// Get or create module
 	module, exists := p.ctx.GetModule(importPath)
 	if !exists {
+		modScope := table.NewSymbolTable(p.ctx.Universe)
 		module = &context_v2.Module{
 			FilePath:     "",
 			ImportPath:   importPath,
 			Type:         context_v2.ModuleLocal,
 			Phase:        context_v2.PhaseNotStarted,
-			CurrentScope: table.NewSymbolTable(p.ctx.Universe),
+			ModuleScope:  modScope,
+			CurrentScope: modScope,
 			Content:      "",
 			AST:          nil,
 		}
