@@ -1,0 +1,9 @@
+// Test importing same module twice with different aliases
+
+import "test_project/utils";
+import "test_project/utils" as U;
+
+fn main() {
+    let x := utils::MAX;
+    let y := U::MAX;
+}

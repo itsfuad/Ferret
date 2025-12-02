@@ -47,19 +47,15 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.FuncDecl:
-
-		funcScope := n.Scope.(*table.SymbolTable)
-
 		// switch to function scope
-		oldScope := mod.CurrentScope
-		mod.CurrentScope = funcScope
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
 
-		// 3) Bind names in function body
+		// Bind names in function body
 		if n.Body != nil {
 			resolveBlock(ctx, mod, n.Body)
 		}
-
-		mod.CurrentScope = oldScope // restore
 
 	case *ast.AssignStmt:
 		resolveExpr(ctx, mod, n.Lhs)
@@ -73,11 +69,7 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 	case *ast.IfStmt:
 		// Enter if scope if it exists
 		if n.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = n.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
 		resolveExpr(ctx, mod, n.Cond)
@@ -89,11 +81,7 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 	case *ast.ForStmt:
 		// Enter for loop scope if it exists
 		if n.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = n.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
 		if n.Init != nil {
@@ -110,11 +98,7 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 	case *ast.WhileStmt:
 		// Enter while loop scope if it exists
 		if n.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = n.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
 		resolveExpr(ctx, mod, n.Cond)
@@ -139,11 +123,7 @@ func resolveBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 
 	// Enter block scope if it exists
 	if block.Scope != nil {
-		oldScope := mod.CurrentScope
-		mod.CurrentScope = block.Scope.(*table.SymbolTable)
-		defer func() {
-			mod.CurrentScope = oldScope
-		}()
+		defer mod.EnterScope(block.Scope.(*table.SymbolTable))()
 	}
 
 	for _, node := range block.Nodes {
@@ -214,11 +194,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	case *ast.FuncLit:
 		// Function literals have their own scope for parameters and body
 		if e.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = e.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(e.Scope.(*table.SymbolTable))()
 		}
 
 		// Resolve function body
@@ -231,7 +207,6 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		// No binding needed
 	}
 }
-
 
 func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module, e *ast.ScopeResolutionExpr) {
 	// Handle module::symbol resolution
@@ -263,7 +238,9 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 			return
 		}
 
-		sym, ok := importedMod.CurrentScope.GetSymbol(symbolName)
+		// Look up symbol in the imported module's module scope (not CurrentScope)
+		// Use ModuleScope to access module-level symbols
+		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
 		if !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, moduleName)).

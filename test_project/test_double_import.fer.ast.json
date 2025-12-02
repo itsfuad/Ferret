@@ -1,0 +1,272 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_project/test_double_import.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Path": {
+        "Kind": 2,
+        "Value": "test_project/utils",
+        "Start": {
+          "Line": 3,
+          "Column": 8,
+          "Index": 67
+        },
+        "End": {
+          "Line": 3,
+          "Column": 28,
+          "Index": 87
+        }
+      },
+      "Alias": {
+        "Name": "",
+        "Start": null,
+        "End": null
+      },
+      "LocationOnDisk": "",
+      "Start": {
+        "Line": 3,
+        "Column": 1,
+        "Index": 60
+      },
+      "End": {
+        "Line": 3,
+        "Column": 29,
+        "Index": 88
+      }
+    },
+    {
+      "Path": {
+        "Kind": 2,
+        "Value": "test_project/utils",
+        "Start": {
+          "Line": 4,
+          "Column": 8,
+          "Index": 96
+        },
+        "End": {
+          "Line": 4,
+          "Column": 28,
+          "Index": 116
+        }
+      },
+      "Alias": {
+        "Name": "U",
+        "Start": {
+          "Line": 4,
+          "Column": 32,
+          "Index": 120
+        },
+        "End": {
+          "Line": 4,
+          "Column": 33,
+          "Index": 121
+        }
+      },
+      "LocationOnDisk": "",
+      "Start": {
+        "Line": 4,
+        "Column": 1,
+        "Index": 89
+      },
+      "End": {
+        "Line": 4,
+        "Column": 34,
+        "Index": 122
+      }
+    },
+    {
+      "Name": {
+        "Name": "main",
+        "Start": {
+          "Line": 6,
+          "Column": 4,
+          "Index": 127
+        },
+        "End": {
+          "Line": 6,
+          "Column": 8,
+          "Index": 131
+        }
+      },
+      "Type": {
+        "Params": null,
+        "Result": null,
+        "Start": {
+          "Line": 6,
+          "Column": 1,
+          "Index": 124
+        },
+        "End": {
+          "Line": 6,
+          "Column": 10,
+          "Index": 133
+        }
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "x",
+                  "Start": {
+                    "Line": 7,
+                    "Column": 9,
+                    "Index": 144
+                  },
+                  "End": {
+                    "Line": 7,
+                    "Column": 10,
+                    "Index": 145
+                  }
+                },
+                "Type": null,
+                "Value": {
+                  "X": {
+                    "Name": "utils",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 14,
+                      "Index": 149
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 19,
+                      "Index": 154
+                    }
+                  },
+                  "Selector": {
+                    "Name": "MAX",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 21,
+                      "Index": 156
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 24,
+                      "Index": 159
+                    }
+                  },
+                  "Start": {
+                    "Line": 7,
+                    "Column": 14,
+                    "Index": 149
+                  },
+                  "End": {
+                    "Line": 7,
+                    "Column": 24,
+                    "Index": 159
+                  }
+                }
+              }
+            ],
+            "Start": {
+              "Line": 7,
+              "Column": 5,
+              "Index": 140
+            },
+            "End": {
+              "Line": 7,
+              "Column": 25,
+              "Index": 160
+            }
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "y",
+                  "Start": {
+                    "Line": 8,
+                    "Column": 9,
+                    "Index": 169
+                  },
+                  "End": {
+                    "Line": 8,
+                    "Column": 10,
+                    "Index": 170
+                  }
+                },
+                "Type": null,
+                "Value": {
+                  "X": {
+                    "Name": "U",
+                    "Start": {
+                      "Line": 8,
+                      "Column": 14,
+                      "Index": 174
+                    },
+                    "End": {
+                      "Line": 8,
+                      "Column": 15,
+                      "Index": 175
+                    }
+                  },
+                  "Selector": {
+                    "Name": "MAX",
+                    "Start": {
+                      "Line": 8,
+                      "Column": 17,
+                      "Index": 177
+                    },
+                    "End": {
+                      "Line": 8,
+                      "Column": 20,
+                      "Index": 180
+                    }
+                  },
+                  "Start": {
+                    "Line": 8,
+                    "Column": 14,
+                    "Index": 174
+                  },
+                  "End": {
+                    "Line": 8,
+                    "Column": 20,
+                    "Index": 180
+                  }
+                }
+              }
+            ],
+            "Start": {
+              "Line": 8,
+              "Column": 5,
+              "Index": 165
+            },
+            "End": {
+              "Line": 8,
+              "Column": 21,
+              "Index": 181
+            }
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 6,
+          "Column": 11,
+          "Index": 134
+        },
+        "End": {
+          "Line": 9,
+          "Column": 2,
+          "Index": 183
+        }
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 6,
+        "Column": 1,
+        "Index": 124
+      },
+      "End": {
+        "Line": 9,
+        "Column": 2,
+        "Index": 183
+      }
+    }
+  ],
+  "Start": null,
+  "End": null
+}

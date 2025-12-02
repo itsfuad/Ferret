@@ -7,6 +7,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
+	"compiler/internal/source"
 	"compiler/internal/types"
 	"fmt"
 )
@@ -82,16 +83,12 @@ func collectBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 	blockScope := table.NewSymbolTable(mod.CurrentScope)
 	block.Scope = blockScope
 
-	// Enter new block scope
-	oldScope := mod.CurrentScope
-	mod.CurrentScope = blockScope
+	// Enter new block scope and ensure it's restored on exit
+	defer mod.EnterScope(blockScope)()
 
-	defer func() {
-		mod.CurrentScope = oldScope
-		if ctx.Debug {
-			colors.BROWN.Println("Exiting new scope...")
-		}
-	}()
+	if ctx.Debug {
+		defer colors.BROWN.Println("Exiting new scope...")
+	}
 
 	for _, n := range block.Nodes {
 		collectNode(ctx, mod, n)
@@ -288,14 +285,20 @@ func collectImport(mod *context_v2.Module, stmt *ast.ImportStmt) {
 		alias = stmt.Alias.Name
 	}
 
-	// Create import entry
-	imp := &context_v2.Import{
-		Path:     path,
-		Alias:    alias,
-		Location: stmt.Loc(),
+	// Get or create import entry
+	imp, exists := mod.Imports[path]
+	if !exists {
+		imp = &context_v2.Import{
+			Path:      path,
+			Aliases:   []string{},
+			Locations: []*source.Location{},
+		}
+		mod.Imports[path] = imp
 	}
 
-	mod.Imports[path] = imp
+	// Append alias and location
+	imp.Aliases = append(imp.Aliases, alias)
+	imp.Locations = append(imp.Locations, stmt.Loc())
 }
 
 // isExported checks if a name is exported (starts with uppercase letter in Ferret)
@@ -314,21 +317,17 @@ func collectIfStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt
 	ifScope := table.NewSymbolTable(mod.CurrentScope)
 	stmt.Scope = ifScope
 
-	oldScope := mod.CurrentScope
-	mod.CurrentScope = ifScope
-	defer func() {
-		mod.CurrentScope = oldScope
-	}()
-
-	// Collect symbols in the if body
-	if stmt.Body != nil {
-		collectNode(ctx, mod, stmt.Body)
+	// Enter if scope for the body
+	{
+		defer mod.EnterScope(ifScope)()
+		// Collect symbols in the if body
+		if stmt.Body != nil {
+			collectNode(ctx, mod, stmt.Body)
+		}
 	}
 
-	// Restore scope before processing else
-	mod.CurrentScope = oldScope
-
 	// Process else branch (which may be another IfStmt or Block)
+	// Note: else branch uses the parent scope, not the if scope
 	if stmt.Else != nil {
 		collectNode(ctx, mod, stmt.Else)
 	}
@@ -340,11 +339,8 @@ func collectForStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stm
 	forScope := table.NewSymbolTable(mod.CurrentScope)
 	stmt.Scope = forScope
 
-	oldScope := mod.CurrentScope
-	mod.CurrentScope = forScope
-	defer func() {
-		mod.CurrentScope = oldScope
-	}()
+	// Enter for scope and ensure it's restored on exit
+	defer mod.EnterScope(forScope)()
 
 	// Collect symbols in the for body
 	if stmt.Body != nil {
@@ -358,11 +354,8 @@ func collectWhileStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 	whileScope := table.NewSymbolTable(mod.CurrentScope)
 	stmt.Scope = whileScope
 
-	oldScope := mod.CurrentScope
-	mod.CurrentScope = whileScope
-	defer func() {
-		mod.CurrentScope = oldScope
-	}()
+	// Enter while scope and ensure it's restored on exit
+	defer mod.EnterScope(whileScope)()
 
 	// Collect symbols in the while body
 	if stmt.Body != nil {
@@ -449,15 +442,12 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	// Create new scope with current scope as parent
 	// For function literals, this enables closure (capturing parent variables)
 	newScope := table.NewSymbolTable(mod.CurrentScope)
+
+	// Assign the scope to the pointer so the caller can access it
 	*scopePtr = newScope
 
-	// Enter function scope
-	oldScope := mod.CurrentScope
-	mod.CurrentScope = newScope
-
-	defer func() {
-		mod.CurrentScope = oldScope
-	}()
+	// Enter function scope and ensure it's restored on exit
+	defer mod.EnterScope(newScope)()
 
 	// Validate and declare parameters
 	if funcType != nil && funcType.Params != nil {

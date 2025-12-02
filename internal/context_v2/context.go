@@ -25,8 +25,8 @@ import (
 
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/semantics/table"
 	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/source"
 	"compiler/internal/types"
 	"compiler/internal/utils/fs"
@@ -130,7 +130,7 @@ type Module struct {
 	CurrentScope *table.SymbolTable // Current scope during scope switching
 
 	Imports        map[string]*Import // Resolved imports
-	ImportAliasMap map[string]string // alias/name -> import path mapping for module access
+	ImportAliasMap map[string]string  // alias/name -> import path mapping for module access
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
@@ -140,12 +140,24 @@ type Module struct {
 	Mu sync.Mutex // Protects field updates during parallel parsing
 }
 
+// EnterScope switches to a new scope and returns a function to restore the old scope.
+// Use with defer to ensure scope is always restored:
+//
+//	defer EnterScope(mod, newScope)()
+func (mod *Module) EnterScope(newScope *table.SymbolTable) func() {
+	oldScope := mod.CurrentScope
+	mod.CurrentScope = newScope
+	return func() {
+		mod.CurrentScope = oldScope
+	}
+}
+
 // Import represents a resolved import statement
 type Import struct {
-	Path     string           // Import path as written in source
-	Alias    string           // Optional alias (e.g., "import math as m")
-	Location *source.Location // Source location for diagnostics
-	IsUsed   bool
+	Path      string             // Import path as written in source
+	Aliases   []string           // All aliases for this import (default name + explicit aliases)
+	Locations []*source.Location // Source locations for each alias (for diagnostics)
+	IsUsed    bool
 }
 
 // CompilerContext is the central compilation state manager

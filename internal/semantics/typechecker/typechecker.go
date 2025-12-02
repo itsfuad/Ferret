@@ -51,11 +51,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 	case *ast.IfStmt:
 		// Enter if scope if it exists
 		if n.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = n.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
@@ -66,11 +62,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 	case *ast.ForStmt:
 		// Enter for loop scope if it exists
 		if n.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = n.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
 		if n.Init != nil {
@@ -86,11 +78,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 	case *ast.WhileStmt:
 		// Enter while loop scope if it exists
 		if n.Scope != nil {
-			oldScope := mod.CurrentScope
-			mod.CurrentScope = n.Scope.(*table.SymbolTable)
-			defer func() {
-				mod.CurrentScope = oldScope
-			}()
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
@@ -176,13 +164,10 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 // checkFuncDecl type checks a function declaration
 func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
-
 	funcScope := decl.Scope.(*table.SymbolTable)
 
-	// Save the current scope to restore later
-	oldScope := mod.CurrentScope
-
-	mod.CurrentScope = funcScope
+	// Enter function scope for the entire function processing
+	defer mod.EnterScope(funcScope)()
 
 	// Add parameters to the function scope with type information
 	if decl.Type != nil && decl.Type.Params != nil {
@@ -202,10 +187,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	// Check the body with the function scope
 	if decl.Body != nil {
-		oldScope := mod.CurrentScope
-		mod.CurrentScope = funcScope
 		checkBlock(ctx, mod, decl.Body)
-		mod.CurrentScope = oldScope
 
 		// Build control flow graph for the function
 		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
@@ -214,8 +196,6 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 		// Analyze return paths
 		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
 	}
-
-	mod.CurrentScope = oldScope // restore
 }
 
 // checkAssignStmt type checks an assignment statement
@@ -485,103 +465,5 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 	default:
 		return types.TypeUnknown
-	}
-}
-
-// fitsInType checks if a value fits in a given type
-func fitsInType(value int64, t types.SemType) bool {
-	// Extract primitive type name
-	name, ok := types.GetPrimitiveName(t)
-	if !ok {
-		return false // Non-primitive types don't have numeric ranges
-	}
-
-	switch name {
-	case types.TYPE_I8:
-		return value >= -128 && value <= 127
-	case types.TYPE_I16:
-		return value >= -32768 && value <= 32767
-	case types.TYPE_I32:
-		return value >= -2147483648 && value <= 2147483647
-	case types.TYPE_I64:
-		return true // int64 always fits
-	case types.TYPE_U8:
-		return value >= 0 && value <= 255
-	case types.TYPE_U16:
-		return value >= 0 && value <= 65535
-	case types.TYPE_U32:
-		return value >= 0 && value <= 4294967295
-	case types.TYPE_U64:
-		return value >= 0
-	default:
-		return false
-	}
-}
-
-// getMinimumTypeForValue returns the smallest type that can hold the given value
-func getMinimumTypeForValue(value int64) string {
-	// For negative values, check signed types
-	if value < 0 {
-		if value >= -128 {
-			return "i8"
-		}
-		if value >= -32768 {
-			return "i16"
-		}
-		if value >= -2147483648 {
-			return "i32"
-		}
-		return "i64"
-	}
-
-	// For positive values, prefer unsigned types but also show signed alternative
-	if value <= 127 {
-		return "i8 or u8"
-	}
-	if value <= 255 {
-		return "u8 or i16"
-	}
-	if value <= 32767 {
-		return "i16 or u16"
-	}
-	if value <= 65535 {
-		return "u16 or i32"
-	}
-	if value <= 2147483647 {
-		return "i32 or u32"
-	}
-	if value <= 4294967295 {
-		return "u32 or i64"
-	}
-	return "i64 or u64"
-}
-
-// getTypeRange returns a human-readable range for integer types
-func getTypeRange(t types.SemType) string {
-	// Extract primitive type name
-	name, ok := types.GetPrimitiveName(t)
-	if !ok {
-		return "unknown range"
-	}
-
-	switch name {
-	case types.TYPE_I8:
-		return "-128 to 127"
-	case types.TYPE_I16:
-		return "-32,768 to 32,767"
-	case types.TYPE_I32:
-		return "-2,147,483,648 to 2,147,483,647"
-	case types.TYPE_I64:
-		return "-9,223,372,036,854,775,808 to 9,223,372,036,854,775,807"
-	case types.TYPE_U8:
-		return "0 to 255"
-	case types.TYPE_U16:
-		return "0 to 65,535"
-	case types.TYPE_U32:
-		return "0 to 4,294,967,295"
-	case types.TYPE_U64:
-		return "0 to 18,446,744,073,709,551,615"
-	default:
-		return "unknown range"
 	}
 }

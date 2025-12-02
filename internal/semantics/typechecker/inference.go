@@ -320,11 +320,7 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 
 	// Enter function literal scope for type checking the body
 	if lit.Scope != nil {
-		oldScope := mod.CurrentScope
-		mod.CurrentScope = lit.Scope.(*table.SymbolTable)
-		defer func() {
-			mod.CurrentScope = oldScope
-		}()
+		defer mod.EnterScope(lit.Scope.(*table.SymbolTable))()
 	}
 
 	// Build parameter types
