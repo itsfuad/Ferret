@@ -17,6 +17,10 @@ import (
 // It fills Symbol.Type for declarations and creates ExprTypes map for expressions.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 
+	// Reset CurrentScope to ModuleScope before type checking
+	// This ensures we're starting from the module-level scope
+	mod.CurrentScope = mod.ModuleScope
+
 	// Check all declarations in the module
 	if mod.AST != nil {
 		for _, node := range mod.AST.Nodes {
@@ -175,7 +179,8 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	funcScope := decl.Scope.(*table.SymbolTable)
 
-	oldScope := funcScope
+	// Save the current scope to restore later
+	oldScope := mod.CurrentScope
 
 	mod.CurrentScope = funcScope
 

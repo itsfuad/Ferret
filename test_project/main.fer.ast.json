@@ -565,43 +565,55 @@
               "Index": 224
             }
           },
-          "Type": null,
+          "Type": {
+            "Name": "i32",
+            "Start": {
+              "Line": 21,
+              "Column": 12,
+              "Index": 227
+            },
+            "End": {
+              "Line": 21,
+              "Column": 15,
+              "Index": 230
+            }
+          },
           "Value": {
             "X": {
               "Name": "utils",
               "Start": {
                 "Line": 21,
-                "Column": 13,
-                "Index": 228
+                "Column": 18,
+                "Index": 233
               },
               "End": {
                 "Line": 21,
-                "Column": 18,
-                "Index": 233
+                "Column": 23,
+                "Index": 238
               }
             },
             "Selector": {
               "Name": "NAME",
               "Start": {
                 "Line": 21,
-                "Column": 20,
-                "Index": 235
+                "Column": 25,
+                "Index": 240
               },
               "End": {
                 "Line": 21,
-                "Column": 24,
-                "Index": 239
+                "Column": 29,
+                "Index": 244
               }
             },
             "Start": {
               "Line": 21,
-              "Column": 13,
-              "Index": 228
+              "Column": 18,
+              "Index": 233
             },
             "End": {
               "Line": 21,
-              "Column": 24,
-              "Index": 239
+              "Column": 29,
+              "Index": 244
             }
           }
         }
@@ -613,8 +625,8 @@
       },
       "End": {
         "Line": 21,
-        "Column": 25,
-        "Index": 240
+        "Column": 30,
+        "Index": 245
       }
     }
   ],

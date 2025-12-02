@@ -129,7 +129,7 @@ type Module struct {
 	ModuleScope  *table.SymbolTable // Module-level symbols
 	CurrentScope *table.SymbolTable // Current scope during scope switching
 
-	Imports        []*Import         // Resolved imports
+	Imports        map[string]*Import // Resolved imports
 	ImportAliasMap map[string]string // alias/name -> import path mapping for module access
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 

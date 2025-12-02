@@ -6,7 +6,6 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/semantics/table"
 	"compiler/internal/types"
-
 	"strconv"
 )
 
@@ -39,6 +38,9 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 
 	case *ast.SelectorExpr:
 		return inferSelectorExprType(e)
+
+	case *ast.ScopeResolutionExpr:
+		return inferScopeResolutionExprType(ctx, mod, e)
 
 	case *ast.CastExpr:
 		return inferCastExprType(e)
@@ -173,6 +175,44 @@ func inferIndexExprType(expr *ast.IndexExpr) types.SemType {
 func inferSelectorExprType(expr *ast.SelectorExpr) types.SemType {
 	// TODO: Implement struct field type lookup
 	return types.TypeUnknown
+}
+
+// inferScopeResolutionExprType determines the type of a module::symbol access
+func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ScopeResolutionExpr) types.SemType {
+	// Handle module::symbol resolution
+	// X should be an identifier representing the module name/alias
+	if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+		moduleName := ident.Name
+		symbolName := expr.Selector.Name
+
+		// Look up the import path from the alias/name
+		importPath, ok := mod.ImportAliasMap[moduleName]
+		if !ok {
+			// Module not imported - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Get the imported module from context
+		importedMod, exists := ctx.GetModule(importPath)
+		if !exists {
+			// Module not loaded - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Look up the symbol in the imported module's module scope
+		// Use ModuleScope.GetSymbol (not Lookup) to get module-level symbols only
+		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		if !ok {
+			// Symbol not found - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Return the symbol's type
+		return sym.Type
+	}
+
+	// For non-identifier X (e.g., enum::variant), recurse
+	return inferExprType(ctx, mod, expr.X)
 }
 
 // inferCastExprType determines the target type of a cast

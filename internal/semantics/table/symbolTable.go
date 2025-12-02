@@ -12,6 +12,8 @@ type SymbolTable struct {
 	symbols map[string]*symbols.Symbol
 }
 
+func (st SymbolTable) Scope() {}
+
 // NewSymbolTable creates a new symbol table with optional parent scope
 func NewSymbolTable(parent *SymbolTable) *SymbolTable {
 	return &SymbolTable{
