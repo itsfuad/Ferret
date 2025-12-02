@@ -1,0 +1,164 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_project/module_access_error1.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Path": {
+        "Kind": 2,
+        "Value": "test_project/utils",
+        "Start": {
+          "Line": 3,
+          "Column": 8,
+          "Index": 73
+        },
+        "End": {
+          "Line": 3,
+          "Column": 28,
+          "Index": 93
+        }
+      },
+      "Alias": {
+        "Name": "",
+        "Start": null,
+        "End": null
+      },
+      "LocationOnDisk": "",
+      "Start": {
+        "Line": 3,
+        "Column": 1,
+        "Index": 66
+      },
+      "End": {
+        "Line": 3,
+        "Column": 29,
+        "Index": 94
+      }
+    },
+    {
+      "Name": {
+        "Name": "main",
+        "Start": {
+          "Line": 5,
+          "Column": 4,
+          "Index": 99
+        },
+        "End": {
+          "Line": 5,
+          "Column": 8,
+          "Index": 103
+        }
+      },
+      "Type": {
+        "Params": null,
+        "Result": null,
+        "Start": {
+          "Line": 5,
+          "Column": 1,
+          "Index": 96
+        },
+        "End": {
+          "Line": 5,
+          "Column": 10,
+          "Index": 105
+        }
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "value",
+                  "Start": {
+                    "Line": 7,
+                    "Column": 9,
+                    "Index": 175
+                  },
+                  "End": {
+                    "Line": 7,
+                    "Column": 14,
+                    "Index": 180
+                  }
+                },
+                "Type": null,
+                "Value": {
+                  "X": {
+                    "Name": "utils",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 18,
+                      "Index": 184
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 23,
+                      "Index": 189
+                    }
+                  },
+                  "Selector": {
+                    "Name": "a",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 25,
+                      "Index": 191
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 26,
+                      "Index": 192
+                    }
+                  },
+                  "Start": {
+                    "Line": 7,
+                    "Column": 18,
+                    "Index": 184
+                  },
+                  "End": {
+                    "Line": 7,
+                    "Column": 26,
+                    "Index": 192
+                  }
+                }
+              }
+            ],
+            "Start": {
+              "Line": 7,
+              "Column": 5,
+              "Index": 171
+            },
+            "End": {
+              "Line": 7,
+              "Column": 27,
+              "Index": 193
+            }
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 5,
+          "Column": 11,
+          "Index": 106
+        },
+        "End": {
+          "Line": 8,
+          "Column": 2,
+          "Index": 195
+        }
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 5,
+        "Column": 1,
+        "Index": 96
+      },
+      "End": {
+        "Line": 8,
+        "Column": 2,
+        "Index": 195
+      }
+    }
+  ],
+  "Start": null,
+  "End": null
+}

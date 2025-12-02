@@ -4,8 +4,21 @@ fn add(a: i32, b: i32) -> i32 {
     return sum;
 }
 
+fn(a: i32, b: i32) {
+    let aa : i32 = a + b;
+}
+
 fn main() {
     let x: i32 = 42;
     let y: i32 = 100;
-    let z := x + y;
+
+    let a := {}; // literal
+   // y = a;
+
+   {
+        let p := 1;
+        p = p + 1;
+   }
+
+    let z := x + y + p;
 }

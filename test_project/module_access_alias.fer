@@ -1,0 +1,12 @@
+// Test module::symbol access with alias
+
+import "test_project/utils" as u;
+
+fn main() {
+    // Access using alias
+    let name := u::NAME;
+    let result := u::Multiply(5, 10);
+    
+    // This should error - original name no longer works
+    // let x := utils::NAME;
+}

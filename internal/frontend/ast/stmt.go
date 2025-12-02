@@ -16,7 +16,6 @@ type Module struct {
 	ImportPath string // the logical path to the module
 	Alias      string // module alias
 	Nodes      []Node // top-level declarations and statements
-
 	source.Location
 }
 

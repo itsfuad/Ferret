@@ -1,0 +1,24 @@
+// Test multiple aliases for the same module
+// This demonstrates that importing the same module twice with different
+// aliases now works correctly - both aliases can be used
+
+import "test_project/utils";
+import "test_project/utils" as U;
+import "test_project/utils" as Util;
+
+fn main() {
+    // All three aliases should work for the same module
+    let name1 := utils::NAME;   // default alias
+    let name2 := U::NAME;        // first explicit alias
+    let name3 := Util::NAME;     // second explicit alias
+    
+    // All three should access the same MAX constant
+    let max1 := utils::MAX;
+    let max2 := U::MAX;
+    let max3 := Util::MAX;
+    
+    // Functions should also work with all aliases
+    let result1 := utils::Multiply(10, 5);
+    let result2 := U::Add(20, 30);
+    let result3 := Util::Multiply(2, 3);
+}

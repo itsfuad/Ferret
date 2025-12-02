@@ -1,0 +1,13 @@
+// Test parameter validation for both named functions and literals
+
+// Test regular function with valid parameters
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+// Test function literal with valid parameters
+fn main() {
+    let multiply := fn(x: i32, y: i32) -> i32 {
+        return x * y;
+    };
+}

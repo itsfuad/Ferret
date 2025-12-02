@@ -1,0 +1,8 @@
+// Test module::symbol access - error case for unexported symbol
+
+import "test_project/utils";
+
+fn main() {
+    // This should error - 'a' is not exported (lowercase)
+    let value := utils::a;
+}

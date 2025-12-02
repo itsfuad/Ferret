@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"compiler/internal/frontend/ast"
-	"compiler/internal/table"
+	"compiler/internal/semantics/table"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/types"
 )
 
@@ -184,9 +185,9 @@ func TestSymbolTable(t *testing.T) {
 	child := table.NewSymbolTable(parent)
 
 	// Add symbol to parent
-	parentSym := &table.Symbol{
+	parentSym := &symbols.Symbol{
 		Name:     "x",
-		Kind:     table.SymbolVariable,
+		Kind:     symbols.SymbolVariable,
 		Type:     types.TypeI32,
 		Exported: true,
 	}
@@ -213,15 +214,15 @@ func TestSymbolTable(t *testing.T) {
 	}
 
 	// Try to redeclare in parent (should fail)
-	err = parent.Declare("x", &table.Symbol{Name: "x", Kind: table.SymbolConstant})
+	err = parent.Declare("x", &symbols.Symbol{Name: "x", Kind: symbols.SymbolConstant})
 	if err == nil {
 		t.Error("Expected error when redeclaring symbol")
 	}
 
 	// Add symbol to child (shadowing)
-	childSym := &table.Symbol{
+	childSym := &symbols.Symbol{
 		Name:     "x",
-		Kind:     table.SymbolConstant,
+		Kind:     symbols.SymbolConstant,
 		Type:     types.TypeI64,
 		Exported: false,
 	}
@@ -237,7 +238,7 @@ func TestSymbolTable(t *testing.T) {
 		t.Error("Expected to find symbol in child")
 	}
 
-	if found.Kind != table.SymbolConstant {
+	if found.Kind != symbols.SymbolConstant {
 		t.Errorf("Expected SymbolConstant, got %v", found.Kind)
 	}
 
@@ -247,7 +248,7 @@ func TestSymbolTable(t *testing.T) {
 		t.Error("Expected to find symbol in parent")
 	}
 
-	if found.Kind != table.SymbolVariable {
+	if found.Kind != symbols.SymbolVariable {
 		t.Errorf("Expected SymbolVariable, got %v", found.Kind)
 	}
 }
@@ -335,11 +336,11 @@ func TestAddModuleWithAST(t *testing.T) {
 	}
 
 	module := &Module{
-		FilePath: "/test/module.fer",
-		Type:     ModuleLocal,
-		Phase:    PhaseParsed,
-		AST:      astModule,
-		Scope:    table.NewSymbolTable(ctx.Universe),
+		FilePath:    "/test/module.fer",
+		Type:        ModuleLocal,
+		Phase:       PhaseParsed,
+		AST:         astModule,
+		ModuleScope: table.NewSymbolTable(ctx.Universe),
 	}
 
 	ctx.AddModule("test/module", module)
@@ -353,7 +354,7 @@ func TestAddModuleWithAST(t *testing.T) {
 		t.Error("Expected AST to be set")
 	}
 
-	if retrieved.Scope == nil {
+	if retrieved.ModuleScope == nil {
 		t.Error("Expected symbol table to be set")
 	}
 }

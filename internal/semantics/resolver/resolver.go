@@ -4,7 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/table"
+	"compiler/internal/semantics/table"
 
 	"fmt"
 )
@@ -47,39 +47,14 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.FuncDecl:
-		// 1) Validate parameters (variadic rules, duplicates, missing types)
-		validateFunctionParams(ctx, mod, n)
-
-		sym, ok := mod.Scope.Lookup(n.Name.Name)
-		if !ok {
-			fmt.Printf("function %s not declared", n.Name.Name)
-			return
-		}
-
-		funcScope := sym.Scope
-
 		// switch to function scope
-		oldScope := mod.Scope
-		mod.Scope = funcScope
-
-		for _, param := range n.Type.Params {
-			psym := table.Symbol{
-				Name: param.Name.Name,
-				Kind: table.SymbolParameter,
-				Decl: &param,
-			}
-
-			err := mod.Scope.Declare(param.Name.Name, &psym)
-
-			if err != nil {
-				fmt.Printf("param %s alreary declared", param.Name.Name)
-			}
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
-		// 3) Bind names in function body
+		// Bind names in function body
 		if n.Body != nil {
 			resolveBlock(ctx, mod, n.Body)
-			mod.Scope = oldScope // restore
 		}
 
 	case *ast.AssignStmt:
@@ -92,6 +67,11 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.IfStmt:
+		// Enter if scope if it exists
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
 		resolveExpr(ctx, mod, n.Cond)
 		resolveBlock(ctx, mod, n.Body)
 		if n.Else != nil {
@@ -99,6 +79,11 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 	case *ast.ForStmt:
+		// Enter for loop scope if it exists
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
 		if n.Init != nil {
 			resolveNode(ctx, mod, n.Init)
 		}
@@ -108,6 +93,15 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		if n.Post != nil {
 			resolveNode(ctx, mod, n.Post)
 		}
+		resolveBlock(ctx, mod, n.Body)
+
+	case *ast.WhileStmt:
+		// Enter while loop scope if it exists
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
+		resolveExpr(ctx, mod, n.Cond)
 		resolveBlock(ctx, mod, n.Body)
 
 	case *ast.Block:
@@ -126,12 +120,18 @@ func resolveBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 	if block == nil {
 		return
 	}
+
+	// Enter block scope if it exists
+	if block.Scope != nil {
+		defer mod.EnterScope(block.Scope.(*table.SymbolTable))()
+	}
+
 	for _, node := range block.Nodes {
 		resolveNode(ctx, mod, node)
 	}
 }
 
-// resolveExpr checks identifier references in expressions
+// resolveExpr checks identifier references in expressions// resolveExpr checks identifier references in expressions
 func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) {
 	if expr == nil {
 		return
@@ -141,7 +141,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	case *ast.IdentifierExpr:
 		// Check if the identifier is declared
 		name := e.Name
-		if _, ok := mod.Scope.Lookup(name); !ok {
+		if _, ok := mod.CurrentScope.Lookup(name); !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found", name)).
 					WithPrimaryLabel(mod.FilePath, &e.Location, "").
@@ -171,7 +171,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		// Sel is the field name, not checked here
 
 	case *ast.ScopeResolutionExpr:
-		resolveExpr(ctx, mod, e.X)
+		resolveStaticAccess(ctx, mod, e)
 
 	case *ast.CompositeLit:
 		for _, elem := range e.Elts {
@@ -191,82 +191,79 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		resolveExpr(ctx, mod, e.Cond)
 		resolveExpr(ctx, mod, e.Default)
 
+	case *ast.FuncLit:
+		// Function literals have their own scope for parameters and body
+		if e.Scope != nil {
+			defer mod.EnterScope(e.Scope.(*table.SymbolTable))()
+		}
+
+		// Resolve function body
+		if e.Body != nil {
+			resolveNode(ctx, mod, e.Body)
+		}
+
 	// Literals don't need binding
 	case *ast.BasicLit:
 		// No binding needed
 	}
 }
 
-// validateFunctionParams validates function parameters including variadic rules
-func validateFunctionParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcDecl *ast.FuncDecl) {
-	if funcDecl.Type == nil || funcDecl.Type.Params == nil {
-		return
-	}
+func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module, e *ast.ScopeResolutionExpr) {
+	// Handle module::symbol resolution
+	// X should be an identifier representing the module name/alias
+	if ident, ok := e.X.(*ast.IdentifierExpr); ok {
+		moduleName := ident.Name
+		symbolName := e.Selector.Name
 
-	params := funcDecl.Type.Params
-	variadicCount := 0
-	variadicIndex := -1
-
-	// Check for variadic parameters and their position
-	for i, param := range params {
-		if param.IsVariadic {
-			variadicCount++
-			variadicIndex = i
-		}
-	}
-
-	// Rule: Maximum one variadic parameter
-	if variadicCount > 1 {
-		for _, param := range params {
-			if param.IsVariadic {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError("multiple variadic parameters").
-						WithPrimaryLabel(mod.FilePath, param.Loc(), "variadic parameter here").
-						WithHelp("a function can have at most one variadic parameter"),
-				)
-			}
-		}
-		return
-	}
-
-	// Rule: Variadic parameter must be last
-	if variadicCount == 1 && variadicIndex != len(params)-1 {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError("variadic parameter must be last").
-				WithPrimaryLabel(mod.FilePath, params[variadicIndex].Loc(), "variadic parameter not at end").
-				WithHelp(fmt.Sprintf("move this parameter to position %d (last)", len(params))),
-		)
-	}
-
-	// Check for duplicate parameter names
-	paramNames := make(map[string]*ast.Field)
-	for _, param := range params {
-		if param.Name != nil {
-			name := param.Name.Name
-			if existing, ok := paramNames[name]; ok {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("duplicate parameter name '%s'", name)).
-						WithPrimaryLabel(mod.FilePath, param.Loc(), fmt.Sprintf("'%s' already declared", name)).
-						WithSecondaryLabel(mod.FilePath, existing.Loc(), "previous declaration here"),
-				)
-			} else {
-				paramNames[name] = &param
-			}
-		}
-	}
-
-	// Check for missing parameter types
-	for _, param := range params {
-		if param.Type == nil {
-			paramName := "<unnamed>"
-			if param.Name != nil {
-				paramName = param.Name.Name
-			}
+		// Look up the import path from the alias/name
+		importPath, ok := mod.ImportAliasMap[moduleName]
+		if !ok {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("parameter '%s' missing type annotation", paramName)).
-					WithPrimaryLabel(mod.FilePath, param.Loc(), "type annotation required").
-					WithHelp("add type annotation (e.g., 'name: i32')"),
+				diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleName)).
+					WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleName)).
+					WithNote("Make sure to import this module first"),
 			)
+			return
 		}
+
+		// Get the imported module from context
+		importedMod, exists := ctx.GetModule(importPath)
+
+		if !exists {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
+					WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleName)).
+					WithNote("This is likely a compiler bug"),
+			)
+			return
+		}
+
+		// Look up symbol in the imported module's module scope (not CurrentScope)
+		// Use ModuleScope to access module-level symbols
+		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		if !ok {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, moduleName)).
+					WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)).
+					WithNote(fmt.Sprintf("Module '%s' does not export this symbol", moduleName)),
+			)
+			return
+		}
+
+		// Check if symbol is exported
+		if !sym.Exported {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, moduleName)).
+					WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
+					WithHelp("Only symbols starting with uppercase letters are exported"),
+			)
+			return
+		}
+
+		mod.Imports[importPath].IsUsed = true
+
+	} else {
+		// For now, just resolve the left side (could be enum::variant later)
+		resolveExpr(ctx, mod, e.X)
 	}
 }

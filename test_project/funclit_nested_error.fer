@@ -1,0 +1,14 @@
+// Test function literals - error case for nested block scoping
+
+fn main() {
+    // Function literal with nested block scope
+    let nested := fn(x: i32) -> i32 {
+        let a := x + 1;
+        {
+            let b := a + 2;
+            // 'b' should only be visible in this block
+        }
+        // This should error: 'b' not accessible here (outside the inner block)
+        return b;
+    };
+}

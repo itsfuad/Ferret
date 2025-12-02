@@ -11,7 +11,7 @@ import (
 // parseVarDecl: let x := 10; or let x: i32 = 10;
 func (p *Parser) parseVarDecl() *ast.VarDecl {
 	start := p.advance().Start
-	decls, location := p.parseVariableDeclaration(start, false)
+	decls, location := p.parseVariableDeclaration(start)
 	return &ast.VarDecl{
 		Decls:    decls,
 		Location: location,
@@ -23,7 +23,7 @@ func (p *Parser) parseConstDecl() *ast.ConstDecl {
 	start := p.peek().Start
 	p.expect(lexer.CONST_TOKEN)
 
-	decls, location := p.parseVariableDeclaration(start, true)
+	decls, location := p.parseVariableDeclaration(start)
 
 	return &ast.ConstDecl{
 		Decls:    decls,
@@ -33,7 +33,7 @@ func (p *Parser) parseConstDecl() *ast.ConstDecl {
 
 // parseVariableDeclaration: unified parser for let/const declarations
 // Returns the declarations and location
-func (p *Parser) parseVariableDeclaration(start source.Position, isConst bool) ([]ast.DeclItem, source.Location) {
+func (p *Parser) parseVariableDeclaration(start source.Position) ([]ast.DeclItem, source.Location) {
 	var decls []ast.DeclItem
 
 	// can be let a : <type> = <expr>; or let a := <expr>; or let a: <type>;
@@ -41,7 +41,7 @@ func (p *Parser) parseVariableDeclaration(start source.Position, isConst bool) (
 	// for const, initializer is mandatory
 
 	for !p.isAtEnd() && !p.match(lexer.SEMICOLON_TOKEN) {
-		decl := p.parseDeclItem(isConst)
+		decl := p.parseDeclItem()
 		decls = append(decls, decl)
 
 		if !p.match(lexer.COMMA_TOKEN) {
@@ -57,7 +57,7 @@ func (p *Parser) parseVariableDeclaration(start source.Position, isConst bool) (
 
 // parseDeclItem parses a single declaration item (name, optional type, initializer)
 // extracted to reduce cognitive complexity in parseVariableDeclaration.
-func (p *Parser) parseDeclItem(isConst bool) ast.DeclItem {
+func (p *Parser) parseDeclItem() ast.DeclItem {
 	var decl ast.DeclItem
 
 	decl.Name = p.parseIdentifier()

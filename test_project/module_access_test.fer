@@ -1,0 +1,14 @@
+// Test module::symbol access
+
+import "test_project/utils";
+
+fn main() {
+    // Access exported symbol from utils module
+    let name := utils::NAME;
+    
+    // Access exported function from utils module
+    let result := utils::Multiply(10, 20);
+    
+    // Access another exported function
+    let sum := utils::Add(5, 10);
+}

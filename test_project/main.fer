@@ -18,4 +18,4 @@ fn add(a: i32, b: i32) -> i32 {
 
 let result := add(10, 20);
 
-let name := utils::NAME;
+let name : i32 = utils::NAME;

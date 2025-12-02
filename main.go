@@ -16,6 +16,7 @@ func main() {
 	// Define flags
 	debug := flag.Bool("d", false, "Enable debug output")
 	showVersion := flag.Bool("v", false, "Show version")
+	saveAST := flag.Bool("ast", false, "Save AST")
 	flag.BoolVar(debug, "debug", false, "Enable debug output")
 	flag.BoolVar(showVersion, "version", false, "Show version")
 
@@ -42,6 +43,7 @@ func main() {
 	result := compiler.Compile(compiler.Options{
 		EntryFile: entryFile,
 		Debug:     *debug,
+		SaveAST:   *saveAST,
 		LogFormat: compiler.ANSI,
 	})
 

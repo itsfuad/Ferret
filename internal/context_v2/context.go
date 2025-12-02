@@ -25,8 +25,9 @@ import (
 
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/source"
-	"compiler/internal/table"
 	"compiler/internal/types"
 	"compiler/internal/utils/fs"
 )
@@ -125,8 +126,11 @@ type Module struct {
 	Phase ModulePhase // Current compilation phase
 
 	// Semantic data
-	Scope   *table.SymbolTable // Module-level symbols
-	Imports []*Import          // Resolved imports
+	ModuleScope  *table.SymbolTable // Module-level symbols
+	CurrentScope *table.SymbolTable // Current scope during scope switching
+
+	Imports        map[string]*Import // Resolved imports
+	ImportAliasMap map[string]string  // alias/name -> import path mapping for module access
 	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
@@ -136,12 +140,24 @@ type Module struct {
 	Mu sync.Mutex // Protects field updates during parallel parsing
 }
 
+// EnterScope switches to a new scope and returns a function to restore the old scope.
+// Use with defer to ensure scope is always restored:
+//
+//	defer EnterScope(mod, newScope)()
+func (mod *Module) EnterScope(newScope *table.SymbolTable) func() {
+	oldScope := mod.CurrentScope
+	mod.CurrentScope = newScope
+	return func() {
+		mod.CurrentScope = oldScope
+	}
+}
+
 // Import represents a resolved import statement
 type Import struct {
-	Path     string           // Import path as written in source
-	Alias    string           // Optional alias (e.g., "import math as m")
-	Location *source.Location // Source location for diagnostics
-	IsUsed   bool
+	Path      string             // Import path as written in source
+	Aliases   []string           // All aliases for this import (default name + explicit aliases)
+	Locations []*source.Location // Source locations for each alias (for diagnostics)
+	IsUsed    bool
 }
 
 // CompilerContext is the central compilation state manager
@@ -273,24 +289,24 @@ func registerBuiltins(universe *table.SymbolTable) {
 	}
 
 	for _, typ := range builtinTypes {
-		universe.Declare(typ.String(), &table.Symbol{
+		universe.Declare(typ.String(), &symbols.Symbol{
 			Name:     typ.String(),
-			Kind:     table.SymbolType,
+			Kind:     symbols.SymbolType,
 			Type:     typ,
 			Exported: true,
 		})
 	}
 
 	// Built-in constants
-	universe.Declare("true", &table.Symbol{
+	universe.Declare("true", &symbols.Symbol{
 		Name:     "true",
-		Kind:     table.SymbolConstant,
+		Kind:     symbols.SymbolConstant,
 		Type:     types.TypeBool,
 		Exported: true,
 	})
-	universe.Declare("false", &table.Symbol{
+	universe.Declare("false", &symbols.Symbol{
 		Name:     "false",
-		Kind:     table.SymbolConstant,
+		Kind:     symbols.SymbolConstant,
 		Type:     types.TypeBool,
 		Exported: true,
 	})
@@ -327,13 +343,16 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 	// Add source content to diagnostic bag's cache so it can display source lines
 	ctx.Diagnostics.AddSourceContent(virtualPath, code)
 
+	modScope := table.NewSymbolTable(ctx.Universe)
+
 	// Create the entry module directly with the provided code
 	module := &Module{
-		FilePath: virtualPath,
-		Type:     ModuleLocal,
-		Phase:    PhaseNotStarted,
-		Scope:    table.NewSymbolTable(ctx.Universe),
-		Content:  code,
+		FilePath:     virtualPath,
+		Type:         ModuleLocal,
+		Phase:        PhaseNotStarted,
+		ModuleScope:  modScope,
+		CurrentScope: modScope,
+		Content:      code,
 	}
 
 	ctx.AddModule(ctx.EntryModule, module)

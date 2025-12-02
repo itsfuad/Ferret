@@ -1,0 +1,12 @@
+// Test function literals - error case for local variable scoping
+
+fn main() {
+    // Function literal with local variables
+    let multiply := fn(x: i32, y: i32) -> i32 {
+        let result := x * y;
+        return result;
+    };
+
+    // This should error: 'result' is a local variable of the function literal, not accessible here
+    let test := result + 5;
+}

@@ -1,8 +1,13 @@
 package ast
 
 import (
+	//"compiler/internal/semantics/symbols"
 	"compiler/internal/source"
 )
+
+type SymbolTable interface {
+	Scope()
+}
 
 // Node is the base interface for all AST nodes
 type Node interface {

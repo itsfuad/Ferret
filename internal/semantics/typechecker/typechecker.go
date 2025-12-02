@@ -5,7 +5,8 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/controlflow"
-	"compiler/internal/table"
+	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 	"fmt"
 	"strconv"
@@ -15,6 +16,10 @@ import (
 // CheckModule performs type checking on a module.
 // It fills Symbol.Type for declarations and creates ExprTypes map for expressions.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+
+	// Reset CurrentScope to ModuleScope before type checking
+	// This ensures we're starting from the module-level scope
+	mod.CurrentScope = mod.ModuleScope
 
 	// Check all declarations in the module
 	if mod.AST != nil {
@@ -44,12 +49,22 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			checkExpr(ctx, mod, n.Result, types.TypeUnknown)
 		}
 	case *ast.IfStmt:
+		// Enter if scope if it exists
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 		checkBlock(ctx, mod, n.Body)
 		if n.Else != nil {
 			checkNode(ctx, mod, n.Else)
 		}
 	case *ast.ForStmt:
+		// Enter for loop scope if it exists
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
 		if n.Init != nil {
 			checkNode(ctx, mod, n.Init)
 		}
@@ -59,6 +74,14 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		if n.Post != nil {
 			checkNode(ctx, mod, n.Post)
 		}
+		checkBlock(ctx, mod, n.Body)
+	case *ast.WhileStmt:
+		// Enter while loop scope if it exists
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
+		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 		checkBlock(ctx, mod, n.Body)
 	case *ast.Block:
 		checkBlock(ctx, mod, n)
@@ -86,27 +109,9 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		name := item.Name.Name
 
 		// Get or create the symbol (module-level or local)
-		sym, ok := mod.Scope.Lookup(name)
+		sym, ok := mod.CurrentScope.GetSymbol(name)
 		if !ok {
-			// This is a local variable declaration - create a new symbol
-			kind := table.SymbolVariable
-			if isConst {
-				kind = table.SymbolConstant
-			}
-			sym = &table.Symbol{
-				Name:     name,
-				Kind:     kind,
-				Type:     types.TypeUnknown,
-				Exported: false,
-				Decl:     item.Name, // Use the identifier as the Decl node
-			}
-			if err := mod.Scope.Declare(name, sym); err != nil {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
-						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "already declared in this scope"),
-				)
-				continue
-			}
+			continue
 		}
 
 		// Determine the type
@@ -159,19 +164,10 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 // checkFuncDecl type checks a function declaration
 func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
+	funcScope := decl.Scope.(*table.SymbolTable)
 
-	// Create a new scope for the function body
-	sym, ok := mod.Scope.Lookup(decl.Name.Name)
-	if !ok {
-		fmt.Printf("function %s not declared", decl.Name.Name)
-		return
-	}
-
-	funcScope := sym.Scope
-
-	oldScope := funcScope
-
-	mod.Scope = funcScope
+	// Enter function scope for the entire function processing
+	defer mod.EnterScope(funcScope)()
 
 	// Add parameters to the function scope with type information
 	if decl.Type != nil && decl.Type.Params != nil {
@@ -179,10 +175,9 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 			if param.Name != nil {
 				paramType := typeFromTypeNode(param.Type)
 				// update the param type
-				psym, ok := funcScope.Lookup(param.Name.Name)
+				psym, ok := funcScope.GetSymbol(param.Name.Name)
 				if !ok {
-					fmt.Printf("function param %s not declared", param.Name.Name)
-					continue
+					continue // should not happen but safe side
 				}
 
 				psym.Type = paramType // Done
@@ -192,10 +187,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	// Check the body with the function scope
 	if decl.Body != nil {
-		oldScope := mod.Scope
-		mod.Scope = funcScope
 		checkBlock(ctx, mod, decl.Body)
-		mod.Scope = oldScope
 
 		// Build control flow graph for the function
 		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
@@ -204,16 +196,14 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 		// Analyze return paths
 		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
 	}
-
-	mod.Scope = oldScope // restore
 }
 
 // checkAssignStmt type checks an assignment statement
 func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.AssignStmt) {
 	// Check if we're trying to reassign a constant
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-		if sym, found := mod.Scope.Lookup(ident.Name); found {
-			if sym.Kind == table.SymbolConstant {
+		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+			if sym.Kind == symbols.SymbolConstant {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
 						WithPrimaryLabel(mod.FilePath, stmt.Lhs.Loc(), "cannot modify constant").
@@ -238,6 +228,16 @@ func checkBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *
 	if block == nil {
 		return
 	}
+
+	// Enter block scope if it exists
+	if block.Scope != nil {
+		oldScope := mod.CurrentScope
+		mod.CurrentScope = block.Scope.(*table.SymbolTable)
+		defer func() {
+			mod.CurrentScope = oldScope
+		}()
+	}
+
 	for _, node := range block.Nodes {
 		checkNode(ctx, mod, node)
 	}
@@ -465,103 +465,5 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 	default:
 		return types.TypeUnknown
-	}
-}
-
-// fitsInType checks if a value fits in a given type
-func fitsInType(value int64, t types.SemType) bool {
-	// Extract primitive type name
-	name, ok := types.GetPrimitiveName(t)
-	if !ok {
-		return false // Non-primitive types don't have numeric ranges
-	}
-
-	switch name {
-	case types.TYPE_I8:
-		return value >= -128 && value <= 127
-	case types.TYPE_I16:
-		return value >= -32768 && value <= 32767
-	case types.TYPE_I32:
-		return value >= -2147483648 && value <= 2147483647
-	case types.TYPE_I64:
-		return true // int64 always fits
-	case types.TYPE_U8:
-		return value >= 0 && value <= 255
-	case types.TYPE_U16:
-		return value >= 0 && value <= 65535
-	case types.TYPE_U32:
-		return value >= 0 && value <= 4294967295
-	case types.TYPE_U64:
-		return value >= 0
-	default:
-		return false
-	}
-}
-
-// getMinimumTypeForValue returns the smallest type that can hold the given value
-func getMinimumTypeForValue(value int64) string {
-	// For negative values, check signed types
-	if value < 0 {
-		if value >= -128 {
-			return "i8"
-		}
-		if value >= -32768 {
-			return "i16"
-		}
-		if value >= -2147483648 {
-			return "i32"
-		}
-		return "i64"
-	}
-
-	// For positive values, prefer unsigned types but also show signed alternative
-	if value <= 127 {
-		return "i8 or u8"
-	}
-	if value <= 255 {
-		return "u8 or i16"
-	}
-	if value <= 32767 {
-		return "i16 or u16"
-	}
-	if value <= 65535 {
-		return "u16 or i32"
-	}
-	if value <= 2147483647 {
-		return "i32 or u32"
-	}
-	if value <= 4294967295 {
-		return "u32 or i64"
-	}
-	return "i64 or u64"
-}
-
-// getTypeRange returns a human-readable range for integer types
-func getTypeRange(t types.SemType) string {
-	// Extract primitive type name
-	name, ok := types.GetPrimitiveName(t)
-	if !ok {
-		return "unknown range"
-	}
-
-	switch name {
-	case types.TYPE_I8:
-		return "-128 to 127"
-	case types.TYPE_I16:
-		return "-32,768 to 32,767"
-	case types.TYPE_I32:
-		return "-2,147,483,648 to 2,147,483,647"
-	case types.TYPE_I64:
-		return "-9,223,372,036,854,775,808 to 9,223,372,036,854,775,807"
-	case types.TYPE_U8:
-		return "0 to 255"
-	case types.TYPE_U16:
-		return "0 to 65,535"
-	case types.TYPE_U32:
-		return "0 to 4,294,967,295"
-	case types.TYPE_U64:
-		return "0 to 18,446,744,073,709,551,615"
-	default:
-		return "unknown range"
 	}
 }

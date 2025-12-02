@@ -15,9 +15,9 @@ import (
 	"compiler/internal/frontend/parser"
 	"compiler/internal/semantics/collector"
 	"compiler/internal/semantics/resolver"
+	"compiler/internal/semantics/table"
 	"compiler/internal/semantics/typechecker"
 	"compiler/internal/source"
-	"compiler/internal/table"
 )
 
 // Pipeline coordinates the compilation process
@@ -50,12 +50,13 @@ func (p *Pipeline) Run() error {
 	// Wait for all parsing tasks to complete
 	p.wg.Wait()
 
+	// Compute topological order once after parsing
+	// Do this even if there are errors, so tests can inspect what was discovered
+	p.ctx.ComputeTopologicalOrder()
+
 	if p.ctx.HasErrors() {
 		return fmt.Errorf("compilation failed with errors")
 	}
-
-	// Compute topological order once after parsing
-	p.ctx.ComputeTopologicalOrder()
 
 	// Phase 2: Symbol Collection
 	if p.ctx.Debug {
@@ -113,19 +114,18 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	// Get or create module
 	module, exists := p.ctx.GetModule(importPath)
 	if !exists {
+		modScope := table.NewSymbolTable(p.ctx.Universe)
 		module = &context_v2.Module{
-			FilePath:   "",
-			ImportPath: importPath,
-			Type:       context_v2.ModuleLocal,
-			Phase:      context_v2.PhaseNotStarted,
-			Scope:      table.NewSymbolTable(p.ctx.Universe),
-			Content:    "",
-			AST:        nil,
+			FilePath:     "",
+			ImportPath:   importPath,
+			Type:         context_v2.ModuleLocal,
+			Phase:        context_v2.PhaseNotStarted,
+			ModuleScope:  modScope,
+			CurrentScope: modScope,
+			Content:      "",
+			AST:          nil,
 		}
 		p.ctx.AddModule(importPath, module)
-		if p.ctx.Debug {
-			fmt.Printf("module '%s' parsed and added", importPath)
-		}
 	}
 
 	// Resolve import path to file path
@@ -196,6 +196,10 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 	module.Mu.Lock()
 	module.AST = astModule
 	module.Mu.Unlock()
+
+	if astModule != nil {
+		astModule.SaveAST()
+	}
 
 	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseParsed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)

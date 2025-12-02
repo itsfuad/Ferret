@@ -1,0 +1,23 @@
+// Comprehensive module::symbol access test
+
+import "test_project/utils";
+import "test_project/utils" as U;
+
+fn main() {
+    // 1. Access exported constant with default name
+    let name1 := utils::NAME;
+    
+    // 2. Access exported constant with alias
+    let name2 := U::NAME;
+    
+    // 3. Access exported function with default name
+    let result1 := utils::Multiply(10, 5);
+    
+    // 4. Access exported function with alias
+    let result2 := U::Add(20, 30);
+    
+    // 5. Access exported constant MAX
+    let max := utils::MAX;
+    
+    // All these work because the symbols are exported (uppercase)
+}

@@ -2,11 +2,10 @@ package typechecker
 
 import (
 	"compiler/internal/context_v2"
-	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
+	"compiler/internal/semantics/table"
 	"compiler/internal/types"
-	"fmt"
 	"strconv"
 )
 
@@ -40,6 +39,9 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	case *ast.SelectorExpr:
 		return inferSelectorExprType(e)
 
+	case *ast.ScopeResolutionExpr:
+		return inferScopeResolutionExprType(ctx, mod, e)
+
 	case *ast.CastExpr:
 		return inferCastExprType(e)
 
@@ -48,6 +50,9 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 
 	case *ast.CompositeLit:
 		return inferCompositeLitType(e)
+
+	case *ast.FuncLit:
+		return inferFuncLitType(ctx, mod, e)
 
 	default:
 		return types.TypeUnknown
@@ -77,14 +82,9 @@ func inferLiteralType(lit *ast.BasicLit) types.SemType {
 }
 
 // inferIdentifierType looks up an identifier's declared type
-func inferIdentifierType(ctx *context_v2.CompilerContext, mod *context_v2.Module, ident *ast.IdentifierExpr) types.SemType {
-	sym, ok := mod.Scope.Lookup(ident.Name)
+func inferIdentifierType(_ *context_v2.CompilerContext, mod *context_v2.Module, ident *ast.IdentifierExpr) types.SemType {
+	sym, ok := mod.CurrentScope.Lookup(ident.Name)
 	if !ok {
-		// Report error with good context
-		ctx.Diagnostics.Add(
-			diagnostics.NewError(fmt.Sprintf("undefined: %s", ident.Name)).
-				WithPrimaryLabel(mod.FilePath, ident.Loc(), "not declared in this scope"),
-		)
 		return types.TypeUnknown
 	}
 	return sym.Type
@@ -146,10 +146,10 @@ func inferUnaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 }
 
 // inferCallExprType determines the return type of a function call
-func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
+func inferCallExprType(_ *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
 	// Look up the function
 	if ident, ok := expr.Fun.(*ast.IdentifierExpr); ok {
-		sym, exists := mod.Scope.Lookup(ident.Name)
+		sym, exists := mod.CurrentScope.Lookup(ident.Name)
 		if !exists {
 			return types.TypeUnknown
 		}
@@ -177,6 +177,44 @@ func inferSelectorExprType(expr *ast.SelectorExpr) types.SemType {
 	return types.TypeUnknown
 }
 
+// inferScopeResolutionExprType determines the type of a module::symbol access
+func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ScopeResolutionExpr) types.SemType {
+	// Handle module::symbol resolution
+	// X should be an identifier representing the module name/alias
+	if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+		moduleName := ident.Name
+		symbolName := expr.Selector.Name
+
+		// Look up the import path from the alias/name
+		importPath, ok := mod.ImportAliasMap[moduleName]
+		if !ok {
+			// Module not imported - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Get the imported module from context
+		importedMod, exists := ctx.GetModule(importPath)
+		if !exists {
+			// Module not loaded - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Look up the symbol in the imported module's module scope
+		// Use ModuleScope.GetSymbol (not Lookup) to get module-level symbols only
+		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		if !ok {
+			// Symbol not found - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Return the symbol's type
+		return sym.Type
+	}
+
+	// For non-identifier X (e.g., enum::variant), recurse
+	return inferExprType(ctx, mod, expr.X)
+}
+
 // inferCastExprType determines the target type of a cast
 func inferCastExprType(expr *ast.CastExpr) types.SemType {
 	return typeFromTypeNode(expr.Type)
@@ -189,7 +227,6 @@ func inferCompositeLitType(lit *ast.CompositeLit) types.SemType {
 	}
 	return types.TypeUnknown
 }
-
 
 // widerType returns the wider of two numeric types for implicit conversion
 func widerType(a, b types.SemType) types.SemType {
@@ -273,4 +310,40 @@ func contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemTy
 	default:
 		return types.TypeUnknown
 	}
+}
+
+// inferFuncLitType infers the type of a function literal
+func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.FuncLit) types.SemType {
+	if lit.Type == nil {
+		return types.TypeUnknown
+	}
+
+	// Enter function literal scope for type checking the body
+	if lit.Scope != nil {
+		defer mod.EnterScope(lit.Scope.(*table.SymbolTable))()
+	}
+
+	// Build parameter types
+	params := make([]types.ParamType, len(lit.Type.Params))
+	for i, param := range lit.Type.Params {
+		params[i] = types.ParamType{
+			Name: param.Name.Name,
+			Type: typeFromTypeNode(param.Type),
+		}
+
+		// Update symbol table with the parameter's type
+		if sym, ok := mod.CurrentScope.GetSymbol(param.Name.Name); ok {
+			sym.Type = params[i].Type
+		}
+	}
+
+	// Get return type
+	returnType := typeFromTypeNode(lit.Type.Result)
+
+	// Type check the function body
+	if lit.Body != nil {
+		checkBlock(ctx, mod, lit.Body)
+	}
+
+	return types.NewFunction(params, returnType)
 }

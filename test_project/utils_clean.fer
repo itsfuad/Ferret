@@ -1,0 +1,13 @@
+// Clean utils module for testing
+fn Multiply(a: i32, b: i32) -> i32 {
+    return a * b;
+}
+
+fn Add(x: i32, y: i32) -> i32 {
+    return x + y;
+}
+
+const MAX: i32 = 100;
+const MIN: i32 = 0;
+
+let GlobalCount: i32 = 42;

@@ -1,0 +1,53 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "PI",
+            "Start": {
+              "Line": 2,
+              "Column": 7,
+              "Index": 7
+            },
+            "End": {
+              "Line": 2,
+              "Column": 9,
+              "Index": 9
+            }
+          },
+          "Type": null,
+          "Value": {
+            "Kind": 1,
+            "Value": "3.1416",
+            "Start": {
+              "Line": 2,
+              "Column": 13,
+              "Index": 13
+            },
+            "End": {
+              "Line": 2,
+              "Column": 19,
+              "Index": 19
+            }
+          }
+        }
+      ],
+      "Start": {
+        "Line": 2,
+        "Column": 1,
+        "Index": 1
+      },
+      "End": {
+        "Line": 2,
+        "Column": 20,
+        "Index": 20
+      }
+    }
+  ],
+  "Start": null,
+  "End": null
+}
