@@ -50,12 +50,13 @@ func (p *Pipeline) Run() error {
 	// Wait for all parsing tasks to complete
 	p.wg.Wait()
 
+	// Compute topological order once after parsing
+	// Do this even if there are errors, so tests can inspect what was discovered
+	p.ctx.ComputeTopologicalOrder()
+
 	if p.ctx.HasErrors() {
 		return fmt.Errorf("compilation failed with errors")
 	}
-
-	// Compute topological order once after parsing
-	p.ctx.ComputeTopologicalOrder()
 
 	// Phase 2: Symbol Collection
 	if p.ctx.Debug {
