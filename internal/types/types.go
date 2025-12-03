@@ -26,9 +26,8 @@ type SemType interface {
 	isType()
 }
 
-// ============================================================================
+
 // Primitive Types (built-in) likely can be represented as numbers
-// ============================================================================
 
 // UntypedKind represents the kind of untyped literal
 type UntypedKind int
@@ -119,9 +118,7 @@ func getPrimitiveSize(name TYPE_NAME) int {
 	}
 }
 
-// ============================================================================
 // Array Types
-// ============================================================================
 
 // ArrayType represents array types: [N]T or []T (dynamic)
 type ArrayType struct {
@@ -156,9 +153,8 @@ func (a *ArrayType) Equals(other SemType) bool {
 	return false
 }
 
-// ============================================================================
+
 // Map Types
-// ============================================================================
 
 // MapType represents map types: Map<K, V>
 type MapType struct {
@@ -187,9 +183,7 @@ func (m *MapType) Equals(other SemType) bool {
 	return false
 }
 
-// ============================================================================
 // Function Types
-// ============================================================================
 
 // FunctionType represents function signatures: fn(T1, T2) -> R
 type ParamType struct {
@@ -254,9 +248,6 @@ func (f *FunctionType) Equals(other SemType) bool {
 	return false
 }
 
-// ============================================================================
-// Optional Types
-// ============================================================================
 
 // OptionalType represents nullable types: T?
 type OptionalType struct {
@@ -284,9 +275,6 @@ func (o *OptionalType) Equals(other SemType) bool {
 	return false
 }
 
-// ============================================================================
-// Result/Error Types
-// ============================================================================
 
 // ResultType represents result types with error handling: T ! E
 type ResultType struct {
@@ -320,9 +308,6 @@ func (r *ResultType) Equals(other SemType) bool {
 	return false
 }
 
-// ============================================================================
-// Struct Types
-// ============================================================================
 
 // StructField represents a field in a struct
 type StructField struct {
@@ -385,9 +370,6 @@ func (s *StructType) Equals(other SemType) bool {
 	return false
 }
 
-// ============================================================================
-// Enum Types
-// ============================================================================
 
 // EnumVariant represents a variant in an enum
 type EnumVariant struct {
@@ -430,10 +412,6 @@ func (e *EnumType) Equals(other SemType) bool {
 	}
 	return false
 }
-
-// ============================================================================
-// Convenience Functions
-// ============================================================================
 
 // Commonly used types (initialized in init())
 var (

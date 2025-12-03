@@ -4,8 +4,8 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 	"fmt"
-	"strings"
 )
 
 // buildImportAliasMap creates a mapping from alias/module-name to import path
@@ -29,10 +29,8 @@ func buildImportAliasMap(ctx *context_v2.CompilerContext, mod *context_v2.Module
 			// Extract the last component of the import path as the default name
 			// e.g., "test_project/utils" -> "utils"
 			//       "std/math" -> "math"
-			parts := splitImportPath(imp.Path)
-			if len(parts) > 0 {
-				aliasName = parts[len(parts)-1]
-			} else {
+			aliasName = fs.LastPart(imp.Path)
+			if aliasName == "" {
 				// Skip invalid import paths
 				continue
 			}
@@ -61,19 +59,4 @@ func buildImportAliasMap(ctx *context_v2.CompilerContext, mod *context_v2.Module
 			location:   imp.Location,
 		}
 	}
-}
-
-// splitImportPath splits an import path by '/' to get components
-func splitImportPath(path string) []string {
-	// Remove quotes if present
-	path = strings.Trim(path, "\"")
-
-	// Split by forward slash
-	parts := []string{}
-	for _, part := range strings.Split(path, "/") {
-		if part != "" {
-			parts = append(parts, part)
-		}
-	}
-	return parts
 }

@@ -560,10 +560,6 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 	}
 }
 
-// ============================================================================
-// Call Expression Validation
-// ============================================================================
-
 // checkCallExpr validates function call expressions
 // This includes:
 // - Verifying the called expression is actually a function

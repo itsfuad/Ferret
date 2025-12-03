@@ -305,71 +305,6 @@ import "third_lib/math" as math3;
 	}
 }
 
-// Test splitImportPath helper function
-func TestSplitImportPath(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected []string
-	}{
-		{
-			name:     "simple path",
-			input:    "std/math",
-			expected: []string{"std", "math"},
-		},
-		{
-			name:     "nested path",
-			input:    "test_project/utils/helpers",
-			expected: []string{"test_project", "utils", "helpers"},
-		},
-		{
-			name:     "path with quotes",
-			input:    `"std/math"`,
-			expected: []string{"std", "math"},
-		},
-		{
-			name:     "single component",
-			input:    "math",
-			expected: []string{"math"},
-		},
-		{
-			name:     "trailing slash",
-			input:    "std/math/",
-			expected: []string{"std", "math"},
-		},
-		{
-			name:     "leading slash",
-			input:    "/std/math",
-			expected: []string{"std", "math"},
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: []string{},
-		},
-		{
-			name:     "only quotes",
-			input:    `""`,
-			expected: []string{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := splitImportPath(tt.input)
-			if len(result) != len(tt.expected) {
-				t.Errorf("Expected %d parts, got %d", len(tt.expected), len(result))
-				return
-			}
-			for i := range result {
-				if result[i] != tt.expected[i] {
-					t.Errorf("Part %d: expected %q, got %q", i, tt.expected[i], result[i])
-				}
-			}
-		})
-	}
-}
-
 // Test that diagnostic has proper labels (primary and secondary)
 func TestImportAliasDuplicateDiagnosticLabels(t *testing.T) {
 	src := `
@@ -423,11 +358,11 @@ import "std/io" as m;
 
 // Test empty import path handling
 func TestImportAliasEmptyPath(t *testing.T) {
-	// This tests the edge case where splitImportPath returns empty array
+	// This tests the edge case where fs.LastPart returns empty string
 	mod := &context_v2.Module{
 		FilePath:       "test.fer",
 		ImportAliasMap: make(map[string]string),
-		Imports: make(map[string]*context_v2.Import),
+		Imports:        make(map[string]*context_v2.Import),
 	}
 
 	ctx := createTestContext()
@@ -437,7 +372,7 @@ func TestImportAliasEmptyPath(t *testing.T) {
 	if len(mod.ImportAliasMap) != 0 {
 		t.Errorf("Expected empty alias map for empty import path, got %d entries", len(mod.ImportAliasMap))
 	}
-	
+
 	// Should not add anything to the map
 	if len(mod.ImportAliasMap) != 0 {
 		t.Errorf("Expected empty alias map for empty import path, got %d entries", len(mod.ImportAliasMap))

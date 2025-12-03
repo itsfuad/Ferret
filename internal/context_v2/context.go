@@ -390,42 +390,10 @@ func (ctx *CompilerContext) FilePathToImportPath(filePath string) string {
 	return relPath
 }
 
-// NormalizeImportPath normalizes an import path for semantic use
-//
-// Import paths are semantic identifiers, not file system paths. This function
-// ensures consistent representation by:
-// - Trimming leading/trailing whitespace
-// - Trimming leading/trailing slashes
-// - Collapsing multiple consecutive slashes into one
-// - Using forward slashes only (no backslashes)
-//
-// Examples:
-//   - " myproject/utils " -> "myproject/utils"
-//   - "myproject//utils"  -> "myproject/utils"
-//   - "/myproject/utils/" -> "myproject/utils"
-//   - "myproject\utils"   -> "myproject/utils"
-func (ctx *CompilerContext) NormalizeImportPath(importPath string) string {
-	// Trim whitespace
-	importPath = strings.TrimSpace(importPath)
-
-	// Replace backslashes with forward slashes (handle Windows-style paths in source)
-	importPath = strings.ReplaceAll(importPath, "\\", "/")
-
-	// Collapse multiple slashes into one
-	for strings.Contains(importPath, "//") {
-		importPath = strings.ReplaceAll(importPath, "//", "/")
-	}
-
-	// Trim leading/trailing slashes
-	importPath = strings.Trim(importPath, "/")
-
-	return importPath
-}
-
 // ImportPathToFilePath converts an import path to a file path
 func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, ModuleType, error) {
 	// Normalize import path to ensure consistent lookup
-	importPath = ctx.NormalizeImportPath(importPath)
+	importPath = fs.NormalizeImportPath(importPath)
 
 	// Determine module type
 	packageName := fs.FirstPart(importPath)

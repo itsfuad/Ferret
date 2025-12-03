@@ -18,6 +18,7 @@ import (
 	"compiler/internal/semantics/table"
 	"compiler/internal/semantics/typechecker"
 	"compiler/internal/source"
+	"compiler/internal/utils/fs"
 )
 
 // Pipeline coordinates the compilation process
@@ -45,7 +46,7 @@ func (p *Pipeline) Run() error {
 	}
 
 	// Start with entry module and recursively process imports
-	p.processModule(p.ctx.EntryModule, "", nil)
+	p.processModule(p.ctx.EntryModule, nil)
 
 	// Wait for all parsing tasks to complete
 	p.wg.Wait()
@@ -96,7 +97,7 @@ func (p *Pipeline) Run() error {
 }
 
 // processModule schedules parsing for a module exactly once (thread-safe)
-func (p *Pipeline) processModule(importPath, requestedFrom string, requestedLocation *source.Location) {
+func (p *Pipeline) processModule(importPath string, requestedLocation *source.Location) {
 	// Fast "do-once" gate. If already scheduled/parsed, return.
 	if _, loaded := p.seen.LoadOrStore(importPath, struct{}{}); loaded {
 		return
@@ -109,12 +110,12 @@ func (p *Pipeline) processModule(importPath, requestedFrom string, requestedLoca
 			p.wg.Done() // mark task done
 		}()
 
-		p.parseModule(importPath, requestedFrom, requestedLocation)
+		p.parseModule(importPath, requestedLocation)
 	}()
 }
 
 // parseModule does the actual parsing work and schedules imports
-func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocation *source.Location) {
+func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Location) {
 	// Get or create module
 	module, exists := p.ctx.GetModule(importPath)
 	if !exists {
@@ -157,10 +158,6 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 		contentBytes, err := os.ReadFile(filePath)
 		if err != nil {
 			errMsg := fmt.Sprintf("cannot read file %s: %v", filePath, err)
-			errorFile := requestedFrom
-			if errorFile == "" {
-				errorFile = filePath
-			}
 			p.ctx.Diagnostics.Add(
 				diagnostics.NewError(errMsg).
 					WithPrimaryLabel(requestedLocation, ""),
@@ -223,7 +220,7 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 
 	// Schedule imports for processing (they will run in parallel via sem)
 	for _, imp := range imports {
-		p.processModule(imp.path, filePath, imp.location)
+		p.processModule(imp.path, imp.location)
 	}
 }
 
@@ -245,7 +242,7 @@ func (p *Pipeline) extractTopLevelImports(astModule *ast.Module) []importInfo {
 
 		if impStmt.Path != nil {
 			importPath := strings.Trim(impStmt.Path.Value, "\"")
-			importPath = p.ctx.NormalizeImportPath(importPath)
+			importPath = fs.NormalizeImportPath(importPath)
 			if importPath != "" {
 				imports = append(imports, importInfo{
 					path:     importPath,
