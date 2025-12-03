@@ -26,7 +26,6 @@ type SemType interface {
 	isType()
 }
 
-
 // Primitive Types (built-in) likely can be represented as numbers
 
 // UntypedKind represents the kind of untyped literal
@@ -105,6 +104,10 @@ func getPrimitiveSize(name TYPE_NAME) int {
 		return 4
 	case TYPE_I64, TYPE_U64, TYPE_F64:
 		return 8
+	case TYPE_I128, TYPE_U128:
+		return 16
+	case TYPE_I256, TYPE_U256:
+		return 32
 	case TYPE_BOOL:
 		return 1
 	case TYPE_STRING:
@@ -152,7 +155,6 @@ func (a *ArrayType) Equals(other SemType) bool {
 	}
 	return false
 }
-
 
 // Map Types
 
@@ -248,7 +250,6 @@ func (f *FunctionType) Equals(other SemType) bool {
 	return false
 }
 
-
 // OptionalType represents nullable types: T?
 type OptionalType struct {
 	Inner SemType
@@ -274,7 +275,6 @@ func (o *OptionalType) Equals(other SemType) bool {
 	}
 	return false
 }
-
 
 // ResultType represents result types with error handling: T ! E
 type ResultType struct {
@@ -307,7 +307,6 @@ func (r *ResultType) Equals(other SemType) bool {
 	}
 	return false
 }
-
 
 // StructField represents a field in a struct
 type StructField struct {
@@ -370,7 +369,6 @@ func (s *StructType) Equals(other SemType) bool {
 	return false
 }
 
-
 // EnumVariant represents a variant in an enum
 type EnumVariant struct {
 	Name string
@@ -419,10 +417,14 @@ var (
 	TypeI16     SemType
 	TypeI32     SemType
 	TypeI64     SemType
+	TypeI128    SemType
+	TypeI256    SemType
 	TypeU8      SemType
 	TypeU16     SemType
 	TypeU32     SemType
 	TypeU64     SemType
+	TypeU128    SemType
+	TypeU256    SemType
 	TypeF32     SemType
 	TypeF64     SemType
 	TypeBool    SemType
@@ -440,10 +442,14 @@ func init() {
 	TypeI16 = NewPrimitive(TYPE_I16)
 	TypeI32 = NewPrimitive(TYPE_I32)
 	TypeI64 = NewPrimitive(TYPE_I64)
+	TypeI128 = NewPrimitive(TYPE_I128)
+	TypeI256 = NewPrimitive(TYPE_I256)
 	TypeU8 = NewPrimitive(TYPE_U8)
 	TypeU16 = NewPrimitive(TYPE_U16)
 	TypeU32 = NewPrimitive(TYPE_U32)
 	TypeU64 = NewPrimitive(TYPE_U64)
+	TypeU128 = NewPrimitive(TYPE_U128)
+	TypeU256 = NewPrimitive(TYPE_U256)
 	TypeF32 = NewPrimitive(TYPE_F32)
 	TypeF64 = NewPrimitive(TYPE_F64)
 	TypeBool = NewPrimitive(TYPE_BOOL)

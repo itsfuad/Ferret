@@ -2,6 +2,7 @@ package numeric
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -92,6 +93,54 @@ func StringToFloat(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
+// StringToBigInt parses a string into a big.Int, handling hex, octal, binary, and decimal formats
+// This is used for validating large integer literals (128-bit and 256-bit)
+func StringToBigInt(s string) (*big.Int, error) {
+	// Remove any underscores used for readability
+	s = strings.ReplaceAll(s, "_", "")
+
+	// Determine base and trim prefix
+	base := 10
+	trimmed := s
+
+	if IsHexadecimal(s) {
+		base = 16
+		trimmed = s[2:] // Remove "0x" or "0X"
+	} else if IsOctal(s) {
+		base = 8
+		trimmed = s[2:] // Remove "0o" or "0O"
+	} else if IsBinary(s) {
+		base = 2
+		trimmed = s[2:] // Remove "0b" or "0B"
+	}
+
+	// Parse as big.Int
+	result := new(big.Int)
+	_, ok := result.SetString(trimmed, base)
+	if !ok {
+		return nil, fmt.Errorf("invalid integer literal: %s", s)
+	}
+
+	return result, nil
+}
+
+// FitsInBitSize checks if a big.Int value fits in the given bit size (signed or unsigned)
+// Returns true if the value is within the valid range for the specified bit size
+func FitsInBitSize(value *big.Int, bitSize int, signed bool) bool {
+	if signed {
+		// Signed range: -2^(bitSize-1) to 2^(bitSize-1) - 1
+		min := new(big.Int).Lsh(big.NewInt(-1), uint(bitSize-1))
+		max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(bitSize-1)), big.NewInt(1))
+		return value.Cmp(min) >= 0 && value.Cmp(max) <= 0
+	} else {
+		// Unsigned range: 0 to 2^bitSize - 1
+		if value.Sign() < 0 {
+			return false
+		}
+		max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(bitSize)), big.NewInt(1))
+		return value.Cmp(max) <= 0
+	}
+}
 
 // numeric to ordinal: 1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc.
 func NumericToOrdinal(n int) string {

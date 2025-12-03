@@ -25,3 +25,16 @@ let s : str = 10;
 let int := 10;
 
 let string : str = int;
+
+// 128-bit integers
+let huge: i128 = 170141183460469231731687303715884105727;  // 2^127 - 1
+let big_unsigned: u128 = 340282366920938463463374607431768211455;
+
+// 256-bit integers  
+let massive: i256 = 578960446186580977117854925043439539266;  // 2^255 - 1
+let enormous: u8 = 115792089237316195423570985008687907853;  // 2^256 - 1
+
+enormous = "2";
+
+// Works with hex notation too
+let hex_val: i128 = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;

@@ -9,7 +9,6 @@ import (
 	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 	"fmt"
-	"strconv"
 	"sync"
 )
 
@@ -140,8 +139,8 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 			// Check initializer if present
 			if item.Value != nil {
-				// Pass item.Name for secondary label (variable location)
-				checkAssignLike(ctx, mod, declType, item.Name, item.Value)
+				// Pass item.Type for type location in error messages
+				checkAssignLike(ctx, mod, declType, item.Type, item.Value)
 			} else if isConst {
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
@@ -353,7 +352,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 	rhsType := checkExpr(ctx, mod, valueExpr, targetType)
 
 	// Special check for integer literals: ensure they fit in the target type
-	if ok := checkFitness(ctx, mod, rhsType, targetType, valueExpr, typeNode); !ok {
+	if ok := checkFitness(ctx, rhsType, targetType, valueExpr, typeNode); !ok {
 		return
 	}
 
@@ -439,27 +438,41 @@ func formatTypeDescription(typ types.SemType) string {
 	return typ.String()
 }
 
-func checkFitness(ctx *context_v2.CompilerContext, mod *context_v2.Module, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
+func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
 	if types.IsUntypedInt(rhsType) || rhsType.Equals(types.TypeI64) {
 		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
 			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
-				value, err := strconv.ParseInt(lit.Value, 0, 64)
-				if err == nil && !fitsInType(value, targetType) {
-					// Literal doesn't fit in target type
-					minType := getMinimumTypeForValue(value)
+				// Use big.Int for all range checking (simpler, consistent)
+				if !fitsInType(lit.Value, targetType) {
+					// Get minimum type that can hold this value
+					minType := getMinimumTypeForValue(lit.Value)
+
+					// Build error message
 					diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", lit.Value, targetType.String()))
 
 					if typeNode != nil {
-						// Show value location (primary) and variable/LHS location (secondary)
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("need at least %s", minType)).
-							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+						// Show value location (primary) and type location (secondary)
+						if minType != "unknown" && minType != "too large for any supported type" {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required to store this value", minType)).
+								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+						} else if minType == "too large for any supported type" {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), "exceeds maximum supported integer size (256-bit)").
+								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+						} else {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), "value too large for this type").
+								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+						}
 					} else {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value %s doesn't fit in %s", lit.Value, targetType.String()))
+						if minType != "unknown" && minType != "too large for any supported type" {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required, got %s", minType, targetType.String()))
+						} else {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value doesn't fit in %s", targetType.String()))
+						}
 					}
 
-					ctx.Diagnostics.Add(
-						diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType))),
-					)
+					diag = diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType)))
+
+					ctx.Diagnostics.Add(diag)
 					return false
 				}
 			}

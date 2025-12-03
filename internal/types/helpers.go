@@ -1,6 +1,6 @@
 package types
 
-func GetNumberBitSize(kind TYPE_NAME) uint8 {
+func GetNumberBitSize(kind TYPE_NAME) uint16 {
 	switch kind {
 	case TYPE_I8, TYPE_U8, TYPE_BYTE:
 		return 8
@@ -10,6 +10,10 @@ func GetNumberBitSize(kind TYPE_NAME) uint8 {
 		return 32
 	case TYPE_I64, TYPE_U64, TYPE_F64:
 		return 64
+	case TYPE_I128, TYPE_U128:
+		return 128
+	case TYPE_I256, TYPE_U256:
+		return 256
 	default:
 		return 0
 	}
@@ -17,7 +21,7 @@ func GetNumberBitSize(kind TYPE_NAME) uint8 {
 
 func IsSigned(kind TYPE_NAME) bool {
 	switch kind {
-	case TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64:
+	case TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64, TYPE_I128, TYPE_I256:
 		return true
 	default:
 		return false
@@ -26,7 +30,7 @@ func IsSigned(kind TYPE_NAME) bool {
 
 func IsUnsigned(kind TYPE_NAME) bool {
 	switch kind {
-	case TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64, TYPE_BYTE:
+	case TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64, TYPE_U128, TYPE_U256, TYPE_BYTE:
 		return true
 	default:
 		return false
@@ -41,8 +45,8 @@ func IsNumericTypeName(typeName TYPE_NAME) bool {
 // IsIntegerTypeName checks if a type name is an integer type
 func IsIntegerTypeName(typeName TYPE_NAME) bool {
 	switch typeName {
-	case TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64,
-		TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64, TYPE_BYTE:
+	case TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64, TYPE_I128, TYPE_I256,
+		TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64, TYPE_U128, TYPE_U256, TYPE_BYTE:
 		return true
 	default:
 		return false

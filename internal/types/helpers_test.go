@@ -54,7 +54,7 @@ func TestIsFloat(t *testing.T) {
 func TestGetNumberBitSize(t *testing.T) {
 	tests := []struct {
 		kind     TYPE_NAME
-		expected uint8
+		expected uint16
 	}{
 		{TYPE_I8, 8},
 		{TYPE_U8, 8},
@@ -67,6 +67,10 @@ func TestGetNumberBitSize(t *testing.T) {
 		{TYPE_I64, 64},
 		{TYPE_U64, 64},
 		{TYPE_F64, 64},
+		{TYPE_I128, 128},
+		{TYPE_U128, 128},
+		{TYPE_I256, 256},
+		{TYPE_U256, 256},
 		{TYPE_STRING, 0}, // assuming STRING is a TYPE_NAME that doesn't match any case
 	}
 
@@ -87,10 +91,14 @@ func TestIsSigned(t *testing.T) {
 		{TYPE_I16, true},
 		{TYPE_I32, true},
 		{TYPE_I64, true},
+		{TYPE_I128, true},
+		{TYPE_I256, true},
 		{TYPE_U8, false},
 		{TYPE_U16, false},
 		{TYPE_U32, false},
 		{TYPE_U64, false},
+		{TYPE_U128, false},
+		{TYPE_U256, false},
 		{TYPE_BYTE, false},
 		{TYPE_F32, false},
 		{TYPE_F64, false},
@@ -114,11 +122,15 @@ func TestIsUnsigned(t *testing.T) {
 		{TYPE_U16, true},
 		{TYPE_U32, true},
 		{TYPE_U64, true},
+		{TYPE_U128, true},
+		{TYPE_U256, true},
 		{TYPE_BYTE, true},
 		{TYPE_I8, false},
 		{TYPE_I16, false},
 		{TYPE_I32, false},
 		{TYPE_I64, false},
+		{TYPE_I128, false},
+		{TYPE_I256, false},
 		{TYPE_F32, false},
 		{TYPE_F64, false},
 		{TYPE_STRING, false}, // assuming STRING is a TYPE_NAME that doesn't match any case

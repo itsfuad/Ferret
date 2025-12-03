@@ -1,0 +1,4 @@
+// Test overflow detection
+let too_big_i8: i8 = 128;  // overflow: max is 127
+let too_big_u8: u8 = 256;  // overflow: max is 255
+let negative_unsigned: u32 = -1;  // overflow: unsigned can't be negative

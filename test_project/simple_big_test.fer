@@ -1,0 +1,5 @@
+// Simple 128-bit test
+let x: i128 = 100;
+let y: u128 = 200;
+let z: i256 = 300;
+let w: u256 = 400;

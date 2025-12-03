@@ -1,0 +1,250 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "x",
+            "Start": {
+              "Line": 2,
+              "Column": 5,
+              "Index": 27
+            },
+            "End": {
+              "Line": 2,
+              "Column": 6,
+              "Index": 28
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Type": {
+            "Name": "i128",
+            "Start": {
+              "Line": 2,
+              "Column": 8,
+              "Index": 30
+            },
+            "End": {
+              "Line": 2,
+              "Column": 12,
+              "Index": 34
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Value": {
+            "Kind": 0,
+            "Value": "100",
+            "Start": {
+              "Line": 2,
+              "Column": 15,
+              "Index": 37
+            },
+            "End": {
+              "Line": 2,
+              "Column": 18,
+              "Index": 40
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 2,
+        "Column": 1,
+        "Index": 23
+      },
+      "End": {
+        "Line": 2,
+        "Column": 19,
+        "Index": 41
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "y",
+            "Start": {
+              "Line": 3,
+              "Column": 5,
+              "Index": 46
+            },
+            "End": {
+              "Line": 3,
+              "Column": 6,
+              "Index": 47
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Type": {
+            "Name": "u128",
+            "Start": {
+              "Line": 3,
+              "Column": 8,
+              "Index": 49
+            },
+            "End": {
+              "Line": 3,
+              "Column": 12,
+              "Index": 53
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Value": {
+            "Kind": 0,
+            "Value": "200",
+            "Start": {
+              "Line": 3,
+              "Column": 15,
+              "Index": 56
+            },
+            "End": {
+              "Line": 3,
+              "Column": 18,
+              "Index": 59
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 3,
+        "Column": 1,
+        "Index": 42
+      },
+      "End": {
+        "Line": 3,
+        "Column": 19,
+        "Index": 60
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "z",
+            "Start": {
+              "Line": 4,
+              "Column": 5,
+              "Index": 65
+            },
+            "End": {
+              "Line": 4,
+              "Column": 6,
+              "Index": 66
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Type": {
+            "Name": "i256",
+            "Start": {
+              "Line": 4,
+              "Column": 8,
+              "Index": 68
+            },
+            "End": {
+              "Line": 4,
+              "Column": 12,
+              "Index": 72
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Value": {
+            "Kind": 0,
+            "Value": "300",
+            "Start": {
+              "Line": 4,
+              "Column": 15,
+              "Index": 75
+            },
+            "End": {
+              "Line": 4,
+              "Column": 18,
+              "Index": 78
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 4,
+        "Column": 1,
+        "Index": 61
+      },
+      "End": {
+        "Line": 4,
+        "Column": 19,
+        "Index": 79
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "w",
+            "Start": {
+              "Line": 5,
+              "Column": 5,
+              "Index": 84
+            },
+            "End": {
+              "Line": 5,
+              "Column": 6,
+              "Index": 85
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Type": {
+            "Name": "u256",
+            "Start": {
+              "Line": 5,
+              "Column": 8,
+              "Index": 87
+            },
+            "End": {
+              "Line": 5,
+              "Column": 12,
+              "Index": 91
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          },
+          "Value": {
+            "Kind": 0,
+            "Value": "400",
+            "Start": {
+              "Line": 5,
+              "Column": 15,
+              "Index": 94
+            },
+            "End": {
+              "Line": 5,
+              "Column": 18,
+              "Index": 97
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 5,
+        "Column": 1,
+        "Index": 80
+      },
+      "End": {
+        "Line": 5,
+        "Column": 19,
+        "Index": 98
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/simple_big_test.fer"
+    }
+  ],
+  "Start": null,
+  "End": null,
+  "Filename": null
+}

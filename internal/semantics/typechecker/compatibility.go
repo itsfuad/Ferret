@@ -2,6 +2,7 @@ package typechecker
 
 import (
 	"compiler/internal/types"
+	"compiler/internal/utils/numeric"
 	"fmt"
 )
 
@@ -128,72 +129,89 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 	}
 }
 
-// fitsInType checks if a value fits in a given type
-func fitsInType(value int64, t types.SemType) bool {
+// fitsInType checks if a string literal value fits in a given type.
+// Uses NumericValue interface which automatically chooses int64 (fast) or big.Int (precise) representation.
+func fitsInType(valueStr string, t types.SemType) bool {
+	// Parse as NumericValue (automatically chooses optimal representation)
+	numValue, err := numeric.NewNumericValue(valueStr)
+	if err != nil {
+		return false
+	}
+
 	// Extract primitive type name
 	name, ok := types.GetPrimitiveName(t)
 	if !ok {
-		return false // Non-primitive types don't have numeric ranges
-	}
-
-	switch name {
-	case types.TYPE_I8:
-		return value >= -128 && value <= 127
-	case types.TYPE_I16:
-		return value >= -32768 && value <= 32767
-	case types.TYPE_I32:
-		return value >= -2147483648 && value <= 2147483647
-	case types.TYPE_I64:
-		return true // int64 always fits
-	case types.TYPE_U8:
-		return value >= 0 && value <= 255
-	case types.TYPE_U16:
-		return value >= 0 && value <= 65535
-	case types.TYPE_U32:
-		return value >= 0 && value <= 4294967295
-	case types.TYPE_U64:
-		return value >= 0
-	default:
 		return false
 	}
+
+	// Check based on type
+	bitSize := types.GetNumberBitSize(name)
+	if bitSize == 0 {
+		return false // Not a numeric type
+	}
+
+	signed := types.IsSigned(name)
+	return numValue.FitsInBitSize(int(bitSize), signed)
 }
 
-// getMinimumTypeForValue returns the smallest type that can hold the given value
-func getMinimumTypeForValue(value int64) string {
-	// For negative values, check signed types
-	if value < 0 {
-		if value >= -128 {
-			return "i8"
-		}
-		if value >= -32768 {
-			return "i16"
-		}
-		if value >= -2147483648 {
-			return "i32"
-		}
-		return "i64"
+// getMinimumTypeForValue returns the smallest type that can hold the given value.
+// For positive values, returns both unsigned and signed alternatives (e.g., "u8 or i16").
+// Uses NumericValue interface which automatically chooses optimal representation.
+func getMinimumTypeForValue(valueStr string) string {
+	// Use NumericValue interface (automatically chooses int64 fast path or big.Int)
+	numValue, err := numeric.NewNumericValue(valueStr)
+	if err != nil {
+		return "unknown"
 	}
 
-	// For positive values, prefer unsigned types but also show signed alternative
-	if value <= 127 {
-		return "i8 or u8"
+	// Check signed types first if negative
+	if numValue.IsNegative() {
+		signedTypes := []struct {
+			name    string
+			bitSize int
+		}{
+			{"i8", 8},
+			{"i16", 16},
+			{"i32", 32},
+			{"i64", 64},
+			{"i128", 128},
+			{"i256", 256},
+		}
+
+		for _, t := range signedTypes {
+			if numValue.FitsInBitSize(t.bitSize, true) {
+				return t.name
+			}
+		}
+	} else {
+		// For positive values, show both unsigned and next signed alternative
+		types := []struct {
+			unsigned    string
+			unsignedBit int
+			signed      string
+			signedBit   int
+		}{
+			{"u8", 8, "i16", 16},
+			{"u16", 16, "i32", 32},
+			{"u32", 32, "i64", 64},
+			{"u64", 64, "i128", 128},
+			{"u128", 128, "i256", 256},
+			{"u256", 256, "", 0},
+		}
+
+		for _, t := range types {
+			if numValue.FitsInBitSize(t.unsignedBit, false) {
+				if t.signed != "" {
+					// Show both unsigned and signed alternatives
+					return fmt.Sprintf("%s or %s", t.unsigned, t.signed)
+				}
+				// u256 has no larger signed type
+				return t.unsigned
+			}
+		}
 	}
-	if value <= 255 {
-		return "u8 or i16"
-	}
-	if value <= 32767 {
-		return "i16 or u16"
-	}
-	if value <= 65535 {
-		return "u16 or i32"
-	}
-	if value <= 2147483647 {
-		return "i32 or u32"
-	}
-	if value <= 4294967295 {
-		return "u32 or i64"
-	}
-	return "i64 or u64"
+
+	return "too large for any supported type"
 }
 
 // getTypeRange returns a human-readable range for integer types
@@ -213,6 +231,10 @@ func getTypeRange(t types.SemType) string {
 		return "-2,147,483,648 to 2,147,483,647"
 	case types.TYPE_I64:
 		return "-9,223,372,036,854,775,808 to 9,223,372,036,854,775,807"
+	case types.TYPE_I128:
+		return "-170,141,183,460,469,231,731,687,303,715,884,105,728 to 170,141,183,460,469,231,731,687,303,715,884,105,727"
+	case types.TYPE_I256:
+		return "-2^255 to 2^255 - 1 (256-bit signed)"
 	case types.TYPE_U8:
 		return "0 to 255"
 	case types.TYPE_U16:
@@ -221,6 +243,10 @@ func getTypeRange(t types.SemType) string {
 		return "0 to 4,294,967,295"
 	case types.TYPE_U64:
 		return "0 to 18,446,744,073,709,551,615"
+	case types.TYPE_U128:
+		return "0 to 340,282,366,920,938,463,463,374,607,431,768,211,455"
+	case types.TYPE_U256:
+		return "0 to 2^256 - 1 (256-bit unsigned)"
 	default:
 		return "unknown range"
 	}

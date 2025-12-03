@@ -6,7 +6,6 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/semantics/table"
 	"compiler/internal/types"
-	"strconv"
 )
 
 // inferExprType determines the type of an expression based on its structure and value.
@@ -295,8 +294,8 @@ func contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemTy
 		// Try to fit into expected type
 		if types.IsNumeric(expected) {
 			if _, ok := types.GetPrimitiveName(expected); ok {
-				value, err := strconv.ParseInt(lit.Value, 0, 64)
-				if err == nil && fitsInType(value, expected) {
+				// Use big.Int for all integer validation (simpler, more maintainable)
+				if fitsInType(lit.Value, expected) {
 					return expected
 				}
 			}
