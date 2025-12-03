@@ -2,6 +2,7 @@ package diagnostics
 
 import (
 	"compiler/internal/source"
+	"fmt"
 )
 
 // Common diagnostic builders for type checker
@@ -27,7 +28,33 @@ func RedeclaredSymbol(filepath string, newLoc, prevLoc *source.Location, name st
 func WrongArgumentCount(filepath string, loc *source.Location, expected, found int) *Diagnostic {
 	return NewError("wrong number of arguments").
 		WithCode(ErrWrongArgumentCount).
-		WithPrimaryLabel(filepath, loc, "expected "+string(rune(expected))+" arguments, found "+string(rune(found)))
+		WithPrimaryLabel(filepath, loc, fmt.Sprintf("expected %d arguments, found %d", expected, found))
+}
+
+// WrongArgumentCountVariadic creates a diagnostic for wrong number of arguments to variadic function
+func WrongArgumentCountVariadic(filepath string, loc *source.Location, minExpected, found int) *Diagnostic {
+	return NewError("wrong number of arguments").
+		WithCode(ErrWrongArgumentCount).
+		WithPrimaryLabel(filepath, loc, fmt.Sprintf("expected at least %d arguments, found %d", minExpected, found))
+}
+
+// ArgumentTypeMismatch creates a diagnostic for argument type mismatch
+func ArgumentTypeMismatch(filepath string, loc *source.Location, paramName, expected, found string) *Diagnostic {
+	msg := "type mismatch in argument"
+	if paramName != "" {
+		msg = "type mismatch in argument '" + paramName + "'"
+	}
+	return NewError(msg).
+		WithCode(ErrTypeMismatch).
+		WithPrimaryLabel(filepath, loc, "expected "+expected+", found "+found)
+}
+
+// NotCallable creates a diagnostic for calling a non-function
+func NotCallable(filepath string, loc *source.Location, typeName string) *Diagnostic {
+	return NewError("cannot call non-function").
+		WithCode(ErrNotCallable).
+		WithPrimaryLabel(filepath, loc, "type "+typeName+" is not callable").
+		WithHelp("only functions can be called")
 }
 
 // FieldNotFound creates a diagnostic for field not found

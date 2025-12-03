@@ -104,7 +104,7 @@ func TestPlural(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := Plural(test.singular, test.plural, test.count)
+		result := Pluralize(test.singular, test.plural, test.count)
 		if result != test.expected {
 			t.Errorf("Plural(%q, %q, %d) = %q, expected %q",
 				test.singular, test.plural, test.count, result, test.expected)

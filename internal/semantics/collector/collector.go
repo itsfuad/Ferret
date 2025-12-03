@@ -68,6 +68,18 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		collectForStmt(ctx, mod, n)
 	case *ast.WhileStmt:
 		collectWhileStmt(ctx, mod, n)
+	case *ast.ReturnStmt:
+		// Collect function literals in return expressions
+		if n.Result != nil {
+			collectExpr(ctx, mod, n.Result)
+		}
+	case *ast.AssignStmt:
+		// Collect function literals in assignment expressions
+		collectExpr(ctx, mod, n.Lhs)
+		collectExpr(ctx, mod, n.Rhs)
+	case *ast.ExprStmt:
+		// Collect function literals in expression statements
+		collectExpr(ctx, mod, n.X)
 	// Other statements don't declare module-level symbols
 	default:
 		// Skip non-declaration nodes
@@ -473,7 +485,10 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	}
 
 	// Collect local variables and nested declarations in function body
+	// Don't call collectBlock since we've already set up the scope
 	if body != nil {
-		collectNode(ctx, mod, body)
+		for _, n := range body.Nodes {
+			collectNode(ctx, mod, n)
+		}
 	}
 }

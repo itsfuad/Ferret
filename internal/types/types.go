@@ -153,11 +153,15 @@ func (m *MapType) Equals(other SemType) bool {
 
 // FunctionType represents function signatures: fn(T1, T2) -> R
 type ParamType struct {
-	Name string
-	Type SemType
+	Name       string
+	Type       SemType
+	IsVariadic bool // true if this is a variadic parameter (...type)
 }
 
 func (p *ParamType) String() string {
+	if p.IsVariadic {
+		return fmt.Sprintf("%s: ...%s", p.Name, p.Type.String())
+	}
 	return fmt.Sprintf("%s: %s", p.Name, p.Type.String())
 }
 
@@ -194,12 +198,14 @@ func (f *FunctionType) Equals(other SemType) bool {
 		if len(f.Params) != len(ft.Params) {
 			return false
 		}
-		// Check each parameter (both name and type)
+		// Check each parameter type (structural typing - ignore names)
+		// Parameter names are for documentation/error messages only
 		for i := range f.Params {
-			if f.Params[i].Name != ft.Params[i].Name {
+			if !f.Params[i].Type.Equals(ft.Params[i].Type) {
 				return false
 			}
-			if !f.Params[i].Type.Equals(ft.Params[i].Type) {
+			// Check variadic flag must match
+			if f.Params[i].IsVariadic != ft.Params[i].IsVariadic {
 				return false
 			}
 		}

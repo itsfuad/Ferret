@@ -45,8 +45,26 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 	case *ast.AssignStmt:
 		checkAssignStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
+		// Check return value type against function's declared return type
 		if n.Result != nil {
-			checkExpr(ctx, mod, n.Result, types.TypeUnknown)
+			expectedReturnType := mod.CurrentFunctionReturnType
+			if expectedReturnType == nil {
+				expectedReturnType = types.TypeUnknown
+			}
+			returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
+
+			// Validate return type matches function signature
+			if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
+				compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
+				if compatibility == Incompatible {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("type mismatch in return statement").
+							WithCode("T0015").
+							WithPrimaryLabel(mod.FilePath, n.Result.Loc(),
+								fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
+					)
+				}
+			}
 		}
 	case *ast.IfStmt:
 		// Enter if scope if it exists
@@ -164,10 +182,35 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 // checkFuncDecl type checks a function declaration
 func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
+	// Safety check: Scope should be set during collection phase
+	if decl.Scope == nil {
+		ctx.ReportError(fmt.Sprintf("internal error: function '%s' has nil scope", decl.Name.Name), decl.Loc())
+		return
+	}
+
 	funcScope := decl.Scope.(*table.SymbolTable)
+
+	// Update the function symbol's type with actual function signature
+	if decl.Name != nil && decl.Type != nil {
+		funcType := typeFromTypeNode(decl.Type).(*types.FunctionType)
+		if sym, ok := mod.CurrentScope.Lookup(decl.Name.Name); ok {
+			sym.Type = funcType
+		}
+	}
 
 	// Enter function scope for the entire function processing
 	defer mod.EnterScope(funcScope)()
+
+	// Set expected return type for validation
+	var expectedReturnType types.SemType = types.TypeVoid
+	if decl.Type != nil && decl.Type.Result != nil {
+		expectedReturnType = typeFromTypeNode(decl.Type.Result)
+	}
+	oldReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = expectedReturnType
+	defer func() {
+		mod.CurrentFunctionReturnType = oldReturnType
+	}()
 
 	// Add parameters to the function scope with type information
 	if decl.Type != nil && decl.Type.Params != nil {
@@ -249,6 +292,12 @@ func checkBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *
 func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression, expected types.SemType) types.SemType {
 	if expr == nil {
 		return types.TypeUnknown
+	}
+
+	// Special handling for call expressions - validate before inference
+	if callExpr, ok := expr.(*ast.CallExpr); ok {
+		checkCallExpr(ctx, mod, callExpr)
+		// Continue with normal type inference for return type
 	}
 
 	// First, infer the type based on the expression structure
@@ -454,6 +503,7 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 				param := &params[idx]
 				param.Name = par.Name.Name
 				param.Type = typeFromTypeNode(par.Type)
+				param.IsVariadic = par.IsVariadic // Preserve variadic info
 			}(i, param)
 		}
 
@@ -465,5 +515,163 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 
 	default:
 		return types.TypeUnknown
+	}
+}
+
+// ============================================================================
+// Call Expression Validation
+// ============================================================================
+
+// checkCallExpr validates function call expressions
+// This includes:
+// - Verifying the called expression is actually a function
+// - Checking argument count (regular and variadic functions)
+// - Validating argument types against parameter types
+func checkCallExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) {
+	// 1. Infer the type of the expression being called
+	funType := inferExprType(ctx, mod, expr.Fun)
+
+	// 2. Check if it's unknown (error already reported in resolution phase)
+	if funType.Equals(types.TypeUnknown) {
+		// Still type check arguments to find additional errors
+		for _, arg := range expr.Args {
+			checkExpr(ctx, mod, arg, types.TypeUnknown)
+		}
+		return
+	}
+
+	// 3. Check if it's a function type
+	funcType, ok := funType.(*types.FunctionType)
+	if !ok {
+		ctx.Diagnostics.Add(
+			diagnostics.NotCallable(mod.FilePath, expr.Fun.Loc(), funType.String()),
+		)
+		// Still type check arguments
+		for _, arg := range expr.Args {
+			checkExpr(ctx, mod, arg, types.TypeUnknown)
+		}
+		return
+	}
+
+	// 4. Validate argument count
+	validateCallArgumentCount(ctx, mod, expr, funcType)
+
+	// 5. Validate argument types
+	validateCallArgumentTypes(ctx, mod, expr, funcType)
+}
+
+// validateCallArgumentCount checks if the number of arguments matches the function signature
+func validateCallArgumentCount(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr, funcType *types.FunctionType) {
+	argCount := len(expr.Args)
+	paramCount := len(funcType.Params)
+
+	// Check if function is variadic
+	isVariadic := paramCount > 0 && funcType.Params[paramCount-1].IsVariadic
+
+	if isVariadic {
+		// Variadic function: need at least (paramCount - 1) arguments
+		minRequired := paramCount - 1
+		if argCount < minRequired {
+			ctx.Diagnostics.Add(
+				diagnostics.WrongArgumentCountVariadic(
+					mod.FilePath,
+					&expr.Location,
+					minRequired,
+					argCount,
+				),
+			)
+		}
+	} else {
+		// Regular function: need exactly paramCount arguments
+		if argCount != paramCount {
+			ctx.Diagnostics.Add(
+				diagnostics.WrongArgumentCount(
+					mod.FilePath,
+					&expr.Location,
+					paramCount,
+					argCount,
+				),
+			)
+		}
+	}
+}
+
+// validateCallArgumentTypes checks if argument types are compatible with parameter types
+func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr, funcType *types.FunctionType) {
+	paramCount := len(funcType.Params)
+	argCount := len(expr.Args)
+
+	// Determine if function is variadic
+	isVariadic := paramCount > 0 && funcType.Params[paramCount-1].IsVariadic
+
+	// Check regular parameters
+	regularParamCount := paramCount
+	if isVariadic {
+		regularParamCount = paramCount - 1
+	}
+
+	// Validate regular parameters
+	for i := 0; i < regularParamCount && i < argCount; i++ {
+		param := funcType.Params[i]
+		arg := expr.Args[i]
+
+		// Infer argument type with parameter type as context
+		argType := checkExpr(ctx, mod, arg, param.Type)
+
+		// Check compatibility
+		compatibility := checkTypeCompatibility(argType, param.Type)
+
+		if compatibility == Incompatible {
+			ctx.Diagnostics.Add(
+				diagnostics.ArgumentTypeMismatch(
+					mod.FilePath,
+					arg.Loc(),
+					param.Name,
+					param.Type.String(),
+					argType.String(),
+				),
+			)
+		}
+	}
+
+	// Validate variadic arguments
+	if isVariadic && argCount > regularParamCount {
+		variadicParam := funcType.Params[paramCount-1]
+		variadicElemType := variadicParam.Type // The element type (not array type)
+
+		for i := regularParamCount; i < argCount; i++ {
+			arg := expr.Args[i]
+
+			// Infer argument type with variadic element type as context
+			argType := checkExpr(ctx, mod, arg, variadicElemType)
+
+			// Check compatibility with variadic element type
+			compatibility := checkTypeCompatibility(argType, variadicElemType)
+
+			if compatibility == Incompatible {
+				ctx.Diagnostics.Add(
+					diagnostics.ArgumentTypeMismatch(
+						mod.FilePath,
+						arg.Loc(),
+						variadicParam.Name,
+						variadicElemType.String(),
+						argType.String(),
+					),
+				)
+			}
+		}
+	}
+
+	// Type check any remaining arguments (in case of wrong count)
+	// This helps find multiple errors in a single pass
+	maxChecked := argCount
+	if isVariadic {
+		maxChecked = argCount // Already checked all
+	} else {
+		maxChecked = regularParamCount
+	}
+
+	for i := maxChecked; i < argCount; i++ {
+		checkExpr(ctx, mod, expr.Args[i], types.TypeUnknown)
 	}
 }

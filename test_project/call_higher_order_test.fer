@@ -1,0 +1,43 @@
+// Test file for higher-order function calls
+
+// Test 1: Function returning function
+fn makeAdder(x: i32) -> fn(y: i32) -> i32 {
+    return fn(y: i32) -> i32 {
+        return x + y;
+    };
+}
+
+let addFive := makeAdder(5);
+let result := addFive(10); // OK - should be 15
+
+// Test 2: Wrong args to returned function
+let bad1 := addFive(); // ERROR: expected 1 argument, found 0
+let bad2 := addFive(10, 20); // ERROR: expected 1 argument, found 2
+let bad3 := addFive("hello"); // ERROR: type mismatch (str vs i32)
+
+// Test 3: Immediately invoked function
+let iife := (fn(x: i32, y: i32) -> i32 {
+    return x * y;
+})(5, 6); // OK - should be 30
+
+// Test 4: Function as argument
+fn applyTwice(f: fn(n: i32) -> i32, x: i32) -> i32 {
+    return f(f(x));
+}
+
+fn double(n: i32) -> i32 {
+    return n * 2;
+}
+
+let result2 := applyTwice(double, 5); // OK - should be 20
+
+// Test 5: Wrong function signature
+fn triple(n: i32) -> i32 {
+    return n * 3;
+}
+
+fn wrongSig(x: f64) -> f64 {
+    return x * 2.0;
+}
+
+let bad4 := applyTwice(wrongSig, 5); // ERROR: type mismatch in 'f'

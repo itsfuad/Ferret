@@ -340,6 +340,12 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 	// Get return type
 	returnType := typeFromTypeNode(lit.Type.Result)
 
+	// Set the current function return type for validating return statements
+	// Save the parent function's return type and restore it after
+	prevReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = returnType
+	defer func() { mod.CurrentFunctionReturnType = prevReturnType }()
+
 	// Type check the function body
 	if lit.Body != nil {
 		checkBlock(ctx, mod, lit.Body)

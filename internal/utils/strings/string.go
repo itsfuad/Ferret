@@ -24,7 +24,7 @@ func ToLowerCase(str string) string {
 	return strings.ToLower(str)
 }
 
-func Plural(singular, plural string, count int) string {
+func Pluralize(singular, plural string, count int) string {
 	if count == 1 {
 		return singular
 	}

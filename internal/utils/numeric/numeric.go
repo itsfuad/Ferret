@@ -1,6 +1,7 @@
 package numeric
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,4 +90,29 @@ func StringToFloat(s string) (float64, error) {
 	// Remove any underscores used for readability
 	s = strings.ReplaceAll(s, "_", "")
 	return strconv.ParseFloat(s, 64)
+}
+
+
+// numeric to ordinal: 1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc.
+func NumericToOrdinal(n int) string {
+	if n <= 0 {
+		return ""
+	}
+
+	// Handle special cases for 11, 12, 13
+	switch n % 100 {
+	case 11, 12, 13:
+		return fmt.Sprintf("%dth", n)
+	}
+
+	switch n % 10 {
+	case 1:
+		return fmt.Sprintf("%dst", n)
+	case 2:
+		return fmt.Sprintf("%dnd", n)
+	case 3:
+		return fmt.Sprintf("%drd", n)
+	default:
+		return fmt.Sprintf("%dth", n)
+	}
 }
