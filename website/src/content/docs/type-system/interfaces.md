@@ -38,7 +38,7 @@ fn (c: Circle) get_bounds() -> struct {
     .x_max: i32,
     .y_max: i32
 } {
-    return .{
+    return {
         .x_min = c.x - c.radius,
         .y_min = c.y - c.radius,
         .x_max = c.x + c.radius,

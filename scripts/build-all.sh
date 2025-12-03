@@ -17,7 +17,7 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 echo ""
-echo "[1/2] Building native execusymbol_table..."
+echo "[1/2] Building native executable..."
 echo "------------------------------------"
 go build -v -o "$TARGET_DIR/ferret" main.go
 if [ $? -ne 0 ]; then

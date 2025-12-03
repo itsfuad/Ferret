@@ -255,7 +255,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, moduleName)).
 					WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
-					WithHelp("Only symbols starting with uppercase letters are exported"),
+					WithNote("Only symbols starting with uppercase letters are exported"),
 			)
 			return
 		}

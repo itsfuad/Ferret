@@ -200,7 +200,7 @@ func validateParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, par
 				ctx.Diagnostics.Add(
 					diagnostics.NewError("multiple variadic parameters").
 						WithPrimaryLabel(mod.FilePath, param.Loc(), "variadic parameter here").
-						WithHelp("a function can have at most one variadic parameter"),
+						WithNote("a function can have at most one variadic parameter"),
 				)
 			}
 		}

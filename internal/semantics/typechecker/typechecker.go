@@ -329,7 +329,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 		}
 
 		ctx.Diagnostics.Add(
-			diag.WithHelp(fmt.Sprintf("use an explicit cast: %s(value)", targetType.String())),
+			diag.WithHelp(fmt.Sprintf("use an explicit cast: as %s", targetType.String())),
 		)
 
 	case Incompatible:
@@ -367,7 +367,7 @@ func checkFitness(ctx *context_v2.CompilerContext, mod *context_v2.Module, rhsTy
 					}
 
 					ctx.Diagnostics.Add(
-						diag.WithHelp(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType))),
+						diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType))),
 					)
 					return false
 				}

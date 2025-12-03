@@ -17,8 +17,6 @@ Ferret provides two keywords for this: `let` for variables and `const` for const
 
 Use `let` to create a variable. A variable can change later. We use `:=` to declare with a value. You will learn about the `:=` (walrus) operator and why we did not use `=` later. Just remember to use `:=` when you are declaring a variable or constant for the first time with a value.
 
-```ferret
-
 ### Basic Variable Examples
 
 ```ferret

@@ -22,7 +22,7 @@ if age >= 18 {
 ```
 
 The pattern is:
-```
+```ferret
 if condition {
     // code that runs when condition is true
 }
@@ -65,7 +65,7 @@ if score >= 60 {
 ```
 
 The pattern is:
-```
+```ferret
 if condition {
     // runs when condition is true
 } else {

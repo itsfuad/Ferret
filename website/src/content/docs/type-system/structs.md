@@ -84,10 +84,10 @@ You can just use structs without defining a type:
 let point : struct{ .x: i32, .y: i32}; // Define an anonymous struct type
 ```
 
-You can use `.{}` to create instances of anonymous structs:
+You can use `{}` to create instances of anonymous structs:
 
 ```ferret 
-let point := .{ .x = 10, .y = 20 };
+let point := { .x = 10, .y = 20 };
 ```
 
 ## Next Steps
