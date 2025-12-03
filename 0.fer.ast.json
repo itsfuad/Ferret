@@ -775,6 +775,88 @@
         "Column": 2,
         "Index": 319
       }
+    },
+    {
+      "X": {
+        "Fun": {
+          "Name": "add",
+          "Start": {
+            "Line": 15,
+            "Column": 1,
+            "Index": 321
+          },
+          "End": {
+            "Line": 15,
+            "Column": 4,
+            "Index": 324
+          }
+        },
+        "Args": [
+          {
+            "Kind": 0,
+            "Value": "23",
+            "Start": {
+              "Line": 15,
+              "Column": 5,
+              "Index": 325
+            },
+            "End": {
+              "Line": 15,
+              "Column": 7,
+              "Index": 327
+            }
+          },
+          {
+            "Kind": 0,
+            "Value": "56",
+            "Start": {
+              "Line": 15,
+              "Column": 9,
+              "Index": 329
+            },
+            "End": {
+              "Line": 15,
+              "Column": 11,
+              "Index": 331
+            }
+          },
+          {
+            "Kind": 0,
+            "Value": "10",
+            "Start": {
+              "Line": 15,
+              "Column": 13,
+              "Index": 333
+            },
+            "End": {
+              "Line": 15,
+              "Column": 15,
+              "Index": 335
+            }
+          }
+        ],
+        "Catch": null,
+        "Start": {
+          "Line": 15,
+          "Column": 1,
+          "Index": 321
+        },
+        "End": {
+          "Line": 15,
+          "Column": 16,
+          "Index": 336
+        }
+      },
+      "Start": {
+        "Line": 15,
+        "Column": 1,
+        "Index": 321
+      },
+      "End": {
+        "Line": 15,
+        "Column": 17,
+        "Index": 337
+      }
     }
   ],
   "Start": null,

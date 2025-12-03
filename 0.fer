@@ -12,4 +12,6 @@ fn add(a: i32, b: str) -> i32 {
     return a + b;
 }
 
+add(23, 56, 10); // Error: cannot add i32 and str
+
 //let pi : f32 = math::PI;

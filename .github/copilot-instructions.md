@@ -14,18 +14,26 @@ Ferret is a Go-based compiler for a modern systems programming language with:
 
 ### Compilation Pipeline (internal/pipeline/)
 
-The compiler uses a **3-state concurrent pipeline**: `Unseen → Parsing → Done`
+The compiler uses a **multi-phase pipeline** where each module progresses through phases independently:
 
 ```go
-// Each module progresses through phases independently
-PhaseNotStarted → PhaseLexed → PhaseParsed → PhaseCollected → PhaseResolved → PhaseTypeChecked → PhaseCodeGen
+// Module phase progression
+PhaseNotStarted → PhaseLexed → PhaseParsed → PhaseCollected → PhaseResolved → PhaseTypeChecked → PhaseCodeGen (future)
 ```
+
+**Pipeline Phases:**
+1. **Lex + Parse** - Parallel parsing with deduplication by import path
+2. **Symbol Collection** (`internal/semantics/collector/`) - Build symbol tables, declare names
+3. **Resolution** (`internal/semantics/resolver/`) - Bind identifiers to declarations
+4. **Type Checking** (`internal/semantics/typechecker/`) - Validate types and control flow
+5. **Code Generation** (future)
 
 **Critical invariants** (enforced by `pipeline_test.go`):
 - Each module is parsed exactly once (deduplicated by import path)
 - Parallel parsing uses semaphore-bounded workers (`runtime.NumCPU()`)
 - Diagnostic collection is thread-safe (`sync.Mutex` in `DiagnosticBag`)
 - Phase advancement requires prerequisites (checked via `phasePrerequisites` map)
+- Phases run in topological order after parallel parsing completes
 
 Example: A module at `PhaseResolved` requires all imports at least `PhaseParsed`.
 
@@ -47,7 +55,7 @@ Dependencies are automatically deduplicated to avoid redundant edges.
 ### Error Diagnostics (internal/diagnostics/)
 
 Rust-style error output with:
-- Primary/secondary labels with `^^^` and `---` underlines
+- Primary/secondary labels with `^ or ~~~` and `---` underlines
 - Color-coded severity (Error, Warning, Info, Hint)
 - Source context with line numbers
 - Notes and help suggestions
@@ -56,7 +64,8 @@ Rust-style error output with:
 diagnostics.NewError("message").
     WithPrimaryLabel(filepath, location, "explanation").
     WithSecondaryLabel(otherFile, otherLoc, "context").
-    WithHelp("try doing X instead")
+    WithHelp("try doing X instead").
+    WithNote("additional info")
 ```
 
 Thread-safe collection via `DiagnosticBag.Add()` with internal mutex.
@@ -82,10 +91,13 @@ Regex-based tokenizer that:
 ## Development Workflows
 
 ### Build & Run
-
+scripts folder contains build scripts:
 ```bash
-# Build native + WASM
-./build.sh          # → bin/ferret + website/public/ferret.wasm
+# Build native
+./build.sh|bat
+# Build all (native + WASM)
+./build_all.sh|bat
+```
 
 # Run directly (development)
 go run main.go test_project/main.fer
@@ -148,12 +160,22 @@ Entry point resolution order:
 ```
 internal/
   compiler/          # Entry point: Compile() function
-  pipeline/          # Lex → Parse → (future) Analyze → Codegen
+  pipeline/          # Multi-phase pipeline orchestration
   context_v2/        # Module registry, phase tracking, config
   frontend/
     lexer/           # Regex-based tokenizer (no separate scanner)
     parser/          # Recursive descent, error recovery
     ast/             # AST node definitions
+  semantics/
+    collector/       # Phase 2: Build symbol tables
+    resolver/        # Phase 3: Bind identifiers to declarations
+    typechecker/     # Phase 4: Type checking & validation
+      inference.go   # Type inference from expressions
+      compatibility.go # Type compatibility checking
+      typechecker.go # Main type checking logic
+    controlflow/     # CFG analysis, return path validation
+    symbols/         # Symbol kinds and attributes
+    table/           # Symbol table (lexical scopes)
   diagnostics/       # Error collection & rendering
   source/            # Position/Location tracking
   types/             # Built-in types (i8, i32, str, etc.)
@@ -177,10 +199,45 @@ internal/
 4. **Include 3+ lines context** when modifying parser error messages (helps locate code)
 5. **WASM build uses different entry point** (`main_wasm.go` vs `main.go`)
 
+## Semantic Analysis Architecture
+
+### Phase 2: Symbol Collection (`collector/`)
+- Traverses AST and declares names (let, const, fn, type)
+- Creates scoped symbol tables (module, function, block scopes)
+- Validates parameter definitions (variadic rules, duplicates)
+- No type resolution yet - symbols get `TypeUnknown` initially
+- Builds import alias maps for qualified access
+
+### Phase 3: Resolution (`resolver/`)
+- Binds identifiers to their declarations via scope lookup
+- Resolves qualified names (`module::symbol`) to imported symbols
+- Detects undefined symbols and reports errors
+- Validates scope access rules
+
+### Phase 4: Type Checking (`typechecker/`)
+- **Type inference** (`inference.go`): Infers types from expressions
+- **Type compatibility** (`compatibility.go`): Checks assignability, conversions
+- **Type checking** (`typechecker.go`): Validates declarations, statements, expressions
+- **Control flow** (`controlflow/`): CFG construction, return path analysis, unreachable code detection
+- Contextual typing for untyped literals
+- Optional type wrapping (T → T?)
+
+### Symbol Table Architecture (`table/`)
+- Lexical scoping with parent chain (`Parent *SymbolTable`)
+- `Lookup(name)` walks parent chain for resolution
+- `GetSymbol(name)` checks only current scope
+- Each block/function/module has its own scope
+- `Module.CurrentScope` tracks active scope during traversal
+- `Module.EnterScope(scope)` returns defer-able restore function
+
 ## Key Files to Reference
 
-- `internal/context_v2/context.go`: Architecture comments (lines 1-20)
-- `internal/pipeline/pipeline.go`: Concurrency patterns, 3-state machine
+- `internal/context_v2/context.go`: Architecture comments (lines 1-20), module phase system
+- `internal/pipeline/pipeline.go`: Multi-phase pipeline, concurrency patterns
+- `internal/semantics/collector/collector.go`: Symbol table construction
+- `internal/semantics/resolver/resolver.go`: Name binding and resolution
+- `internal/semantics/typechecker/typechecker.go`: Type checking logic
+- `internal/semantics/controlflow/cfg.go`: Control flow graph and analysis
 - `internal/diagnostics/emitter.go`: Error rendering with colors
 - `internal/frontend/parser/parser.go`: Recursive descent patterns
 - `test_project/`: Example `.fer` files for testing imports/features
