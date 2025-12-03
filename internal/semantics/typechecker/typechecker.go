@@ -498,8 +498,8 @@ func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.Sem
 								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s' supports ~%d digits", targetType.String(), getFloatPrecision(targetName)))
 						} else {
 							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits", digits)).
-								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s' (max ~71 digits)", targetType.String())).
-								WithNote("This literal exceeds f256 precision limit")
+								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String())).
+								WithNote("This literal exceeds max f256 precision limit (~71 digits)")
 						}
 					} else {
 						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits, need %s but got %s", digits, minType, targetType.String()))

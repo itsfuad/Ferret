@@ -1041,7 +1041,7 @@
                 },
                 "Value": {
                   "Kind": 1,
-                  "Value": "1.414",
+                  "Value": "1.41400055766666666666666666666666666666666666666666666666666666666669999999996",
                   "Start": {
                     "Line": 26,
                     "Column": 26,
@@ -1049,8 +1049,8 @@
                   },
                   "End": {
                     "Line": 26,
-                    "Column": 31,
-                    "Index": 675
+                    "Column": 105,
+                    "Index": 749
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1063,8 +1063,8 @@
             },
             "End": {
               "Line": 26,
-              "Column": 32,
-              "Index": 676
+              "Column": 106,
+              "Index": 750
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1076,12 +1076,12 @@
                   "Start": {
                     "Line": 27,
                     "Column": 9,
-                    "Index": 685
+                    "Index": 759
                   },
                   "End": {
                     "Line": 27,
                     "Column": 23,
-                    "Index": 699
+                    "Index": 773
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1090,12 +1090,12 @@
                   "Start": {
                     "Line": 27,
                     "Column": 25,
-                    "Index": 701
+                    "Index": 775
                   },
                   "End": {
                     "Line": 27,
                     "Column": 29,
-                    "Index": 705
+                    "Index": 779
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1104,12 +1104,12 @@
                   "Start": {
                     "Line": 27,
                     "Column": 32,
-                    "Index": 708
+                    "Index": 782
                   },
                   "End": {
                     "Line": 27,
                     "Column": 40,
-                    "Index": 716
+                    "Index": 790
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1118,12 +1118,12 @@
             "Start": {
               "Line": 27,
               "Column": 5,
-              "Index": 681
+              "Index": 755
             },
             "End": {
               "Line": 27,
               "Column": 41,
-              "Index": 717
+              "Index": 791
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           }
@@ -1137,7 +1137,7 @@
         "End": {
           "Line": 28,
           "Column": 2,
-          "Index": 735
+          "Index": 809
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1150,7 +1150,7 @@
       "End": {
         "Line": 28,
         "Column": 2,
-        "Index": 735
+        "Index": 809
       },
       "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
     },
@@ -1160,12 +1160,12 @@
         "Start": {
           "Line": 30,
           "Column": 4,
-          "Index": 740
+          "Index": 814
         },
         "End": {
           "Line": 30,
           "Column": 25,
-          "Index": 761
+          "Index": 835
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1175,12 +1175,12 @@
         "Start": {
           "Line": 30,
           "Column": 1,
-          "Index": 737
+          "Index": 811
         },
         "End": {
           "Line": 30,
           "Column": 27,
-          "Index": 763
+          "Index": 837
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1194,12 +1194,12 @@
                   "Start": {
                     "Line": 32,
                     "Column": 9,
-                    "Index": 810
+                    "Index": 884
                   },
                   "End": {
                     "Line": 32,
                     "Column": 16,
-                    "Index": 817
+                    "Index": 891
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1208,12 +1208,12 @@
                   "Start": {
                     "Line": 32,
                     "Column": 18,
-                    "Index": 819
+                    "Index": 893
                   },
                   "End": {
                     "Line": 32,
                     "Column": 21,
-                    "Index": 822
+                    "Index": 896
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1223,12 +1223,12 @@
                   "Start": {
                     "Line": 32,
                     "Column": 24,
-                    "Index": 825
+                    "Index": 899
                   },
                   "End": {
                     "Line": 32,
                     "Column": 26,
-                    "Index": 827
+                    "Index": 901
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1237,12 +1237,12 @@
             "Start": {
               "Line": 32,
               "Column": 5,
-              "Index": 806
+              "Index": 880
             },
             "End": {
               "Line": 32,
               "Column": 27,
-              "Index": 828
+              "Index": 902
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1254,12 +1254,12 @@
                   "Start": {
                     "Line": 33,
                     "Column": 9,
-                    "Index": 837
+                    "Index": 911
                   },
                   "End": {
                     "Line": 33,
                     "Column": 22,
-                    "Index": 850
+                    "Index": 924
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1268,12 +1268,12 @@
                   "Start": {
                     "Line": 33,
                     "Column": 24,
-                    "Index": 852
+                    "Index": 926
                   },
                   "End": {
                     "Line": 33,
                     "Column": 28,
-                    "Index": 856
+                    "Index": 930
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1282,12 +1282,12 @@
                   "Start": {
                     "Line": 33,
                     "Column": 31,
-                    "Index": 859
+                    "Index": 933
                   },
                   "End": {
                     "Line": 33,
                     "Column": 38,
-                    "Index": 866
+                    "Index": 940
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1296,12 +1296,12 @@
             "Start": {
               "Line": 33,
               "Column": 5,
-              "Index": 833
+              "Index": 907
             },
             "End": {
               "Line": 33,
               "Column": 39,
-              "Index": 867
+              "Index": 941
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1313,12 +1313,12 @@
                   "Start": {
                     "Line": 35,
                     "Column": 9,
-                    "Index": 907
+                    "Index": 981
                   },
                   "End": {
                     "Line": 35,
                     "Column": 16,
-                    "Index": 914
+                    "Index": 988
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1327,12 +1327,12 @@
                   "Start": {
                     "Line": 35,
                     "Column": 18,
-                    "Index": 916
+                    "Index": 990
                   },
                   "End": {
                     "Line": 35,
                     "Column": 21,
-                    "Index": 919
+                    "Index": 993
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1342,12 +1342,12 @@
                   "Start": {
                     "Line": 35,
                     "Column": 24,
-                    "Index": 922
+                    "Index": 996
                   },
                   "End": {
                     "Line": 35,
                     "Column": 29,
-                    "Index": 927
+                    "Index": 1001
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1356,12 +1356,12 @@
             "Start": {
               "Line": 35,
               "Column": 5,
-              "Index": 903
+              "Index": 977
             },
             "End": {
               "Line": 35,
               "Column": 30,
-              "Index": 928
+              "Index": 1002
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1373,12 +1373,12 @@
                   "Start": {
                     "Line": 36,
                     "Column": 9,
-                    "Index": 937
+                    "Index": 1011
                   },
                   "End": {
                     "Line": 36,
                     "Column": 22,
-                    "Index": 950
+                    "Index": 1024
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1387,12 +1387,12 @@
                   "Start": {
                     "Line": 36,
                     "Column": 24,
-                    "Index": 952
+                    "Index": 1026
                   },
                   "End": {
                     "Line": 36,
                     "Column": 28,
-                    "Index": 956
+                    "Index": 1030
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1401,12 +1401,12 @@
                   "Start": {
                     "Line": 36,
                     "Column": 31,
-                    "Index": 959
+                    "Index": 1033
                   },
                   "End": {
                     "Line": 36,
                     "Column": 38,
-                    "Index": 966
+                    "Index": 1040
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1415,12 +1415,12 @@
             "Start": {
               "Line": 36,
               "Column": 5,
-              "Index": 933
+              "Index": 1007
             },
             "End": {
               "Line": 36,
               "Column": 39,
-              "Index": 967
+              "Index": 1041
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1432,12 +1432,12 @@
                   "Start": {
                     "Line": 38,
                     "Column": 9,
-                    "Index": 1007
+                    "Index": 1081
                   },
                   "End": {
                     "Line": 38,
                     "Column": 17,
-                    "Index": 1015
+                    "Index": 1089
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1446,12 +1446,12 @@
                   "Start": {
                     "Line": 38,
                     "Column": 19,
-                    "Index": 1017
+                    "Index": 1091
                   },
                   "End": {
                     "Line": 38,
                     "Column": 23,
-                    "Index": 1021
+                    "Index": 1095
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1461,12 +1461,12 @@
                   "Start": {
                     "Line": 38,
                     "Column": 26,
-                    "Index": 1024
+                    "Index": 1098
                   },
                   "End": {
                     "Line": 38,
                     "Column": 33,
-                    "Index": 1031
+                    "Index": 1105
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1475,12 +1475,12 @@
             "Start": {
               "Line": 38,
               "Column": 5,
-              "Index": 1003
+              "Index": 1077
             },
             "End": {
               "Line": 38,
               "Column": 34,
-              "Index": 1032
+              "Index": 1106
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1492,12 +1492,12 @@
                   "Start": {
                     "Line": 39,
                     "Column": 9,
-                    "Index": 1041
+                    "Index": 1115
                   },
                   "End": {
                     "Line": 39,
                     "Column": 23,
-                    "Index": 1055
+                    "Index": 1129
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1506,12 +1506,12 @@
                   "Start": {
                     "Line": 39,
                     "Column": 25,
-                    "Index": 1057
+                    "Index": 1131
                   },
                   "End": {
                     "Line": 39,
                     "Column": 29,
-                    "Index": 1061
+                    "Index": 1135
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 },
@@ -1520,12 +1520,12 @@
                   "Start": {
                     "Line": 39,
                     "Column": 32,
-                    "Index": 1064
+                    "Index": 1138
                   },
                   "End": {
                     "Line": 39,
                     "Column": 40,
-                    "Index": 1072
+                    "Index": 1146
                   },
                   "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
                 }
@@ -1534,12 +1534,12 @@
             "Start": {
               "Line": 39,
               "Column": 5,
-              "Index": 1037
+              "Index": 1111
             },
             "End": {
               "Line": 39,
               "Column": 41,
-              "Index": 1073
+              "Index": 1147
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           }
@@ -1548,12 +1548,12 @@
         "Start": {
           "Line": 30,
           "Column": 28,
-          "Index": 764
+          "Index": 838
         },
         "End": {
           "Line": 40,
           "Column": 2,
-          "Index": 1102
+          "Index": 1176
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1561,12 +1561,12 @@
       "Start": {
         "Line": 30,
         "Column": 1,
-        "Index": 737
+        "Index": 811
       },
       "End": {
         "Line": 40,
         "Column": 2,
-        "Index": 1102
+        "Index": 1176
       },
       "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
     },
@@ -1576,12 +1576,12 @@
         "Start": {
           "Line": 42,
           "Column": 4,
-          "Index": 1107
+          "Index": 1181
         },
         "End": {
           "Line": 42,
           "Column": 8,
-          "Index": 1111
+          "Index": 1185
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1591,12 +1591,12 @@
         "Start": {
           "Line": 42,
           "Column": 1,
-          "Index": 1104
+          "Index": 1178
         },
         "End": {
           "Line": 42,
           "Column": 10,
-          "Index": 1113
+          "Index": 1187
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1609,12 +1609,12 @@
                 "Start": {
                   "Line": 43,
                   "Column": 5,
-                  "Index": 1120
+                  "Index": 1194
                 },
                 "End": {
                   "Line": 43,
                   "Column": 14,
-                  "Index": 1129
+                  "Index": 1203
                 },
                 "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
               },
@@ -1623,24 +1623,24 @@
               "Start": {
                 "Line": 43,
                 "Column": 5,
-                "Index": 1120
+                "Index": 1194
               },
               "End": {
                 "Line": 43,
                 "Column": 16,
-                "Index": 1131
+                "Index": 1205
               },
               "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
             },
             "Start": {
               "Line": 43,
               "Column": 5,
-              "Index": 1120
+              "Index": 1194
             },
             "End": {
               "Line": 43,
               "Column": 17,
-              "Index": 1132
+              "Index": 1206
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1651,12 +1651,12 @@
                 "Start": {
                   "Line": 44,
                   "Column": 5,
-                  "Index": 1137
+                  "Index": 1211
                 },
                 "End": {
                   "Line": 44,
                   "Column": 14,
-                  "Index": 1146
+                  "Index": 1220
                 },
                 "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
               },
@@ -1665,24 +1665,24 @@
               "Start": {
                 "Line": 44,
                 "Column": 5,
-                "Index": 1137
+                "Index": 1211
               },
               "End": {
                 "Line": 44,
                 "Column": 16,
-                "Index": 1148
+                "Index": 1222
               },
               "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
             },
             "Start": {
               "Line": 44,
               "Column": 5,
-              "Index": 1137
+              "Index": 1211
             },
             "End": {
               "Line": 44,
               "Column": 17,
-              "Index": 1149
+              "Index": 1223
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1693,12 +1693,12 @@
                 "Start": {
                   "Line": 45,
                   "Column": 5,
-                  "Index": 1154
+                  "Index": 1228
                 },
                 "End": {
                   "Line": 45,
                   "Column": 21,
-                  "Index": 1170
+                  "Index": 1244
                 },
                 "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
               },
@@ -1707,24 +1707,24 @@
               "Start": {
                 "Line": 45,
                 "Column": 5,
-                "Index": 1154
+                "Index": 1228
               },
               "End": {
                 "Line": 45,
                 "Column": 23,
-                "Index": 1172
+                "Index": 1246
               },
               "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
             },
             "Start": {
               "Line": 45,
               "Column": 5,
-              "Index": 1154
+              "Index": 1228
             },
             "End": {
               "Line": 45,
               "Column": 24,
-              "Index": 1173
+              "Index": 1247
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           },
@@ -1735,12 +1735,12 @@
                 "Start": {
                   "Line": 46,
                   "Column": 5,
-                  "Index": 1178
+                  "Index": 1252
                 },
                 "End": {
                   "Line": 46,
                   "Column": 26,
-                  "Index": 1199
+                  "Index": 1273
                 },
                 "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
               },
@@ -1749,24 +1749,24 @@
               "Start": {
                 "Line": 46,
                 "Column": 5,
-                "Index": 1178
+                "Index": 1252
               },
               "End": {
                 "Line": 46,
                 "Column": 28,
-                "Index": 1201
+                "Index": 1275
               },
               "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
             },
             "Start": {
               "Line": 46,
               "Column": 5,
-              "Index": 1178
+              "Index": 1252
             },
             "End": {
               "Line": 46,
               "Column": 29,
-              "Index": 1202
+              "Index": 1276
             },
             "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
           }
@@ -1775,12 +1775,12 @@
         "Start": {
           "Line": 42,
           "Column": 11,
-          "Index": 1114
+          "Index": 1188
         },
         "End": {
           "Line": 47,
           "Column": 2,
-          "Index": 1204
+          "Index": 1278
         },
         "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
       },
@@ -1788,12 +1788,12 @@
       "Start": {
         "Line": 42,
         "Column": 1,
-        "Index": 1104
+        "Index": 1178
       },
       "End": {
         "Line": 47,
         "Column": 2,
-        "Index": 1204
+        "Index": 1278
       },
       "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_types_test.fer"
     }
