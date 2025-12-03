@@ -1,4 +1,4 @@
-import "Ferret/exp";
+import "Ferret/exp" as e;
 
 let sum := 10 + 5;          // 15
 let difference := 10 - 5;   // 5
@@ -17,6 +17,8 @@ fn add(a: i32, b: str) -> i32 {
 add(23, 56, 10); // Error: cannot add i32 and str
 
 //let pi : f32 = math::PI
+
+e::ExportedNamwe;
 
 let s : str = 10;
 

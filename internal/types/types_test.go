@@ -192,7 +192,7 @@ func TestFunctionTypeEquals(t *testing.T) {
 		{"fn1 vs fn2", fn1, fn2, false, "expected fn1 to not equal fn2 (different param count)"},
 		{"fn1 vs fn3", fn1, fn3, false, "expected fn1 to not equal fn3 (different param types)"},
 		{"fn1 vs fn4", fn1, fn4, true, "expected fn1 to equal fn4 (same params and return)"},
-		{"fn1 vs fn5", fn1, fn5, false, "expected fn1 to not equal fn5 (different param names)"},
+		{"fn1 vs fn5", fn1, fn5, true, "expected fn1 to equal fn5 (different param names but same types)"},
 	}
 
 	for _, tt := range tests {

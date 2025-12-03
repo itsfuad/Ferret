@@ -157,10 +157,10 @@ func (mod *Module) EnterScope(newScope *table.SymbolTable) func() {
 
 // Import represents a resolved import statement
 type Import struct {
-	Path      string             // Import path as written in source
-	Aliases   []string           // All aliases for this import (default name + explicit aliases)
-	Locations []*source.Location // Source locations for each alias (for diagnostics)
-	IsUsed    bool
+	Path     string // Import path as written in source
+	Alias    string
+	Location *source.Location
+	IsUsed   bool
 }
 
 // CompilerContext is the central compilation state manager

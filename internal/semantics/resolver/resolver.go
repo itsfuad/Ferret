@@ -212,15 +212,15 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	// Handle module::symbol resolution
 	// X should be an identifier representing the module name/alias
 	if ident, ok := e.X.(*ast.IdentifierExpr); ok {
-		moduleName := ident.Name
+		moduleAlias := ident.Name
 		symbolName := e.Selector.Name
 
 		// Look up the import path from the alias/name
-		importPath, ok := mod.ImportAliasMap[moduleName]
+		importPath, ok := mod.ImportAliasMap[moduleAlias]
 		if !ok {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleName)).
-					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleName)).
+				diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleAlias)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleAlias)).
 					WithNote("Make sure to import this module first"),
 			)
 			return
@@ -232,7 +232,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		if !exists {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
-					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleName)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleAlias)).
 					WithNote("This is likely a compiler bug"),
 			)
 			return
@@ -243,7 +243,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
 		if !ok {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, moduleName)).
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, importPath)).
 					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)),
 			)
 			return
@@ -252,7 +252,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		// Check if symbol is exported
 		if !sym.Exported {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, moduleName)).
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, importPath)).
 					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
 					WithSecondaryLabel(sym.Decl.Loc(), "declared here").
 					WithNote("only symbols starting with uppercase letters are exported"),

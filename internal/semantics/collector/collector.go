@@ -7,7 +7,6 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
-	"compiler/internal/source"
 	"compiler/internal/types"
 	"compiler/internal/utils/numeric"
 	"fmt"
@@ -302,16 +301,16 @@ func collectImport(mod *context_v2.Module, stmt *ast.ImportStmt) {
 	imp, exists := mod.Imports[path]
 	if !exists {
 		imp = &context_v2.Import{
-			Path:      path,
-			Aliases:   []string{},
-			Locations: []*source.Location{},
+			Path:     path,
+			Alias:    alias,
+			Location: stmt.Loc(),
 		}
 		mod.Imports[path] = imp
 	}
 
 	// Append alias and location
-	imp.Aliases = append(imp.Aliases, alias)
-	imp.Locations = append(imp.Locations, stmt.Loc())
+	imp.Alias = alias
+	imp.Location = stmt.Loc()
 }
 
 // isExported checks if a name is exported (starts with uppercase letter in Ferret)
