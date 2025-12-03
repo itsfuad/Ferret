@@ -10,7 +10,7 @@ Ferret comes with a set of built‑in types that let you work with numbers, text
 
 ## Primitive Types
 
-Primitive types are the simplest kinds of data. Internally they are just numbers. 
+Primitive types are the simplest kinds of data. Internally they are just numbers. Unlike other languages, Ferret has a rich set of primitive types to give you more control over how data is stored and manipulated. We support maximum 256-bit integers and floating-point numbers with up to 71 decimal digits of precision! And it's built right into the language without needing any special libraries.
 
 ### Integer Types
 
@@ -18,10 +18,18 @@ These types store whole numbers.
 
 | Type  | Size   | Range         | Description                 |
 | ----- | ------ | ------------- | --------------------------- |
+| `i8`  | 8‑bit  | -2⁷ to 2⁷‑1   | Small integer               |
+| `i16` | 16‑bit | -2¹⁵ to 2¹⁵‑1 | Medium integer              |
 | `i32` | 32‑bit | -2³¹ to 2³¹‑1 | Standard integer            |
 | `i64` | 64‑bit | -2⁶³ to 2⁶³‑1 | Bigger integer              |
+| `i128` | 128‑bit | -2¹²⁷ to 2¹²⁷‑1 | Very big integer            |
+| `i256` | 256‑bit | -2²⁵⁵ to 2²⁵⁵‑1 | Extremely big integer       |
+| `u8`  | 8‑bit  | 0 to 2⁸‑1     | Non‑negative small integer  |
+| `u16` | 16‑bit | 0 to 2¹⁶‑1   | Non‑negative medium integer |
 | `u32` | 32‑bit | 0 to 2³²‑1    | Non‑negative integer        |
 | `u64` | 64‑bit | 0 to 2⁶⁴‑1    | Bigger non‑negative integer |
+| `u128` | 128‑bit | 0 to 2¹²⁸‑1   | Very big non‑negative integer |
+| `u256` | 256‑bit | 0 to 2²⁵⁶‑1   | Extremely big non‑negative integer |
 
 Now if you are confused about the `i` and `u` prefixes, `i` stands for signed integers (can be negative) and `u` stands for unsigned integers (non-negative only). And the numbers `32` and `64` stand for the number of bits used to store the value. Other languages may use different names for these types, but the concepts are the same. So when you see `i32`, think of it as a 32-bit signed integer.
 
@@ -29,8 +37,11 @@ Now remember the `:=` operator you learned about in the Variables & Constants se
 
 ```ferret
 let count: i32 = 42;
+let small: i8 = -128;
 let big_number: i64 = 9223372036854775807;
 let positive: u32 = 4294967295;
+let very_big: u128 = 340282366920938463463374607431768211455;
+let huge: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
 ```
 
 ### Floating‑Point Types
@@ -41,6 +52,8 @@ These types store numbers with decimal points. Think of them as numbers that can
 | ----- | ------ | ---------- | -------------------------- |
 | `f32` | 32‑bit | ~7 digits  | Single precision float     |
 | `f64` | 64‑bit | ~15 digits | Double precision (default) |
+| `f128` | 128‑bit | ~34 digits | Quadruple precision float  |
+| `f256` | 256‑bit | ~71 digits | Octuple precision float    |
 
 The `f` stands for floating-point, and the numbers `32` and `64` represent the bits used to store the value. The bigger the number, the more precise your decimal calculations will be.
 
@@ -50,6 +63,8 @@ When you write a number with a decimal point without specifying a type, Ferret a
 let pi: f32 = 3.14159;
 let e: f64 = 2.718281828459045;
 let price := 19.99;  // Inferred as f64
+let large_value: f128 = 1.2345678901234567890123456789012345;
+let precise_value: f256 = 1.2345678901234567890123456789012345678901234567890123456789012345678901234567890;
 ```
 
 ### String Type
@@ -92,8 +107,6 @@ Characters are created using single quotes `'` instead of double quotes.
 
 ```ferret
 let letter: byte = 'A';
-let symbol: byte = '♠';
-let emoji: byte = '🎉';
 let newline: byte = '\n';  // Special characters use backslash
 ```
 
