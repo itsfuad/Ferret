@@ -89,13 +89,15 @@ func TestDiagnostic_WithCode(t *testing.T) {
 }
 
 func TestDiagnostic_WithPrimaryLabel(t *testing.T) {
+	test := "test.fer"
 	loc := source.NewLocation(
+		&test,
 		&source.Position{Line: 1, Column: 5},
 		&source.Position{Line: 1, Column: 10},
 	)
 
 	diag := NewError("undefined variable").
-		WithPrimaryLabel("test.fer", loc, "not found here")
+		WithPrimaryLabel(loc, "not found here")
 
 	if len(diag.Labels) != 1 {
 		t.Fatalf("Expected 1 label, got %d", len(diag.Labels))
@@ -106,8 +108,8 @@ func TestDiagnostic_WithPrimaryLabel(t *testing.T) {
 		t.Errorf("Expected Primary style, got %v", label.Style)
 	}
 
-	if label.FilePath != "test.fer" {
-		t.Errorf("Expected filepath 'test.fer', got %q", label.FilePath)
+	if *label.Location.Filename != test {
+		t.Errorf("Expected filepath 'test.fer', got %q", *label.Location.Filename)
 	}
 
 	if label.Message != "not found here" {
@@ -120,19 +122,23 @@ func TestDiagnostic_WithPrimaryLabel(t *testing.T) {
 }
 
 func TestDiagnostic_WithSecondaryLabel(t *testing.T) {
+
+	test := "test.fer"
 	primaryLoc := source.NewLocation(
+		&test,
 		&source.Position{Line: 1, Column: 5},
 		&source.Position{Line: 1, Column: 10},
 	)
 
 	secondaryLoc := source.NewLocation(
+		&test,
 		&source.Position{Line: 5, Column: 1},
 		&source.Position{Line: 5, Column: 5},
 	)
 
 	diag := NewError("type mismatch").
-		WithPrimaryLabel("test.fer", primaryLoc, "used here").
-		WithSecondaryLabel("test.fer", secondaryLoc, "defined here")
+		WithPrimaryLabel(primaryLoc, "used here").
+		WithSecondaryLabel(secondaryLoc, "defined here")
 
 	if len(diag.Labels) != 2 {
 		t.Fatalf("Expected 2 labels, got %d", len(diag.Labels))
@@ -158,29 +164,36 @@ func TestDiagnostic_SecondaryWithoutPrimary_Panics(t *testing.T) {
 		}
 	}()
 
+	test := "test.fer"
+
 	loc := source.NewLocation(
+		&test,
 		&source.Position{Line: 1, Column: 1},
 		&source.Position{Line: 1, Column: 5},
 	)
 
 	// This should panic
-	NewError("test").WithSecondaryLabel("test.fer", loc, "invalid")
+	NewError("test").WithSecondaryLabel(loc, "invalid")
 }
 
 func TestDiagnostic_MultiplePrimaryLabels(t *testing.T) {
+
+	test := "test.fer"
 	loc1 := source.NewLocation(
+		&test,
 		&source.Position{Line: 1, Column: 1},
 		&source.Position{Line: 1, Column: 5},
 	)
 
 	loc2 := source.NewLocation(
+		&test,
 		&source.Position{Line: 2, Column: 1},
 		&source.Position{Line: 2, Column: 5},
 	)
 
 	diag := NewError("test").
-		WithPrimaryLabel("test.fer", loc1, "first primary").
-		WithPrimaryLabel("test.fer", loc2, "second primary attempt")
+		WithPrimaryLabel(loc1, "first primary").
+		WithPrimaryLabel(loc2, "second primary attempt")
 
 	// Should only have one primary label
 	primaryCount := 0
@@ -228,14 +241,16 @@ func TestDiagnostic_WithHelp(t *testing.T) {
 
 func TestDiagnostic_BuilderPattern(t *testing.T) {
 	// Test the full builder pattern with chaining
+	test := "test.fer"
 	loc := source.NewLocation(
+		&test,
 		&source.Position{Line: 10, Column: 5},
 		&source.Position{Line: 10, Column: 15},
 	)
 
 	diag := NewError("undefined variable 'myVar'").
 		WithCode("E0404").
-		WithPrimaryLabel("test.fer", loc, "not found").
+		WithPrimaryLabel(loc, "not found").
 		WithNote("Did you forget to declare this variable?").
 		WithHelp("Declare the variable before using it: let myVar := value;")
 
@@ -266,30 +281,34 @@ func TestDiagnostic_BuilderPattern(t *testing.T) {
 }
 
 func TestDiagnostic_MultipleFiles(t *testing.T) {
+	file1 := "file1.fer"
 	loc1 := source.NewLocation(
+		&file1,
 		&source.Position{Line: 1, Column: 1},
 		&source.Position{Line: 1, Column: 5},
 	)
 
+	file2 := "file2.fer"
 	loc2 := source.NewLocation(
+		&file2,
 		&source.Position{Line: 10, Column: 1},
 		&source.Position{Line: 10, Column: 5},
 	)
 
 	diag := NewError("conflicting definitions").
-		WithPrimaryLabel("file1.fer", loc1, "first definition").
-		WithSecondaryLabel("file2.fer", loc2, "conflicting definition here")
+		WithPrimaryLabel(loc1, "first definition").
+		WithSecondaryLabel(loc2, "conflicting definition here")
 
 	if len(diag.Labels) != 2 {
 		t.Fatalf("Expected 2 labels, got %d", len(diag.Labels))
 	}
 
-	if diag.Labels[0].FilePath != "file1.fer" {
-		t.Errorf("Expected first label from file1.fer, got %q", diag.Labels[0].FilePath)
+	if *diag.Labels[0].Location.Filename != file1	{
+		t.Errorf("Expected first label from file1.fer, got %q", *diag.Labels[0].Location.Filename)
 	}
 
-	if diag.Labels[1].FilePath != "file2.fer" {
-		t.Errorf("Expected second label from file2.fer, got %q", diag.Labels[1].FilePath)
+	if *diag.Labels[1].Location.Filename != file2 {
+		t.Errorf("Expected second label from file2.fer, got %q", *diag.Labels[1].Location.Filename)
 	}
 }
 

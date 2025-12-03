@@ -62,7 +62,7 @@ func (p *Parser) parseTopLevel() ast.Node {
 		if p.seenNonImport {
 			p.diagnostics.Add(
 				diagnostics.NewError("import statements must appear before other declarations").
-					WithPrimaryLabel(p.filepath, source.NewLocation(imp.Location.Start, imp.Location.End), "cannot import here"),
+					WithPrimaryLabel(source.NewLocation(&p.filepath, imp.Location.Start, imp.Location.End), "cannot import here"),
 			)
 			return nil
 		}
@@ -106,7 +106,7 @@ func (p *Parser) parseAnnonType() *ast.TypeDecl {
 
 	p.diagnostics.Add(
 		diagnostics.NewWarning("annonymous type defined").
-			WithPrimaryLabel(p.filepath, typ.Loc(), "remove this type").
+			WithPrimaryLabel(typ.Loc(), "remove this type").
 			WithNote("types has to be declared with a name to be used"),
 	)
 
@@ -115,7 +115,7 @@ func (p *Parser) parseAnnonType() *ast.TypeDecl {
 	return &ast.TypeDecl{
 		Name:     &ast.IdentifierExpr{Name: "<anonymous>"},
 		Type:     typ,
-		Location: *source.NewLocation(typ.Loc().Start, typ.Loc().End),
+		Location: *source.NewLocation(&p.filepath, typ.Loc().Start, typ.Loc().End),
 	}
 }
 
@@ -135,7 +135,7 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 	path := &ast.BasicLit{
 		Kind:     ast.STRING,
 		Value:    pathTok.Value,
-		Location: *source.NewLocation(&pathTok.Start, &pathTok.End),
+		Location: *source.NewLocation(&p.filepath, &pathTok.Start, &pathTok.End),
 	}
 
 	alias := &ast.IdentifierExpr{}
@@ -144,7 +144,7 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 		p.advance()
 		al := p.expect(lexer.IDENTIFIER_TOKEN)
 		alias.Name = al.Value
-		alias.Location = *source.NewLocation(&al.Start, &al.End)
+		alias.Location = *source.NewLocation(&p.filepath, &al.Start, &al.End)
 	}
 
 	p.expect(lexer.SEMICOLON_TOKEN)
@@ -204,7 +204,7 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 	return &ast.ReturnStmt{
 		Result:   result,
 		IsError:  isError,
-		Location: *source.NewLocation(&start, endPos),
+		Location: *source.NewLocation(&p.filepath, &start, endPos),
 	}
 }
 
@@ -249,7 +249,7 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 		return &ast.AssignStmt{
 			Lhs:      lhs,
 			Rhs:      rhs,
-			Location: *source.NewLocation(lhs.Loc().Start, rhs.Loc().End),
+			Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, rhs.Loc().End),
 		}
 	}
 
@@ -278,7 +278,7 @@ func (p *Parser) parseElvis() ast.Expression {
 		return &ast.ElvisExpr{
 			Cond:     left,
 			Default:  right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -295,7 +295,7 @@ func (p *Parser) parseLogicalOr() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -312,7 +312,7 @@ func (p *Parser) parseLogicalAnd() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -329,7 +329,7 @@ func (p *Parser) parseEquality() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -346,7 +346,7 @@ func (p *Parser) parseComparison() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -363,7 +363,7 @@ func (p *Parser) parseAdditive() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -380,7 +380,7 @@ func (p *Parser) parseMultiplicative() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -398,7 +398,7 @@ func (p *Parser) parseExponentiation() ast.Expression {
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
 		}
 	}
 
@@ -418,7 +418,7 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		p.diagnostics.Add(
 			diagnostics.NewError("too many nested unary operators (maximum 100)").
 				WithCode("P0002").
-				WithPrimaryLabel(p.filepath, source.NewLocation(&tok.Start, &tok.End), "excessive nesting"),
+				WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), "excessive nesting"),
 		)
 		return p.parsePostfix()
 	}
@@ -429,7 +429,7 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		return &ast.UnaryExpr{
 			Op:       op,
 			X:        expr,
-			Location: *source.NewLocation(&op.Start, expr.Loc().End),
+			Location: *source.NewLocation(&p.filepath, &op.Start, expr.Loc().End),
 		}
 	}
 
@@ -489,7 +489,7 @@ func (p *Parser) parseCallExpr(fun ast.Expression) *ast.CallExpr {
 		Fun:      fun,
 		Args:     args,
 		Catch:    catchClause,
-		Location: *source.NewLocation(fun.Loc().Start, &end),
+		Location: *source.NewLocation(&p.filepath, fun.Loc().Start, &end),
 	}
 }
 
@@ -538,7 +538,7 @@ func (p *Parser) parseIndexExpr(x ast.Expression) *ast.IndexExpr {
 	return &ast.IndexExpr{
 		X:        x,
 		Index:    index,
-		Location: *source.NewLocation(&start, &end),
+		Location: *source.NewLocation(&p.filepath, &start, &end),
 	}
 }
 
@@ -548,7 +548,7 @@ func (p *Parser) parseSelectorExpr(x ast.Expression) *ast.SelectorExpr {
 	return &ast.SelectorExpr{
 		X:        x,
 		Sel:      sel,
-		Location: *source.NewLocation(x.Loc().Start, sel.Loc().End),
+		Location: *source.NewLocation(&p.filepath, x.Loc().Start, sel.Loc().End),
 	}
 }
 
@@ -558,7 +558,7 @@ func (p *Parser) parseScopeResolutionExpr(x ast.Expression) *ast.ScopeResolution
 	return &ast.ScopeResolutionExpr{
 		X:        x,
 		Selector: member,
-		Location: *source.NewLocation(x.Loc().Start, member.Loc().End),
+		Location: *source.NewLocation(&p.filepath, x.Loc().Start, member.Loc().End),
 	}
 }
 
@@ -568,7 +568,7 @@ func (p *Parser) parseCastExpr(x ast.Expression) *ast.CastExpr {
 	return &ast.CastExpr{
 		X:        x,
 		Type:     targetType,
-		Location: *source.NewLocation(x.Loc().Start, targetType.Loc().End),
+		Location: *source.NewLocation(&p.filepath, x.Loc().Start, targetType.Loc().End),
 	}
 }
 
@@ -635,7 +635,7 @@ func (p *Parser) parseCompositeLiteralElement() ast.Expression {
 		return &ast.KeyValueExpr{
 			Key:      name,
 			Value:    val,
-			Location: *source.NewLocation(name.Start, val.Loc().End),
+			Location: *source.NewLocation(&p.filepath, name.Start, val.Loc().End),
 		}
 	}
 
@@ -646,7 +646,7 @@ func (p *Parser) parseCompositeLiteralElement() ast.Expression {
 		return &ast.KeyValueExpr{
 			Key:      key,
 			Value:    val,
-			Location: *source.NewLocation(key.Loc().Start, val.Loc().End),
+			Location: *source.NewLocation(&p.filepath, key.Loc().Start, val.Loc().End),
 		}
 	}
 
@@ -670,7 +670,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 		return &ast.BasicLit{
 			Kind:     kind,
 			Value:    tok.Value,
-			Location: *source.NewLocation(&tok.Start, &tok.End),
+			Location: *source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 		}
 
 	case lexer.STRING_TOKEN:
@@ -678,7 +678,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 		return &ast.BasicLit{
 			Kind:     ast.STRING,
 			Value:    tok.Value,
-			Location: *source.NewLocation(&tok.Start, &tok.End),
+			Location: *source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 		}
 
 	case lexer.BYTE_TOKEN:
@@ -686,7 +686,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 		return &ast.BasicLit{
 			Kind:     ast.BYTE,
 			Value:    tok.Value,
-			Location: *source.NewLocation(&tok.Start, &tok.End),
+			Location: *source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 		}
 
 	case lexer.IDENTIFIER_TOKEN:
@@ -744,7 +744,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 		return &ast.CompositeLit{
 			Type:     nil, // Anonymous struct/map literal
 			Elts:     elems,
-			Location: *source.NewLocation(&start, &end),
+			Location: *source.NewLocation(&p.filepath, &start, &end),
 		}
 
 	default:
@@ -754,7 +754,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 		// Create a detailed error message with helpful labels
 		diag := diagnostics.NewError(fmt.Sprintf("unexpected token '%s' in expression", tok.Value)).
 			WithCode("P0001").
-			WithPrimaryLabel(p.filepath, source.NewLocation(&tok.Start, &tok.End),
+			WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 				fmt.Sprintf("cannot use '%s' here", tok.Value))
 
 		// Add context-specific help messages
@@ -777,7 +777,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 
 		// If at end, return invalid
 		return &ast.Invalid{
-			Location: *source.NewLocation(&tok.Start, &end),
+			Location: *source.NewLocation(&p.filepath, &tok.Start, &end),
 		}
 	}
 }
@@ -808,7 +808,7 @@ func (p *Parser) parseArrayLiteral() *ast.CompositeLit {
 
 	return &ast.CompositeLit{
 		Elts:     elems,
-		Location: *source.NewLocation(&start, &end),
+		Location: *source.NewLocation(&p.filepath, &start, &end),
 	}
 }
 
@@ -821,7 +821,7 @@ func (p *Parser) parseIdentifier() *ast.IdentifierExpr {
 	tok := p.advance()
 	return &ast.IdentifierExpr{
 		Name:     tok.Value,
-		Location: *source.NewLocation(&tok.Start, &tok.End),
+		Location: *source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 	}
 }
 
@@ -883,17 +883,17 @@ func (p *Parser) expectError(kind lexer.TOKEN, msg string) lexer.Token {
 		// p.diagnostics.Add(
 		// 	diagnostics.NewError(fmt.Sprintf("expected ';' at end of statement, got %s", tok.Value)).
 		// 		WithCode(diagnostics.ErrUnterminatedExpr).
-		// 		WithPrimaryLabel(p.filepath, source.NewLocation(&tok.Start, &tok.End), "missing semicolon").
+		// 		WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), "missing semicolon").
 		// 		WithNote("Every statement must end with a semicolon"),
 		// )
 
 		// highlight the end of the previous token as the likely location
 		prevTok := p.previous()
-		loc := source.NewLocation(&prevTok.End, &prevTok.End)
+		loc := source.NewLocation(&p.filepath, &prevTok.End, &prevTok.End)
 		p.diagnostics.Add(
 			diagnostics.NewError("expected ';' at end of statement").
 				WithCode(diagnostics.ErrUnterminatedExpr).
-				WithPrimaryLabel(p.filepath, loc, "add semicolon here").
+				WithPrimaryLabel(loc, "add semicolon here").
 				WithNote("Every statement must end with a semicolon"),
 		)
 
@@ -907,11 +907,11 @@ func (p *Parser) expectError(kind lexer.TOKEN, msg string) lexer.Token {
 // error reports a parsing error to the diagnostics
 func (p *Parser) error(msg string) {
 	tok := p.peek()
-	loc := source.NewLocation(&tok.Start, &tok.End)
+	loc := source.NewLocation(&p.filepath, &tok.Start, &tok.End)
 	p.diagnostics.Add(
 		diagnostics.NewError(msg).
 			WithCode("P0001").
-			WithPrimaryLabel(p.filepath, loc, ""),
+			WithPrimaryLabel(loc, ""),
 	)
 }
 
@@ -932,11 +932,11 @@ func (p *Parser) checkTrailing(target, closingToken lexer.TOKEN, contextName str
 		// We just consumed a comma and we're at the closing delimiter
 		// This means there was a trailing comma
 		token := p.peek()
-		loc := source.NewLocation(&token.Start, &token.End)
+		loc := source.NewLocation(&p.filepath, &token.Start, &token.End)
 		p.diagnostics.Add(
 			diagnostics.NewInfo(fmt.Sprintf("trailing %s in %s", target, contextName)).
 				WithCode(diagnostics.InfoTrailingComma).
-				WithPrimaryLabel(p.filepath, loc, "remove this trailing comma").
+				WithPrimaryLabel(loc, "remove this trailing comma").
 				WithNote(fmt.Sprintf("Trailing %s are allowed but excluding it keeps code clean ans consistent", target)),
 		)
 		return true
@@ -947,5 +947,5 @@ func (p *Parser) checkTrailing(target, closingToken lexer.TOKEN, contextName str
 // makeLocation creates a source location from start to current position
 func (p *Parser) makeLocation(start source.Position) source.Location {
 	end := p.previous().End
-	return *source.NewLocation(&start, &end)
+	return *source.NewLocation(&p.filepath, &start, &end)
 }

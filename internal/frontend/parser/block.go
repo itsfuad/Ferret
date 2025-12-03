@@ -27,6 +27,6 @@ func (p *Parser) parseBlock() *ast.Block {
 
 	return &ast.Block{
 		Nodes:    nodes,
-		Location: *source.NewLocation(&start, &end),
+		Location: *source.NewLocation(&p.filepath, &start, &end),
 	}
 }

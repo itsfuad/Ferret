@@ -184,6 +184,7 @@ func TestDiagnosticBag_WithLocations(t *testing.T) {
 	bag.AddSourceContent("test.fer", content)
 
 	loc := source.NewLocation(
+		nil,
 		&source.Position{Line: 1, Column: 5},
 		&source.Position{Line: 1, Column: 6},
 	)

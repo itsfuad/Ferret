@@ -49,7 +49,6 @@ const (
 	TYPE_MAP       TYPE_NAME = "map"
 
 	TYPE_UNTYPED TYPE_NAME = "untyped" // For untyped numeric literals before contextual instantiation
-	UNTYPED      TYPE_NAME = "untyped" // Alias for TYPE_UNTYPED
 
 	TYPE_UNKNOWN TYPE_NAME = "unknown"
 )

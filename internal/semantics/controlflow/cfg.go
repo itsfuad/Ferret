@@ -209,7 +209,7 @@ func (b *CFGBuilder) buildBreak(stmt *ast.BreakStmt, current *BasicBlock) *Basic
 	if b.currentLoop == nil {
 		b.ctx.Diagnostics.Add(
 			diagnostics.NewError("break statement outside loop").
-				WithPrimaryLabel(b.mod.FilePath, stmt.Loc(), "not inside a loop"),
+				WithPrimaryLabel(stmt.Loc(), "not inside a loop"),
 		)
 		return current
 	}
@@ -226,7 +226,7 @@ func (b *CFGBuilder) buildContinue(stmt *ast.ContinueStmt, current *BasicBlock) 
 	if b.currentLoop == nil {
 		b.ctx.Diagnostics.Add(
 			diagnostics.NewError("continue statement outside loop").
-				WithPrimaryLabel(b.mod.FilePath, stmt.Loc(), "not inside a loop"),
+				WithPrimaryLabel(stmt.Loc(), "not inside a loop"),
 		)
 		return current
 	}
@@ -425,13 +425,14 @@ func (b *CFGBuilder) reportUnreachableCodeRange(start, end ast.Node) {
 
 	// Merge locations
 	rangeLocation := &source.Location{
+		Filename: start.Loc().Filename,
 		Start: startLoc.Start,
 		End:   endLoc.End,
 	}
 
 	b.ctx.Diagnostics.Add(
 		diagnostics.NewWarning("unreachable code").
-			WithPrimaryLabel(b.mod.FilePath, rangeLocation, "this code will never execute").
+			WithPrimaryLabel(rangeLocation, "this code will never execute").
 			WithHelp("remove this code or restructure control flow"),
 	)
 }
@@ -464,7 +465,7 @@ func AnalyzeReturns(
 		diag := diagnostics.NewError(
 			fmt.Sprintf("not all code paths in function '%s' return a value of type %s",
 				getFuncName(funcDecl), returnType)).
-			WithPrimaryLabel(mod.FilePath, funcDecl.Name.Loc(),
+			WithPrimaryLabel(funcDecl.Name.Loc(),
 				"missing return on some paths")
 
 		// Find which branches are missing returns
@@ -485,7 +486,7 @@ func AnalyzeReturns(
 						msg = fmt.Sprintf("missing return in %s at line %d", block.BranchKind, block.Location.Start.Line)
 					}
 
-					diag.WithSecondaryLabel(mod.FilePath, block.Location, msg)
+					diag.WithSecondaryLabel(block.Location, msg)
 				}
 			}
 		}

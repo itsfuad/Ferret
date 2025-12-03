@@ -194,7 +194,7 @@ func (e *Emitter) Emit(diag *Diagnostic) {
 		var files []string
 
 		for _, label := range diag.Labels {
-			filepath := label.FilePath
+			filepath := *label.Location.Filename
 			if filepath == "" {
 				filepath = diag.FilePath
 			}

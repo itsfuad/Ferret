@@ -2,6 +2,7 @@ package diagnostics
 
 import (
 	"compiler/internal/source"
+	"compiler/internal/utils/strings"
 	"fmt"
 )
 
@@ -11,7 +12,7 @@ import (
 func UndefinedSymbol(filepath string, loc *source.Location, name string) *Diagnostic {
 	return NewError("undefined symbol: "+name).
 		WithCode(ErrUndefinedSymbol).
-		WithPrimaryLabel(filepath, loc, "not found in this scope").
+		WithPrimaryLabel(loc, "not found in this scope").
 		WithHelp("check if the symbol is declared and imported correctly")
 }
 
@@ -19,8 +20,8 @@ func UndefinedSymbol(filepath string, loc *source.Location, name string) *Diagno
 func RedeclaredSymbol(filepath string, newLoc, prevLoc *source.Location, name string) *Diagnostic {
 	return NewError(name+" is already declared").
 		WithCode(ErrRedeclaredSymbol).
-		WithPrimaryLabel(filepath, newLoc, "redeclared here").
-		WithSecondaryLabel(filepath, prevLoc, "previously declared here").
+		WithPrimaryLabel(newLoc, "redeclared here").
+		WithSecondaryLabel(prevLoc, "previously declared here").
 		WithHelp("use a different name or remove one of the declarations")
 }
 
@@ -28,32 +29,33 @@ func RedeclaredSymbol(filepath string, newLoc, prevLoc *source.Location, name st
 func WrongArgumentCount(filepath string, loc *source.Location, expected, found int) *Diagnostic {
 	return NewError("wrong number of arguments").
 		WithCode(ErrWrongArgumentCount).
-		WithPrimaryLabel(filepath, loc, fmt.Sprintf("expected %d arguments, found %d", expected, found))
+		WithPrimaryLabel(loc, fmt.Sprintf("expected %d %s, found %d",
+			expected, strings.Pluralize("argument", "arguments", expected), found))
 }
 
 // WrongArgumentCountVariadic creates a diagnostic for wrong number of arguments to variadic function
 func WrongArgumentCountVariadic(filepath string, loc *source.Location, minExpected, found int) *Diagnostic {
 	return NewError("wrong number of arguments").
 		WithCode(ErrWrongArgumentCount).
-		WithPrimaryLabel(filepath, loc, fmt.Sprintf("expected at least %d arguments, found %d", minExpected, found))
+		WithPrimaryLabel(loc, fmt.Sprintf("expected at least %d %s, found %d",
+			minExpected, strings.Pluralize("argument", "arguments", minExpected), found))
 }
 
 // ArgumentTypeMismatch creates a diagnostic for argument type mismatch
-func ArgumentTypeMismatch(filepath string, loc *source.Location, paramName, expected, found string) *Diagnostic {
-	msg := "type mismatch in argument"
-	if paramName != "" {
-		msg = "type mismatch in argument '" + paramName + "'"
-	}
+func ArgumentTypeMismatch(filepath string, loc *source.Location, param, expected, found string) *Diagnostic {
+	
+	msg := fmt.Sprintf("type mismatch in parameter '%s'", param)
+
 	return NewError(msg).
 		WithCode(ErrTypeMismatch).
-		WithPrimaryLabel(filepath, loc, "expected "+expected+", found "+found)
+		WithPrimaryLabel(loc, fmt.Sprintf("expected %s, found %s", expected, found))
 }
 
 // NotCallable creates a diagnostic for calling a non-function
 func NotCallable(filepath string, loc *source.Location, typeName string) *Diagnostic {
 	return NewError("cannot call non-function").
 		WithCode(ErrNotCallable).
-		WithPrimaryLabel(filepath, loc, "type "+typeName+" is not callable").
+		WithPrimaryLabel(loc, fmt.Sprintf("type %s is not callable", typeName)).
 		WithHelp("only functions can be called")
 }
 
@@ -61,6 +63,6 @@ func NotCallable(filepath string, loc *source.Location, typeName string) *Diagno
 func FieldNotFound(filepath string, loc *source.Location, fieldName, typeName string) *Diagnostic {
 	return NewError("field "+fieldName+" not found").
 		WithCode(ErrFieldNotFound).
-		WithPrimaryLabel(filepath, loc, typeName+" has no field "+fieldName).
+		WithPrimaryLabel(loc, fmt.Sprintf("%s has no field %s", typeName, fieldName)).
 		WithHelp("check the field name spelling")
 }

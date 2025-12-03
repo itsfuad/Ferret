@@ -60,7 +60,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					ctx.Diagnostics.Add(
 						diagnostics.NewError("type mismatch in return statement").
 							WithCode("T0015").
-							WithPrimaryLabel(mod.FilePath, n.Result.Loc(),
+							WithPrimaryLabel(n.Result.Loc(),
 								fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
 					)
 				}
@@ -146,7 +146,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
-						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "constants require an initializer").
+						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer").
 						WithHelp("provide a value: const x: i32 = 42"),
 				)
 			}
@@ -166,13 +166,13 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				// Constants must have an initializer
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
-						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "constants require an initializer").
+						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer").
 						WithHelp("provide a value: const x := 42 or const x: i32 = 42"),
 				)
 			} else {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot infer type for '%s'", name)).
-						WithPrimaryLabel(mod.FilePath, item.Name.Loc(), "missing type or initializer"),
+						WithPrimaryLabel(item.Name.Loc(), "missing type or initializer"),
 				)
 			}
 			sym.Type = types.TypeUnknown
@@ -249,8 +249,8 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 			if sym.Kind == symbols.SymbolConstant {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
-						WithPrimaryLabel(mod.FilePath, stmt.Lhs.Loc(), "cannot modify constant").
-						WithSecondaryLabel(mod.FilePath, sym.Decl.Loc(), "declared as constant here").
+						WithPrimaryLabel(stmt.Lhs.Loc(), "cannot modify constant").
+						WithSecondaryLabel(sym.Decl.Loc(), "declared as constant here").
 						WithHelp("constants are immutable; use 'let' for mutable variables"),
 				)
 				return
@@ -371,10 +371,10 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 
 		// Add dual labels if we have type node location
 		if typeNode != nil {
-			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+				WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), "implicit conversion may lose precision")
+			diag = diag.WithPrimaryLabel(valueExpr.Loc(), "implicit conversion may lose precision")
 		}
 
 		ctx.Diagnostics.Add(
@@ -387,10 +387,10 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 
 		// Add dual labels if we have type node location
 		if typeNode != nil {
-			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+				WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("expected '%s', got '%s'", targetType.String(), rhsType.String()))
+			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("expected '%s', got '%s'", targetType.String(), rhsType.String()))
 		}
 
 		ctx.Diagnostics.Add(diag)
@@ -409,10 +409,10 @@ func checkFitness(ctx *context_v2.CompilerContext, mod *context_v2.Module, rhsTy
 
 					if typeNode != nil {
 						// Show value location (primary) and variable/LHS location (secondary)
-						diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("need at least %s", minType)).
-							WithSecondaryLabel(mod.FilePath, typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("need at least %s", minType)).
+							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 					} else {
-						diag = diag.WithPrimaryLabel(mod.FilePath, valueExpr.Loc(), fmt.Sprintf("value %s doesn't fit in %s", lit.Value, targetType.String()))
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value %s doesn't fit in %s", lit.Value, targetType.String()))
 					}
 
 					ctx.Diagnostics.Add(

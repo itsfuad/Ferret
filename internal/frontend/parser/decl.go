@@ -88,7 +88,7 @@ func (p *Parser) parseDeclItem() ast.DeclItem {
 		p.diagnostics.Add(
 			diagnostics.NewError("expected ':=' for inferred symbols with values").
 				WithCode(diagnostics.ErrUnexpectedToken).
-				WithPrimaryLabel(p.filepath, &loc, "add a `:` before `=`"),
+				WithPrimaryLabel(&loc, "add a `:` before `=`"),
 		)
 		return decl
 	}
@@ -112,7 +112,7 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	return &ast.TypeDecl{
 		Name:     name,
 		Type:     typ,
-		Location: *source.NewLocation(&start, typ.Loc().End),
+		Location: *source.NewLocation(&p.filepath, &start, typ.Loc().End),
 	}
 }
 
@@ -194,7 +194,7 @@ func (p *Parser) parseFunctionParams() []ast.Field {
 			Name:       name,
 			Type:       paramType,
 			IsVariadic: isVariadic,
-			Location:   *source.NewLocation(name.Start, endPos),
+			Location:   *source.NewLocation(&p.filepath, name.Start, endPos),
 		}
 
 		params = append(params, param)
@@ -233,7 +233,7 @@ func (p *Parser) parseNamedFuncDecl(start source.Position) *ast.FuncDecl {
 		Name:     name,
 		Type:     funcType,
 		Body:     body,
-		Location: *source.NewLocation(&start, body.End),
+		Location: *source.NewLocation(&p.filepath, &start, body.End),
 	}
 }
 
@@ -263,10 +263,7 @@ func (p *Parser) parseFuncLit(start source.Position, params []ast.Field) *ast.Fu
 	return &ast.FuncLit{
 		ID: ast.IdentifierExpr{
 			Name: utils.GenerateFuncLitID(),
-			Location: source.Location{
-				Start: &start,
-				End:   &start,
-			},
+			Location: *source.NewLocation(&p.filepath, &start, &start),
 		},
 		Type:     funcType,
 		Body:     body,
@@ -284,7 +281,7 @@ func (p *Parser) parseMethodDecl(start source.Position, receivers []ast.Field) *
 		p.diagnostics.Add(
 			diagnostics.NewError("method must have a receiver").
 				WithCode(diagnostics.ErrUnexpectedToken).
-				WithPrimaryLabel(p.filepath, methodName.Loc(), "method declared without receiver"),
+				WithPrimaryLabel(methodName.Loc(), "method declared without receiver"),
 		)
 		return nil
 	}
@@ -294,7 +291,7 @@ func (p *Parser) parseMethodDecl(start source.Position, receivers []ast.Field) *
 		p.diagnostics.Add(
 			diagnostics.NewError("method can only have one receiver").
 				WithCode(diagnostics.ErrUnexpectedToken).
-				WithPrimaryLabel(p.filepath, secondReceiver.Loc(), "extra receiver"),
+				WithPrimaryLabel(secondReceiver.Loc(), "extra receiver"),
 		)
 	}
 
@@ -309,6 +306,6 @@ func (p *Parser) parseMethodDecl(start source.Position, receivers []ast.Field) *
 		Name:     methodName,
 		Type:     funcType,
 		Body:     body,
-		Location: *source.NewLocation(&start, body.End),
+		Location: *source.NewLocation(&p.filepath, &start, body.End),
 	}
 }

@@ -144,7 +144,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		if _, ok := mod.CurrentScope.Lookup(name); !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found", name)).
-					WithPrimaryLabel(mod.FilePath, &e.Location, "").
+					WithPrimaryLabel(&e.Location, "").
 					WithNote("Make sure it's imported or defined"),
 			)
 		}
@@ -220,7 +220,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		if !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleName)).
-					WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleName)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleName)).
 					WithNote("Make sure to import this module first"),
 			)
 			return
@@ -232,7 +232,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		if !exists {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
-					WithPrimaryLabel(mod.FilePath, ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleName)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleName)).
 					WithNote("This is likely a compiler bug"),
 			)
 			return
@@ -244,8 +244,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		if !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, moduleName)).
-					WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)).
-					WithNote(fmt.Sprintf("Module '%s' does not export this symbol", moduleName)),
+					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)),
 			)
 			return
 		}
@@ -254,8 +253,9 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		if !sym.Exported {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, moduleName)).
-					WithPrimaryLabel(mod.FilePath, e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
-					WithNote("Only symbols starting with uppercase letters are exported"),
+					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
+					WithSecondaryLabel(sym.Decl.Loc(), "declared here").
+					WithNote("only symbols starting with uppercase letters are exported"),
 			)
 			return
 		}

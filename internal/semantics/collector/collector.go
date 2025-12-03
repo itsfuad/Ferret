@@ -9,6 +9,7 @@ import (
 	"compiler/internal/semantics/table"
 	"compiler/internal/source"
 	"compiler/internal/types"
+	"compiler/internal/utils/numeric"
 	"fmt"
 )
 
@@ -128,8 +129,8 @@ func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, dec
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
 					WithCode("C-REDEC").
-					WithPrimaryLabel(mod.FilePath, &item.Name.Location, fmt.Sprintf("'%s' already declared", name)).
-					WithSecondaryLabel(mod.FilePath, existing.Decl.Loc(), "previous declaration here"),
+					WithPrimaryLabel(&item.Name.Location, fmt.Sprintf("'%s' already declared", name)).
+					WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here"),
 			)
 			continue
 		}
@@ -166,8 +167,8 @@ func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		ctx.Diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
 				WithCode("C-REDEC-FUNC").
-				WithPrimaryLabel(mod.FilePath, decl.Loc(), fmt.Sprintf("'%s' already declared", name)).
-				WithSecondaryLabel(mod.FilePath, existing.Decl.Loc(), "previous declaration here"),
+				WithPrimaryLabel(decl.Loc(), fmt.Sprintf("'%s' already declared", name)).
+				WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here"),
 		)
 		return
 	}
@@ -211,7 +212,7 @@ func validateParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, par
 			if param.IsVariadic {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError("multiple variadic parameters").
-						WithPrimaryLabel(mod.FilePath, param.Loc(), "variadic parameter here").
+						WithPrimaryLabel(param.Loc(), "variadic parameter here").
 						WithNote("a function can have at most one variadic parameter"),
 				)
 			}
@@ -223,8 +224,8 @@ func validateParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, par
 	if variadicCount == 1 && variadicIndex != len(params)-1 {
 		ctx.Diagnostics.Add(
 			diagnostics.NewError("variadic parameter must be last").
-				WithPrimaryLabel(mod.FilePath, params[variadicIndex].Loc(), "variadic parameter not at end").
-				WithHelp(fmt.Sprintf("move this parameter to position %d (last)", len(params))),
+				WithPrimaryLabel(params[variadicIndex].Loc(), "variadic parameter not at end").
+				WithHelp(fmt.Sprintf("move this parameter to the %s position (last)", numeric.NumericToOrdinal(len(params)))),
 		)
 	}
 
@@ -236,8 +237,8 @@ func validateParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, par
 			if existing, ok := paramNames[name]; ok {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("duplicate parameter name '%s'", name)).
-						WithPrimaryLabel(mod.FilePath, param.Loc(), fmt.Sprintf("'%s' already declared", name)).
-						WithSecondaryLabel(mod.FilePath, existing.Loc(), "previous declaration here"),
+						WithPrimaryLabel(param.Loc(), fmt.Sprintf("'%s' already declared", name)).
+						WithSecondaryLabel(existing.Loc(), "previous declaration here"),
 				)
 			} else {
 				paramNames[name] = &param
@@ -254,7 +255,7 @@ func validateParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, par
 			}
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("parameter '%s' missing type annotation", paramName)).
-					WithPrimaryLabel(mod.FilePath, param.Loc(), "type annotation required").
+					WithPrimaryLabel(param.Loc(), "type annotation required").
 					WithHelp("add type annotation (e.g., 'name: i32')"),
 			)
 		}
@@ -270,8 +271,8 @@ func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		ctx.Diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", name)).
 				WithCode("C-REDEC-TYPE").
-				WithPrimaryLabel(mod.FilePath, decl.Loc(), fmt.Sprintf("'%s' already declared", name)).
-				WithSecondaryLabel(mod.FilePath, existing.Decl.Loc(), "previous declaration here"),
+				WithPrimaryLabel(decl.Loc(), fmt.Sprintf("'%s' already declared", name)).
+				WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here"),
 		)
 		return
 	}
@@ -478,7 +479,7 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 			if err != nil {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("duplicate parameter '%s'", param.Name.Name)).
-						WithPrimaryLabel(mod.FilePath, param.Loc(), "parameter already declared"),
+						WithPrimaryLabel(param.Loc(), "parameter already declared"),
 				)
 			}
 		}

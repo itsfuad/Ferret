@@ -54,9 +54,8 @@ func (p *Pipeline) Run() error {
 	// Do this even if there are errors, so tests can inspect what was discovered
 	p.ctx.ComputeTopologicalOrder()
 
-	if p.ctx.HasErrors() {
-		return fmt.Errorf("compilation failed with errors")
-	}
+	// Continue to later phases even if there are parse errors
+	// This allows us to collect more diagnostics from successfully parsed modules
 
 	// Phase 2: Symbol Collection
 	if p.ctx.Debug {
@@ -83,6 +82,11 @@ func (p *Pipeline) Run() error {
 	}
 
 	// Phase 5: Code Generation (future)
+
+	// Final error check
+	if p.ctx.HasErrors() {
+		return fmt.Errorf("compilation failed with errors")
+	}
 
 	if p.ctx.Debug {
 		colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
@@ -143,13 +147,9 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 
 		filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
 		if err != nil {
-			errorFile := requestedFrom
-			if errorFile == "" {
-				errorFile = filePath
-			}
 			p.ctx.Diagnostics.Add(
 				diagnostics.NewError(err.Error()).
-					WithPrimaryLabel(errorFile, requestedLocation, ""),
+					WithPrimaryLabel(requestedLocation, ""),
 			)
 			return
 		}
@@ -163,7 +163,7 @@ func (p *Pipeline) parseModule(importPath, requestedFrom string, requestedLocati
 			}
 			p.ctx.Diagnostics.Add(
 				diagnostics.NewError(errMsg).
-					WithPrimaryLabel(errorFile, requestedLocation, ""),
+					WithPrimaryLabel(requestedLocation, ""),
 			)
 			return
 		}
@@ -380,9 +380,7 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 		}
 	}
 
-	if p.ctx.HasErrors() {
-		return fmt.Errorf("type checking failed with errors")
-	}
-
+	// Don't return error here - let Run() handle final error check
+	// This allows all modules to be type checked even if some have errors
 	return nil
 }

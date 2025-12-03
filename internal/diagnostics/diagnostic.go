@@ -31,7 +31,6 @@ func (s Severity) String() string {
 
 // Label represents a labeled section of code in a diagnostic
 type Label struct {
-	FilePath string
 	Location *source.Location
 	Message  string
 	Style    LabelStyle
@@ -97,12 +96,11 @@ func (d *Diagnostic) WithCode(code string) *Diagnostic {
 }
 
 // WithLabel adds a labeled location to the diagnostic
-func (d *Diagnostic) WithLabel(filepath string, loc *source.Location, message string, style LabelStyle) *Diagnostic {
+func (d *Diagnostic) WithLabel(loc *source.Location, message string, style LabelStyle) *Diagnostic {
 	if d.FilePath == "" {
-		d.FilePath = filepath
+		d.FilePath = *loc.Filename
 	}
 	d.Labels = append(d.Labels, Label{
-		FilePath: filepath,
 		Location: loc,
 		Message:  message,
 		Style:    style,
@@ -112,7 +110,7 @@ func (d *Diagnostic) WithLabel(filepath string, loc *source.Location, message st
 
 // WithPrimaryLabel adds a primary labeled location
 // Must be called before any WithSecondaryLabel calls
-func (d *Diagnostic) WithPrimaryLabel(filepath string, loc *source.Location, message string) *Diagnostic {
+func (d *Diagnostic) WithPrimaryLabel(loc *source.Location, message string) *Diagnostic {
 	// Ensure primary label is always first
 	if len(d.Labels) > 0 {
 		// Check if we already have a primary
@@ -124,23 +122,22 @@ func (d *Diagnostic) WithPrimaryLabel(filepath string, loc *source.Location, mes
 		}
 		// We have secondary labels but no primary - insert at beginning
 		d.Labels = append([]Label{{
-			FilePath: filepath,
 			Location: loc,
 			Message:  message,
 			Style:    Primary,
 		}}, d.Labels...)
 		if d.FilePath == "" {
-			d.FilePath = filepath
+			d.FilePath = *loc.Filename
 		}
 		return d
 	}
-	return d.WithLabel(filepath, loc, message, Primary)
+	return d.WithLabel(loc, message, Primary)
 }
 
 // WithSecondaryLabel adds a secondary labeled location
 // Can be called multiple times to add multiple context labels
 // Primary label must exist before adding secondary labels
-func (d *Diagnostic) WithSecondaryLabel(filepath string, loc *source.Location, message string) *Diagnostic {
+func (d *Diagnostic) WithSecondaryLabel(loc *source.Location, message string) *Diagnostic {
 	// Verify we have a primary label
 	hasPrimary := false
 	for _, label := range d.Labels {
@@ -156,7 +153,7 @@ func (d *Diagnostic) WithSecondaryLabel(filepath string, loc *source.Location, m
 		panic("Cannot add secondary label without primary label. Call WithPrimaryLabel first.")
 	}
 
-	return d.WithLabel(filepath, loc, message, Secondary)
+	return d.WithLabel(loc, message, Secondary)
 }
 
 // WithNote adds a note to the diagnostic

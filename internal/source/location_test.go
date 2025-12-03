@@ -12,6 +12,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "position at start",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 1},
 				&Position{Line: 1, Column: 10},
 			),
@@ -21,6 +22,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "position at end",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 1},
 				&Position{Line: 1, Column: 10},
 			),
@@ -30,6 +32,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "position in middle",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 1},
 				&Position{Line: 1, Column: 10},
 			),
@@ -39,6 +42,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "position before start",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 5},
 				&Position{Line: 1, Column: 10},
 			),
@@ -48,6 +52,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "position after end",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 1},
 				&Position{Line: 1, Column: 5},
 			),
@@ -57,6 +62,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "position on different line",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 1},
 				&Position{Line: 1, Column: 10},
 			),
@@ -66,6 +72,7 @@ func TestLocationContains(t *testing.T) {
 		{
 			name: "multi-line location",
 			location: NewLocation(
+				nil,
 				&Position{Line: 1, Column: 1},
 				&Position{Line: 3, Column: 10},
 			),
@@ -87,7 +94,7 @@ func TestNewLocation(t *testing.T) {
 	start := &Position{Line: 1, Column: 1}
 	end := &Position{Line: 1, Column: 10}
 
-	loc := NewLocation(start, end)
+	loc := NewLocation(nil, start, end)
 
 	if loc.Start != start {
 		t.Errorf("NewLocation().Start = %v, want %v", loc.Start, start)

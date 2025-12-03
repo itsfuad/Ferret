@@ -25,7 +25,7 @@ func (p *Parser) parseType() ast.TypeNode {
 		}
 		return &ast.ReferenceType{
 			Base:     baseType,
-			Location: *source.NewLocation(&ampersand.Start, endPos),
+			Location: *source.NewLocation(&p.filepath, &ampersand.Start, endPos),
 		}
 	}
 
@@ -60,7 +60,7 @@ func (p *Parser) parseType() ast.TypeNode {
 		p.diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("expected type, got %s", tok.Value)).
 				WithCode(diagnostics.ErrMissingType).
-				WithPrimaryLabel(p.filepath, source.NewLocation(&tok.Start, &tok.End), fmt.Sprintf("expected type here, got `%s`", tok.Value)),
+				WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), fmt.Sprintf("expected type here, got `%s`", tok.Value)),
 		)
 		// Return a placeholder identifier type instead of recursing
 		// This prevents stack overflow on invalid syntax
@@ -105,7 +105,7 @@ func (p *Parser) parseType() ast.TypeNode {
 			// No error type provided, use default 'str'
 			resultType = &ast.IdentifierExpr{
 				Name:     "str",
-				Location: *source.NewLocation(&notToken.End, &notToken.End),
+				Location: *source.NewLocation(&p.filepath, &notToken.End, &notToken.End),
 			}
 			endPos = &notToken.End
 		}
@@ -113,7 +113,7 @@ func (p *Parser) parseType() ast.TypeNode {
 		t = &ast.ResultType{
 			Value:    t,
 			Error:    resultType,
-			Location: *source.NewLocation(t.Loc().Start, endPos),
+			Location: *source.NewLocation(&p.filepath, t.Loc().Start, endPos),
 		}
 	}
 
@@ -136,7 +136,7 @@ func (p *Parser) parseArrayType() *ast.ArrayType {
 	return &ast.ArrayType{
 		Len:      size, // nil for dynamic arrays []T
 		ElType:   elem,
-		Location: *source.NewLocation(&tok.Start, elem.Loc().End),
+		Location: *source.NewLocation(&p.filepath, &tok.Start, elem.Loc().End),
 	}
 }
 
@@ -181,7 +181,7 @@ func (p *Parser) parseStructType() *ast.StructType {
 
 	return &ast.StructType{
 		Fields:   fields,
-		Location: *source.NewLocation(&tok.Start, &end.End),
+		Location: *source.NewLocation(&p.filepath, &tok.Start, &end.End),
 	}
 }
 
@@ -240,7 +240,7 @@ func parseParams(p *Parser) []ast.Field {
 			Name:       name,
 			Type:       typ,
 			IsVariadic: isVariadic,
-			Location:   *source.NewLocation(name.Start, endPos),
+			Location:   *source.NewLocation(&p.filepath, name.Start, endPos),
 		})
 
 		if p.match(lexer.CLOSE_PAREN) {
@@ -279,7 +279,7 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 		methods = append(methods, ast.Field{
 			Name:     name,
 			Type:     functype,
-			Location: *source.NewLocation(name.Start, functype.End),
+			Location: *source.NewLocation(&p.filepath, name.Start, functype.End),
 		})
 
 		if p.match(lexer.CLOSE_CURLY) {
@@ -298,7 +298,7 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 	return &ast.InterfaceType{
 		Methods:  methods,
-		Location: *source.NewLocation(&tok.Start, &end),
+		Location: *source.NewLocation(&p.filepath, &tok.Start, &end),
 	}
 }
 

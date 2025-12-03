@@ -4,78 +4,28 @@
   "Alias": "",
   "Nodes": [
     {
-      "Decls": [
-        {
-          "Name": {
-            "Name": "sum",
-            "Start": {
-              "Line": 1,
-              "Column": 5,
-              "Index": 4
-            },
-            "End": {
-              "Line": 1,
-              "Column": 8,
-              "Index": 7
-            }
-          },
-          "Type": null,
-          "Value": {
-            "X": {
-              "Kind": 0,
-              "Value": "10",
-              "Start": {
-                "Line": 1,
-                "Column": 12,
-                "Index": 11
-              },
-              "End": {
-                "Line": 1,
-                "Column": 14,
-                "Index": 13
-              }
-            },
-            "Op": {
-              "Kind": "+",
-              "Value": "+",
-              "Start": {
-                "Line": 1,
-                "Column": 15,
-                "Index": 14
-              },
-              "End": {
-                "Line": 1,
-                "Column": 16,
-                "Index": 15
-              }
-            },
-            "Y": {
-              "Kind": 0,
-              "Value": "5",
-              "Start": {
-                "Line": 1,
-                "Column": 17,
-                "Index": 16
-              },
-              "End": {
-                "Line": 1,
-                "Column": 18,
-                "Index": 17
-              }
-            },
-            "Start": {
-              "Line": 1,
-              "Column": 12,
-              "Index": 11
-            },
-            "End": {
-              "Line": 1,
-              "Column": 18,
-              "Index": 17
-            }
-          }
-        }
-      ],
+      "Path": {
+        "Kind": 2,
+        "Value": "Ferret/exp",
+        "Start": {
+          "Line": 1,
+          "Column": 8,
+          "Index": 7
+        },
+        "End": {
+          "Line": 1,
+          "Column": 20,
+          "Index": 19
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+      },
+      "Alias": {
+        "Name": "",
+        "Start": null,
+        "End": null,
+        "Filename": null
+      },
+      "LocationOnDisk": "",
       "Start": {
         "Line": 1,
         "Column": 1,
@@ -83,9 +33,99 @@
       },
       "End": {
         "Line": 1,
+        "Column": 21,
+        "Index": 20
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "sum",
+            "Start": {
+              "Line": 3,
+              "Column": 5,
+              "Index": 26
+            },
+            "End": {
+              "Line": 3,
+              "Column": 8,
+              "Index": 29
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Kind": 0,
+              "Value": "10",
+              "Start": {
+                "Line": 3,
+                "Column": 12,
+                "Index": 33
+              },
+              "End": {
+                "Line": 3,
+                "Column": 14,
+                "Index": 35
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+            },
+            "Op": {
+              "Kind": "+",
+              "Value": "+",
+              "Start": {
+                "Line": 3,
+                "Column": 15,
+                "Index": 36
+              },
+              "End": {
+                "Line": 3,
+                "Column": 16,
+                "Index": 37
+              }
+            },
+            "Y": {
+              "Kind": 0,
+              "Value": "5",
+              "Start": {
+                "Line": 3,
+                "Column": 17,
+                "Index": 38
+              },
+              "End": {
+                "Line": 3,
+                "Column": 18,
+                "Index": 39
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+            },
+            "Start": {
+              "Line": 3,
+              "Column": 12,
+              "Index": 33
+            },
+            "End": {
+              "Line": 3,
+              "Column": 18,
+              "Index": 39
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 3,
+        "Column": 1,
+        "Index": 22
+      },
+      "End": {
+        "Line": 3,
         "Column": 19,
-        "Index": 18
-      }
+        "Index": 40
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "Decls": [
@@ -93,15 +133,16 @@
           "Name": {
             "Name": "difference",
             "Start": {
-              "Line": 2,
+              "Line": 4,
               "Column": 5,
-              "Index": 38
+              "Index": 60
             },
             "End": {
-              "Line": 2,
+              "Line": 4,
               "Column": 15,
-              "Index": 48
-            }
+              "Index": 70
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           "Type": null,
           "Value": {
@@ -109,67 +150,71 @@
               "Kind": 0,
               "Value": "10",
               "Start": {
-                "Line": 2,
+                "Line": 4,
                 "Column": 19,
-                "Index": 52
+                "Index": 74
               },
               "End": {
-                "Line": 2,
+                "Line": 4,
                 "Column": 21,
-                "Index": 54
-              }
+                "Index": 76
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Op": {
               "Kind": "-",
               "Value": "-",
               "Start": {
-                "Line": 2,
+                "Line": 4,
                 "Column": 22,
-                "Index": 55
+                "Index": 77
               },
               "End": {
-                "Line": 2,
+                "Line": 4,
                 "Column": 23,
-                "Index": 56
+                "Index": 78
               }
             },
             "Y": {
               "Kind": 0,
               "Value": "5",
               "Start": {
-                "Line": 2,
+                "Line": 4,
                 "Column": 24,
-                "Index": 57
+                "Index": 79
               },
               "End": {
-                "Line": 2,
+                "Line": 4,
                 "Column": 25,
-                "Index": 58
-              }
+                "Index": 80
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Start": {
-              "Line": 2,
+              "Line": 4,
               "Column": 19,
-              "Index": 52
+              "Index": 74
             },
             "End": {
-              "Line": 2,
+              "Line": 4,
               "Column": 25,
-              "Index": 58
-            }
+              "Index": 80
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         }
       ],
       "Start": {
-        "Line": 2,
+        "Line": 4,
         "Column": 1,
-        "Index": 34
+        "Index": 56
       },
       "End": {
-        "Line": 2,
+        "Line": 4,
         "Column": 26,
-        "Index": 59
-      }
+        "Index": 81
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "Decls": [
@@ -177,15 +222,16 @@
           "Name": {
             "Name": "product",
             "Start": {
-              "Line": 3,
+              "Line": 5,
               "Column": 5,
-              "Index": 71
+              "Index": 93
             },
             "End": {
-              "Line": 3,
+              "Line": 5,
               "Column": 12,
-              "Index": 78
-            }
+              "Index": 100
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           "Type": null,
           "Value": {
@@ -193,67 +239,71 @@
               "Kind": 0,
               "Value": "10",
               "Start": {
-                "Line": 3,
+                "Line": 5,
                 "Column": 16,
-                "Index": 82
+                "Index": 104
               },
               "End": {
-                "Line": 3,
+                "Line": 5,
                 "Column": 18,
-                "Index": 84
-              }
+                "Index": 106
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Op": {
               "Kind": "*",
               "Value": "*",
               "Start": {
-                "Line": 3,
+                "Line": 5,
                 "Column": 19,
-                "Index": 85
+                "Index": 107
               },
               "End": {
-                "Line": 3,
+                "Line": 5,
                 "Column": 20,
-                "Index": 86
+                "Index": 108
               }
             },
             "Y": {
               "Kind": 0,
               "Value": "5",
               "Start": {
-                "Line": 3,
+                "Line": 5,
                 "Column": 21,
-                "Index": 87
+                "Index": 109
               },
               "End": {
-                "Line": 3,
+                "Line": 5,
                 "Column": 22,
-                "Index": 88
-              }
+                "Index": 110
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Start": {
-              "Line": 3,
+              "Line": 5,
               "Column": 16,
-              "Index": 82
+              "Index": 104
             },
             "End": {
-              "Line": 3,
+              "Line": 5,
               "Column": 22,
-              "Index": 88
-            }
+              "Index": 110
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         }
       ],
       "Start": {
-        "Line": 3,
+        "Line": 5,
         "Column": 1,
-        "Index": 67
+        "Index": 89
       },
       "End": {
-        "Line": 3,
+        "Line": 5,
         "Column": 23,
-        "Index": 89
-      }
+        "Index": 111
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "Decls": [
@@ -261,15 +311,16 @@
           "Name": {
             "Name": "quotient",
             "Start": {
-              "Line": 4,
+              "Line": 6,
               "Column": 5,
-              "Index": 105
+              "Index": 127
             },
             "End": {
-              "Line": 4,
+              "Line": 6,
               "Column": 13,
-              "Index": 113
-            }
+              "Index": 135
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           "Type": null,
           "Value": {
@@ -277,67 +328,71 @@
               "Kind": 0,
               "Value": "10",
               "Start": {
-                "Line": 4,
+                "Line": 6,
                 "Column": 17,
-                "Index": 117
+                "Index": 139
               },
               "End": {
-                "Line": 4,
+                "Line": 6,
                 "Column": 19,
-                "Index": 119
-              }
+                "Index": 141
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Op": {
               "Kind": "/",
               "Value": "/",
               "Start": {
-                "Line": 4,
+                "Line": 6,
                 "Column": 20,
-                "Index": 120
+                "Index": 142
               },
               "End": {
-                "Line": 4,
+                "Line": 6,
                 "Column": 21,
-                "Index": 121
+                "Index": 143
               }
             },
             "Y": {
               "Kind": 0,
               "Value": "5",
               "Start": {
-                "Line": 4,
+                "Line": 6,
                 "Column": 22,
-                "Index": 122
+                "Index": 144
               },
               "End": {
-                "Line": 4,
+                "Line": 6,
                 "Column": 23,
-                "Index": 123
-              }
+                "Index": 145
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Start": {
-              "Line": 4,
+              "Line": 6,
               "Column": 17,
-              "Index": 117
+              "Index": 139
             },
             "End": {
-              "Line": 4,
+              "Line": 6,
               "Column": 23,
-              "Index": 123
-            }
+              "Index": 145
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         }
       ],
       "Start": {
-        "Line": 4,
+        "Line": 6,
         "Column": 1,
-        "Index": 101
+        "Index": 123
       },
       "End": {
-        "Line": 4,
+        "Line": 6,
         "Column": 24,
-        "Index": 124
-      }
+        "Index": 146
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "Decls": [
@@ -345,15 +400,16 @@
           "Name": {
             "Name": "remainder",
             "Start": {
-              "Line": 5,
+              "Line": 7,
               "Column": 5,
-              "Index": 138
+              "Index": 160
             },
             "End": {
-              "Line": 5,
+              "Line": 7,
               "Column": 14,
-              "Index": 147
-            }
+              "Index": 169
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           "Type": null,
           "Value": {
@@ -361,67 +417,71 @@
               "Kind": 0,
               "Value": "10",
               "Start": {
-                "Line": 5,
+                "Line": 7,
                 "Column": 18,
-                "Index": 151
+                "Index": 173
               },
               "End": {
-                "Line": 5,
+                "Line": 7,
                 "Column": 20,
-                "Index": 153
-              }
+                "Index": 175
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Op": {
               "Kind": "%",
               "Value": "%",
               "Start": {
-                "Line": 5,
+                "Line": 7,
                 "Column": 21,
-                "Index": 154
+                "Index": 176
               },
               "End": {
-                "Line": 5,
+                "Line": 7,
                 "Column": 22,
-                "Index": 155
+                "Index": 177
               }
             },
             "Y": {
               "Kind": 0,
               "Value": "3",
               "Start": {
-                "Line": 5,
+                "Line": 7,
                 "Column": 23,
-                "Index": 156
+                "Index": 178
               },
               "End": {
-                "Line": 5,
+                "Line": 7,
                 "Column": 24,
-                "Index": 157
-              }
+                "Index": 179
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Start": {
-              "Line": 5,
+              "Line": 7,
               "Column": 18,
-              "Index": 151
+              "Index": 173
             },
             "End": {
-              "Line": 5,
+              "Line": 7,
               "Column": 24,
-              "Index": 157
-            }
+              "Index": 179
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         }
       ],
       "Start": {
-        "Line": 5,
+        "Line": 7,
         "Column": 1,
-        "Index": 134
+        "Index": 156
       },
       "End": {
-        "Line": 5,
+        "Line": 7,
         "Column": 25,
-        "Index": 158
-      }
+        "Index": 180
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "Decls": [
@@ -429,15 +489,16 @@
           "Name": {
             "Name": "power",
             "Start": {
-              "Line": 6,
+              "Line": 8,
               "Column": 5,
-              "Index": 206
+              "Index": 228
             },
             "End": {
-              "Line": 6,
+              "Line": 8,
               "Column": 10,
-              "Index": 211
-            }
+              "Index": 233
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           "Type": null,
           "Value": {
@@ -445,110 +506,57 @@
               "Kind": 0,
               "Value": "2",
               "Start": {
-                "Line": 6,
+                "Line": 8,
                 "Column": 14,
-                "Index": 215
+                "Index": 237
               },
               "End": {
-                "Line": 6,
+                "Line": 8,
                 "Column": 15,
-                "Index": 216
-              }
+                "Index": 238
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Op": {
               "Kind": "**",
               "Value": "**",
               "Start": {
-                "Line": 6,
+                "Line": 8,
                 "Column": 16,
-                "Index": 217
+                "Index": 239
               },
               "End": {
-                "Line": 6,
+                "Line": 8,
                 "Column": 18,
-                "Index": 219
+                "Index": 241
               }
             },
             "Y": {
               "Kind": 0,
               "Value": "4",
               "Start": {
-                "Line": 6,
+                "Line": 8,
                 "Column": 19,
-                "Index": 220
+                "Index": 242
               },
               "End": {
-                "Line": 6,
+                "Line": 8,
                 "Column": 20,
-                "Index": 221
-              }
+                "Index": 243
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Start": {
-              "Line": 6,
+              "Line": 8,
               "Column": 14,
-              "Index": 215
+              "Index": 237
             },
             "End": {
-              "Line": 6,
+              "Line": 8,
               "Column": 20,
-              "Index": 221
-            }
-          }
-        }
-      ],
-      "Start": {
-        "Line": 6,
-        "Column": 1,
-        "Index": 202
-      },
-      "End": {
-        "Line": 6,
-        "Column": 21,
-        "Index": 222
-      }
-    },
-    {
-      "Decls": [
-        {
-          "Name": {
-            "Name": "a",
-            "Start": {
-              "Line": 8,
-              "Column": 5,
-              "Index": 228
+              "Index": 243
             },
-            "End": {
-              "Line": 8,
-              "Column": 6,
-              "Index": 229
-            }
-          },
-          "Type": {
-            "Name": "str",
-            "Start": {
-              "Line": 8,
-              "Column": 9,
-              "Index": 232
-            },
-            "End": {
-              "Line": 8,
-              "Column": 12,
-              "Index": 235
-            }
-          },
-          "Value": {
-            "Kind": 2,
-            "Value": "hi",
-            "Start": {
-              "Line": 8,
-              "Column": 15,
-              "Index": 238
-            },
-            "End": {
-              "Line": 8,
-              "Column": 19,
-              "Index": 242
-            }
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         }
       ],
@@ -559,23 +567,85 @@
       },
       "End": {
         "Line": 8,
+        "Column": 21,
+        "Index": 244
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "a",
+            "Start": {
+              "Line": 10,
+              "Column": 5,
+              "Index": 250
+            },
+            "End": {
+              "Line": 10,
+              "Column": 6,
+              "Index": 251
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Type": {
+            "Name": "str",
+            "Start": {
+              "Line": 10,
+              "Column": 9,
+              "Index": 254
+            },
+            "End": {
+              "Line": 10,
+              "Column": 12,
+              "Index": 257
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Value": {
+            "Kind": 2,
+            "Value": "hi",
+            "Start": {
+              "Line": 10,
+              "Column": 15,
+              "Index": 260
+            },
+            "End": {
+              "Line": 10,
+              "Column": 19,
+              "Index": 264
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 10,
+        "Column": 1,
+        "Index": 246
+      },
+      "End": {
+        "Line": 10,
         "Column": 20,
-        "Index": 243
-      }
+        "Index": 265
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "Name": {
         "Name": "add",
         "Start": {
-          "Line": 10,
+          "Line": 12,
           "Column": 4,
-          "Index": 248
+          "Index": 270
         },
         "End": {
-          "Line": 10,
+          "Line": 12,
           "Column": 7,
-          "Index": 251
-        }
+          "Index": 273
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
       },
       "Type": {
         "Params": [
@@ -583,106 +653,114 @@
             "Name": {
               "Name": "a",
               "Start": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 8,
-                "Index": 252
+                "Index": 274
               },
               "End": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 9,
-                "Index": 253
-              }
+                "Index": 275
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Type": {
               "Name": "i32",
               "Start": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 11,
-                "Index": 255
+                "Index": 277
               },
               "End": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 14,
-                "Index": 258
-              }
+                "Index": 280
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Value": null,
             "IsVariadic": false,
             "Start": {
-              "Line": 10,
+              "Line": 12,
               "Column": 8,
-              "Index": 252
+              "Index": 274
             },
             "End": {
-              "Line": 10,
+              "Line": 12,
               "Column": 14,
-              "Index": 258
-            }
+              "Index": 280
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           {
             "Name": {
               "Name": "b",
               "Start": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 16,
-                "Index": 260
+                "Index": 282
               },
               "End": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 17,
-                "Index": 261
-              }
+                "Index": 283
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Type": {
               "Name": "str",
               "Start": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 19,
-                "Index": 263
+                "Index": 285
               },
               "End": {
-                "Line": 10,
+                "Line": 12,
                 "Column": 22,
-                "Index": 266
-              }
+                "Index": 288
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "Value": null,
             "IsVariadic": false,
             "Start": {
-              "Line": 10,
+              "Line": 12,
               "Column": 16,
-              "Index": 260
+              "Index": 282
             },
             "End": {
-              "Line": 10,
+              "Line": 12,
               "Column": 22,
-              "Index": 266
-            }
+              "Index": 288
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         ],
         "Result": {
           "Name": "i32",
           "Start": {
-            "Line": 10,
+            "Line": 12,
             "Column": 27,
-            "Index": 271
+            "Index": 293
           },
           "End": {
-            "Line": 10,
+            "Line": 12,
             "Column": 30,
-            "Index": 274
-          }
+            "Index": 296
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
         },
         "Start": {
-          "Line": 10,
+          "Line": 12,
           "Column": 1,
-          "Index": 245
+          "Index": 267
         },
         "End": {
-          "Line": 10,
+          "Line": 12,
           "Column": 30,
-          "Index": 274
-        }
+          "Index": 296
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
       },
       "Body": {
         "Nodes": [
@@ -691,174 +769,256 @@
               "X": {
                 "Name": "a",
                 "Start": {
-                  "Line": 12,
+                  "Line": 14,
                   "Column": 12,
-                  "Index": 311
+                  "Index": 333
                 },
                 "End": {
-                  "Line": 12,
+                  "Line": 14,
                   "Column": 13,
-                  "Index": 312
-                }
+                  "Index": 334
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
               },
               "Op": {
                 "Kind": "+",
                 "Value": "+",
                 "Start": {
-                  "Line": 12,
+                  "Line": 14,
                   "Column": 14,
-                  "Index": 313
+                  "Index": 335
                 },
                 "End": {
-                  "Line": 12,
+                  "Line": 14,
                   "Column": 15,
-                  "Index": 314
+                  "Index": 336
                 }
               },
               "Y": {
                 "Name": "b",
                 "Start": {
-                  "Line": 12,
+                  "Line": 14,
                   "Column": 16,
-                  "Index": 315
+                  "Index": 337
                 },
                 "End": {
-                  "Line": 12,
+                  "Line": 14,
                   "Column": 17,
-                  "Index": 316
-                }
+                  "Index": 338
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
               },
               "Start": {
-                "Line": 12,
+                "Line": 14,
                 "Column": 12,
-                "Index": 311
+                "Index": 333
               },
               "End": {
-                "Line": 12,
+                "Line": 14,
                 "Column": 17,
-                "Index": 316
-              }
+                "Index": 338
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
             },
             "IsError": false,
             "Start": {
-              "Line": 12,
+              "Line": 14,
               "Column": 5,
-              "Index": 304
+              "Index": 326
             },
             "End": {
-              "Line": 12,
+              "Line": 14,
               "Column": 17,
-              "Index": 316
-            }
+              "Index": 338
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         ],
         "Scope": null,
         "Start": {
-          "Line": 10,
+          "Line": 12,
           "Column": 31,
-          "Index": 275
+          "Index": 297
         },
         "End": {
-          "Line": 13,
+          "Line": 15,
           "Column": 2,
-          "Index": 319
-        }
+          "Index": 341
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
       },
       "Scope": null,
       "Start": {
-        "Line": 10,
+        "Line": 12,
         "Column": 1,
-        "Index": 245
+        "Index": 267
       },
       "End": {
-        "Line": 13,
+        "Line": 15,
         "Column": 2,
-        "Index": 319
-      }
+        "Index": 341
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     },
     {
       "X": {
         "Fun": {
           "Name": "add",
           "Start": {
-            "Line": 15,
+            "Line": 17,
             "Column": 1,
-            "Index": 321
+            "Index": 343
           },
           "End": {
-            "Line": 15,
+            "Line": 17,
             "Column": 4,
-            "Index": 324
-          }
+            "Index": 346
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
         },
         "Args": [
           {
             "Kind": 0,
             "Value": "23",
             "Start": {
-              "Line": 15,
+              "Line": 17,
               "Column": 5,
-              "Index": 325
+              "Index": 347
             },
             "End": {
-              "Line": 15,
+              "Line": 17,
               "Column": 7,
-              "Index": 327
-            }
+              "Index": 349
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           {
             "Kind": 0,
             "Value": "56",
             "Start": {
-              "Line": 15,
+              "Line": 17,
               "Column": 9,
-              "Index": 329
+              "Index": 351
             },
             "End": {
-              "Line": 15,
+              "Line": 17,
               "Column": 11,
-              "Index": 331
-            }
+              "Index": 353
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           },
           {
             "Kind": 0,
             "Value": "10",
             "Start": {
-              "Line": 15,
+              "Line": 17,
               "Column": 13,
-              "Index": 333
+              "Index": 355
             },
             "End": {
-              "Line": 15,
+              "Line": 17,
               "Column": 15,
-              "Index": 335
-            }
+              "Index": 357
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
           }
         ],
         "Catch": null,
         "Start": {
-          "Line": 15,
+          "Line": 17,
           "Column": 1,
-          "Index": 321
+          "Index": 343
         },
         "End": {
-          "Line": 15,
+          "Line": 17,
           "Column": 16,
-          "Index": 336
-        }
+          "Index": 358
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
       },
       "Start": {
-        "Line": 15,
+        "Line": 17,
         "Column": 1,
-        "Index": 321
+        "Index": 343
       },
       "End": {
-        "Line": 15,
+        "Line": 17,
         "Column": 17,
-        "Index": 337
-      }
+        "Index": 359
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+    },
+    {
+      "Lhs": {
+        "X": {
+          "Name": "exp",
+          "Start": {
+            "Line": 21,
+            "Column": 1,
+            "Index": 421
+          },
+          "End": {
+            "Line": 21,
+            "Column": 4,
+            "Index": 424
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+        },
+        "Selector": {
+          "Name": "exportedName",
+          "Start": {
+            "Line": 21,
+            "Column": 6,
+            "Index": 426
+          },
+          "End": {
+            "Line": 21,
+            "Column": 18,
+            "Index": 438
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+        },
+        "Start": {
+          "Line": 21,
+          "Column": 1,
+          "Index": 421
+        },
+        "End": {
+          "Line": 21,
+          "Column": 18,
+          "Index": 438
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+      },
+      "Rhs": {
+        "Kind": 0,
+        "Value": "12",
+        "Start": {
+          "Line": 21,
+          "Column": 21,
+          "Index": 441
+        },
+        "End": {
+          "Line": 21,
+          "Column": 23,
+          "Index": 443
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+      },
+      "Start": {
+        "Line": 21,
+        "Column": 1,
+        "Index": 421
+      },
+      "End": {
+        "Line": 21,
+        "Column": 23,
+        "Index": 443
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     }
   ],
   "Start": null,
-  "End": null
+  "End": null,
+  "Filename": null
 }

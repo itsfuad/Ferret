@@ -6,11 +6,13 @@ import "fmt"
 type Location struct {
 	Start *Position
 	End   *Position
+	Filename *string
 }
 
 // NewLocation creates a new Location with the given start and end positions
-func NewLocation(start, end *Position) *Location {
+func NewLocation(filename *string, start, end *Position) *Location {
 	return &Location{
+		Filename: filename,
 		Start: start,
 		End:   end,
 	}

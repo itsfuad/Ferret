@@ -45,8 +45,8 @@ func buildImportAliasMap(ctx *context_v2.CompilerContext, mod *context_v2.Module
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("duplicate import alias '%s'", aliasName)).
 						WithCode("C-DUP-ALIAS").
-						WithPrimaryLabel(mod.FilePath, imp.Locations[i], fmt.Sprintf("'%s' already used for another import", aliasName)).
-						WithSecondaryLabel(mod.FilePath, existing.location, "previous import here").
+						WithPrimaryLabel(imp.Locations[i], fmt.Sprintf("'%s' already used for another import", aliasName)).
+						WithSecondaryLabel(existing.location, "previous import here").
 						WithHelp(fmt.Sprintf("use a different alias: import \"%s\" as %s_alt", imp.Path, aliasName)),
 				)
 				continue

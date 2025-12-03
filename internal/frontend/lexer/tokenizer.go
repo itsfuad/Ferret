@@ -198,7 +198,8 @@ func (lex *Lexer) Tokenize(debug bool) []Token {
 			tok := lex.remainder()[0]
 			errMsg := fmt.Sprintf("unrecognized character '%c'", tok)
 			lex.diagnostics.Add(
-				diagnostics.NewError(errMsg).WithPrimaryLabel(lex.FilePath, source.NewLocation(
+				diagnostics.NewError(errMsg).WithPrimaryLabel(source.NewLocation(
+					&lex.FilePath,
 					&lex.Position,
 					&lex.Position,
 				), ""),

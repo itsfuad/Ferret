@@ -1,3 +1,5 @@
+import "Ferret/exp";
+
 let sum := 10 + 5;          // 15
 let difference := 10 - 5;   // 5
 let product := 10 * 5;      // 50
@@ -14,4 +16,6 @@ fn add(a: i32, b: str) -> i32 {
 
 add(23, 56, 10); // Error: cannot add i32 and str
 
-//let pi : f32 = math::PI;
+//let pi : f32 = math::PI
+
+exp::exportedName = 12;
