@@ -64,18 +64,14 @@ func inferLiteralType(lit *ast.BasicLit) types.SemType {
 	switch lit.Kind {
 	case ast.INT:
 		// Integer literals are UNTYPED until contextualized
-		return types.TypeUntyped
-
+		return types.TypeUntypedInt
 	case ast.FLOAT:
 		// Float literals are UNTYPED until contextualized
-		return types.TypeUntyped
-
+		return types.TypeUntypedFloat
 	case ast.STRING:
 		return types.TypeString
-
 	case ast.BOOL:
 		return types.TypeBool
-
 	default:
 		return types.TypeUnknown
 	}
@@ -96,13 +92,20 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	rhsType := inferExprType(ctx, mod, expr.Y)
 
 	// Handle UNTYPED operands
-	if lhsType.Equals(types.TypeUntyped) && rhsType.Equals(types.TypeUntyped) {
-		return types.TypeUntyped
+	lhsUntyped := types.IsUntyped(lhsType)
+	rhsUntyped := types.IsUntyped(rhsType)
+
+	if lhsUntyped && rhsUntyped {
+		// Both untyped - preserve untyped, prioritize float over int
+		if types.IsUntypedFloat(lhsType) || types.IsUntypedFloat(rhsType) {
+			return types.TypeUntypedFloat
+		}
+		return types.TypeUntypedInt
 	}
-	if lhsType.Equals(types.TypeUntyped) {
+	if lhsUntyped {
 		return rhsType
 	}
-	if rhsType.Equals(types.TypeUntyped) {
+	if rhsUntyped {
 		return lhsType
 	}
 
@@ -298,14 +301,15 @@ func contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemTy
 				}
 			}
 		}
-		// Can't fit or no context - return default
-		return types.TypeI64
+		// Can't contextualize - stay untyped for better error messages
+		return types.TypeUntypedInt
 
 	case ast.FLOAT:
 		if expected.Equals(types.TypeF32) || expected.Equals(types.TypeF64) {
 			return expected
 		}
-		return types.TypeF64
+		// Can't contextualize - stay untyped for better error messages
+		return types.TypeUntypedFloat
 
 	default:
 		return types.TypeUnknown

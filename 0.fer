@@ -18,4 +18,8 @@ add(23, 56, 10); // Error: cannot add i32 and str
 
 //let pi : f32 = math::PI
 
-exp::exportedName = 12;
+let s : str = 10;
+
+let int := 10;
+
+let string : str = int;

@@ -30,15 +30,35 @@ type SemType interface {
 // Primitive Types (built-in) likely can be represented as numbers
 // ============================================================================
 
+// UntypedKind represents the kind of untyped literal
+type UntypedKind int
+
+const (
+	UntypedNone  UntypedKind = iota // Not an untyped literal
+	UntypedInt                      // Untyped integer literal
+	UntypedFloat                    // Untyped float literal
+)
+
 // PrimitiveType represents built-in scalar types (i32, str, bool, etc.)
 type PrimitiveType struct {
-	name TYPE_NAME
-	size int // size in bytes
+	name        TYPE_NAME
+	size        int         // size in bytes
+	untypedKind UntypedKind // kind of untyped literal (UntypedNone for typed)
 }
 
 func NewPrimitive(name TYPE_NAME) *PrimitiveType {
 	size := getPrimitiveSize(name)
-	return &PrimitiveType{name: name, size: size}
+	return &PrimitiveType{name: name, size: size, untypedKind: UntypedNone}
+}
+
+// NewUntypedInt creates an untyped integer literal type
+func NewUntypedInt() *PrimitiveType {
+	return &PrimitiveType{name: TYPE_UNTYPED, size: -1, untypedKind: UntypedInt}
+}
+
+// NewUntypedFloat creates an untyped float literal type
+func NewUntypedFloat() *PrimitiveType {
+	return &PrimitiveType{name: TYPE_UNTYPED, size: -1, untypedKind: UntypedFloat}
 }
 
 func (p *PrimitiveType) String() string { return string(p.name) }
@@ -46,7 +66,7 @@ func (p *PrimitiveType) Size() int      { return p.size }
 func (p *PrimitiveType) isType()        {}
 func (p *PrimitiveType) Equals(other SemType) bool {
 	if o, ok := other.(*PrimitiveType); ok {
-		return p.name == o.name
+		return p.name == o.name && p.untypedKind == o.untypedKind
 	}
 	return false
 }
@@ -54,6 +74,26 @@ func (p *PrimitiveType) Equals(other SemType) bool {
 // GetName returns the primitive type name (for compatibility during migration)
 func (p *PrimitiveType) GetName() TYPE_NAME {
 	return p.name
+}
+
+// IsUntyped returns true if this is an untyped literal type
+func (p *PrimitiveType) IsUntyped() bool {
+	return p.untypedKind != UntypedNone
+}
+
+// IsUntypedInt returns true if this is an untyped integer literal
+func (p *PrimitiveType) IsUntypedInt() bool {
+	return p.untypedKind == UntypedInt
+}
+
+// IsUntypedFloat returns true if this is an untyped float literal
+func (p *PrimitiveType) IsUntypedFloat() bool {
+	return p.untypedKind == UntypedFloat
+}
+
+// GetUntypedKind returns the kind of untyped literal
+func (p *PrimitiveType) GetUntypedKind() UntypedKind {
+	return p.untypedKind
 }
 
 func getPrimitiveSize(name TYPE_NAME) int {
@@ -411,7 +451,10 @@ var (
 	TypeString  SemType
 	TypeVoid    SemType
 	TypeUnknown SemType
-	TypeUntyped SemType
+
+	// Untyped literal types
+	TypeUntypedInt   SemType
+	TypeUntypedFloat SemType
 )
 
 func init() {
@@ -429,7 +472,9 @@ func init() {
 	TypeString = NewPrimitive(TYPE_STRING)
 	TypeVoid = NewPrimitive(TYPE_VOID)
 	TypeUnknown = NewPrimitive(TYPE_UNKNOWN)
-	TypeUntyped = NewPrimitive(TYPE_UNTYPED)
+
+	TypeUntypedInt = NewUntypedInt()
+	TypeUntypedFloat = NewUntypedFloat()
 }
 
 // FromTypeName converts TYPE_NAME to Type (for backward compatibility during migration)
@@ -473,4 +518,28 @@ func GetPrimitiveName(t SemType) (TYPE_NAME, bool) {
 		return p.name, true
 	}
 	return TYPE_UNKNOWN, false
+}
+
+// IsUntyped checks if a type is an untyped literal type
+func IsUntyped(t SemType) bool {
+	if p, ok := t.(*PrimitiveType); ok {
+		return p.IsUntyped()
+	}
+	return false
+}
+
+// IsUntypedInt checks if a type is an untyped integer literal
+func IsUntypedInt(t SemType) bool {
+	if p, ok := t.(*PrimitiveType); ok {
+		return p.IsUntypedInt()
+	}
+	return false
+}
+
+// IsUntypedFloat checks if a type is an untyped float literal
+func IsUntypedFloat(t SemType) bool {
+	if p, ok := t.(*PrimitiveType); ok {
+		return p.IsUntypedFloat()
+	}
+	return false
 }

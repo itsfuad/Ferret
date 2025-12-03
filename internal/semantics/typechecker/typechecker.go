@@ -155,7 +155,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			rhsType := checkExpr(ctx, mod, item.Value, types.TypeUnknown)
 
 			// If the RHS is UNTYPED, finalize it to a default type
-			if rhsType.Equals(types.TypeUntyped) {
+			if types.IsUntyped(rhsType) {
 				rhsType = finalizeUntyped(item.Value)
 			}
 
@@ -306,8 +306,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	// Apply contextual typing
 	resultType := inferredType
 
-	// 1. Handle UNTYPED numeric/string literals
-	if inferredType.Equals(types.TypeUntyped) && !expected.Equals(types.TypeUnknown) {
+	// 1. Handle UNTYPED numeric literals
+	if types.IsUntyped(inferredType) && !expected.Equals(types.TypeUnknown) {
 		if lit, ok := expr.(*ast.BasicLit); ok {
 			// If expected is optional, contextualize to inner type
 			expectedForLit := expected
@@ -338,7 +338,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	}
 
 	// If still UNTYPED and we need a concrete type, finalize it
-	if resultType.Equals(types.TypeUntyped) && expected.Equals(types.TypeUnknown) {
+	if types.IsUntyped(resultType) && expected.Equals(types.TypeUnknown) {
 		// Keep as UNTYPED for now - will be finalized when needed
 	}
 
@@ -382,12 +382,28 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 		)
 
 	case Incompatible:
-		// Cannot convert
-		diag := diagnostics.NewError(getConversionError(rhsType, targetType, compatibility))
+		// Cannot convert - create user-friendly error message
+		var errorMsg string
+		if types.IsUntyped(rhsType) {
+			// For untyped literals, use more intuitive message
+			if types.IsUntypedInt(rhsType) {
+				errorMsg = fmt.Sprintf("cannot use integer literal as type '%s'", targetType.String())
+			} else if types.IsUntypedFloat(rhsType) {
+				errorMsg = fmt.Sprintf("cannot use float literal as type '%s'", targetType.String())
+			} else {
+				errorMsg = getConversionError(rhsType, targetType, compatibility)
+			}
+		} else {
+			errorMsg = getConversionError(rhsType, targetType, compatibility)
+		}
+
+		diag := diagnostics.NewError(errorMsg)
 
 		// Add dual labels if we have type node location
 		if typeNode != nil {
-			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+			// Format value description (special handling for untyped literals)
+			valueDesc := formatValueDescription(rhsType)
+			diag = diag.WithPrimaryLabel(valueExpr.Loc(), valueDesc).
 				WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 		} else {
 			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("expected '%s', got '%s'", targetType.String(), rhsType.String()))
@@ -397,8 +413,34 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 	}
 }
 
+// formatValueDescription formats a user-friendly description for a value in error messages.
+// For untyped literals, it returns "integer literal" or "float literal" instead of "type 'untyped'".
+func formatValueDescription(typ types.SemType) string {
+	// Handle untyped literals specially
+	if types.IsUntypedInt(typ) {
+		return "integer literal"
+	}
+	if types.IsUntypedFloat(typ) {
+		return "float literal"
+	}
+	return fmt.Sprintf("type '%s'", typ.String())
+}
+
+// formatTypeDescription formats a user-friendly type description (without "type" prefix).
+// For untyped literals, it returns "integer" or "float" instead of "untyped".
+func formatTypeDescription(typ types.SemType) string {
+	// Handle untyped literals specially
+	if types.IsUntypedInt(typ) {
+		return "integer"
+	}
+	if types.IsUntypedFloat(typ) {
+		return "float"
+	}
+	return typ.String()
+}
+
 func checkFitness(ctx *context_v2.CompilerContext, mod *context_v2.Module, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
-	if rhsType.Equals(types.TypeUntyped) || rhsType.Equals(types.TypeI64) {
+	if types.IsUntypedInt(rhsType) || rhsType.Equals(types.TypeI64) {
 		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
 			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
 				value, err := strconv.ParseInt(lit.Value, 0, 64)
@@ -622,13 +664,15 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 		compatibility := checkTypeCompatibility(argType, param.Type)
 
 		if compatibility == Incompatible {
+			// Format the argument type in a user-friendly way
+			argTypeDesc := formatTypeDescription(argType)
 			ctx.Diagnostics.Add(
 				diagnostics.ArgumentTypeMismatch(
 					mod.FilePath,
 					arg.Loc(),
 					param.Name,
 					param.Type.String(),
-					argType.String(),
+					argTypeDesc,
 				),
 			)
 		}
@@ -649,13 +693,15 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 			compatibility := checkTypeCompatibility(argType, variadicElemType)
 
 			if compatibility == Incompatible {
+				// Format the argument type in a user-friendly way
+				argTypeDesc := formatTypeDescription(argType)
 				ctx.Diagnostics.Add(
 					diagnostics.ArgumentTypeMismatch(
 						mod.FilePath,
 						arg.Loc(),
 						variadicParam.Name,
 						variadicElemType.String(),
-						argType.String(),
+						argTypeDesc,
 					),
 				)
 			}

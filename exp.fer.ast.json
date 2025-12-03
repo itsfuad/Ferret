@@ -7,7 +7,7 @@
       "Decls": [
         {
           "Name": {
-            "Name": "exportedName",
+            "Name": "ExportedName",
             "Start": {
               "Line": 3,
               "Column": 5,

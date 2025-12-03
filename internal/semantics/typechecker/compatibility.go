@@ -55,8 +55,11 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	}
 
 	// UNTYPED literals can be assigned to any compatible concrete type
-	if source.Equals(types.TypeUntyped) {
-		if types.IsNumeric(target) {
+	if types.IsUntyped(source) {
+		if types.IsUntypedInt(source) && types.IsNumeric(target) {
+			return Assignable
+		}
+		if types.IsUntypedFloat(source) && types.IsFloat(target) {
 			return Assignable
 		}
 		return Incompatible
@@ -124,7 +127,6 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 		return fmt.Sprintf("type mismatch: '%s' and '%s'", source, target)
 	}
 }
-
 
 // fitsInType checks if a value fits in a given type
 func fitsInType(value int64, t types.SemType) bool {
@@ -223,4 +225,3 @@ func getTypeRange(t types.SemType) string {
 		return "unknown range"
 	}
 }
-
