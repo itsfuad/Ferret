@@ -10,9 +10,9 @@ func GetNumberBitSize(kind TYPE_NAME) uint16 {
 		return 32
 	case TYPE_I64, TYPE_U64, TYPE_F64:
 		return 64
-	case TYPE_I128, TYPE_U128:
+	case TYPE_I128, TYPE_U128, TYPE_F128:
 		return 128
-	case TYPE_I256, TYPE_U256:
+	case TYPE_I256, TYPE_U256, TYPE_F256:
 		return 256
 	default:
 		return 0
@@ -55,7 +55,7 @@ func IsIntegerTypeName(typeName TYPE_NAME) bool {
 
 func IsFloatTypeName(typeName TYPE_NAME) bool {
 	switch typeName {
-	case TYPE_F32, TYPE_F64:
+	case TYPE_F32, TYPE_F64, TYPE_F128, TYPE_F256:
 		return true
 	default:
 		return false

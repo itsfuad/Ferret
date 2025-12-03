@@ -439,6 +439,7 @@ func formatTypeDescription(typ types.SemType) string {
 }
 
 func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
+	// Check integer literal overflow
 	if types.IsUntypedInt(rhsType) || rhsType.Equals(types.TypeI64) {
 		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
 			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
@@ -478,6 +479,39 @@ func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.Sem
 			}
 		}
 	}
+
+	// Check float literal precision
+	if types.IsUntypedFloat(rhsType) {
+		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.FLOAT {
+			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsFloatTypeName(targetName) {
+				if !fitsInType(lit.Value, targetType) {
+					// Get minimum type that can hold this precision
+					digits := countSignificantDigits(lit.Value)
+					minType := getMinimumFloatTypeForDigits(digits)
+
+					// Build error message
+					diag := diagnostics.NewError(fmt.Sprintf("float literal has too many significant digits for %s", targetType.String()))
+
+					if typeNode != nil {
+						if minType != "exceeds f256 precision" {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits (needs %s)", digits, minType)).
+								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s' supports ~%d digits", targetType.String(), getFloatPrecision(targetName)))
+						} else {
+							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits", digits)).
+								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s' (max ~71 digits)", targetType.String())).
+								WithNote("This literal exceeds f256 precision limit")
+						}
+					} else {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits, need %s but got %s", digits, minType, targetType.String()))
+					}
+
+					ctx.Diagnostics.Add(diag)
+					return false
+				}
+			}
+		}
+	}
+
 	return true
 }
 

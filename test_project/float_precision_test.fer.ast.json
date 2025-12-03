@@ -1,0 +1,1165 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Name": {
+        "Name": "demonstrate_float_range",
+        "Start": {
+          "Line": 7,
+          "Column": 4,
+          "Index": 157
+        },
+        "End": {
+          "Line": 7,
+          "Column": 27,
+          "Index": 180
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Type": {
+        "Params": null,
+        "Result": null,
+        "Start": {
+          "Line": 7,
+          "Column": 1,
+          "Index": 154
+        },
+        "End": {
+          "Line": 7,
+          "Column": 29,
+          "Index": 182
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "small",
+                  "Start": {
+                    "Line": 9,
+                    "Column": 9,
+                    "Index": 233
+                  },
+                  "End": {
+                    "Line": 9,
+                    "Column": 14,
+                    "Index": 238
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f32",
+                  "Start": {
+                    "Line": 9,
+                    "Column": 16,
+                    "Index": 240
+                  },
+                  "End": {
+                    "Line": 9,
+                    "Column": 19,
+                    "Index": 243
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.14159",
+                  "Start": {
+                    "Line": 9,
+                    "Column": 22,
+                    "Index": 246
+                  },
+                  "End": {
+                    "Line": 9,
+                    "Column": 29,
+                    "Index": 253
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 9,
+              "Column": 5,
+              "Index": 229
+            },
+            "End": {
+              "Line": 9,
+              "Column": 30,
+              "Index": 254
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "medium",
+                  "Start": {
+                    "Line": 12,
+                    "Column": 9,
+                    "Index": 312
+                  },
+                  "End": {
+                    "Line": 12,
+                    "Column": 15,
+                    "Index": 318
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f64",
+                  "Start": {
+                    "Line": 12,
+                    "Column": 17,
+                    "Index": 320
+                  },
+                  "End": {
+                    "Line": 12,
+                    "Column": 20,
+                    "Index": 323
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.141592653589793",
+                  "Start": {
+                    "Line": 12,
+                    "Column": 23,
+                    "Index": 326
+                  },
+                  "End": {
+                    "Line": 12,
+                    "Column": 40,
+                    "Index": 343
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 12,
+              "Column": 5,
+              "Index": 308
+            },
+            "End": {
+              "Line": 12,
+              "Column": 41,
+              "Index": 344
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "large",
+                  "Start": {
+                    "Line": 15,
+                    "Column": 9,
+                    "Index": 400
+                  },
+                  "End": {
+                    "Line": 15,
+                    "Column": 14,
+                    "Index": 405
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f128",
+                  "Start": {
+                    "Line": 15,
+                    "Column": 16,
+                    "Index": 407
+                  },
+                  "End": {
+                    "Line": 15,
+                    "Column": 20,
+                    "Index": 411
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.14159265358979323846",
+                  "Start": {
+                    "Line": 15,
+                    "Column": 23,
+                    "Index": 414
+                  },
+                  "End": {
+                    "Line": 15,
+                    "Column": 45,
+                    "Index": 436
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 15,
+              "Column": 5,
+              "Index": 396
+            },
+            "End": {
+              "Line": 15,
+              "Column": 46,
+              "Index": 437
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "huge",
+                  "Start": {
+                    "Line": 18,
+                    "Column": 9,
+                    "Index": 508
+                  },
+                  "End": {
+                    "Line": 18,
+                    "Column": 13,
+                    "Index": 512
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f256",
+                  "Start": {
+                    "Line": 18,
+                    "Column": 15,
+                    "Index": 514
+                  },
+                  "End": {
+                    "Line": 18,
+                    "Column": 19,
+                    "Index": 518
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.1415926535897932384626433832795028841971693993751058209749445923078164",
+                  "Start": {
+                    "Line": 18,
+                    "Column": 22,
+                    "Index": 521
+                  },
+                  "End": {
+                    "Line": 18,
+                    "Column": 94,
+                    "Index": 593
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 18,
+              "Column": 5,
+              "Index": 504
+            },
+            "End": {
+              "Line": 18,
+              "Column": 95,
+              "Index": 594
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "overflow_f32",
+                  "Start": {
+                    "Line": 21,
+                    "Column": 9,
+                    "Index": 678
+                  },
+                  "End": {
+                    "Line": 21,
+                    "Column": 21,
+                    "Index": 690
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f32",
+                  "Start": {
+                    "Line": 21,
+                    "Column": 23,
+                    "Index": 692
+                  },
+                  "End": {
+                    "Line": 21,
+                    "Column": 26,
+                    "Index": 695
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.1415926535897932384626433832795028841971693993751058209749445",
+                  "Start": {
+                    "Line": 21,
+                    "Column": 29,
+                    "Index": 698
+                  },
+                  "End": {
+                    "Line": 21,
+                    "Column": 92,
+                    "Index": 761
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 21,
+              "Column": 5,
+              "Index": 674
+            },
+            "End": {
+              "Line": 21,
+              "Column": 93,
+              "Index": 762
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "overflow_f64",
+                  "Start": {
+                    "Line": 24,
+                    "Column": 9,
+                    "Index": 847
+                  },
+                  "End": {
+                    "Line": 24,
+                    "Column": 21,
+                    "Index": 859
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f64",
+                  "Start": {
+                    "Line": 24,
+                    "Column": 23,
+                    "Index": 861
+                  },
+                  "End": {
+                    "Line": 24,
+                    "Column": 26,
+                    "Index": 864
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.14159265358979323846",
+                  "Start": {
+                    "Line": 24,
+                    "Column": 29,
+                    "Index": 867
+                  },
+                  "End": {
+                    "Line": 24,
+                    "Column": 51,
+                    "Index": 889
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 24,
+              "Column": 5,
+              "Index": 843
+            },
+            "End": {
+              "Line": 24,
+              "Column": 52,
+              "Index": 890
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 7,
+          "Column": 30,
+          "Index": 183
+        },
+        "End": {
+          "Line": 25,
+          "Column": 2,
+          "Index": 892
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 7,
+        "Column": 1,
+        "Index": 154
+      },
+      "End": {
+        "Line": 25,
+        "Column": 2,
+        "Index": 892
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+    },
+    {
+      "Name": {
+        "Name": "demonstrate_conversions",
+        "Start": {
+          "Line": 27,
+          "Column": 4,
+          "Index": 897
+        },
+        "End": {
+          "Line": 27,
+          "Column": 27,
+          "Index": 920
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Type": {
+        "Params": null,
+        "Result": null,
+        "Start": {
+          "Line": 27,
+          "Column": 1,
+          "Index": 894
+        },
+        "End": {
+          "Line": 27,
+          "Column": 29,
+          "Index": 922
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "f32_val",
+                  "Start": {
+                    "Line": 29,
+                    "Column": 9,
+                    "Index": 989
+                  },
+                  "End": {
+                    "Line": 29,
+                    "Column": 16,
+                    "Index": 996
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f32",
+                  "Start": {
+                    "Line": 29,
+                    "Column": 18,
+                    "Index": 998
+                  },
+                  "End": {
+                    "Line": 29,
+                    "Column": 21,
+                    "Index": 1001
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "1.5",
+                  "Start": {
+                    "Line": 29,
+                    "Column": 24,
+                    "Index": 1004
+                  },
+                  "End": {
+                    "Line": 29,
+                    "Column": 27,
+                    "Index": 1007
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 29,
+              "Column": 5,
+              "Index": 985
+            },
+            "End": {
+              "Line": 29,
+              "Column": 28,
+              "Index": 1008
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "to_f64",
+                  "Start": {
+                    "Line": 30,
+                    "Column": 9,
+                    "Index": 1017
+                  },
+                  "End": {
+                    "Line": 30,
+                    "Column": 15,
+                    "Index": 1023
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f64",
+                  "Start": {
+                    "Line": 30,
+                    "Column": 17,
+                    "Index": 1025
+                  },
+                  "End": {
+                    "Line": 30,
+                    "Column": 20,
+                    "Index": 1028
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Name": "f32_val",
+                  "Start": {
+                    "Line": 30,
+                    "Column": 23,
+                    "Index": 1031
+                  },
+                  "End": {
+                    "Line": 30,
+                    "Column": 30,
+                    "Index": 1038
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 30,
+              "Column": 5,
+              "Index": 1013
+            },
+            "End": {
+              "Line": 30,
+              "Column": 31,
+              "Index": 1039
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "to_f128",
+                  "Start": {
+                    "Line": 31,
+                    "Column": 9,
+                    "Index": 1069
+                  },
+                  "End": {
+                    "Line": 31,
+                    "Column": 16,
+                    "Index": 1076
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f128",
+                  "Start": {
+                    "Line": 31,
+                    "Column": 18,
+                    "Index": 1078
+                  },
+                  "End": {
+                    "Line": 31,
+                    "Column": 22,
+                    "Index": 1082
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Name": "f32_val",
+                  "Start": {
+                    "Line": 31,
+                    "Column": 25,
+                    "Index": 1085
+                  },
+                  "End": {
+                    "Line": 31,
+                    "Column": 32,
+                    "Index": 1092
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 31,
+              "Column": 5,
+              "Index": 1065
+            },
+            "End": {
+              "Line": 31,
+              "Column": 33,
+              "Index": 1093
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "to_f256",
+                  "Start": {
+                    "Line": 32,
+                    "Column": 9,
+                    "Index": 1122
+                  },
+                  "End": {
+                    "Line": 32,
+                    "Column": 16,
+                    "Index": 1129
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f256",
+                  "Start": {
+                    "Line": 32,
+                    "Column": 18,
+                    "Index": 1131
+                  },
+                  "End": {
+                    "Line": 32,
+                    "Column": 22,
+                    "Index": 1135
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Name": "f32_val",
+                  "Start": {
+                    "Line": 32,
+                    "Column": 25,
+                    "Index": 1138
+                  },
+                  "End": {
+                    "Line": 32,
+                    "Column": 32,
+                    "Index": 1145
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 32,
+              "Column": 5,
+              "Index": 1118
+            },
+            "End": {
+              "Line": 32,
+              "Column": 33,
+              "Index": 1146
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "f64_val",
+                  "Start": {
+                    "Line": 34,
+                    "Column": 9,
+                    "Index": 1180
+                  },
+                  "End": {
+                    "Line": 34,
+                    "Column": 16,
+                    "Index": 1187
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f64",
+                  "Start": {
+                    "Line": 34,
+                    "Column": 18,
+                    "Index": 1189
+                  },
+                  "End": {
+                    "Line": 34,
+                    "Column": 21,
+                    "Index": 1192
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "2.5",
+                  "Start": {
+                    "Line": 34,
+                    "Column": 24,
+                    "Index": 1195
+                  },
+                  "End": {
+                    "Line": 34,
+                    "Column": 27,
+                    "Index": 1198
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 34,
+              "Column": 5,
+              "Index": 1176
+            },
+            "End": {
+              "Line": 34,
+              "Column": 28,
+              "Index": 1199
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "f64_to_f128",
+                  "Start": {
+                    "Line": 35,
+                    "Column": 9,
+                    "Index": 1208
+                  },
+                  "End": {
+                    "Line": 35,
+                    "Column": 20,
+                    "Index": 1219
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f128",
+                  "Start": {
+                    "Line": 35,
+                    "Column": 22,
+                    "Index": 1221
+                  },
+                  "End": {
+                    "Line": 35,
+                    "Column": 26,
+                    "Index": 1225
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Name": "f64_val",
+                  "Start": {
+                    "Line": 35,
+                    "Column": 29,
+                    "Index": 1228
+                  },
+                  "End": {
+                    "Line": 35,
+                    "Column": 36,
+                    "Index": 1235
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 35,
+              "Column": 5,
+              "Index": 1204
+            },
+            "End": {
+              "Line": 35,
+              "Column": 37,
+              "Index": 1236
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "f64_to_f256",
+                  "Start": {
+                    "Line": 36,
+                    "Column": 9,
+                    "Index": 1264
+                  },
+                  "End": {
+                    "Line": 36,
+                    "Column": 20,
+                    "Index": 1275
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f256",
+                  "Start": {
+                    "Line": 36,
+                    "Column": 22,
+                    "Index": 1277
+                  },
+                  "End": {
+                    "Line": 36,
+                    "Column": 26,
+                    "Index": 1281
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Name": "f64_val",
+                  "Start": {
+                    "Line": 36,
+                    "Column": 29,
+                    "Index": 1284
+                  },
+                  "End": {
+                    "Line": 36,
+                    "Column": 36,
+                    "Index": 1291
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 36,
+              "Column": 5,
+              "Index": 1260
+            },
+            "End": {
+              "Line": 36,
+              "Column": 37,
+              "Index": 1292
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "f128_val",
+                  "Start": {
+                    "Line": 38,
+                    "Column": 9,
+                    "Index": 1325
+                  },
+                  "End": {
+                    "Line": 38,
+                    "Column": 17,
+                    "Index": 1333
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f128",
+                  "Start": {
+                    "Line": 38,
+                    "Column": 19,
+                    "Index": 1335
+                  },
+                  "End": {
+                    "Line": 38,
+                    "Column": 23,
+                    "Index": 1339
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Kind": 1,
+                  "Value": "3.5",
+                  "Start": {
+                    "Line": 38,
+                    "Column": 26,
+                    "Index": 1342
+                  },
+                  "End": {
+                    "Line": 38,
+                    "Column": 29,
+                    "Index": 1345
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 38,
+              "Column": 5,
+              "Index": 1321
+            },
+            "End": {
+              "Line": 38,
+              "Column": 30,
+              "Index": 1346
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "Decls": [
+              {
+                "Name": {
+                  "Name": "f128_to_f256",
+                  "Start": {
+                    "Line": 39,
+                    "Column": 9,
+                    "Index": 1355
+                  },
+                  "End": {
+                    "Line": 39,
+                    "Column": 21,
+                    "Index": 1367
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Type": {
+                  "Name": "f256",
+                  "Start": {
+                    "Line": 39,
+                    "Column": 23,
+                    "Index": 1369
+                  },
+                  "End": {
+                    "Line": 39,
+                    "Column": 27,
+                    "Index": 1373
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                },
+                "Value": {
+                  "Name": "f128_val",
+                  "Start": {
+                    "Line": 39,
+                    "Column": 30,
+                    "Index": 1376
+                  },
+                  "End": {
+                    "Line": 39,
+                    "Column": 38,
+                    "Index": 1384
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+                }
+              }
+            ],
+            "Start": {
+              "Line": 39,
+              "Column": 5,
+              "Index": 1351
+            },
+            "End": {
+              "Line": 39,
+              "Column": 39,
+              "Index": 1385
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 27,
+          "Column": 30,
+          "Index": 923
+        },
+        "End": {
+          "Line": 40,
+          "Column": 2,
+          "Index": 1406
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 27,
+        "Column": 1,
+        "Index": 894
+      },
+      "End": {
+        "Line": 40,
+        "Column": 2,
+        "Index": 1406
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+    },
+    {
+      "Name": {
+        "Name": "main",
+        "Start": {
+          "Line": 42,
+          "Column": 4,
+          "Index": 1411
+        },
+        "End": {
+          "Line": 42,
+          "Column": 8,
+          "Index": 1415
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Type": {
+        "Params": null,
+        "Result": null,
+        "Start": {
+          "Line": 42,
+          "Column": 1,
+          "Index": 1408
+        },
+        "End": {
+          "Line": 42,
+          "Column": 10,
+          "Index": 1417
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "X": {
+              "Fun": {
+                "Name": "demonstrate_float_range",
+                "Start": {
+                  "Line": 43,
+                  "Column": 5,
+                  "Index": 1424
+                },
+                "End": {
+                  "Line": 43,
+                  "Column": 28,
+                  "Index": 1447
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+              },
+              "Args": [],
+              "Catch": null,
+              "Start": {
+                "Line": 43,
+                "Column": 5,
+                "Index": 1424
+              },
+              "End": {
+                "Line": 43,
+                "Column": 30,
+                "Index": 1449
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+            },
+            "Start": {
+              "Line": 43,
+              "Column": 5,
+              "Index": 1424
+            },
+            "End": {
+              "Line": 43,
+              "Column": 31,
+              "Index": 1450
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          },
+          {
+            "X": {
+              "Fun": {
+                "Name": "demonstrate_conversions",
+                "Start": {
+                  "Line": 44,
+                  "Column": 5,
+                  "Index": 1455
+                },
+                "End": {
+                  "Line": 44,
+                  "Column": 28,
+                  "Index": 1478
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+              },
+              "Args": [],
+              "Catch": null,
+              "Start": {
+                "Line": 44,
+                "Column": 5,
+                "Index": 1455
+              },
+              "End": {
+                "Line": 44,
+                "Column": 30,
+                "Index": 1480
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+            },
+            "Start": {
+              "Line": 44,
+              "Column": 5,
+              "Index": 1455
+            },
+            "End": {
+              "Line": 44,
+              "Column": 31,
+              "Index": 1481
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 42,
+          "Column": 11,
+          "Index": 1418
+        },
+        "End": {
+          "Line": 45,
+          "Column": 2,
+          "Index": 1483
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 42,
+        "Column": 1,
+        "Index": 1408
+      },
+      "End": {
+        "Line": 45,
+        "Column": 2,
+        "Index": 1483
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_project/float_precision_test.fer"
+    }
+  ],
+  "Start": null,
+  "End": null,
+  "Filename": null
+}

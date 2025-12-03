@@ -89,15 +89,21 @@ func isLosslessNumericConversion(source, target types.SemType) bool {
 
 	// Widening conversions that don't lose precision
 	losslessConversions := map[types.TYPE_NAME][]types.TYPE_NAME{
-		types.TYPE_I8:  {types.TYPE_I16, types.TYPE_I32, types.TYPE_I64, types.TYPE_F32, types.TYPE_F64},
-		types.TYPE_I16: {types.TYPE_I32, types.TYPE_I64, types.TYPE_F32, types.TYPE_F64},
-		types.TYPE_I32: {types.TYPE_I64, types.TYPE_F64},
-		types.TYPE_I64: {types.TYPE_F64},
-		types.TYPE_U8:  {types.TYPE_U16, types.TYPE_U32, types.TYPE_U64, types.TYPE_I16, types.TYPE_I32, types.TYPE_I64, types.TYPE_F32, types.TYPE_F64},
-		types.TYPE_U16: {types.TYPE_U32, types.TYPE_U64, types.TYPE_I32, types.TYPE_I64, types.TYPE_F32, types.TYPE_F64},
-		types.TYPE_U32: {types.TYPE_U64, types.TYPE_I64, types.TYPE_F64},
-		types.TYPE_U64: {types.TYPE_F64},
-		types.TYPE_F32: {types.TYPE_F64},
+		types.TYPE_I8:   {types.TYPE_I16, types.TYPE_I32, types.TYPE_I64, types.TYPE_I128, types.TYPE_I256, types.TYPE_F32, types.TYPE_F64, types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_I16:  {types.TYPE_I32, types.TYPE_I64, types.TYPE_I128, types.TYPE_I256, types.TYPE_F32, types.TYPE_F64, types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_I32:  {types.TYPE_I64, types.TYPE_I128, types.TYPE_I256, types.TYPE_F64, types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_I64:  {types.TYPE_I128, types.TYPE_I256, types.TYPE_F64, types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_I128: {types.TYPE_I256, types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_I256: {types.TYPE_F256},
+		types.TYPE_U8:   {types.TYPE_U16, types.TYPE_U32, types.TYPE_U64, types.TYPE_I16, types.TYPE_I32, types.TYPE_I64, types.TYPE_F32, types.TYPE_F64, types.TYPE_F128},
+		types.TYPE_U16:  {types.TYPE_U32, types.TYPE_U64, types.TYPE_I32, types.TYPE_I64, types.TYPE_F32, types.TYPE_F64, types.TYPE_F128},
+		types.TYPE_U32:  {types.TYPE_U64, types.TYPE_I64, types.TYPE_F64, types.TYPE_F128},
+		types.TYPE_U64:  {types.TYPE_F64, types.TYPE_F128},
+		types.TYPE_U128: {types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_U256: {types.TYPE_F256},
+		types.TYPE_F32:  {types.TYPE_F64, types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_F64:  {types.TYPE_F128, types.TYPE_F256},
+		types.TYPE_F128: {types.TYPE_F256},
 	}
 
 	if targets, ok := losslessConversions[srcName]; ok {
@@ -129,29 +135,135 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 	}
 }
 
+// countSignificantDigits counts the number of significant digits in a float literal string
+// Ignores leading zeros before first non-zero digit and trailing zeros after decimal point
+func countSignificantDigits(floatStr string) int {
+	// Remove sign
+	if len(floatStr) > 0 && (floatStr[0] == '+' || floatStr[0] == '-') {
+		floatStr = floatStr[1:]
+	}
+
+	// Find the exponent part if exists
+	expIndex := -1
+	for i, ch := range floatStr {
+		if ch == 'e' || ch == 'E' {
+			expIndex = i
+			break
+		}
+	}
+
+	// Work with the mantissa only (before exponent)
+	mantissa := floatStr
+	if expIndex != -1 {
+		mantissa = floatStr[:expIndex]
+	}
+
+	// Remove trailing zeros after decimal point
+	if decimalIndex := -1; true {
+		for i, ch := range mantissa {
+			if ch == '.' {
+				decimalIndex = i
+				break
+			}
+		}
+		if decimalIndex != -1 {
+			// Has decimal point - trim trailing zeros
+			mantissa = trimTrailingZeros(mantissa)
+		}
+	}
+
+	// Count significant digits (ignoring leading zeros and decimal point)
+	count := 0
+	leadingZeros := true
+
+	for _, ch := range mantissa {
+		if ch == '.' {
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			if ch != '0' {
+				leadingZeros = false
+			}
+			if !leadingZeros {
+				count++
+			}
+		}
+	}
+
+	return count
+}
+
+// trimTrailingZeros removes trailing zeros after the decimal point
+func trimTrailingZeros(s string) string {
+	// Find decimal point
+	decimalIndex := -1
+	for i, ch := range s {
+		if ch == '.' {
+			decimalIndex = i
+			break
+		}
+	}
+	if decimalIndex == -1 {
+		return s // No decimal point
+	}
+
+	// Trim from the end
+	end := len(s)
+	for end > decimalIndex+1 && s[end-1] == '0' {
+		end--
+	}
+
+	// If we trimmed everything after decimal, keep the decimal point
+	return s[:end]
+}
+
+// getFloatPrecision returns the approximate decimal precision for float types
+func getFloatPrecision(name types.TYPE_NAME) int {
+	switch name {
+	case types.TYPE_F32:
+		return 7 // ~7 decimal digits
+	case types.TYPE_F64:
+		return 16 // ~15-16 decimal digits
+	case types.TYPE_F128:
+		return 34 // ~34 decimal digits
+	case types.TYPE_F256:
+		return 71 // ~71 decimal digits
+	default:
+		return 0
+	}
+}
+
 // fitsInType checks if a string literal value fits in a given type.
 // Uses NumericValue interface which automatically chooses int64 (fast) or big.Int (precise) representation.
 func fitsInType(valueStr string, t types.SemType) bool {
-	// Parse as NumericValue (automatically chooses optimal representation)
-	numValue, err := numeric.NewNumericValue(valueStr)
-	if err != nil {
-		return false
-	}
-
 	// Extract primitive type name
 	name, ok := types.GetPrimitiveName(t)
 	if !ok {
 		return false
 	}
 
-	// Check based on type
-	bitSize := types.GetNumberBitSize(name)
-	if bitSize == 0 {
-		return false // Not a numeric type
+	// Handle float types - check precision
+	if types.IsFloatTypeName(name) {
+		digits := countSignificantDigits(valueStr)
+		precision := getFloatPrecision(name)
+		return digits <= precision
 	}
 
-	signed := types.IsSigned(name)
-	return numValue.FitsInBitSize(int(bitSize), signed)
+	// Handle integer types - check range
+	if types.IsIntegerTypeName(name) {
+		numValue, err := numeric.NewNumericValue(valueStr)
+		if err != nil {
+			return false
+		}
+		bitSize := types.GetNumberBitSize(name)
+		if bitSize == 0 {
+			return false
+		}
+		signed := types.IsSigned(name)
+		return numValue.FitsInBitSize(int(bitSize), signed)
+	}
+
+	return false
 }
 
 // getMinimumTypeForValue returns the smallest type that can hold the given value.
@@ -212,6 +324,23 @@ func getMinimumTypeForValue(valueStr string) string {
 	}
 
 	return "too large for any supported type"
+}
+
+// getMinimumFloatTypeForDigits returns the smallest float type that can hold the given precision
+func getMinimumFloatTypeForDigits(digits int) string {
+	if digits <= 7 {
+		return "f32"
+	}
+	if digits <= 16 {
+		return "f64"
+	}
+	if digits <= 34 {
+		return "f128"
+	}
+	if digits <= 71 {
+		return "f256"
+	}
+	return "exceeds f256 precision"
 }
 
 // getTypeRange returns a human-readable range for integer types

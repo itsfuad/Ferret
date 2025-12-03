@@ -104,9 +104,9 @@ func getPrimitiveSize(name TYPE_NAME) int {
 		return 4
 	case TYPE_I64, TYPE_U64, TYPE_F64:
 		return 8
-	case TYPE_I128, TYPE_U128:
+	case TYPE_I128, TYPE_U128, TYPE_F128:
 		return 16
-	case TYPE_I256, TYPE_U256:
+	case TYPE_I256, TYPE_U256, TYPE_F256:
 		return 32
 	case TYPE_BOOL:
 		return 1
@@ -427,6 +427,8 @@ var (
 	TypeU256    SemType
 	TypeF32     SemType
 	TypeF64     SemType
+	TypeF128    SemType
+	TypeF256    SemType
 	TypeBool    SemType
 	TypeString  SemType
 	TypeVoid    SemType
@@ -452,6 +454,8 @@ func init() {
 	TypeU256 = NewPrimitive(TYPE_U256)
 	TypeF32 = NewPrimitive(TYPE_F32)
 	TypeF64 = NewPrimitive(TYPE_F64)
+	TypeF128 = NewPrimitive(TYPE_F128)
+	TypeF256 = NewPrimitive(TYPE_F256)
 	TypeBool = NewPrimitive(TYPE_BOOL)
 	TypeString = NewPrimitive(TYPE_STRING)
 	TypeVoid = NewPrimitive(TYPE_VOID)

@@ -1,0 +1,15 @@
+// Test trailing zeros behavior
+
+fn test_trailing_zeros() {
+    // These should all work in f32 (only needs 1 significant digit)
+    let a: f32 = 1.0;
+    let b: f32 = 1.00;
+    let c: f32 = 1.000;
+    
+    // This has 8 actual significant digits (should fail for f32)
+    let d: f32 = 1.0000000;  // 1 + 7 trailing zeros = 8 digits
+}
+
+fn main() {
+    test_trailing_zeros();
+}

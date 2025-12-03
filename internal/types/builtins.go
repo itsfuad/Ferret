@@ -40,6 +40,8 @@ const (
 	TYPE_U256      TYPE_NAME = "u256"
 	TYPE_F32       TYPE_NAME = "f32"
 	TYPE_F64       TYPE_NAME = "f64"
+	TYPE_F128      TYPE_NAME = "f128"
+	TYPE_F256      TYPE_NAME = "f256"
 	TYPE_STRING    TYPE_NAME = "str"
 	TYPE_BOOL      TYPE_NAME = "bool"
 	TYPE_NONE      TYPE_NAME = "none"

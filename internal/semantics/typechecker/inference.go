@@ -304,8 +304,13 @@ func contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemTy
 		return types.TypeUntypedInt
 
 	case ast.FLOAT:
-		if expected.Equals(types.TypeF32) || expected.Equals(types.TypeF64) {
-			return expected
+		// Try to fit into expected float type (check precision)
+		if types.IsFloat(expected) {
+			if _, ok := types.GetPrimitiveName(expected); ok {
+				if fitsInType(lit.Value, expected) {
+					return expected
+				}
+			}
 		}
 		// Can't contextualize - stay untyped for better error messages
 		return types.TypeUntypedFloat
