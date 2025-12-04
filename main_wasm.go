@@ -23,7 +23,7 @@ func compile(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	result := compiler.Compile(compiler.Options{
+	result := compiler.Compile(&compiler.Options{
 		Code:      args[0].String(),
 		Debug:     args[1].Bool(),
 		LogFormat: compiler.HTML,

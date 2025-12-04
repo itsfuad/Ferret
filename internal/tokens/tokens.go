@@ -155,6 +155,7 @@ func IsKeyword(token string) bool {
 	return false
 }
 
+// Todo: improve number detection
 func IsNumber(token string) bool {
 	if len(token) == 0 {
 		return false
