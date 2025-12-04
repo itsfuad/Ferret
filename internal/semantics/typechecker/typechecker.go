@@ -375,10 +375,8 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion may lose precision")
 		}
 
-	
-
 		ctx.Diagnostics.Add(
-			diag.WithHelp(fmt.Sprintf("use an explicit cast: as %s", leftType.String())),
+			diag.WithHelp(fmt.Sprintf("use an explicit cast: %s as %s", rightNode.Loc().GetText(), leftType.String())),
 		)
 
 	case Incompatible:

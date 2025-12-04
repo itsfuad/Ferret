@@ -1,10 +1,8 @@
 package diagnostics
 
 import (
-	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 
@@ -38,7 +36,9 @@ func (sc *SourceCache) AddSource(filepath, content string) {
 	sc.mu.Unlock()
 }
 
-// GetLine retrieves a specific line from a source file
+// GetLine retrieves a specific line from a source file.
+// Uses source.GetSourceLinesRange for efficient reading when file is not cached.
+// For files with multiple errors, the entire file is cached after first access.
 func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 	sc.mu.RLock()
 	lines, ok := sc.files[filepath]
@@ -51,18 +51,10 @@ func (sc *SourceCache) GetLine(filepath string, line int) (string, error) {
 		return "", fmt.Errorf("line %d out of range", line)
 	}
 
-	file, err := os.Open(filepath)
+	// Use the optimized range reading from source package
+	// Read entire file and cache it (diagnostics often need multiple lines)
+	lines, err := source.GetSourceLines(filepath)
 	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	lines = make([]string, 0)
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
 		return "", err
 	}
 
