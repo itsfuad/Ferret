@@ -56,9 +56,11 @@ type Point struct {
     .y: f64,
 };
 
-let p := { .x = 3.0, .y = 4.0 } as Point;
+let p := { .x = 3.0, .p = 1.2 } as Point;
 
 let pp : i32 = p.x;
+
+let valueFromLiteral : i8 = { .x = 5.0, .y = 10.0 }.z;
 
 // should work
 fn (p: Point) move(dx: f64, dy: f64) -> Point {
@@ -70,3 +72,5 @@ fn (p: Point) move(dx: f64, dy: f64) -> Point {
 fn (p: struct{.x: f64, .y: f64}) magnitude() -> f64 {
     return p.x * p.x + p.y * p.s;
 }
+
+let newPoint : i32 = p.move(1, 2);

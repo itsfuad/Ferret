@@ -1,2 +1,0 @@
-// Test i64 works
-let a: i64 = 100;

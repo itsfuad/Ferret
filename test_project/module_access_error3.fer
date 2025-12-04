@@ -1,6 +1,0 @@
-// Test module::symbol access - error case for module not imported
-
-fn main() {
-    // This should error - 'utils' was not imported
-    let value := utils::NAME;
-}

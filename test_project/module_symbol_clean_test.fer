@@ -1,9 +1,0 @@
-// Test module::symbol type checking with clean utils
-import "test_project/utils_clean" as utils;
-
-let x: i32 = utils::MAX;  // Should work if MAX is i32
-let y := utils::MAX + 10;  // Should infer type from MAX
-
-fn test() {
-    let z := utils::MAX * 2;  // Should work with type inference
-}

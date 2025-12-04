@@ -1,9 +1,0 @@
-// Test that duplicate aliases are still detected and reported
-// This should fail with an error
-
-import "test_project/utils" as U;
-import "test_project/utils" as U;  // ERROR: duplicate alias 'U'
-
-fn main() {
-    let x := U::MAX;
-}

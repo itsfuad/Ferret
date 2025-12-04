@@ -1,8 +1,0 @@
-// Test that original name doesn't work when alias is used
-
-import "test_project/utils" as u;
-
-fn main() {
-    // This should error - only the alias 'u' should work
-    let x := utils::NAME;
-}

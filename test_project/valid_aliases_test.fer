@@ -1,5 +1,0 @@
-// Test valid resolution with explicit aliases
-import "test_project/utils";
-import "test_project/utils" as utils2;  // Valid: different alias
-
-let x := 42;

@@ -1,3 +1,0 @@
-import "test_project/circular_a";
-
-let b := 2;

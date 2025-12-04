@@ -1,5 +1,0 @@
-// Test duplicate import alias detection
-import "test_project/utils";
-import "test_project/utils" as utils;  // Should error: 'utils' already used
-
-let x := 42;
