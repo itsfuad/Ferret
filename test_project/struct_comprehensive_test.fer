@@ -1,0 +1,38 @@
+// Comprehensive test of struct literals, field access, and method calls
+
+type Point struct {
+    .x: f64,
+    .y: f64
+};
+
+// Method that accesses fields
+fn (p: Point) get_x() -> f64 {
+    return p.x;
+}
+
+// Method that returns a value
+fn (p: Point) distance_from_origin() -> f64 {
+    return p.x * p.x + p.y * p.y;
+}
+
+// Method that takes parameters and returns a new struct
+fn (p: Point) add(other: Point) -> Point {
+    let result := {.x = p.x + other.x, .y = p.y + other.y} as Point;
+    return result;
+}
+
+// Create some points
+let p1: Point = {.x = 3.0, .y = 4.0} as Point;
+let p2 := {.x = 1.0, .y = 2.0} as Point;
+
+// Field access
+let x_coord := p1.x;
+let y_coord := p1.y;
+
+// Method calls
+let x_val := p1.get_x();
+let dist := p1.distance_from_origin();
+
+// Method with parameters
+let p3 := p1.add(p2);
+let sum_x := p3.x;

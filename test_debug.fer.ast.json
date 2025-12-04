@@ -1,0 +1,537 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Name": {
+        "Name": "Point",
+        "Start": {
+          "Line": 1,
+          "Column": 6,
+          "Index": 5
+        },
+        "End": {
+          "Line": 1,
+          "Column": 11,
+          "Index": 10
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+      },
+      "Type": {
+        "Fields": [
+          {
+            "Name": {
+              "Name": "x",
+              "Start": {
+                "Line": 2,
+                "Column": 6,
+                "Index": 25
+              },
+              "End": {
+                "Line": 2,
+                "Column": 7,
+                "Index": 26
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Type": {
+              "Name": "f64",
+              "Start": {
+                "Line": 2,
+                "Column": 9,
+                "Index": 28
+              },
+              "End": {
+                "Line": 2,
+                "Column": 12,
+                "Index": 31
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null,
+            "Filename": null
+          },
+          {
+            "Name": {
+              "Name": "y",
+              "Start": {
+                "Line": 3,
+                "Column": 6,
+                "Index": 38
+              },
+              "End": {
+                "Line": 3,
+                "Column": 7,
+                "Index": 39
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Type": {
+              "Name": "f64",
+              "Start": {
+                "Line": 3,
+                "Column": 9,
+                "Index": 41
+              },
+              "End": {
+                "Line": 3,
+                "Column": 12,
+                "Index": 44
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null,
+            "Filename": null
+          }
+        ],
+        "Start": {
+          "Line": 1,
+          "Column": 12,
+          "Index": 11
+        },
+        "End": {
+          "Line": 4,
+          "Column": 2,
+          "Index": 47
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+      },
+      "Start": {
+        "Line": 1,
+        "Column": 1,
+        "Index": 0
+      },
+      "End": {
+        "Line": 4,
+        "Column": 2,
+        "Index": 47
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "p",
+            "Start": {
+              "Line": 6,
+              "Column": 5,
+              "Index": 54
+            },
+            "End": {
+              "Line": 6,
+              "Column": 6,
+              "Index": 55
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Type": null,
+              "Elts": [
+                {
+                  "Key": {
+                    "Name": "x",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 13,
+                      "Index": 62
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 14,
+                      "Index": 63
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "3.0",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 17,
+                      "Index": 66
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 20,
+                      "Index": 69
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+                  },
+                  "Start": {
+                    "Line": 6,
+                    "Column": 13,
+                    "Index": 62
+                  },
+                  "End": {
+                    "Line": 6,
+                    "Column": 20,
+                    "Index": 69
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+                },
+                {
+                  "Key": {
+                    "Name": "y",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 23,
+                      "Index": 72
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 24,
+                      "Index": 73
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "4.0",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 27,
+                      "Index": 76
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 30,
+                      "Index": 79
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+                  },
+                  "Start": {
+                    "Line": 6,
+                    "Column": 23,
+                    "Index": 72
+                  },
+                  "End": {
+                    "Line": 6,
+                    "Column": 30,
+                    "Index": 79
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+                }
+              ],
+              "Start": {
+                "Line": 6,
+                "Column": 10,
+                "Index": 59
+              },
+              "End": {
+                "Line": 6,
+                "Column": 32,
+                "Index": 81
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Type": {
+              "Name": "Point",
+              "Start": {
+                "Line": 6,
+                "Column": 36,
+                "Index": 85
+              },
+              "End": {
+                "Line": 6,
+                "Column": 41,
+                "Index": 90
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Start": {
+              "Line": 6,
+              "Column": 10,
+              "Index": 59
+            },
+            "End": {
+              "Line": 6,
+              "Column": 41,
+              "Index": 90
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 6,
+        "Column": 1,
+        "Index": 50
+      },
+      "End": {
+        "Line": 6,
+        "Column": 42,
+        "Index": 91
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "pp",
+            "Start": {
+              "Line": 8,
+              "Column": 5,
+              "Index": 97
+            },
+            "End": {
+              "Line": 8,
+              "Column": 7,
+              "Index": 99
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+          },
+          "Type": {
+            "Name": "f64",
+            "Start": {
+              "Line": 8,
+              "Column": 10,
+              "Index": 102
+            },
+            "End": {
+              "Line": 8,
+              "Column": 13,
+              "Index": 105
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+          },
+          "Value": {
+            "X": {
+              "Name": "p",
+              "Start": {
+                "Line": 8,
+                "Column": 16,
+                "Index": 108
+              },
+              "End": {
+                "Line": 8,
+                "Column": 17,
+                "Index": 109
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Sel": {
+              "Name": "x",
+              "Start": {
+                "Line": 8,
+                "Column": 18,
+                "Index": 110
+              },
+              "End": {
+                "Line": 8,
+                "Column": 19,
+                "Index": 111
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "Start": {
+              "Line": 8,
+              "Column": 16,
+              "Index": 108
+            },
+            "End": {
+              "Line": 8,
+              "Column": 19,
+              "Index": 111
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 8,
+        "Column": 1,
+        "Index": 93
+      },
+      "End": {
+        "Line": 8,
+        "Column": 20,
+        "Index": 112
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+    },
+    {
+      "Receiver": {
+        "Name": {
+          "Name": "pt",
+          "Start": {
+            "Line": 10,
+            "Column": 5,
+            "Index": 161
+          },
+          "End": {
+            "Line": 10,
+            "Column": 7,
+            "Index": 163
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+        },
+        "Type": {
+          "Name": "Point",
+          "Start": {
+            "Line": 10,
+            "Column": 9,
+            "Index": 165
+          },
+          "End": {
+            "Line": 10,
+            "Column": 14,
+            "Index": 170
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+        },
+        "Value": null,
+        "IsVariadic": false,
+        "Start": {
+          "Line": 10,
+          "Column": 5,
+          "Index": 161
+        },
+        "End": {
+          "Line": 10,
+          "Column": 14,
+          "Index": 170
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+      },
+      "Name": {
+        "Name": "get_x",
+        "Start": {
+          "Line": 10,
+          "Column": 16,
+          "Index": 172
+        },
+        "End": {
+          "Line": 10,
+          "Column": 21,
+          "Index": 177
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+      },
+      "Type": {
+        "Params": null,
+        "Result": {
+          "Name": "f64",
+          "Start": {
+            "Line": 10,
+            "Column": 27,
+            "Index": 183
+          },
+          "End": {
+            "Line": 10,
+            "Column": 30,
+            "Index": 186
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+        },
+        "Start": {
+          "Line": 10,
+          "Column": 1,
+          "Index": 157
+        },
+        "End": {
+          "Line": 10,
+          "Column": 30,
+          "Index": 186
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Result": {
+              "X": {
+                "Name": "pt",
+                "Start": {
+                  "Line": 11,
+                  "Column": 12,
+                  "Index": 200
+                },
+                "End": {
+                  "Line": 11,
+                  "Column": 14,
+                  "Index": 202
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+              },
+              "Sel": {
+                "Name": "x",
+                "Start": {
+                  "Line": 11,
+                  "Column": 15,
+                  "Index": 203
+                },
+                "End": {
+                  "Line": 11,
+                  "Column": 16,
+                  "Index": 204
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+              },
+              "Start": {
+                "Line": 11,
+                "Column": 12,
+                "Index": 200
+              },
+              "End": {
+                "Line": 11,
+                "Column": 16,
+                "Index": 204
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+            },
+            "IsError": false,
+            "Start": {
+              "Line": 11,
+              "Column": 5,
+              "Index": 193
+            },
+            "End": {
+              "Line": 11,
+              "Column": 16,
+              "Index": 204
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 10,
+          "Column": 31,
+          "Index": 187
+        },
+        "End": {
+          "Line": 12,
+          "Column": 2,
+          "Index": 207
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 10,
+        "Column": 1,
+        "Index": 157
+      },
+      "End": {
+        "Line": 12,
+        "Column": 2,
+        "Index": 207
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_debug.fer"
+    }
+  ],
+  "Start": null,
+  "End": null,
+  "Filename": null
+}

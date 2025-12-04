@@ -3,8 +3,8 @@ package typechecker
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/tokens"
 	"compiler/internal/semantics/table"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
 )
 
@@ -36,7 +36,7 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		return inferIndexExprType(e)
 
 	case *ast.SelectorExpr:
-		return inferSelectorExprType(e)
+		return inferSelectorExprType(ctx, mod, e)
 
 	case *ast.ScopeResolutionExpr:
 		return inferScopeResolutionExprType(ctx, mod, e)
@@ -173,9 +173,37 @@ func inferIndexExprType(expr *ast.IndexExpr) types.SemType {
 	return types.TypeUnknown
 }
 
-// inferSelectorExprType determines the type of a field access
-func inferSelectorExprType(expr *ast.SelectorExpr) types.SemType {
-	// TODO: Implement struct field type lookup
+// inferSelectorExprType determines the type of a field access or method access
+func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.SelectorExpr) types.SemType {
+	// Infer the type of the base expression (e.g., p in p.x)
+	baseType := inferExprType(ctx, mod, expr.X)
+
+	// If base type is unknown, return unknown
+	if baseType.Equals(types.TypeUnknown) {
+		return types.TypeUnknown
+	}
+
+	// Handle struct field or method access
+	if structType, ok := baseType.(*types.StructType); ok {
+		fieldName := expr.Sel.Name // First, check if it's a struct field
+		for _, field := range structType.Fields {
+			if field.Name == fieldName {
+				return field.Type
+			}
+		}
+
+		// If not a field, check if it's a method
+		// Methods are stored as "StructName.methodName" in the symbol table
+		qualifiedMethodName := structType.Name + "." + fieldName
+		if sym, ok := mod.CurrentScope.Lookup(qualifiedMethodName); ok {
+			return sym.Type
+		}
+
+		// Field/method not found - error will be reported by type checker
+		return types.TypeUnknown
+	}
+
+	// For non-struct types, return unknown (error will be reported by type checker)
 	return types.TypeUnknown
 }
 

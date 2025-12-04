@@ -4,6 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 
 	"fmt"
@@ -53,6 +54,22 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 
 		// Bind names in function body
+		if n.Body != nil {
+			resolveBlock(ctx, mod, n.Body)
+		}
+
+	case *ast.MethodDecl:
+		// switch to method scope
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
+		// Resolve receiver type (if it's a reference type)
+		if n.Receiver != nil && n.Receiver.Type != nil {
+			resolveTypeNode(ctx, mod, n.Receiver.Type)
+		}
+
+		// Bind names in method body
 		if n.Body != nil {
 			resolveBlock(ctx, mod, n.Body)
 		}
@@ -265,5 +282,70 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	} else {
 		// For now, just resolve the left side (could be enum::variant later)
 		resolveExpr(ctx, mod, e.X)
+	}
+}
+
+// resolveTypeNode resolves type references in type nodes
+func resolveTypeNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeNode ast.TypeNode) {
+	if typeNode == nil {
+		return
+	}
+
+	switch t := typeNode.(type) {
+	case *ast.ReferenceType:
+		// Resolve the type name
+		if ident, ok := t.Base.(*ast.IdentifierExpr); ok {
+			// Look up the type in the current scope
+			sym, found := mod.CurrentScope.Lookup(ident.Name)
+			if !found {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("undefined type '%s'", ident.Name)).
+						WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' not declared", ident.Name)),
+				)
+			} else if sym.Kind != symbols.SymbolType {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("'%s' is not a type", ident.Name)).
+						WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is a %v", ident.Name, sym.Kind)),
+				)
+			}
+		}
+
+	case *ast.ArrayType:
+		// Resolve element type
+		resolveTypeNode(ctx, mod, t.ElType)
+
+	case *ast.OptionalType:
+		// Resolve inner type
+		resolveTypeNode(ctx, mod, t.Base)
+
+	case *ast.ResultType:
+		// Resolve value and error types
+		resolveTypeNode(ctx, mod, t.Value)
+		resolveTypeNode(ctx, mod, t.Error)
+
+	case *ast.MapType:
+		// Resolve key and value types
+		resolveTypeNode(ctx, mod, t.Key)
+		resolveTypeNode(ctx, mod, t.Value)
+
+	case *ast.StructType:
+		// Resolve field types
+		for i := range t.Fields {
+			resolveTypeNode(ctx, mod, t.Fields[i].Type)
+		}
+
+	case *ast.FuncType:
+		// Resolve parameter types
+		for i := range t.Params {
+			resolveTypeNode(ctx, mod, t.Params[i].Type)
+		}
+		// Resolve return type
+		if t.Result != nil {
+			resolveTypeNode(ctx, mod, t.Result)
+		}
+
+	// Other type nodes don't need resolution (primitives, etc.)
+	default:
+		// Nothing to resolve
 	}
 }

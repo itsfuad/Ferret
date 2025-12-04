@@ -42,11 +42,31 @@ let hex_val: i128 = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 let sixTeefour : i64 = 64;
 let another : i32 = sixTeefour;
 
-fn printf(fmt: str, args:... interface{}) {
+// fn printf(fmt: str, args:... interface{}) {
 
+// }
+
+// printf();
+// printf("no args");
+// printf("one arg: {}", 42);
+// printf("multiple args: {}, {}, {}", 1, "two", 3.0);
+
+type Point struct {
+    .x: f64,
+    .y: f64,
+};
+
+let p := { .x = 3.0, .y = 4.0 } as Point;
+
+let pp : i32 = p.x;
+
+// should work
+fn (p: Point) move(dx: f64, dy: f64) -> Point {
+    let new_point := { .x = p.x + dx, .y = p.y + dy } as Point;
+    return new_point;
 }
 
-printf();
-printf("no args");
-printf("one arg: {}", 42);
-printf("multiple args: {}, {}, {}", 1, "two", 3.0);
+// Method on anonymous struct (should error)
+fn (p: struct{.x: f64, .y: f64}) magnitude() -> f64 {
+    return p.x * p.x + p.y * p.s;
+}

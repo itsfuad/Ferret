@@ -1,0 +1,6 @@
+// Test error case: methods on anonymous structs should fail
+
+// This should fail - cannot define methods on anonymous struct
+fn (p: struct{.x: i32, .y: i32}) invalid_method() -> i32 {
+    return p.x + p.y;
+}

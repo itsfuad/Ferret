@@ -88,6 +88,7 @@ func (f *Field) Loc() *source.Location { return &f.Location }
 // StructType represents a struct type definition
 type StructType struct {
 	Fields []Field
+	ID     string // Unique ID for anonymous structs (e.g., in method receivers)
 	source.Location
 }
 

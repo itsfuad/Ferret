@@ -41,6 +41,10 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		checkVarDecl(ctx, mod, n, true)
 	case *ast.FuncDecl:
 		checkFuncDecl(ctx, mod, n)
+	case *ast.MethodDecl:
+		checkMethodDecl(ctx, mod, n)
+	case *ast.TypeDecl:
+		checkTypeDecl(ctx, mod, n)
 	case *ast.AssignStmt:
 		checkAssignStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
@@ -237,6 +241,133 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 		// Analyze return paths
 		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
 	}
+}
+
+// checkMethodDecl type checks a method declaration with receiver
+func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+	// Safety check: Scope should be set during collection phase
+	if decl.Scope == nil {
+		ctx.ReportError(fmt.Sprintf("internal error: method '%s' has nil scope", decl.Name.Name), decl.Loc())
+		return
+	}
+
+	methodScope := decl.Scope.(*table.SymbolTable)
+
+	// Get receiver type
+	if decl.Receiver == nil || decl.Receiver.Type == nil {
+		// Error already reported in collector
+	} else {
+		receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+
+		// Validate receiver type is a named struct (not anonymous or primitive)
+		structType, ok := receiverType.(*types.StructType)
+		if !ok {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("method receiver must be a struct type").
+					WithCode("T-METHOD-RECEIVER").
+					WithPrimaryLabel(decl.Receiver.Loc(), fmt.Sprintf("type %s is not a struct", receiverType.String())),
+			)
+		} else if structType.Name != "" {
+			// Only update symbol for valid named struct methods
+			// (anonymous struct error already reported in collector)
+			// Update the method symbol's type with actual function signature
+			// Method name is qualified as ReceiverType.methodName
+			qualifiedName := structType.Name + "." + decl.Name.Name
+			if decl.Type != nil {
+				funcType := typeFromTypeNode(decl.Type).(*types.FunctionType)
+				if sym, ok := mod.CurrentScope.Lookup(qualifiedName); ok {
+					sym.Type = funcType
+				}
+			}
+		}
+	}
+
+	// Enter method scope for the entire method processing (even for invalid methods)
+	defer mod.EnterScope(methodScope)()
+
+	// Set expected return type for validation
+	var expectedReturnType types.SemType = types.TypeVoid
+	if decl.Type != nil && decl.Type.Result != nil {
+		expectedReturnType = typeFromTypeNode(decl.Type.Result)
+	}
+	oldReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = expectedReturnType
+	defer func() {
+		mod.CurrentFunctionReturnType = oldReturnType
+	}()
+
+	// Add receiver to method scope as a parameter (even for invalid methods, to allow body analysis)
+	if decl.Receiver != nil && decl.Receiver.Name != nil {
+		receiverSym, ok := methodScope.GetSymbol(decl.Receiver.Name.Name)
+		if ok && decl.Receiver.Type != nil {
+			receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+			receiverSym.Type = receiverType
+		}
+	}
+
+	// Add parameters to the method scope with type information
+	if decl.Type != nil && decl.Type.Params != nil {
+		for _, param := range decl.Type.Params {
+			if param.Name != nil {
+				paramType := typeFromTypeNode(param.Type)
+				psym, ok := methodScope.GetSymbol(param.Name.Name)
+				if !ok {
+					continue
+				}
+				psym.Type = paramType
+			}
+		}
+	}
+
+	// Check the body with the method scope
+	if decl.Body != nil {
+		checkBlock(ctx, mod, decl.Body)
+
+		// Build control flow graph for the method
+		// We'll wrap the method in a FuncDecl for CFG analysis
+		// Create a temporary FuncDecl for CFG construction
+		tempFuncDecl := &ast.FuncDecl{
+			Name:     decl.Name,
+			Type:     decl.Type,
+			Body:     decl.Body,
+			Scope:    decl.Scope,
+			Location: decl.Location,
+		}
+
+		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
+		cfg := cfgBuilder.BuildFunctionCFG(tempFuncDecl)
+
+		// Analyze return paths
+		controlflow.AnalyzeReturns(ctx, mod, tempFuncDecl, cfg)
+	}
+}
+
+// checkTypeDecl fills in the type for user-defined type declarations
+func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.TypeDecl) {
+	if decl.Name == nil || decl.Type == nil {
+		return
+	}
+
+	typeName := decl.Name.Name
+
+	// Look up the type symbol (created during collection)
+	sym, ok := mod.CurrentScope.Lookup(typeName)
+	if !ok {
+		// Symbol should exist from collection phase
+		ctx.ReportError(fmt.Sprintf("internal error: type symbol '%s' not found", typeName), decl.Loc())
+		return
+	}
+
+	// Convert the AST type node to a semantic type
+	semType := typeFromTypeNodeWithContext(ctx, mod, decl.Type)
+
+	// For struct types, set the name (they're anonymous in AST but named via typedef)
+	if structType, ok := semType.(*types.StructType); ok {
+		structType.Name = typeName
+	}
+
+	// Update the symbol's type
+	sym.Type = semType
 }
 
 // checkAssignStmt type checks an assignment statement
@@ -512,6 +643,82 @@ func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.Sem
 	}
 
 	return true
+}
+
+// typeFromTypeNodeWithContext resolves type nodes including user-defined types by looking them up in the symbol table
+func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeNode ast.TypeNode) types.SemType {
+	if typeNode == nil {
+		return types.TypeUnknown
+	}
+
+	switch t := typeNode.(type) {
+	case *ast.IdentifierExpr:
+		// Try to look up user-defined type in symbol table first
+		sym, ok := mod.CurrentScope.Lookup(t.Name)
+		if ok && sym.Kind == symbols.SymbolType {
+			// Return the resolved user-defined type
+			return sym.Type
+		}
+
+		// Not a user-defined type, check if it's a primitive type
+		primitiveType := types.FromTypeName(types.TYPE_NAME(t.Name))
+		if !primitiveType.Equals(types.TypeUnknown) {
+			return primitiveType
+		}
+
+		// Type not found
+		return types.TypeUnknown
+
+	case *ast.ArrayType:
+		// Array type: [N]T or []T
+		elementType := typeFromTypeNodeWithContext(ctx, mod, t.ElType)
+		length := -1
+		if t.Len != nil {
+			// TODO: keep all array dynamic now
+		}
+		return types.NewArray(elementType, length)
+
+	case *ast.OptionalType:
+		// Optional type: T?
+		innerType := typeFromTypeNodeWithContext(ctx, mod, t.Base)
+		return types.NewOptional(innerType)
+
+	case *ast.ResultType:
+		// Result type: T ! E
+		okType := typeFromTypeNodeWithContext(ctx, mod, t.Value)
+		errType := typeFromTypeNodeWithContext(ctx, mod, t.Error)
+		return types.NewResult(okType, errType)
+
+	case *ast.StructType:
+		// Anonymous struct
+		fields := make([]types.StructField, len(t.Fields))
+		for i, f := range t.Fields {
+			fieldName := ""
+			if f.Name != nil {
+				fieldName = f.Name.Name
+			}
+			fields[i] = types.StructField{
+				Name: fieldName,
+				Type: typeFromTypeNodeWithContext(ctx, mod, f.Type),
+			}
+		}
+		return types.NewStruct("", fields)
+
+	case *ast.FuncType:
+		// Function type: fn(T1, T2) -> R
+		params := make([]types.ParamType, len(t.Params))
+		for i, param := range t.Params {
+			params[i].Name = param.Name.Name
+			params[i].Type = typeFromTypeNodeWithContext(ctx, mod, param.Type)
+			params[i].IsVariadic = param.IsVariadic
+		}
+		returnType := typeFromTypeNodeWithContext(ctx, mod, t.Result)
+		return types.NewFunction(params, returnType)
+
+	default:
+		// Fallback to simple version
+		return typeFromTypeNode(typeNode)
+	}
 }
 
 // typeFromTypeNode converts AST type nodes to semantic types

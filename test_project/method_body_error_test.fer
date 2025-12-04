@@ -1,0 +1,8 @@
+// Test that method body is still analyzed even for invalid methods
+
+// This should fail - cannot define methods on anonymous struct
+fn (p: struct{.x: i32, .y: i32}) invalid_method() -> i32 {
+    let z: str = 42; // Type error inside the method
+    let undefined_var := some_undefined_function(); // Undefined function
+    return p.x + p.y; // This should work since p is in scope
+}

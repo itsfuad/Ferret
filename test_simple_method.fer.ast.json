@@ -1,0 +1,524 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Name": {
+        "Name": "Point",
+        "Start": {
+          "Line": 1,
+          "Column": 6,
+          "Index": 5
+        },
+        "End": {
+          "Line": 1,
+          "Column": 11,
+          "Index": 10
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+      },
+      "Type": {
+        "Fields": [
+          {
+            "Name": {
+              "Name": "x",
+              "Start": {
+                "Line": 2,
+                "Column": 6,
+                "Index": 25
+              },
+              "End": {
+                "Line": 2,
+                "Column": 7,
+                "Index": 26
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Type": {
+              "Name": "f64",
+              "Start": {
+                "Line": 2,
+                "Column": 9,
+                "Index": 28
+              },
+              "End": {
+                "Line": 2,
+                "Column": 12,
+                "Index": 31
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null,
+            "Filename": null
+          },
+          {
+            "Name": {
+              "Name": "y",
+              "Start": {
+                "Line": 3,
+                "Column": 6,
+                "Index": 38
+              },
+              "End": {
+                "Line": 3,
+                "Column": 7,
+                "Index": 39
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Type": {
+              "Name": "f64",
+              "Start": {
+                "Line": 3,
+                "Column": 9,
+                "Index": 41
+              },
+              "End": {
+                "Line": 3,
+                "Column": 12,
+                "Index": 44
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null,
+            "Filename": null
+          }
+        ],
+        "Start": {
+          "Line": 1,
+          "Column": 12,
+          "Index": 11
+        },
+        "End": {
+          "Line": 4,
+          "Column": 2,
+          "Index": 47
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+      },
+      "Start": {
+        "Line": 1,
+        "Column": 1,
+        "Index": 0
+      },
+      "End": {
+        "Line": 4,
+        "Column": 2,
+        "Index": 47
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "p",
+            "Start": {
+              "Line": 6,
+              "Column": 5,
+              "Index": 54
+            },
+            "End": {
+              "Line": 6,
+              "Column": 6,
+              "Index": 55
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Type": null,
+              "Elts": [
+                {
+                  "Key": {
+                    "Name": "x",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 13,
+                      "Index": 62
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 14,
+                      "Index": 63
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "3.0",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 17,
+                      "Index": 66
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 20,
+                      "Index": 69
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+                  },
+                  "Start": {
+                    "Line": 6,
+                    "Column": 13,
+                    "Index": 62
+                  },
+                  "End": {
+                    "Line": 6,
+                    "Column": 20,
+                    "Index": 69
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+                },
+                {
+                  "Key": {
+                    "Name": "y",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 23,
+                      "Index": 72
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 24,
+                      "Index": 73
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "4.0",
+                    "Start": {
+                      "Line": 6,
+                      "Column": 27,
+                      "Index": 76
+                    },
+                    "End": {
+                      "Line": 6,
+                      "Column": 30,
+                      "Index": 79
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+                  },
+                  "Start": {
+                    "Line": 6,
+                    "Column": 23,
+                    "Index": 72
+                  },
+                  "End": {
+                    "Line": 6,
+                    "Column": 30,
+                    "Index": 79
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+                }
+              ],
+              "Start": {
+                "Line": 6,
+                "Column": 10,
+                "Index": 59
+              },
+              "End": {
+                "Line": 6,
+                "Column": 32,
+                "Index": 81
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Type": {
+              "Name": "Point",
+              "Start": {
+                "Line": 6,
+                "Column": 36,
+                "Index": 85
+              },
+              "End": {
+                "Line": 6,
+                "Column": 41,
+                "Index": 90
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Start": {
+              "Line": 6,
+              "Column": 10,
+              "Index": 59
+            },
+            "End": {
+              "Line": 6,
+              "Column": 41,
+              "Index": 90
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 6,
+        "Column": 1,
+        "Index": 50
+      },
+      "End": {
+        "Line": 6,
+        "Column": 42,
+        "Index": 91
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "x_val",
+            "Start": {
+              "Line": 8,
+              "Column": 5,
+              "Index": 97
+            },
+            "End": {
+              "Line": 8,
+              "Column": 10,
+              "Index": 102
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Name": "p",
+              "Start": {
+                "Line": 8,
+                "Column": 14,
+                "Index": 106
+              },
+              "End": {
+                "Line": 8,
+                "Column": 15,
+                "Index": 107
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Sel": {
+              "Name": "x",
+              "Start": {
+                "Line": 8,
+                "Column": 16,
+                "Index": 108
+              },
+              "End": {
+                "Line": 8,
+                "Column": 17,
+                "Index": 109
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "Start": {
+              "Line": 8,
+              "Column": 14,
+              "Index": 106
+            },
+            "End": {
+              "Line": 8,
+              "Column": 17,
+              "Index": 109
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 8,
+        "Column": 1,
+        "Index": 93
+      },
+      "End": {
+        "Line": 8,
+        "Column": 18,
+        "Index": 110
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+    },
+    {
+      "Receiver": {
+        "Name": {
+          "Name": "pt",
+          "Start": {
+            "Line": 10,
+            "Column": 5,
+            "Index": 116
+          },
+          "End": {
+            "Line": 10,
+            "Column": 7,
+            "Index": 118
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+        },
+        "Type": {
+          "Name": "Point",
+          "Start": {
+            "Line": 10,
+            "Column": 9,
+            "Index": 120
+          },
+          "End": {
+            "Line": 10,
+            "Column": 14,
+            "Index": 125
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+        },
+        "Value": null,
+        "IsVariadic": false,
+        "Start": {
+          "Line": 10,
+          "Column": 5,
+          "Index": 116
+        },
+        "End": {
+          "Line": 10,
+          "Column": 14,
+          "Index": 125
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+      },
+      "Name": {
+        "Name": "get_x",
+        "Start": {
+          "Line": 10,
+          "Column": 16,
+          "Index": 127
+        },
+        "End": {
+          "Line": 10,
+          "Column": 21,
+          "Index": 132
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+      },
+      "Type": {
+        "Params": null,
+        "Result": {
+          "Name": "f64",
+          "Start": {
+            "Line": 10,
+            "Column": 27,
+            "Index": 138
+          },
+          "End": {
+            "Line": 10,
+            "Column": 30,
+            "Index": 141
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+        },
+        "Start": {
+          "Line": 10,
+          "Column": 1,
+          "Index": 112
+        },
+        "End": {
+          "Line": 10,
+          "Column": 30,
+          "Index": 141
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Result": {
+              "X": {
+                "Name": "pt",
+                "Start": {
+                  "Line": 11,
+                  "Column": 12,
+                  "Index": 155
+                },
+                "End": {
+                  "Line": 11,
+                  "Column": 14,
+                  "Index": 157
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+              },
+              "Sel": {
+                "Name": "x",
+                "Start": {
+                  "Line": 11,
+                  "Column": 15,
+                  "Index": 158
+                },
+                "End": {
+                  "Line": 11,
+                  "Column": 16,
+                  "Index": 159
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+              },
+              "Start": {
+                "Line": 11,
+                "Column": 12,
+                "Index": 155
+              },
+              "End": {
+                "Line": 11,
+                "Column": 16,
+                "Index": 159
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+            },
+            "IsError": false,
+            "Start": {
+              "Line": 11,
+              "Column": 5,
+              "Index": 148
+            },
+            "End": {
+              "Line": 11,
+              "Column": 16,
+              "Index": 159
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 10,
+          "Column": 31,
+          "Index": 142
+        },
+        "End": {
+          "Line": 12,
+          "Column": 2,
+          "Index": 162
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 10,
+        "Column": 1,
+        "Index": 112
+      },
+      "End": {
+        "Line": 12,
+        "Column": 2,
+        "Index": 162
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_simple_method.fer"
+    }
+  ],
+  "Start": null,
+  "End": null,
+  "Filename": null
+}

@@ -8,6 +8,7 @@ import (
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/types"
+	"compiler/internal/utils"
 	"compiler/internal/utils/numeric"
 	"fmt"
 )
@@ -54,6 +55,8 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		collectVarDecl(ctx, mod, n, symbols.SymbolConstant)
 	case *ast.FuncDecl:
 		collectFuncDecl(ctx, mod, n)
+	case *ast.MethodDecl:
+		collectMethodDecl(ctx, mod, n)
 	case *ast.TypeDecl:
 		collectTypeDecl(ctx, mod, n)
 	case *ast.ImportStmt:
@@ -185,6 +188,138 @@ func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 
 	// Collect function scope and body using shared helper
 	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope)
+}
+
+// collectMethodDecl handles method declarations with receivers
+func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+	if decl.Name == nil || decl.Receiver == nil {
+		return
+	}
+
+	methodName := decl.Name.Name
+	receiverType := decl.Receiver.Type
+
+	// Track if the method is invalid (but we'll still create scope for analysis)
+	isInvalid := false
+	var receiverTypeName string
+
+	// Validate receiver type is a named type (not anonymous struct)
+	if receiverType == nil {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("method receiver must have a type").
+				WithCode("C-METHOD-NO-TYPE").
+				WithPrimaryLabel(decl.Receiver.Loc(), "receiver without type"),
+		)
+		isInvalid = true
+		receiverTypeName = utils.GenerateStructLitID() // Unique ID for invalid methods
+	} else if structType, ok := receiverType.(*ast.StructType); ok {
+		// Check if receiver is an anonymous struct (struct { ... })
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("cannot define methods on anonymous struct types").
+				WithCode("C-METHOD-ANON-STRUCT").
+				WithPrimaryLabel(structType.Loc(), "anonymous struct type").
+				WithHelp("define a named type first: type MyType struct { ... }").
+				WithNote("methods can only be defined on named types"),
+		)
+		isInvalid = true
+		// Generate unique ID for this anonymous struct if it doesn't have one
+		if structType.ID == "" {
+			structType.ID = utils.GenerateStructLitID()
+		}
+		receiverTypeName = structType.ID // Use the struct's unique ID
+	} else {
+		// Get the receiver type name (for named types, it's a ReferenceType with an identifier)
+		if refType, ok := receiverType.(*ast.ReferenceType); ok {
+			if ident, ok := refType.Base.(*ast.IdentifierExpr); ok {
+				receiverTypeName = ident.Name
+			} else {
+				receiverTypeName = "<complex type>"
+			}
+		} else {
+			// For other types, we'll validate during type checking
+			receiverTypeName = "<unknown>"
+		}
+	}
+
+	// Create a qualified method name: ReceiverType.methodName
+	qualifiedName := receiverTypeName + "." + methodName
+
+	// Only register valid methods in the symbol table
+	if !isInvalid {
+		// Check for duplicate method declaration on this type
+		if existing, ok := mod.CurrentScope.GetSymbol(qualifiedName); ok {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("redeclaration of method '%s' on type '%s'", methodName, receiverTypeName)).
+					WithCode("C-REDEC-METHOD").
+					WithPrimaryLabel(decl.Loc(), fmt.Sprintf("method '%s' already declared", methodName)).
+					WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here"),
+			)
+			isInvalid = true // Don't register duplicate methods
+		}
+	}
+
+	if !isInvalid {
+		// Create symbol for the method (type will be filled during type checking)
+		sym := &symbols.Symbol{
+			Name:     qualifiedName,
+			Kind:     symbols.SymbolFunction,                                 // Methods are functions with receivers
+			Type:     types.NewFunction([]types.ParamType{}, types.TypeVoid), // Placeholder
+			Exported: isExported(methodName),
+			Decl:     decl,
+		}
+
+		mod.CurrentScope.Declare(qualifiedName, sym)
+	}
+
+	// Collect method scope and body
+	// For methods, we need to add the receiver parameter first
+	// Create new scope with current scope as parent
+	methodScope := table.NewSymbolTable(mod.CurrentScope)
+	decl.Scope = methodScope
+
+	// Enter method scope
+	defer mod.EnterScope(methodScope)()
+
+	// Add receiver as a parameter in the method scope
+	if decl.Receiver.Name != nil {
+		receiverSym := &symbols.Symbol{
+			Name: decl.Receiver.Name.Name,
+			Kind: symbols.SymbolParameter,
+			Decl: decl.Receiver,
+			Type: types.TypeUnknown, // Will be filled during type checking
+		}
+		methodScope.Declare(decl.Receiver.Name.Name, receiverSym)
+	}
+
+	// Now collect parameters and body using the method scope
+	if decl.Type != nil && decl.Type.Params != nil {
+		validateParams(ctx, mod, decl.Type.Params)
+
+		// Declare parameters in method scope
+		for _, param := range decl.Type.Params {
+			psym := &symbols.Symbol{
+				Name: param.Name.Name,
+				Kind: symbols.SymbolParameter,
+				Decl: &param,
+				Type: types.TypeUnknown, // Will be filled during type checking
+			}
+
+			err := methodScope.Declare(param.Name.Name, psym)
+			if err != nil {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("duplicate parameter '%s'", param.Name.Name)).
+						WithPrimaryLabel(param.Loc(), "parameter already declared"),
+				)
+			}
+		}
+	}
+
+	// Collect local variables and nested declarations in method body
+	if decl.Body != nil {
+		for _, n := range decl.Body.Nodes {
+			collectNode(ctx, mod, n)
+		}
+	}
 }
 
 // validateParams validates function parameters including variadic rules, duplicates, and type annotations

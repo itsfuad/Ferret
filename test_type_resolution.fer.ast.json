@@ -1,0 +1,526 @@
+{
+  "FullPath": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer",
+  "ImportPath": "",
+  "Alias": "",
+  "Nodes": [
+    {
+      "Name": {
+        "Name": "Point",
+        "Start": {
+          "Line": 1,
+          "Column": 6,
+          "Index": 5
+        },
+        "End": {
+          "Line": 1,
+          "Column": 11,
+          "Index": 10
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+      },
+      "Type": {
+        "Fields": [
+          {
+            "Name": {
+              "Name": "x",
+              "Start": {
+                "Line": 2,
+                "Column": 6,
+                "Index": 25
+              },
+              "End": {
+                "Line": 2,
+                "Column": 7,
+                "Index": 26
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Type": {
+              "Name": "f64",
+              "Start": {
+                "Line": 2,
+                "Column": 9,
+                "Index": 28
+              },
+              "End": {
+                "Line": 2,
+                "Column": 12,
+                "Index": 31
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null,
+            "Filename": null
+          },
+          {
+            "Name": {
+              "Name": "y",
+              "Start": {
+                "Line": 3,
+                "Column": 6,
+                "Index": 38
+              },
+              "End": {
+                "Line": 3,
+                "Column": 7,
+                "Index": 39
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Type": {
+              "Name": "f64",
+              "Start": {
+                "Line": 3,
+                "Column": 9,
+                "Index": 41
+              },
+              "End": {
+                "Line": 3,
+                "Column": 12,
+                "Index": 44
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": null,
+            "End": null,
+            "Filename": null
+          }
+        ],
+        "Start": {
+          "Line": 1,
+          "Column": 12,
+          "Index": 11
+        },
+        "End": {
+          "Line": 4,
+          "Column": 2,
+          "Index": 47
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+      },
+      "Start": {
+        "Line": 1,
+        "Column": 1,
+        "Index": 0
+      },
+      "End": {
+        "Line": 4,
+        "Column": 2,
+        "Index": 47
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "p1",
+            "Start": {
+              "Line": 7,
+              "Column": 5,
+              "Index": 81
+            },
+            "End": {
+              "Line": 7,
+              "Column": 7,
+              "Index": 83
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Type": null,
+              "Elts": [
+                {
+                  "Key": {
+                    "Name": "x",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 13,
+                      "Index": 89
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 14,
+                      "Index": 90
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "3.0",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 17,
+                      "Index": 93
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 20,
+                      "Index": 96
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Start": {
+                    "Line": 7,
+                    "Column": 13,
+                    "Index": 89
+                  },
+                  "End": {
+                    "Line": 7,
+                    "Column": 20,
+                    "Index": 96
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                },
+                {
+                  "Key": {
+                    "Name": "y",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 23,
+                      "Index": 99
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 24,
+                      "Index": 100
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "4.0",
+                    "Start": {
+                      "Line": 7,
+                      "Column": 27,
+                      "Index": 103
+                    },
+                    "End": {
+                      "Line": 7,
+                      "Column": 30,
+                      "Index": 106
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Start": {
+                    "Line": 7,
+                    "Column": 23,
+                    "Index": 99
+                  },
+                  "End": {
+                    "Line": 7,
+                    "Column": 30,
+                    "Index": 106
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                }
+              ],
+              "Start": {
+                "Line": 7,
+                "Column": 11,
+                "Index": 87
+              },
+              "End": {
+                "Line": 7,
+                "Column": 31,
+                "Index": 107
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Type": {
+              "Name": "Point",
+              "Start": {
+                "Line": 7,
+                "Column": 35,
+                "Index": 111
+              },
+              "End": {
+                "Line": 7,
+                "Column": 40,
+                "Index": 116
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Start": {
+              "Line": 7,
+              "Column": 11,
+              "Index": 87
+            },
+            "End": {
+              "Line": 7,
+              "Column": 40,
+              "Index": 116
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 7,
+        "Column": 1,
+        "Index": 77
+      },
+      "End": {
+        "Line": 7,
+        "Column": 41,
+        "Index": 117
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "x",
+            "Start": {
+              "Line": 8,
+              "Column": 5,
+              "Index": 122
+            },
+            "End": {
+              "Line": 8,
+              "Column": 6,
+              "Index": 123
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          },
+          "Type": null,
+          "Value": {
+            "X": {
+              "Name": "p1",
+              "Start": {
+                "Line": 8,
+                "Column": 10,
+                "Index": 127
+              },
+              "End": {
+                "Line": 8,
+                "Column": 12,
+                "Index": 129
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Sel": {
+              "Name": "x",
+              "Start": {
+                "Line": 8,
+                "Column": 13,
+                "Index": 130
+              },
+              "End": {
+                "Line": 8,
+                "Column": 14,
+                "Index": 131
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Start": {
+              "Line": 8,
+              "Column": 10,
+              "Index": 127
+            },
+            "End": {
+              "Line": 8,
+              "Column": 14,
+              "Index": 131
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 8,
+        "Column": 1,
+        "Index": 118
+      },
+      "End": {
+        "Line": 8,
+        "Column": 15,
+        "Index": 132
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "p2",
+            "Start": {
+              "Line": 11,
+              "Column": 5,
+              "Index": 161
+            },
+            "End": {
+              "Line": 11,
+              "Column": 7,
+              "Index": 163
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          },
+          "Type": {
+            "Name": "Point",
+            "Start": {
+              "Line": 11,
+              "Column": 9,
+              "Index": 165
+            },
+            "End": {
+              "Line": 11,
+              "Column": 14,
+              "Index": 170
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          },
+          "Value": {
+            "X": {
+              "Type": null,
+              "Elts": [
+                {
+                  "Key": {
+                    "Name": "x",
+                    "Start": {
+                      "Line": 11,
+                      "Column": 19,
+                      "Index": 175
+                    },
+                    "End": {
+                      "Line": 11,
+                      "Column": 20,
+                      "Index": 176
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "1.0",
+                    "Start": {
+                      "Line": 11,
+                      "Column": 23,
+                      "Index": 179
+                    },
+                    "End": {
+                      "Line": 11,
+                      "Column": 26,
+                      "Index": 182
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Start": {
+                    "Line": 11,
+                    "Column": 19,
+                    "Index": 175
+                  },
+                  "End": {
+                    "Line": 11,
+                    "Column": 26,
+                    "Index": 182
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                },
+                {
+                  "Key": {
+                    "Name": "y",
+                    "Start": {
+                      "Line": 11,
+                      "Column": 29,
+                      "Index": 185
+                    },
+                    "End": {
+                      "Line": 11,
+                      "Column": 30,
+                      "Index": 186
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Value": {
+                    "Kind": 1,
+                    "Value": "2.0",
+                    "Start": {
+                      "Line": 11,
+                      "Column": 33,
+                      "Index": 189
+                    },
+                    "End": {
+                      "Line": 11,
+                      "Column": 36,
+                      "Index": 192
+                    },
+                    "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                  },
+                  "Start": {
+                    "Line": 11,
+                    "Column": 29,
+                    "Index": 185
+                  },
+                  "End": {
+                    "Line": 11,
+                    "Column": 36,
+                    "Index": 192
+                  },
+                  "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+                }
+              ],
+              "Start": {
+                "Line": 11,
+                "Column": 17,
+                "Index": 173
+              },
+              "End": {
+                "Line": 11,
+                "Column": 37,
+                "Index": 193
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Type": {
+              "Name": "Point",
+              "Start": {
+                "Line": 11,
+                "Column": 41,
+                "Index": 197
+              },
+              "End": {
+                "Line": 11,
+                "Column": 46,
+                "Index": 202
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+            },
+            "Start": {
+              "Line": 11,
+              "Column": 17,
+              "Index": 173
+            },
+            "End": {
+              "Line": 11,
+              "Column": 46,
+              "Index": 202
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 11,
+        "Column": 1,
+        "Index": 157
+      },
+      "End": {
+        "Line": 11,
+        "Column": 47,
+        "Index": 203
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/test_type_resolution.fer"
+    }
+  ],
+  "Start": null,
+  "End": null,
+  "Filename": null
+}
