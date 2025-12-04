@@ -13,6 +13,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/phase"
 	"compiler/internal/semantics/collector"
 	"compiler/internal/semantics/resolver"
 	"compiler/internal/semantics/table"
@@ -127,7 +128,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 			FilePath:     "",
 			ImportPath:   importPath,
 			Type:         context_v2.ModuleLocal,
-			Phase:        context_v2.PhaseNotStarted,
+			Phase:        phase.PhaseNotStarted,
 			ModuleScope:  modScope,
 			CurrentScope: modScope,
 			Content:      "",
@@ -185,7 +186,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 	tokenizer := lexer.New(filePath, content, p.ctx.Diagnostics)
 	tokens := tokenizer.Tokenize(false)
 
-	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseLexed) {
+	if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseLexed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", importPath), nil)
 		return
 	}
@@ -201,7 +202,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 		astModule.SaveAST()
 	}
 
-	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseParsed) {
+	if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseParsed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
 		return
 	}
@@ -311,13 +312,13 @@ func (p *Pipeline) runCollectorPhase() error {
 		}
 
 		// Check if module is at least parsed
-		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseParsed {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseParsed {
 			continue
 		}
 
 		collector.CollectModule(p.ctx, module)
 
-		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseCollected) {
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCollected) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCollected", importPath), nil)
 		}
 
@@ -338,13 +339,13 @@ func (p *Pipeline) runResolverPhase() error {
 		}
 
 		// Check if module is at least collected
-		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseCollected {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseCollected {
 			continue
 		}
 
 		resolver.ResolveModule(p.ctx, module)
 
-		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseResolved) {
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseResolved) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseResolved", importPath), nil)
 		}
 
@@ -365,13 +366,13 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 		}
 
 		// Check if module is at least resolved
-		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseResolved {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseResolved {
 			continue
 		}
 
 		typechecker.CheckModule(p.ctx, module)
 
-		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseTypeChecked) {
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseTypeChecked) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseTypeChecked", importPath), nil)
 		}
 

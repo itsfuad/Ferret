@@ -317,6 +317,7 @@ type StructField struct {
 // StructType represents struct types
 type StructType struct {
 	Name   string // Can be empty for anonymous structs
+	ID     string // Unique ID for type identity (from AST or generated)
 	Fields []StructField
 }
 
@@ -348,10 +349,16 @@ func (s *StructType) isType() {}
 
 func (s *StructType) Equals(other SemType) bool {
 	if st, ok := other.(*StructType); ok {
+		// If both have IDs, compare by ID (canonical identity)
+		if s.ID != "" && st.ID != "" {
+			return s.ID == st.ID
+		}
+
 		// Named structs must have same name
 		if s.Name != "" && st.Name != "" {
 			return s.Name == st.Name
 		}
+
 		// Anonymous structs must have same structure
 		if len(s.Fields) != len(st.Fields) {
 			return false
@@ -528,6 +535,23 @@ func IsUntypedInt(t SemType) bool {
 func IsUntypedFloat(t SemType) bool {
 	if p, ok := t.(*PrimitiveType); ok {
 		return p.IsUntypedFloat()
+	}
+	return false
+}
+
+// IsNumericType checks if a type is a numeric type (integer or float)
+func IsNumericType(t SemType) bool {
+	if p, ok := t.(*PrimitiveType); ok {
+		name := p.name
+		// Check if it's a typed numeric type
+		isTypedNumeric := name == TYPE_I8 || name == TYPE_I16 || name == TYPE_I32 || name == TYPE_I64 || name == TYPE_I128 || name == TYPE_I256 ||
+			name == TYPE_U8 || name == TYPE_U16 || name == TYPE_U32 || name == TYPE_U64 || name == TYPE_U128 || name == TYPE_U256 ||
+			name == TYPE_F32 || name == TYPE_F64
+
+		// Check if it's an untyped numeric literal
+		isUntypedNumeric := name == TYPE_UNTYPED && (p.untypedKind == UntypedInt || p.untypedKind == UntypedFloat)
+
+		return isTypedNumeric || isUntypedNumeric
 	}
 	return false
 }

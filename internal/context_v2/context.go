@@ -25,68 +25,13 @@ import (
 
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/phase"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/source"
 	"compiler/internal/types"
 	"compiler/internal/utils/fs"
 )
-
-// ModulePhase tracks the compilation phase of an individual module
-//
-// Phase progression must be sequential and respect dependencies:
-// - NotStarted -> Lexed -> Parsed (currently implemented)
-// - Parsed -> Collected -> Resolved -> TypeChecked -> CodeGen (future)
-//
-// Phase transitions are validated using AdvanceModulePhase() which checks
-// that prerequisites are satisfied via the phasePrerequisites map.
-//
-// Phase prerequisites (enforced by tests in pipeline_test.go):
-// - A module at PhaseResolved requires all its imports at least PhaseParsed
-// - A module at PhaseTypeChecked requires all its imports at least PhaseResolved
-type ModulePhase int
-
-const (
-	PhaseNotStarted  ModulePhase = iota // Module discovered but not processed
-	PhaseLexed                          // Tokens generated
-	PhaseParsed                         // AST built
-	PhaseCollected                      // Symbols collected (first pass)
-	PhaseResolved                       // Imports and symbols resolved
-	PhaseTypeChecked                    // Type checking complete
-	PhaseCodeGen                        // Code generation complete
-)
-
-// phasePrerequisites maps each phase to its required predecessor phase
-// This explicit mapping is safer than arithmetic and allows for non-linear phase progressions
-var phasePrerequisites = map[ModulePhase]ModulePhase{
-	PhaseLexed:       PhaseNotStarted,
-	PhaseParsed:      PhaseLexed,
-	PhaseCollected:   PhaseParsed,
-	PhaseResolved:    PhaseCollected,
-	PhaseTypeChecked: PhaseResolved,
-	PhaseCodeGen:     PhaseTypeChecked,
-}
-
-func (p ModulePhase) String() string {
-	switch p {
-	case PhaseNotStarted:
-		return "NotStarted"
-	case PhaseLexed:
-		return "Lexed"
-	case PhaseParsed:
-		return "Parsed"
-	case PhaseCollected:
-		return "Collected"
-	case PhaseResolved:
-		return "Resolved"
-	case PhaseTypeChecked:
-		return "TypeChecked"
-	case PhaseCodeGen:
-		return "CodeGen"
-	default:
-		return "Unknown"
-	}
-}
 
 // ModuleType categorizes how a module is resolved
 type ModuleType int
@@ -123,7 +68,7 @@ type Module struct {
 	AST        *ast.Module // Parsed syntax tree
 
 	// Compilation state
-	Phase ModulePhase // Current compilation phase
+	Phase phase.ModulePhase // Current compilation phase
 
 	// Semantic data
 	ModuleScope  *table.SymbolTable // Module-level symbols
@@ -352,7 +297,7 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 	module := &Module{
 		FilePath:     virtualPath,
 		Type:         ModuleLocal,
-		Phase:        PhaseNotStarted,
+		Phase:        phase.PhaseNotStarted,
 		ModuleScope:  modScope,
 		CurrentScope: modScope,
 		Content:      code,
@@ -468,17 +413,17 @@ func (ctx *CompilerContext) HasModule(importPath string) bool {
 }
 
 // GetModulePhase returns the current phase of a module
-func (ctx *CompilerContext) GetModulePhase(importPath string) ModulePhase {
+func (ctx *CompilerContext) GetModulePhase(importPath string) phase.ModulePhase {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
 	if module, exists := ctx.Modules[importPath]; exists {
 		return module.Phase
 	}
-	return PhaseNotStarted
+	return phase.PhaseNotStarted
 }
 
 // SetModulePhase updates the phase of a module
-func (ctx *CompilerContext) SetModulePhase(importPath string, phase ModulePhase) {
+func (ctx *CompilerContext) SetModulePhase(importPath string, phase phase.ModulePhase) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
 	if module, exists := ctx.Modules[importPath]; exists {
@@ -490,7 +435,7 @@ func (ctx *CompilerContext) SetModulePhase(importPath string, phase ModulePhase)
 
 // AdvanceModulePhase advances a module to the next phase with validation
 // Returns false if the phase transition is invalid (prerequisites not met)
-func (ctx *CompilerContext) AdvanceModulePhase(importPath string, targetPhase ModulePhase) bool {
+func (ctx *CompilerContext) AdvanceModulePhase(importPath string, targetPhase phase.ModulePhase) bool {
 	if !ctx.CanProcessPhase(importPath, targetPhase) {
 		return false
 	}
@@ -500,9 +445,9 @@ func (ctx *CompilerContext) AdvanceModulePhase(importPath string, targetPhase Mo
 
 // CanProcessPhase checks if a module is ready for a specific phase
 // Uses explicit prerequisite map for safe phase transitions
-func (ctx *CompilerContext) CanProcessPhase(importPath string, requiredPhase ModulePhase) bool {
+func (ctx *CompilerContext) CanProcessPhase(importPath string, requiredPhase phase.ModulePhase) bool {
 	currentPhase := ctx.GetModulePhase(importPath)
-	prerequisite, exists := phasePrerequisites[requiredPhase]
+	prerequisite, exists := phase.PhasePrerequisites[requiredPhase]
 	if !exists {
 		// Unknown phase - cannot process
 		return false
@@ -512,7 +457,7 @@ func (ctx *CompilerContext) CanProcessPhase(importPath string, requiredPhase Mod
 
 // IsModuleParsed checks if a module has been parsed (at least)
 func (ctx *CompilerContext) IsModuleParsed(importPath string) bool {
-	return ctx.GetModulePhase(importPath) >= PhaseParsed
+	return ctx.GetModulePhase(importPath) >= phase.PhaseParsed
 }
 
 // AddDependency registers an import relationship

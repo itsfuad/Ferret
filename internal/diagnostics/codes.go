@@ -2,6 +2,9 @@ package diagnostics
 
 // Error codes for Ferret compiler
 const (
+
+	ErrMax				  = "E0010"
+
 	// Lexer errors (L prefix)
 	ErrUnexpectedCharacter = "L0001"
 	ErrUnterminatedString  = "L0002"
@@ -43,6 +46,7 @@ const (
 	ErrInvalidBreak            = "T0018"
 	ErrInvalidContinue         = "T0019"
 	ErrInvalidType 			   = "T0020"
+	ErrInvalidMethodReceiver   = "T0021"
 
 	// Module/Import errors (M prefix)
 	ErrModuleNotFound    = "M0001"

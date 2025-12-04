@@ -7,8 +7,12 @@ import (
 	"compiler/internal/semantics/controlflow"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
+	str "compiler/internal/utils/strings"
+
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -21,9 +25,21 @@ func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	mod.CurrentScope = mod.ModuleScope
 
 	// Check all declarations in the module
+	// IMPORTANT: Check type declarations FIRST so user-defined types are available
+	// for use in variable declarations, function signatures, etc.
 	if mod.AST != nil {
+		// Pass 1: Check all type declarations first
 		for _, node := range mod.AST.Nodes {
-			checkNode(ctx, mod, node)
+			if typeDecl, ok := node.(*ast.TypeDecl); ok {
+				checkTypeDecl(ctx, mod, typeDecl)
+			}
+		}
+
+		// Pass 2: Check everything else
+		for _, node := range mod.AST.Nodes {
+			if _, ok := node.(*ast.TypeDecl); !ok {
+				checkNode(ctx, mod, node)
+			}
 		}
 	}
 }
@@ -62,7 +78,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 				if compatibility == Incompatible {
 					ctx.Diagnostics.Add(
 						diagnostics.NewError("type mismatch in return statement").
-							WithCode("T0015").
+							WithCode(diagnostics.ErrTypeMismatch).
 							WithPrimaryLabel(n.Result.Loc(),
 								fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
 					)
@@ -138,7 +154,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		// Determine the type
 		if item.Type != nil {
 			// Explicit type annotation
-			declType := typeFromTypeNode(item.Type)
+			declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
 			sym.Type = declType
 
 			// Check initializer if present
@@ -206,7 +222,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	// Set expected return type for validation
 	var expectedReturnType types.SemType = types.TypeVoid
 	if decl.Type != nil && decl.Type.Result != nil {
-		expectedReturnType = typeFromTypeNode(decl.Type.Result)
+		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, decl.Type.Result)
 	}
 	oldReturnType := mod.CurrentFunctionReturnType
 	mod.CurrentFunctionReturnType = expectedReturnType
@@ -218,7 +234,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	if decl.Type != nil && decl.Type.Params != nil {
 		for _, param := range decl.Type.Params {
 			if param.Name != nil {
-				paramType := typeFromTypeNode(param.Type)
+				paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
 				// update the param type
 				psym, ok := funcScope.GetSymbol(param.Name.Name)
 				if !ok {
@@ -243,6 +259,244 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	}
 }
 
+// checkSelectorExpr validates that a field or method exists on a struct
+// checkBinaryExpr validates that operands of a binary expression have compatible types
+func checkBinaryExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.BinaryExpr, lhsType, rhsType types.SemType) {
+	// Skip if either type is unknown (error already reported)
+	if lhsType.Equals(types.TypeUnknown) || rhsType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Allow untyped operands - they will be contextualized
+	if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
+		return
+	}
+
+	// For arithmetic operators, both operands must be numeric
+	switch expr.Op.Kind {
+	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
+		lhsNumeric := types.IsNumericType(lhsType)
+		rhsNumeric := types.IsNumericType(rhsType)
+
+		if !lhsNumeric || !rhsNumeric {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '%s' operator with %s and %s", expr.Op.Value, lhsType.String(), rhsType.String())),
+			)
+			return
+		}
+
+	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
+		// Comparison operators require compatible types
+		compatibility := checkTypeCompatibility(lhsType, rhsType)
+		if compatibility == Incompatible {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: cannot compare %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "incompatible types in comparison"),
+			)
+		}
+
+	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+		// Ordering operators require numeric types
+		lhsNumeric := types.IsNumericType(lhsType)
+		rhsNumeric := types.IsNumericType(rhsType)
+
+		if !lhsNumeric || !rhsNumeric {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: cannot compare %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "ordering comparison requires numeric types"),
+			)
+		}
+
+	case tokens.AND_TOKEN, tokens.OR_TOKEN:
+		// Logical operators require bool types
+		if !lhsType.Equals(types.TypeBool) || !rhsType.Equals(types.TypeBool) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: logical operator requires bool operands, got %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "logical operators require bool types"),
+			)
+		}
+	}
+}
+
+// checkCastExpr validates that a cast expression is valid
+func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CastExpr, sourceType, targetType types.SemType) {
+	// Skip if target type is unknown
+	if targetType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Special case: casting composite literal to struct type
+	// Validate that the composite literal matches the struct type
+	if compLit, ok := expr.X.(*ast.CompositeLit); ok {
+		if structType, ok := targetType.(*types.StructType); ok {
+			checkCompositeLit(ctx, mod, compLit, structType)
+			return // Composite literal validation is sufficient
+		}
+	}
+
+	// Skip further validation if source type is unknown (error already reported)
+	if sourceType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Allow untyped literals to be cast to any compatible type
+	if types.IsUntyped(sourceType) {
+		return
+	}
+
+	// Check if cast is valid
+	compatibility := checkTypeCompatibility(sourceType, targetType)
+
+	// For struct types, check structural compatibility
+	if srcStruct, ok := sourceType.(*types.StructType); ok {
+		if dstStruct, ok := targetType.(*types.StructType); ok {
+			// Check if struct types are compatible by structure
+			if !areStructsCompatible(srcStruct, dstStruct) {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("cannot cast incompatible struct types").
+						WithCode(diagnostics.ErrTypeMismatch).
+						WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot cast from %s to %s: field mismatch", sourceType.String(), targetType.String())).
+						WithHelp("ensure the source has all required fields with matching types"),
+				)
+			}
+			return
+		}
+	}
+
+	// Allow explicit casts between numeric types
+	if types.IsNumericType(sourceType) && types.IsNumericType(targetType) {
+		return
+	}
+
+	// Otherwise, check standard compatibility
+	if compatibility == Incompatible {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+				WithCode(diagnostics.ErrInvalidCast).
+				WithPrimaryLabel(expr.Loc(), "invalid cast"),
+		)
+	}
+}
+
+// checkCompositeLit validates that a composite literal matches its target type
+func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
+	// Only validate struct literals
+	structType, ok := targetType.(*types.StructType)
+	if !ok {
+		return
+	}
+
+	// Build a map of provided fields
+	providedFields := make(map[string]bool)
+	for _, elem := range lit.Elts {
+		if kv, ok := elem.(*ast.KeyValueExpr); ok {
+			if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+				fieldName := key.Name
+				providedFields[fieldName] = true
+			}
+		}
+	}
+
+	// Check for missing required fields
+	var missingFields []string
+	for _, field := range structType.Fields {
+		if !providedFields[field.Name] {
+			missingFields = append(missingFields, field.Name)
+		}
+	}
+
+	// Only report error if there are missing fields (extra fields are allowed and will be stripped)
+	if len(missingFields) > 0 {
+		errorMsg := fmt.Sprintf("cannot convert composite literal to type '%s'", structType.Name)
+		diag := diagnostics.NewError(errorMsg).
+			WithCode(diagnostics.ErrTypeMismatch).
+			WithPrimaryLabel(lit.Loc(), "incompatible struct literal")
+
+		// Build note with missing fields list
+		noteMsg := fmt.Sprintf("missing %s (%s)", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", "))
+		diag = diag.WithNote(noteMsg)
+
+		ctx.Diagnostics.Add(diag)
+	}
+}
+
+// areStructsCompatible checks if two struct types are structurally compatible
+func areStructsCompatible(src, dst *types.StructType) bool {
+	// Check if destination has all required fields with matching types
+	for _, dstField := range dst.Fields {
+		found := false
+		for _, srcField := range src.Fields {
+			if srcField.Name == dstField.Name {
+				found = true
+				if !srcField.Type.Equals(dstField.Type) {
+					return false // Type mismatch
+				}
+				break
+			}
+		}
+		if !found {
+			return false // Missing required field
+		}
+	}
+	return true
+}
+
+func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.SelectorExpr) {
+	// Infer the base type
+	baseType := inferExprType(ctx, mod, expr.X)
+
+	// Skip validation if base type is unknown (error already reported)
+	if baseType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Only validate struct field/method access
+	structType, ok := baseType.(*types.StructType)
+	if !ok {
+		// Not a struct - could be module access or other, handled elsewhere
+		return
+	}
+
+	fieldName := expr.Sel.Name
+
+	// Check if it's a field
+	for _, field := range structType.Fields {
+		if field.Name == fieldName {
+			return // Field exists
+		}
+	}
+
+	// Check if it's a method (look in type's scope)
+	if structType.Name != "" {
+		// Look up the type symbol to get its scope
+		if typeSym, ok := mod.ModuleScope.Lookup(structType.Name); ok && typeSym.Scope != nil {
+			if _, ok := typeSym.Scope.GetSymbol(fieldName); ok {
+				return // Method exists
+			}
+		}
+	}
+
+	// Field/method not found
+	if structType.Name != "" {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("field or method '%s' not found on type '%s'", fieldName, structType.Name)).
+				WithCode(diagnostics.ErrFieldNotFound).
+				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
+		)
+	} else {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("field '%s' not found on anonymous struct", fieldName)).
+				WithCode(diagnostics.ErrFieldNotFound).
+				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
+		)
+	}
+}
+
 // checkMethodDecl type checks a method declaration with receiver
 func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
 	// Safety check: Scope should be set during collection phase
@@ -264,19 +518,17 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		if !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError("method receiver must be a struct type").
-					WithCode("T-METHOD-RECEIVER").
+					WithCode(diagnostics.ErrInvalidMethodReceiver).
 					WithPrimaryLabel(decl.Receiver.Loc(), fmt.Sprintf("type %s is not a struct", receiverType.String())),
 			)
 		} else if structType.Name != "" {
-			// Only update symbol for valid named struct methods
-			// (anonymous struct error already reported in collector)
-			// Update the method symbol's type with actual function signature
-			// Method name is qualified as ReceiverType.methodName
-			qualifiedName := structType.Name + "." + decl.Name.Name
-			if decl.Type != nil {
-				funcType := typeFromTypeNode(decl.Type).(*types.FunctionType)
-				if sym, ok := mod.CurrentScope.Lookup(qualifiedName); ok {
-					sym.Type = funcType
+			// Look up the receiver type symbol to get its method scope
+			if typeSym, ok := mod.ModuleScope.Lookup(structType.Name); ok && typeSym.Scope != nil {
+				typeScope := typeSym.Scope.(*table.SymbolTable)
+				// Update the method symbol with actual function signature
+				if methodSym, ok := typeScope.GetSymbol(decl.Name.Name); ok && decl.Type != nil {
+					funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
+					methodSym.Type = funcType
 				}
 			}
 		}
@@ -288,7 +540,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	// Set expected return type for validation
 	var expectedReturnType types.SemType = types.TypeVoid
 	if decl.Type != nil && decl.Type.Result != nil {
-		expectedReturnType = typeFromTypeNode(decl.Type.Result)
+		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, decl.Type.Result)
 	}
 	oldReturnType := mod.CurrentFunctionReturnType
 	mod.CurrentFunctionReturnType = expectedReturnType
@@ -309,7 +561,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	if decl.Type != nil && decl.Type.Params != nil {
 		for _, param := range decl.Type.Params {
 			if param.Name != nil {
-				paramType := typeFromTypeNode(param.Type)
+				paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
 				psym, ok := methodScope.GetSymbol(param.Name.Name)
 				if !ok {
 					continue
@@ -361,9 +613,13 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	// Convert the AST type node to a semantic type
 	semType := typeFromTypeNodeWithContext(ctx, mod, decl.Type)
 
-	// For struct types, set the name (they're anonymous in AST but named via typedef)
+	// For struct types, set the name and ensure ID is set
 	if structType, ok := semType.(*types.StructType); ok {
 		structType.Name = typeName
+		// If the struct doesn't have an ID yet (shouldn't happen, but be safe), use the type name
+		if structType.ID == "" {
+			structType.ID = typeName
+		}
 	}
 
 	// Update the symbol's type
@@ -423,20 +679,71 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		return types.TypeUnknown
 	}
 
-	// Special handling for call expressions - validate before inference
-	if callExpr, ok := expr.(*ast.CallExpr); ok {
-		checkCallExpr(ctx, mod, callExpr)
-		// Continue with normal type inference for return type
+	// Recursively validate subexpressions before type inference
+	switch e := expr.(type) {
+	case *ast.CallExpr:
+		checkCallExpr(ctx, mod, e)
+
+	case *ast.SelectorExpr:
+		// Validate base expression first
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkSelectorExpr(ctx, mod, e)
+
+	case *ast.BinaryExpr:
+		// Recursively check operands
+		lhsType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+		// Validate operand type compatibility
+		checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
+
+	case *ast.UnaryExpr:
+		// Recursively check operand
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+
+	case *ast.IndexExpr:
+		// Check both array and index expressions
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
+
+	case *ast.ParenExpr:
+		// Check inner expression
+		return checkExpr(ctx, mod, e.X, expected)
+
+	case *ast.CastExpr:
+		// Check expression being cast and validate cast compatibility
+		sourceType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+		checkCastExpr(ctx, mod, e, sourceType, targetType)
+
+	case *ast.CompositeLit:
+		// Check all element expressions in the composite literal
+		for _, elem := range e.Elts {
+			if kv, ok := elem.(*ast.KeyValueExpr); ok {
+				// Struct field: check the value
+				if kv.Value != nil {
+					checkExpr(ctx, mod, kv.Value, types.TypeUnknown)
+				}
+			} else {
+				// Array element: check the expression directly
+				checkExpr(ctx, mod, elem, types.TypeUnknown)
+			}
+		}
+		// Validate composite literal matches target type if specified
+		if e.Type != nil {
+			targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+			checkCompositeLit(ctx, mod, e, targetType)
+		}
 	}
 
 	// First, infer the type based on the expression structure
 	inferredType := inferExprType(ctx, mod, expr)
 
-	// Apply contextual typing
+	// Apply contextual typing for UNTYPED numeric literals only
+	// Note: Struct literals, string literals, bool literals have concrete types immediately
 	resultType := inferredType
 
-	// 1. Handle UNTYPED numeric literals
 	if types.IsUntyped(inferredType) && !expected.Equals(types.TypeUnknown) {
+		// Only numeric literals (int/float) are untyped and need contextualization
 		if lit, ok := expr.(*ast.BasicLit); ok {
 			// If expected is optional, contextualize to inner type
 			expectedForLit := expected
@@ -447,15 +754,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		}
 	}
 
-	// 2. Handle composite literals (arrays, structs) without explicit type
-	if inferredType.Equals(types.TypeUnknown) && !expected.Equals(types.TypeUnknown) {
-		if lit, ok := expr.(*ast.CompositeLit); ok && lit.Type == nil {
-			// Empty composite literal adopts expected type
-			resultType = expected
-		}
-	}
-
-	// 3. Handle optional type wrapping (T -> T?)
+	// Handle optional type wrapping (T -> T?)
 	if !expected.Equals(types.TypeUnknown) {
 		if optType, ok := expected.(*types.OptionalType); ok {
 			// If assigning non-optional to optional, check if inner types match
@@ -702,7 +1001,10 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 				Type: typeFromTypeNodeWithContext(ctx, mod, f.Type),
 			}
 		}
-		return types.NewStruct("", fields)
+		structType := types.NewStruct("", fields)
+		// Propagate the ID from AST to semantic type for identity tracking
+		structType.ID = t.ID
+		return structType
 
 	case *ast.FuncType:
 		// Function type: fn(T1, T2) -> R

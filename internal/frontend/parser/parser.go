@@ -417,7 +417,7 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		tok := p.peek()
 		p.diagnostics.Add(
 			diagnostics.NewError("too many nested unary operators (maximum 100)").
-				WithCode("P0002").
+				WithCode(diagnostics.ErrMax).
 				WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), "excessive nesting"),
 		)
 		return p.parsePostfix()
@@ -753,7 +753,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 
 		// Create a detailed error message with helpful labels
 		diag := diagnostics.NewError(fmt.Sprintf("unexpected token '%s' in expression", tok.Value)).
-			WithCode("P0001").
+			WithCode(diagnostics.ErrUnexpectedToken).
 			WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 				fmt.Sprintf("cannot use '%s' here", tok.Value))
 
@@ -910,7 +910,7 @@ func (p *Parser) error(msg string) {
 	loc := source.NewLocation(&p.filepath, &tok.Start, &tok.End)
 	p.diagnostics.Add(
 		diagnostics.NewError(msg).
-			WithCode("P0001").
+			WithCode(diagnostics.ErrUnexpectedToken).
 			WithPrimaryLabel(loc, ""),
 	)
 }

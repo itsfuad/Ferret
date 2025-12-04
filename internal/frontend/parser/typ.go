@@ -3,8 +3,9 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/tokens"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
+	"compiler/internal/utils"
 	"fmt"
 )
 
@@ -179,10 +180,15 @@ func (p *Parser) parseStructType() *ast.StructType {
 
 	end := p.expect(tokens.CLOSE_CURLY)
 
-	return &ast.StructType{
+	structType := &ast.StructType{
 		Fields:   fields,
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end.End),
 	}
+
+	// Generate unique ID for this struct type (for type identity)
+	structType.ID = utils.GenerateStructLitID()
+
+	return structType
 }
 
 func (p *Parser) parseFuncType(start source.Position) *ast.FuncType {

@@ -42,13 +42,13 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		return inferScopeResolutionExprType(ctx, mod, e)
 
 	case *ast.CastExpr:
-		return inferCastExprType(e)
+		return inferCastExprType(ctx, mod, e)
 
 	case *ast.ParenExpr:
 		return inferExprType(ctx, mod, e.X)
 
 	case *ast.CompositeLit:
-		return inferCompositeLitType(e)
+		return inferCompositeLitType(ctx, mod, e)
 
 	case *ast.FuncLit:
 		return inferFuncLitType(ctx, mod, e)
@@ -148,8 +148,16 @@ func inferUnaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 }
 
 // inferCallExprType determines the return type of a function call
-func inferCallExprType(_ *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
-	// Look up the function
+func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
+	// Get the type of the called expression (function or method)
+	funType := inferExprType(ctx, mod, expr.Fun)
+
+	// If it's a function type, return its return type
+	if funcType, ok := funType.(*types.FunctionType); ok {
+		return funcType.Return
+	}
+
+	// Fallback: handle direct function name lookup (legacy path)
 	if ident, ok := expr.Fun.(*ast.IdentifierExpr); ok {
 		sym, exists := mod.CurrentScope.Lookup(ident.Name)
 		if !exists {
@@ -159,7 +167,7 @@ func inferCallExprType(_ *context_v2.CompilerContext, mod *context_v2.Module, ex
 		// Get the function declaration
 		if funcDecl, ok := sym.Decl.(*ast.FuncDecl); ok {
 			if funcDecl.Type != nil && funcDecl.Type.Result != nil {
-				return typeFromTypeNode(funcDecl.Type.Result)
+				return typeFromTypeNodeWithContext(ctx, mod, funcDecl.Type.Result)
 			}
 		}
 	}
@@ -192,11 +200,16 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 			}
 		}
 
-		// If not a field, check if it's a method
-		// Methods are stored as "StructName.methodName" in the symbol table
-		qualifiedMethodName := structType.Name + "." + fieldName
-		if sym, ok := mod.CurrentScope.Lookup(qualifiedMethodName); ok {
-			return sym.Type
+		// If not a field, check if it's a method (look in type's scope)
+		if structType.Name != "" {
+			// Look up the type symbol to get its scope
+			if typeSym, ok := mod.ModuleScope.Lookup(structType.Name); ok && typeSym.Scope != nil {
+				typeScope := typeSym.Scope.(*table.SymbolTable)
+				if methodSym, ok := typeScope.GetSymbol(fieldName); ok {
+					// Return the method's function type (includes return type)
+					return methodSym.Type
+				}
+			}
 		}
 
 		// Field/method not found - error will be reported by type checker
@@ -246,15 +259,49 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 }
 
 // inferCastExprType determines the target type of a cast
-func inferCastExprType(expr *ast.CastExpr) types.SemType {
-	return typeFromTypeNode(expr.Type)
+func inferCastExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CastExpr) types.SemType {
+	return typeFromTypeNodeWithContext(ctx, mod, expr.Type)
 }
 
 // inferCompositeLitType determines the type of a composite literal
-func inferCompositeLitType(lit *ast.CompositeLit) types.SemType {
+func inferCompositeLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit) types.SemType {
 	if lit.Type != nil {
-		return typeFromTypeNode(lit.Type)
+		return typeFromTypeNodeWithContext(ctx, mod, lit.Type)
 	}
+
+	// Infer anonymous struct type from field expressions
+	// Check if all elements are key-value pairs (struct literal)
+	if len(lit.Elts) > 0 {
+		allKeyValue := true
+		for _, elem := range lit.Elts {
+			if _, ok := elem.(*ast.KeyValueExpr); !ok {
+				allKeyValue = false
+				break
+			}
+		}
+
+		if allKeyValue {
+			// Build anonymous struct type from fields
+			fields := make([]types.StructField, 0, len(lit.Elts))
+			for _, elem := range lit.Elts {
+				kv := elem.(*ast.KeyValueExpr)
+				if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+					fieldName := key.Name
+					fieldType := inferExprType(ctx, mod, kv.Value)
+					fields = append(fields, types.StructField{
+						Name: fieldName,
+						Type: fieldType,
+					})
+				}
+			}
+
+			if len(fields) > 0 {
+				// Create anonymous struct type (empty name)
+				return types.NewStruct("", fields)
+			}
+		}
+	}
+
 	return types.TypeUnknown
 }
 

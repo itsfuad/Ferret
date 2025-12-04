@@ -113,8 +113,8 @@ func sortDiagnostics(diagnostics []*Diagnostic) {
 			return iLoc.Start.Line < jLoc.Start.Line
 		}
 
-		// Same line, compare by column
-		return iLoc.Start.Column < jLoc.Start.Column
+		// Same line, keep original order (stable sort maintains phase order)
+		return false
 	})
 }
 

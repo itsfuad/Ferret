@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"compiler/internal/frontend/ast"
-	"compiler/internal/semantics/table"
+	"compiler/internal/phase"
 	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 )
 
@@ -51,7 +52,7 @@ func TestAddModule(t *testing.T) {
 	module := &Module{
 		FilePath: "/test/module.fer",
 		Type:     ModuleLocal,
-		Phase:    PhaseParsed,
+		Phase:    phase.PhaseParsed,
 	}
 
 	ctx.AddModule("test/module", module)
@@ -69,7 +70,7 @@ func TestAddModule(t *testing.T) {
 		t.Errorf("Expected import path 'test/module', got '%s'", retrieved.ImportPath)
 	}
 
-	if retrieved.Phase != PhaseParsed {
+	if retrieved.Phase != phase.PhaseParsed {
 		t.Errorf("Expected phase PhaseParsed, got %v", retrieved.Phase)
 	}
 }
@@ -80,20 +81,20 @@ func TestModulePhaseTracking(t *testing.T) {
 	module := &Module{
 		FilePath: "/test/module.fer",
 		Type:     ModuleLocal,
-		Phase:    PhaseNotStarted,
+		Phase:    phase.PhaseNotStarted,
 	}
 
 	ctx.AddModule("test/module", module)
 
 	// Test phase progression
-	phases := []ModulePhase{
-		PhaseNotStarted,
-		PhaseLexed,
-		PhaseParsed,
-		PhaseCollected,
-		PhaseResolved,
-		PhaseTypeChecked,
-		PhaseCodeGen,
+	phases := []phase.ModulePhase{
+		phase.PhaseNotStarted,
+		phase.PhaseLexed,
+		phase.PhaseParsed,
+		phase.PhaseCollected,
+		phase.PhaseResolved,
+		phase.PhaseTypeChecked,
+		phase.PhaseCodeGen,
 	}
 
 	for i, phase := range phases {
@@ -123,7 +124,7 @@ func TestIsModuleParsed(t *testing.T) {
 	module := &Module{
 		FilePath: "/test/module.fer",
 		Type:     ModuleLocal,
-		Phase:    PhaseNotStarted,
+		Phase:    phase.PhaseNotStarted,
 	}
 
 	ctx.AddModule("test/module", module)
@@ -132,14 +133,14 @@ func TestIsModuleParsed(t *testing.T) {
 		t.Error("Expected module not to be parsed yet")
 	}
 
-	ctx.SetModulePhase("test/module", PhaseParsed)
+	ctx.SetModulePhase("test/module", phase.PhaseParsed)
 
 	if !ctx.IsModuleParsed("test/module") {
 		t.Error("Expected module to be parsed")
 	}
 
 	// Should still return true for later phases
-	ctx.SetModulePhase("test/module", PhaseResolved)
+	ctx.SetModulePhase("test/module", phase.PhaseResolved)
 
 	if !ctx.IsModuleParsed("test/module") {
 		t.Error("Expected module to still be considered parsed")
@@ -151,9 +152,9 @@ func TestCycleDetection(t *testing.T) {
 
 	// Add modules
 	modules := map[string]*Module{
-		"a": {FilePath: "/test/a.fer", Type: ModuleLocal, Phase: PhaseParsed},
-		"b": {FilePath: "/test/b.fer", Type: ModuleLocal, Phase: PhaseParsed},
-		"c": {FilePath: "/test/c.fer", Type: ModuleLocal, Phase: PhaseParsed},
+		"a": {FilePath: "/test/a.fer", Type: ModuleLocal, Phase: phase.PhaseParsed},
+		"b": {FilePath: "/test/b.fer", Type: ModuleLocal, Phase: phase.PhaseParsed},
+		"c": {FilePath: "/test/c.fer", Type: ModuleLocal, Phase: phase.PhaseParsed},
 	}
 
 	for path, mod := range modules {
@@ -308,16 +309,16 @@ func TestModuleTypeString(t *testing.T) {
 
 func TestModulePhaseString(t *testing.T) {
 	tests := []struct {
-		phase    ModulePhase
+		phase    phase.ModulePhase
 		expected string
 	}{
-		{PhaseNotStarted, "NotStarted"},
-		{PhaseLexed, "Lexed"},
-		{PhaseParsed, "Parsed"},
-		{PhaseCollected, "Collected"},
-		{PhaseResolved, "Resolved"},
-		{PhaseTypeChecked, "TypeChecked"},
-		{PhaseCodeGen, "CodeGen"},
+		{phase.PhaseNotStarted, "NotStarted"},
+		{phase.PhaseLexed, "Lexed"},
+		{phase.PhaseParsed, "Parsed"},
+		{phase.PhaseCollected, "Collected"},
+		{phase.PhaseResolved, "Resolved"},
+		{phase.PhaseTypeChecked, "TypeChecked"},
+		{phase.PhaseCodeGen, "CodeGen"},
 	}
 
 	for _, tt := range tests {
@@ -338,7 +339,7 @@ func TestAddModuleWithAST(t *testing.T) {
 	module := &Module{
 		FilePath:    "/test/module.fer",
 		Type:        ModuleLocal,
-		Phase:       PhaseParsed,
+		Phase:       phase.PhaseParsed,
 		AST:         astModule,
 		ModuleScope: table.NewSymbolTable(ctx.Universe),
 	}
@@ -387,8 +388,8 @@ func TestDepGraphNormalization(t *testing.T) {
 	ctx := New(&Config{Extension: ".fer"}, false)
 
 	// Add modules with different path separators
-	ctx.AddModule("a", &Module{FilePath: "C:\\test\\a.fer", Phase: PhaseParsed})
-	ctx.AddModule("b", &Module{FilePath: "C:/test/b.fer", Phase: PhaseParsed})
+	ctx.AddModule("a", &Module{FilePath: "C:\\test\\a.fer", Phase: phase.PhaseParsed})
+	ctx.AddModule("b", &Module{FilePath: "C:/test/b.fer", Phase: phase.PhaseParsed})
 
 	// Both should work and be normalized
 	err := ctx.AddDependency("C:\\test\\a.fer", "C:/test/b.fer")
@@ -407,10 +408,10 @@ func TestComputeTopologicalOrder(t *testing.T) {
 	ctx := New(&Config{Extension: ".fer"}, false)
 
 	// Add modules
-	ctx.AddModule("a", &Module{FilePath: "a.fer", Phase: PhaseParsed})
-	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: PhaseParsed})
-	ctx.AddModule("c", &Module{FilePath: "c.fer", Phase: PhaseParsed})
-	ctx.AddModule("d", &Module{FilePath: "d.fer", Phase: PhaseParsed})
+	ctx.AddModule("a", &Module{FilePath: "a.fer", Phase: phase.PhaseParsed})
+	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: phase.PhaseParsed})
+	ctx.AddModule("c", &Module{FilePath: "c.fer", Phase: phase.PhaseParsed})
+	ctx.AddModule("d", &Module{FilePath: "d.fer", Phase: phase.PhaseParsed})
 
 	// Add dependencies:
 	// a -> b, a -> c, b -> d, c -> d
@@ -453,8 +454,8 @@ func TestComputeTopologicalOrder(t *testing.T) {
 
 func TestComputeTopologicalOrder_NoDependencies(t *testing.T) {
 	ctx := New(&Config{Extension: ".fer"}, false)
-	ctx.AddModule("x", &Module{FilePath: "x.fer", Phase: PhaseParsed})
-	ctx.AddModule("y", &Module{FilePath: "y.fer", Phase: PhaseParsed})
+	ctx.AddModule("x", &Module{FilePath: "x.fer", Phase: phase.PhaseParsed})
+	ctx.AddModule("y", &Module{FilePath: "y.fer", Phase: phase.PhaseParsed})
 
 	ctx.ComputeTopologicalOrder()
 	order := ctx.GetModuleNames()
@@ -473,7 +474,7 @@ func TestComputeTopologicalOrder_NoDependencies(t *testing.T) {
 
 func TestComputeTopologicalOrder_SingleModule(t *testing.T) {
 	ctx := New(&Config{Extension: ".fer"}, false)
-	ctx.AddModule("main", &Module{FilePath: "main.fer", Phase: PhaseParsed})
+	ctx.AddModule("main", &Module{FilePath: "main.fer", Phase: phase.PhaseParsed})
 
 	ctx.ComputeTopologicalOrder()
 	order := ctx.GetModuleNames()
@@ -485,8 +486,8 @@ func TestComputeTopologicalOrder_SingleModule(t *testing.T) {
 
 func TestComputeTopologicalOrder_CycleIgnored(t *testing.T) {
 	ctx := New(&Config{Extension: ".fer"}, false)
-	ctx.AddModule("a", &Module{FilePath: "a.fer", Phase: PhaseParsed})
-	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: PhaseParsed})
+	ctx.AddModule("a", &Module{FilePath: "a.fer", Phase: phase.PhaseParsed})
+	ctx.AddModule("b", &Module{FilePath: "b.fer", Phase: phase.PhaseParsed})
 
 	// Add a dependency a -> b
 	if err := ctx.AddDependency("a", "b"); err != nil {

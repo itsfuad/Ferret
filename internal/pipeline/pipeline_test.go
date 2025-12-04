@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"compiler/internal/context_v2"
+	"compiler/internal/phase"
 )
 
 func TestPipelineBasic(t *testing.T) {
@@ -44,9 +45,9 @@ func TestPipelineBasic(t *testing.T) {
 	}
 
 	// Verify module has advanced through the pipeline (at least parsed, possibly further)
-	phase := ctx.GetModulePhase(ctx.EntryModule)
-	if phase < context_v2.PhaseParsed {
-		t.Errorf("Expected at least PhaseParsed, got %v", phase)
+	ph := ctx.GetModulePhase(ctx.EntryModule)
+	if ph < phase.PhaseParsed {
+		t.Errorf("Expected at least PhaseParsed, got %v", ph)
 	}
 }
 
@@ -140,12 +141,12 @@ fn square(x: f64) -> f64 {
 
 			// Verify phase is at least PhaseParsed (pipeline runs through all phases)
 			// With syntax errors, modules may stop at PhaseParsed, otherwise they reach PhaseTypeChecked
-			if module.Phase < context_v2.PhaseParsed {
+			if module.Phase < phase.PhaseParsed {
 				t.Errorf("Run %d: Module %q phase = %v, want at least PhaseParsed", run, moduleName, module.Phase)
 			}
 
 			// Verify AST exists for parsed modules
-			if module.Phase >= context_v2.PhaseParsed && module.AST == nil {
+			if module.Phase >= phase.PhaseParsed && module.AST == nil {
 				t.Errorf("Run %d: Module %q has nil AST despite being at %v", run, moduleName, module.Phase)
 			}
 		}
@@ -387,12 +388,12 @@ let result := 42;`
 		}
 
 		// Current check: Must be at least PhaseParsed
-		if module.Phase < context_v2.PhaseParsed {
+		if module.Phase < phase.PhaseParsed {
 			t.Errorf("Module %q at phase %v, expected at least PhaseParsed", moduleName, module.Phase)
 		}
 
 		// Phase ordering invariant: If a module is PhaseParsed, it must have an AST
-		if module.Phase >= context_v2.PhaseParsed && module.AST == nil {
+		if module.Phase >= phase.PhaseParsed && module.AST == nil {
 			t.Errorf("Module %q at %v but has nil AST (phase invariant violated)", moduleName, module.Phase)
 		}
 	}
