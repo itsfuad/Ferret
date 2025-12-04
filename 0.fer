@@ -38,3 +38,6 @@ enormous = "2";
 
 // Works with hex notation too
 let hex_val: i128 = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+let sixTeefour : i64 = 64;
+let another : i32 = sixTeefour;

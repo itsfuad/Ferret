@@ -145,8 +145,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("constant '%s' must be initialized", name)).
-						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer").
-						WithHelp("provide a value: const x: i32 = 42"),
+						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer"),
 				)
 			}
 		} else if item.Value != nil {
@@ -348,16 +347,16 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 // typeNode: optional AST node for the target type (for location info)
 // valueExpr: the value expression being assigned
 // targetType: the expected/target type
-func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, targetType types.SemType, typeNode ast.Node, valueExpr ast.Expression) {
-	rhsType := checkExpr(ctx, mod, valueExpr, targetType)
+func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, leftType types.SemType, leftNode ast.Node, rightNode ast.Expression) {
+	rhsType := checkExpr(ctx, mod, rightNode, leftType)
 
 	// Special check for integer literals: ensure they fit in the target type
-	if ok := checkFitness(ctx, rhsType, targetType, valueExpr, typeNode); !ok {
+	if ok := checkFitness(ctx, rhsType, leftType, rightNode, leftNode); !ok {
 		return
 	}
 
 	// Check type compatibility
-	compatibility := checkTypeCompatibility(rhsType, targetType)
+	compatibility := checkTypeCompatibility(rhsType, leftType)
 
 	switch compatibility {
 	case Identical, Assignable, LosslessConvertible:
@@ -366,18 +365,20 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 
 	case LossyConvertible:
 		// Requires explicit cast
-		diag := diagnostics.NewError(getConversionError(rhsType, targetType, compatibility))
+		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility))
 
 		// Add dual labels if we have type node location
-		if typeNode != nil {
-			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+		if leftNode != nil {
+			diag = diag.WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(valueExpr.Loc(), "implicit conversion may lose precision")
+			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion may lose precision")
 		}
 
+	
+
 		ctx.Diagnostics.Add(
-			diag.WithHelp(fmt.Sprintf("use an explicit cast: as %s", targetType.String())),
+			diag.WithHelp(fmt.Sprintf("use an explicit cast: as %s", leftType.String())),
 		)
 
 	case Incompatible:
@@ -386,26 +387,26 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, ta
 		if types.IsUntyped(rhsType) {
 			// For untyped literals, use more intuitive message
 			if types.IsUntypedInt(rhsType) {
-				errorMsg = fmt.Sprintf("cannot use integer literal as type '%s'", targetType.String())
+				errorMsg = fmt.Sprintf("cannot use integer literal as type '%s'", leftType.String())
 			} else if types.IsUntypedFloat(rhsType) {
-				errorMsg = fmt.Sprintf("cannot use float literal as type '%s'", targetType.String())
+				errorMsg = fmt.Sprintf("cannot use float literal as type '%s'", leftType.String())
 			} else {
-				errorMsg = getConversionError(rhsType, targetType, compatibility)
+				errorMsg = getConversionError(rhsType, leftType, compatibility)
 			}
 		} else {
-			errorMsg = getConversionError(rhsType, targetType, compatibility)
+			errorMsg = getConversionError(rhsType, leftType, compatibility)
 		}
 
 		diag := diagnostics.NewError(errorMsg)
 
 		// Add dual labels if we have type node location
-		if typeNode != nil {
+		if leftNode != nil {
 			// Format value description (special handling for untyped literals)
 			valueDesc := formatValueDescription(rhsType)
-			diag = diag.WithPrimaryLabel(valueExpr.Loc(), valueDesc).
-				WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+			diag = diag.WithPrimaryLabel(rightNode.Loc(), valueDesc).
+				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("expected '%s', got '%s'", targetType.String(), rhsType.String()))
+			diag = diag.WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("expected '%s', got '%s'", leftType.String(), rhsType.String()))
 		}
 
 		ctx.Diagnostics.Add(diag)

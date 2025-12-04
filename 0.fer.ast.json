@@ -1517,6 +1517,125 @@
         "Index": 939
       },
       "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "sixTeefour",
+            "Start": {
+              "Line": 42,
+              "Column": 5,
+              "Index": 945
+            },
+            "End": {
+              "Line": 42,
+              "Column": 15,
+              "Index": 955
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Type": {
+            "Name": "i64",
+            "Start": {
+              "Line": 42,
+              "Column": 18,
+              "Index": 958
+            },
+            "End": {
+              "Line": 42,
+              "Column": 21,
+              "Index": 961
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Value": {
+            "Kind": 0,
+            "Value": "64",
+            "Start": {
+              "Line": 42,
+              "Column": 24,
+              "Index": 964
+            },
+            "End": {
+              "Line": 42,
+              "Column": 26,
+              "Index": 966
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 42,
+        "Column": 1,
+        "Index": 941
+      },
+      "End": {
+        "Line": 42,
+        "Column": 27,
+        "Index": 967
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+    },
+    {
+      "Decls": [
+        {
+          "Name": {
+            "Name": "another",
+            "Start": {
+              "Line": 43,
+              "Column": 5,
+              "Index": 972
+            },
+            "End": {
+              "Line": 43,
+              "Column": 12,
+              "Index": 979
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Type": {
+            "Name": "i32",
+            "Start": {
+              "Line": 43,
+              "Column": 15,
+              "Index": 982
+            },
+            "End": {
+              "Line": 43,
+              "Column": 18,
+              "Index": 985
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          },
+          "Value": {
+            "Name": "sixTeefour",
+            "Start": {
+              "Line": 43,
+              "Column": 21,
+              "Index": 988
+            },
+            "End": {
+              "Line": 43,
+              "Column": 31,
+              "Index": 998
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
+          }
+        }
+      ],
+      "Start": {
+        "Line": 43,
+        "Column": 1,
+        "Index": 968
+      },
+      "End": {
+        "Line": 43,
+        "Column": 32,
+        "Index": 999
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/0.fer"
     }
   ],
   "Start": null,
