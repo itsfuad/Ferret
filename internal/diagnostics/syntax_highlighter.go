@@ -122,7 +122,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			if tokens.IsKeyword(word) {
 				color = colors.PURPLE // Keywords
 			} else if tokens.IsBuiltinType(word) {
-				color = colors.LIGHT_ORANGE // Types
+				color = colors.CYAN // Types
 			} else {
 				color = colors.WHITE // Regular identifiers
 			}
