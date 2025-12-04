@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 	"compiler/internal/utils"
 )
 
@@ -21,7 +21,7 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 // parseConstDecl: const pi := 3.14;
 func (p *Parser) parseConstDecl() *ast.ConstDecl {
 	start := p.peek().Start
-	p.expect(lexer.CONST_TOKEN)
+	p.expect(tokens.CONST_TOKEN)
 
 	decls, location := p.parseVariableDeclaration(start)
 
@@ -40,17 +40,17 @@ func (p *Parser) parseVariableDeclaration(start source.Position) ([]ast.DeclItem
 	// or list of variables, let a : i32, b := 10, c: str;
 	// for const, initializer is mandatory
 
-	for !p.isAtEnd() && !p.match(lexer.SEMICOLON_TOKEN) {
+	for !p.isAtEnd() && !p.match(tokens.SEMICOLON_TOKEN) {
 		decl := p.parseDeclItem()
 		decls = append(decls, decl)
 
-		if !p.match(lexer.COMMA_TOKEN) {
+		if !p.match(tokens.COMMA_TOKEN) {
 			break
 		}
 		p.advance()
 	}
 
-	p.expect(lexer.SEMICOLON_TOKEN)
+	p.expect(tokens.SEMICOLON_TOKEN)
 
 	return decls, p.makeLocation(start)
 }
@@ -62,12 +62,12 @@ func (p *Parser) parseDeclItem() ast.DeclItem {
 
 	decl.Name = p.parseIdentifier()
 
-	if p.match(lexer.COLON_TOKEN) {
+	if p.match(tokens.COLON_TOKEN) {
 		p.advance()
 		decl.Type = p.parseType()
 
 		// Check for initializer
-		if p.match(lexer.EQUALS_TOKEN) {
+		if p.match(tokens.EQUALS_TOKEN) {
 			p.advance()
 			decl.Value = p.parseExpr()
 		}
@@ -75,13 +75,13 @@ func (p *Parser) parseDeclItem() ast.DeclItem {
 		return decl
 	}
 
-	if p.match(lexer.WALRUS_TOKEN) {
+	if p.match(tokens.WALRUS_TOKEN) {
 		p.advance()
 		decl.Value = p.parseExpr()
 		return decl
 	}
 
-	if p.match(lexer.EQUALS_TOKEN) {
+	if p.match(tokens.EQUALS_TOKEN) {
 		// Allow the parsing but report an error
 		loc := p.makeLocation(p.advance().Start)
 		decl.Value = p.parseExpr()
@@ -102,12 +102,12 @@ func (p *Parser) parseDeclItem() ast.DeclItem {
 // parseTypeDecl: type Point struct { .x: i32 };
 func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 
-	start := p.expect(lexer.TYPE_TOKEN).Start
+	start := p.expect(tokens.TYPE_TOKEN).Start
 
 	name := p.parseIdentifier()
 	typ := p.parseType()
 
-	p.expect(lexer.SEMICOLON_TOKEN)
+	p.expect(tokens.SEMICOLON_TOKEN)
 
 	return &ast.TypeDecl{
 		Name:     name,
@@ -123,19 +123,19 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 // - Methods: fn (r Rect) area() -> f64 { ... }
 func (p *Parser) parseFuncDecl() ast.Node {
 
-	start := p.expect(lexer.FUNCTION_TOKEN).Start
+	start := p.expect(tokens.FUNCTION_TOKEN).Start
 
 	// Lookahead to determine what kind of function this is
-	if p.match(lexer.OPEN_PAREN) {
+	if p.match(tokens.OPEN_PAREN) {
 		// Could be: fn (params) { body } -- anonymous function
 		// Or:       fn (receiver) methodName(params) { body } -- method
 
 		params := p.parseFunctionParams()
 
-		p.expect(lexer.CLOSE_PAREN)
+		p.expect(tokens.CLOSE_PAREN)
 
 		// If next token is identifier, it's a method
-		if p.match(lexer.IDENTIFIER_TOKEN) {
+		if p.match(tokens.IDENTIFIER_TOKEN) {
 			return p.parseMethodDecl(start, params)
 		}
 
@@ -155,26 +155,26 @@ func (p *Parser) parseFunctionParams() []ast.Field {
 
 	params := []ast.Field{}
 
-	if p.match(lexer.CLOSE_PAREN) {
+	if p.match(tokens.CLOSE_PAREN) {
 		return params
 	}
 
-	for !(p.match(lexer.CLOSE_PAREN) || p.isAtEnd()) {
+	for !(p.match(tokens.CLOSE_PAREN) || p.isAtEnd()) {
 
 		// Parse parameter name
 		name := p.parseIdentifier()
 
 		// Expect colon
-		if !p.match(lexer.COLON_TOKEN) {
+		if !p.match(tokens.COLON_TOKEN) {
 			p.error("expected ':' after parameter name")
 			break
 		}
 
-		p.expect(lexer.COLON_TOKEN)
+		p.expect(tokens.COLON_TOKEN)
 
 		// Check for variadic parameter (...)
 		isVariadic := false
-		if p.match(lexer.THREE_DOT_TOKEN) {
+		if p.match(tokens.THREE_DOT_TOKEN) {
 			isVariadic = true
 			p.advance() // consume '...'
 		}
@@ -199,16 +199,16 @@ func (p *Parser) parseFunctionParams() []ast.Field {
 
 		params = append(params, param)
 
-		if p.match(lexer.CLOSE_PAREN) {
+		if p.match(tokens.CLOSE_PAREN) {
 			break
 		}
 
-		if p.checkTrailing(lexer.COMMA_TOKEN, lexer.CLOSE_PAREN, "function parameters") {
+		if p.checkTrailing(tokens.COMMA_TOKEN, tokens.CLOSE_PAREN, "function parameters") {
 			p.advance() // skip the token
 			break
 		}
 
-		p.expect(lexer.COMMA_TOKEN)
+		p.expect(tokens.COMMA_TOKEN)
 	}
 
 	// Note: Don't consume CLOSE_PAREN here - let the caller handle it
@@ -225,7 +225,7 @@ func (p *Parser) parseNamedFuncDecl(start source.Position) *ast.FuncDecl {
 	funcType := p.parseFuncType(start)
 	// Parse body
 	var body *ast.Block
-	if p.match(lexer.OPEN_CURLY) {
+	if p.match(tokens.OPEN_CURLY) {
 		body = p.parseBlock()
 	}
 
@@ -245,7 +245,7 @@ func (p *Parser) parseFuncLit(start source.Position, params []ast.Field) *ast.Fu
 
 	// Parse return type if present
 	var result ast.TypeNode
-	if p.match(lexer.ARROW_TOKEN) {
+	if p.match(tokens.ARROW_TOKEN) {
 		p.advance()
 		typenode := p.parseType()
 		result = typenode

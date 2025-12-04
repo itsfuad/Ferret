@@ -3,7 +3,7 @@ package typechecker
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
+	"compiler/internal/tokens"
 	"compiler/internal/semantics/table"
 	"compiler/internal/types"
 )
@@ -110,17 +110,17 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 
 	// Determine result type based on operator
 	switch expr.Op.Kind {
-	case lexer.PLUS_TOKEN, lexer.MINUS_TOKEN, lexer.MUL_TOKEN, lexer.DIV_TOKEN, lexer.MOD_TOKEN:
+	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
 		// Arithmetic: result is the wider of the two types
 		return widerType(lhsType, rhsType)
 
-	case lexer.DOUBLE_EQUAL_TOKEN, lexer.NOT_EQUAL_TOKEN,
-		lexer.LESS_TOKEN, lexer.LESS_EQUAL_TOKEN,
-		lexer.GREATER_TOKEN, lexer.GREATER_EQUAL_TOKEN:
+	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN,
+		tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN,
+		tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
 		// Comparison: result is always bool
 		return types.TypeBool
 
-	case lexer.AND_TOKEN, lexer.OR_TOKEN:
+	case tokens.AND_TOKEN, tokens.OR_TOKEN:
 		// Logical: result is always bool
 		return types.TypeBool
 
@@ -134,11 +134,11 @@ func inferUnaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	xType := inferExprType(ctx, mod, expr.X)
 
 	switch expr.Op.Kind {
-	case lexer.MINUS_TOKEN, lexer.PLUS_TOKEN:
+	case tokens.MINUS_TOKEN, tokens.PLUS_TOKEN:
 		// Unary +/- preserves numeric type
 		return xType
 
-	case lexer.NOT_TOKEN:
+	case tokens.NOT_TOKEN:
 		// Logical not returns bool
 		return types.TypeBool
 

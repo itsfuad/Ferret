@@ -42,6 +42,9 @@ func New(ctx *context_v2.CompilerContext) *Pipeline {
 // Run executes the full compilation pipeline
 func (p *Pipeline) Run() error {
 	if p.ctx.Debug {
+
+		colors.PrintAllColors()
+
 		colors.CYAN.Printf("\n[Phase 1] Lex + Parse\n")
 	}
 

@@ -1,14 +1,14 @@
 package ast
 
 import (
-	"compiler/internal/frontend/lexer"
+	"compiler/internal/tokens"
 	"compiler/internal/source"
 )
 
 // BinaryExpr represents a binary expression
 type BinaryExpr struct {
 	X  Expression  // left operand
-	Op lexer.Token // operator
+	Op tokens.Token // operator
 	Y  Expression  // right operand
 	source.Location
 }
@@ -19,7 +19,7 @@ func (b *BinaryExpr) Loc() *source.Location { return &b.Location }
 
 // UnaryExpr represents a unary expression
 type UnaryExpr struct {
-	Op lexer.Token // operator
+	Op tokens.Token // operator
 	X  Expression  // operand
 	source.Location
 }
@@ -30,7 +30,7 @@ func (u *UnaryExpr) Loc() *source.Location { return &u.Location }
 
 // PrefixExpr represents a prefix increment/decrement expression (++x, --x)
 type PrefixExpr struct {
-	Op lexer.Token // operator (++, --)
+	Op tokens.Token // operator (++, --)
 	X  Expression  // operand
 	source.Location
 }
@@ -42,7 +42,7 @@ func (p *PrefixExpr) Loc() *source.Location { return &p.Location }
 // PostfixExpr represents a postfix increment/decrement expression (x++, x--)
 type PostfixExpr struct {
 	X  Expression  // operand
-	Op lexer.Token // operator (++, --)
+	Op tokens.Token // operator (++, --)
 	source.Location
 }
 

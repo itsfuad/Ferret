@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"compiler/internal/diagnostics"
+	"compiler/internal/tokens"
 	"testing"
 )
 
@@ -28,15 +29,15 @@ func TestNumberTokenization(t *testing.T) {
 			diag := diagnostics.NewDiagnosticBag("test")
 
 			lex := New(tt.desc, tt.input, diag)
-			tokens := lex.Tokenize(false)
+			toks := lex.Tokenize(false)
 
-			if len(tokens) < 1 {
+			if len(toks) < 1 {
 				t.Errorf("%s: got no tokens", tt.desc)
 				return
 			}
 
-			if tokens[0].Kind != NUMBER_TOKEN {
-				t.Errorf("%s: expected NUMBER_TOKEN, got %v", tt.desc, tokens[0].Kind)
+			if toks[0].Kind != tokens.NUMBER_TOKEN {
+				t.Errorf("%s: expected NUMBER_TOKEN, got %v", tt.desc, toks[0].Kind)
 			}
 		})
 	}

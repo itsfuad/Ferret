@@ -1,0 +1,244 @@
+package tokens
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"compiler/colors"
+	"compiler/internal/source"
+	"compiler/internal/types"
+)
+
+type TOKEN string
+
+const (
+	//keywords
+	LET_TOKEN        TOKEN = "let"
+	CONST_TOKEN      TOKEN = "const"
+	TYPE_TOKEN       TOKEN = "type"
+	IF_TOKEN         TOKEN = "if"
+	ELSE_TOKEN       TOKEN = "else"
+	FOR_TOKEN        TOKEN = "for"
+	FOREACH_TOKEN    TOKEN = "foreach"
+	WHILE_TOKEN      TOKEN = "while"
+	DO_TOKEN         TOKEN = "do"
+	IDENTIFIER_TOKEN TOKEN = "identifier"
+	PRIVATE_TOKEN    TOKEN = "priv"
+	RETURN_TOKEN     TOKEN = "return"
+	IMPORT_TOKEN     TOKEN = "import"
+	AS_TOKEN         TOKEN = "as"
+	MODULE_TOKEN     TOKEN = "mod"
+	CATCH_TOKEN      TOKEN = "catch"
+	//data types
+	NUMBER_TOKEN    TOKEN = "numeric literal"
+	STRING_TOKEN    TOKEN = "string literal"
+	BYTE_TOKEN      TOKEN = "byte literal"
+	STRUCT_TOKEN    TOKEN = TOKEN(types.TYPE_STRUCT)
+	FUNCTION_TOKEN  TOKEN = TOKEN(types.TYPE_FUNC)
+	INTERFACE_TOKEN TOKEN = TOKEN(types.TYPE_INTERFACE)
+	ENUM_TOKEN      TOKEN = TOKEN(types.TYPE_ENUM)
+	MAP_TOKEN       TOKEN = TOKEN(types.TYPE_MAP)
+
+	THREE_DOT_TOKEN TOKEN = "..."
+
+	//array range operator
+	RANGE_TOKEN TOKEN = ".."
+	//increment and decrement
+	PLUS_PLUS_TOKEN   TOKEN = "++"
+	MINUS_MINUS_TOKEN TOKEN = "--"
+	//Binary operators
+	AND_TOKEN TOKEN = "&&"
+	OR_TOKEN  TOKEN = "||"
+	//bitwise operators
+	BIT_AND_TOKEN TOKEN = "&"
+	BIT_OR_TOKEN  TOKEN = "|"
+	BIT_XOR_TOKEN TOKEN = "^"
+	//unary operators
+	NOT_TOKEN TOKEN = "!"
+	//arithmetic operators
+	EXP_TOKEN   TOKEN = "**"
+	MINUS_TOKEN TOKEN = "-"
+	PLUS_TOKEN  TOKEN = "+"
+	MUL_TOKEN   TOKEN = "*"
+	DIV_TOKEN   TOKEN = "/"
+	MOD_TOKEN   TOKEN = "%"
+	//logical operators
+	LESS_EQUAL_TOKEN    TOKEN = "<="
+	GREATER_EQUAL_TOKEN TOKEN = ">="
+	NOT_EQUAL_TOKEN     TOKEN = "!="
+	DOUBLE_EQUAL_TOKEN  TOKEN = "=="
+	LESS_TOKEN          TOKEN = "<"
+	GREATER_TOKEN       TOKEN = ">"
+	//assignment
+	SCOPE_TOKEN        TOKEN = "::"
+	WALRUS_TOKEN       TOKEN = ":="
+	COLON_TOKEN        TOKEN = ":"
+	EQUALS_TOKEN       TOKEN = "="
+	PLUS_EQUALS_TOKEN  TOKEN = "+="
+	MINUS_EQUALS_TOKEN TOKEN = "-="
+	MUL_EQUALS_TOKEN   TOKEN = "*="
+	DIV_EQUALS_TOKEN   TOKEN = "/="
+	MOD_EQUALS_TOKEN   TOKEN = "%="
+	EXP_EQUALS_TOKEN   TOKEN = "^="
+	//delimiters
+	OPEN_PAREN      TOKEN = "("
+	CLOSE_PAREN     TOKEN = ")"
+	OPEN_BRACKET    TOKEN = "["
+	CLOSE_BRACKET   TOKEN = "]"
+	OPEN_CURLY      TOKEN = "{"
+	CLOSE_CURLY     TOKEN = "}"
+	COMMA_TOKEN     TOKEN = ","
+	DOT_TOKEN       TOKEN = "."
+	SEMICOLON_TOKEN TOKEN = ";"
+	ARROW_TOKEN     TOKEN = "->"
+	FAT_ARROW_TOKEN TOKEN = "=>"
+	ELVIS_TOKEN     TOKEN = "?:"
+	QUESTION_TOKEN  TOKEN = "?"
+
+	EOF_TOKEN TOKEN = "end_of_file"
+)
+
+var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
+	LET_TOKEN:       true,
+	CONST_TOKEN:     true,
+	IF_TOKEN:        true,
+	ELSE_TOKEN:      true,
+	FOR_TOKEN:       true,
+	WHILE_TOKEN:     true,
+	TYPE_TOKEN:      true,
+	STRUCT_TOKEN:    true,
+	PRIVATE_TOKEN:   true,
+	INTERFACE_TOKEN: true,
+	ENUM_TOKEN:      true,
+	MAP_TOKEN:       true,
+	CATCH_TOKEN:     true,
+	FUNCTION_TOKEN:  true,
+	RETURN_TOKEN:    true,
+	IMPORT_TOKEN:    true,
+	AS_TOKEN:        true,
+}
+
+var builtinTypes map[string]bool = map[string]bool{
+	string(types.TYPE_U8):   true,
+	string(types.TYPE_U16):  true,
+	string(types.TYPE_U32):  true,
+	string(types.TYPE_U64):  true,
+	string(types.TYPE_U128): true,
+	string(types.TYPE_U256): true,
+
+	string(types.TYPE_I8):   true,
+	string(types.TYPE_I16):  true,
+	string(types.TYPE_I32):  true,
+	string(types.TYPE_I64):  true,
+	string(types.TYPE_I128): true,
+	string(types.TYPE_I256): true,
+
+	string(types.TYPE_F32):  true,
+	string(types.TYPE_F64):  true,
+	string(types.TYPE_F128): true,
+	string(types.TYPE_F256): true,
+
+	string(types.TYPE_BOOL): true,
+
+	string(types.TYPE_STRING): true,
+
+	string(types.TYPE_BYTE): true,
+
+	string(types.TYPE_VOID): true,
+}
+
+func IsKeyword(token string) bool {
+	if _, ok := keyWordsMap[TOKEN(token)]; ok {
+		return true
+	}
+	return false
+}
+
+func IsNumber(token string) bool {
+	if len(token) == 0 {
+		return false
+	}
+
+	// Check for hex (0x), binary (0b), octal (0o) prefixes
+	if len(token) > 2 {
+		prefix := token[:2]
+		if prefix == "0x" || prefix == "0X" || prefix == "0b" || prefix == "0B" || prefix == "0o" || prefix == "0O" {
+			return true
+		}
+	}
+
+	// Check if it's a regular number (int or float)
+	_, err := fmt.Sscanf(token, "%f", new(float64))
+	return err == nil
+}
+
+// IsInteger checks if a token is an integer (no decimal point)
+func IsInteger(token string) bool {
+	if !IsNumber(token) {
+		return false
+	}
+	// If it contains a decimal point, it's a float
+	return !strings.Contains(token, ".")
+}
+
+// IsFloat checks if a token is a floating-point number
+func IsFloat(token string) bool {
+	if !IsNumber(token) {
+		return false
+	}
+	// Must contain a decimal point to be a float
+	return strings.Contains(token, ".")
+}
+
+func IsString(token string) bool {
+	if len(token) < 2 {
+		return false
+	}
+	return token[0] == '"' && token[len(token)-1] == '"'
+}
+
+// IsCharLiteral checks if a token is a character literal
+func IsCharLiteral(token string) bool {
+	if len(token) < 2 {
+		return false
+	}
+	return token[0] == '\'' && token[len(token)-1] == '\''
+}
+
+// IsComment checks if a token starts with a comment
+func IsComment(token string) bool {
+	return len(token) >= 2 && token[0] == '/' && token[1] == '/'
+}
+
+func IsBuiltinType(token string) bool {
+	if _, ok := builtinTypes[token]; ok {
+		return true
+	}
+	return false
+}
+
+type Token struct {
+	Kind  TOKEN
+	Value string
+	Start source.Position
+	End   source.Position
+}
+
+func (t *Token) Debug(filename string) {
+	colors.GREY.Fprintf(os.Stderr, "%s:%d:%d ", filename, t.Start.Line, t.Start.Column)
+	if t.Value == string(t.Kind) {
+		fmt.Fprintf(os.Stderr, "%q\n", t.Value)
+	} else {
+		fmt.Fprintf(os.Stderr, "%q ('%v')\n", t.Value, t.Kind)
+	}
+}
+
+func NewToken(kind TOKEN, value string, start source.Position, end source.Position) Token {
+	return Token{
+		Kind:  kind,
+		Value: value,
+		Start: start,
+		End:   end,
+	}
+}

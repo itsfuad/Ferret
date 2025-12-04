@@ -101,7 +101,7 @@ func ConvertANSIToHTML(text string) string {
 		"\033[32m":       "<span style=\"color: #10b981\">",
 		"\033[33m":       "<span style=\"color: #f59e0b\">",
 		"\033[34m":       "<span style=\"color: #3b82f6\">",
-		"\033[35m":       "<span style=\"color: #a855f7\">",
+		"\033[35m":       "<span style=\"color: #c678dd\">",
 		"\033[36m":       "<span style=\"color: #06b6d4\">",
 		"\033[37m":       "<span style=\"color: #d1d5db\">",
 		"\033[90m":       "<span style=\"color: #808080\">",
@@ -129,6 +129,7 @@ func ConvertANSIToHTML(text string) string {
 		"\033[38;5;201m": "<span style=\"color: #ff00ff\">",
 		"\033[38;5;250m": "<span style=\"color: #bcbcbc\">",
 		"\033[38;5;240m": "<span style=\"color: #585858\">",
+		"\033[38;5;215m": "<span style=\"color: #ffaf5f\">", // LIGHT_ORANGE
 		"\033[38;5;81m":  "<span style=\"color: #5fd7ff\">",
 		"\033[38;5;120m": "<span style=\"color: #87ff87\">",
 		"\033[38;5;229m": "<span style=\"color: #ffffaf\">",

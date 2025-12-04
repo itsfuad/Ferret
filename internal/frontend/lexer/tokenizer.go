@@ -6,6 +6,7 @@ import (
 
 	"compiler/internal/diagnostics"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 	"compiler/internal/utils/numeric"
 )
 
@@ -19,7 +20,7 @@ type regexPattern struct {
 type Lexer struct {
 //	Errors     []error
 	diagnostics *diagnostics.DiagnosticBag
-	Tokens     []Token
+	Tokens     []tokens.Token
 	Position   source.Position
 	sourceCode []byte
 	patterns   []regexPattern
@@ -30,7 +31,7 @@ func (lex *Lexer) advance(match string) {
 	lex.Position.Advance(match)
 }
 
-func (lex *Lexer) push(token Token) {
+func (lex *Lexer) push(token tokens.Token) {
 	lex.Tokens = append(lex.Tokens, token)
 }
 
@@ -46,7 +47,7 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 	//create the lexer
 	lex := &Lexer{
 		sourceCode: []byte(content),
-		Tokens:     make([]Token, 0),
+		Tokens:     make([]tokens.Token, 0),
 		Position: source.Position{
 			Line:   1,
 			Column: 1,
@@ -66,57 +67,57 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 			{regexp.MustCompile(`'[^']'`), byteHandler},                       // byte literals
 			{regexp.MustCompile(numeric.NumberPattern), numberHandler},        // numbers (hex, octal, binary, float, integer)
 			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
-			{regexp.MustCompile(`\+\+`), defaultHandler(PLUS_PLUS_TOKEN)},
-			{regexp.MustCompile(`\-\-`), defaultHandler(MINUS_MINUS_TOKEN)},
-			{regexp.MustCompile(`\->`), defaultHandler(ARROW_TOKEN)},
-			{regexp.MustCompile(`\=>`), defaultHandler(FAT_ARROW_TOKEN)},
-			{regexp.MustCompile(`::`), defaultHandler(SCOPE_TOKEN)}, // Add scope resolution operator before single colon
-			{regexp.MustCompile(`!=`), defaultHandler(NOT_EQUAL_TOKEN)},
-			{regexp.MustCompile(`\+=`), defaultHandler(PLUS_EQUALS_TOKEN)},
-			{regexp.MustCompile(`-=`), defaultHandler(MINUS_EQUALS_TOKEN)},
-			{regexp.MustCompile(`\*=`), defaultHandler(MUL_EQUALS_TOKEN)},
-			{regexp.MustCompile(`/=`), defaultHandler(DIV_EQUALS_TOKEN)},
-			{regexp.MustCompile(`%=`), defaultHandler(MOD_EQUALS_TOKEN)},
-			{regexp.MustCompile(`\^=`), defaultHandler(EXP_EQUALS_TOKEN)},
-			{regexp.MustCompile(`\*\*`), defaultHandler(EXP_TOKEN)},
-			{regexp.MustCompile(`\.\.\.`), defaultHandler(THREE_DOT_TOKEN)},
-			{regexp.MustCompile(`\.\.`), defaultHandler(RANGE_TOKEN)},
-			{regexp.MustCompile(`&&`), defaultHandler(AND_TOKEN)},
-			{regexp.MustCompile(`\|\|`), defaultHandler(OR_TOKEN)},
-			{regexp.MustCompile(`&`), defaultHandler(BIT_AND_TOKEN)},
-			{regexp.MustCompile(`\|`), defaultHandler(BIT_OR_TOKEN)},
-			{regexp.MustCompile(`\^`), defaultHandler(BIT_XOR_TOKEN)},
-			{regexp.MustCompile(`!`), defaultHandler(NOT_TOKEN)},
-			{regexp.MustCompile(`\-`), defaultHandler(MINUS_TOKEN)},
-			{regexp.MustCompile(`\+`), defaultHandler(PLUS_TOKEN)},
-			{regexp.MustCompile(`\*`), defaultHandler(MUL_TOKEN)},
-			{regexp.MustCompile(`/`), defaultHandler(DIV_TOKEN)},
-			{regexp.MustCompile(`%`), defaultHandler(MOD_TOKEN)},
-			{regexp.MustCompile(`<=`), defaultHandler(LESS_EQUAL_TOKEN)},
-			{regexp.MustCompile(`<`), defaultHandler(LESS_TOKEN)},
-			{regexp.MustCompile(`>=`), defaultHandler(GREATER_EQUAL_TOKEN)},
-			{regexp.MustCompile(`>`), defaultHandler(GREATER_TOKEN)},
-			{regexp.MustCompile(`==`), defaultHandler(DOUBLE_EQUAL_TOKEN)},
-			{regexp.MustCompile(`:=`), defaultHandler(WALRUS_TOKEN)},
-			{regexp.MustCompile(`=`), defaultHandler(EQUALS_TOKEN)},
-			{regexp.MustCompile(`:`), defaultHandler(COLON_TOKEN)},
-			{regexp.MustCompile(`;`), defaultHandler(SEMICOLON_TOKEN)},
-			{regexp.MustCompile(`\(`), defaultHandler(OPEN_PAREN)},
-			{regexp.MustCompile(`\)`), defaultHandler(CLOSE_PAREN)},
-			{regexp.MustCompile(`\[`), defaultHandler(OPEN_BRACKET)},
-			{regexp.MustCompile(`\]`), defaultHandler(CLOSE_BRACKET)},
-			{regexp.MustCompile(`\{`), defaultHandler(OPEN_CURLY)},
-			{regexp.MustCompile(`\}`), defaultHandler(CLOSE_CURLY)},
-			{regexp.MustCompile(","), defaultHandler(COMMA_TOKEN)},
-			{regexp.MustCompile(`\.`), defaultHandler(DOT_TOKEN)},
-			{regexp.MustCompile(`\?:`), defaultHandler(ELVIS_TOKEN)},
-			{regexp.MustCompile(`\?`), defaultHandler(QUESTION_TOKEN)},
+			{regexp.MustCompile(`\+\+`), defaultHandler(tokens.PLUS_PLUS_TOKEN)},
+			{regexp.MustCompile(`\-\-`), defaultHandler(tokens.MINUS_MINUS_TOKEN)},
+			{regexp.MustCompile(`\->`), defaultHandler(tokens.ARROW_TOKEN)},
+			{regexp.MustCompile(`\=>`), defaultHandler(tokens.FAT_ARROW_TOKEN)},
+			{regexp.MustCompile(`::`), defaultHandler(tokens.SCOPE_TOKEN)}, // Add scope resolution operator before single colon
+			{regexp.MustCompile(`!=`), defaultHandler(tokens.NOT_EQUAL_TOKEN)},
+			{regexp.MustCompile(`\+=`), defaultHandler(tokens.PLUS_EQUALS_TOKEN)},
+			{regexp.MustCompile(`-=`), defaultHandler(tokens.MINUS_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\*=`), defaultHandler(tokens.MUL_EQUALS_TOKEN)},
+			{regexp.MustCompile(`/=`), defaultHandler(tokens.DIV_EQUALS_TOKEN)},
+			{regexp.MustCompile(`%=`), defaultHandler(tokens.MOD_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\^=`), defaultHandler(tokens.EXP_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\*\*`), defaultHandler(tokens.EXP_TOKEN)},
+			{regexp.MustCompile(`\.\.\.`), defaultHandler(tokens.THREE_DOT_TOKEN)},
+			{regexp.MustCompile(`\.\.`), defaultHandler(tokens.RANGE_TOKEN)},
+			{regexp.MustCompile(`&&`), defaultHandler(tokens.AND_TOKEN)},
+			{regexp.MustCompile(`\|\|`), defaultHandler(tokens.OR_TOKEN)},
+			{regexp.MustCompile(`&`), defaultHandler(tokens.BIT_AND_TOKEN)},
+			{regexp.MustCompile(`\|`), defaultHandler(tokens.BIT_OR_TOKEN)},
+			{regexp.MustCompile(`\^`), defaultHandler(tokens.BIT_XOR_TOKEN)},
+			{regexp.MustCompile(`!`), defaultHandler(tokens.NOT_TOKEN)},
+			{regexp.MustCompile(`\-`), defaultHandler(tokens.MINUS_TOKEN)},
+			{regexp.MustCompile(`\+`), defaultHandler(tokens.PLUS_TOKEN)},
+			{regexp.MustCompile(`\*`), defaultHandler(tokens.MUL_TOKEN)},
+			{regexp.MustCompile(`/`), defaultHandler(tokens.DIV_TOKEN)},
+			{regexp.MustCompile(`%`), defaultHandler(tokens.MOD_TOKEN)},
+			{regexp.MustCompile(`<=`), defaultHandler(tokens.LESS_EQUAL_TOKEN)},
+			{regexp.MustCompile(`<`), defaultHandler(tokens.LESS_TOKEN)},
+			{regexp.MustCompile(`>=`), defaultHandler(tokens.GREATER_EQUAL_TOKEN)},
+			{regexp.MustCompile(`>`), defaultHandler(tokens.GREATER_TOKEN)},
+			{regexp.MustCompile(`==`), defaultHandler(tokens.DOUBLE_EQUAL_TOKEN)},
+			{regexp.MustCompile(`:=`), defaultHandler(tokens.WALRUS_TOKEN)},
+			{regexp.MustCompile(`=`), defaultHandler(tokens.EQUALS_TOKEN)},
+			{regexp.MustCompile(`:`), defaultHandler(tokens.COLON_TOKEN)},
+			{regexp.MustCompile(`;`), defaultHandler(tokens.SEMICOLON_TOKEN)},
+			{regexp.MustCompile(`\(`), defaultHandler(tokens.OPEN_PAREN)},
+			{regexp.MustCompile(`\)`), defaultHandler(tokens.CLOSE_PAREN)},
+			{regexp.MustCompile(`\[`), defaultHandler(tokens.OPEN_BRACKET)},
+			{regexp.MustCompile(`\]`), defaultHandler(tokens.CLOSE_BRACKET)},
+			{regexp.MustCompile(`\{`), defaultHandler(tokens.OPEN_CURLY)},
+			{regexp.MustCompile(`\}`), defaultHandler(tokens.CLOSE_CURLY)},
+			{regexp.MustCompile(","), defaultHandler(tokens.COMMA_TOKEN)},
+			{regexp.MustCompile(`\.`), defaultHandler(tokens.DOT_TOKEN)},
+			{regexp.MustCompile(`\?:`), defaultHandler(tokens.ELVIS_TOKEN)},
+			{regexp.MustCompile(`\?`), defaultHandler(tokens.QUESTION_TOKEN)},
 		},
 	}
 	return lex
 }
 
-func defaultHandler(token TOKEN) regexHandler {
+func defaultHandler(token tokens.TOKEN) regexHandler {
 
 	return func(lex *Lexer, _ *regexp.Regexp) {
 
@@ -124,7 +125,7 @@ func defaultHandler(token TOKEN) regexHandler {
 		lex.advance(string(token))
 		end := lex.Position
 
-		lex.push(NewToken(token, string(token), start, end))
+		lex.push(tokens.NewToken(token, string(token), start, end))
 	}
 }
 
@@ -133,10 +134,10 @@ func identifierHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(identifier)
 	end := lex.Position
-	if IsKeyword(identifier) {
-		lex.push(NewToken(TOKEN(identifier), identifier, start, end))
+	if tokens.IsKeyword(identifier) {
+		lex.push(tokens.NewToken(tokens.TOKEN(identifier), identifier, start, end))
 	} else {
-		lex.push(NewToken(IDENTIFIER_TOKEN, identifier, start, end))
+		lex.push(tokens.NewToken(tokens.IDENTIFIER_TOKEN, identifier, start, end))
 	}
 }
 
@@ -146,7 +147,7 @@ func numberHandler(lex *Lexer, regex *regexp.Regexp) {
 	lex.advance(match)
 	end := lex.Position
 	//find the number is a float or an integer
-	lex.push(NewToken(NUMBER_TOKEN, match, start, end))
+	lex.push(tokens.NewToken(tokens.NUMBER_TOKEN, match, start, end))
 }
 
 func stringHandler(lex *Lexer, regex *regexp.Regexp) {
@@ -156,7 +157,7 @@ func stringHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
-	lex.push(NewToken(STRING_TOKEN, stringLiteral, start, end))
+	lex.push(tokens.NewToken(tokens.STRING_TOKEN, stringLiteral, start, end))
 }
 
 func byteHandler(lex *Lexer, regex *regexp.Regexp) {
@@ -166,7 +167,7 @@ func byteHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
-	lex.push(NewToken(BYTE_TOKEN, byteLiteral, start, end))
+	lex.push(tokens.NewToken(tokens.BYTE_TOKEN, byteLiteral, start, end))
 }
 
 // skipHandler processes a token that should be skipped by the lexer.
@@ -176,7 +177,7 @@ func skipHandler(lex *Lexer, regex *regexp.Regexp) {
 }
 
 // Tokenize reads the source code from the specified file and tokenizes it.
-func (lex *Lexer) Tokenize(debug bool) []Token {
+func (lex *Lexer) Tokenize(debug bool) []tokens.Token {
 
 	for !lex.atEOF() {
 
@@ -209,7 +210,7 @@ func (lex *Lexer) Tokenize(debug bool) []Token {
 		}
 	}
 
-	lex.push(NewToken(EOF_TOKEN, "end of file", lex.Position, lex.Position))
+	lex.push(tokens.NewToken(tokens.EOF_TOKEN, "end of file", lex.Position, lex.Position))
 
 	if debug {
 		for _, token := range lex.Tokens {

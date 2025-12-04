@@ -3,7 +3,7 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/frontend/lexer"
+	"compiler/internal/tokens"
 	"compiler/internal/source"
 	"fmt"
 )
@@ -13,7 +13,7 @@ func (p *Parser) parseType() ast.TypeNode {
 	tok := p.peek()
 
 	// Check for reference type &T
-	if p.match(lexer.BIT_AND_TOKEN) {
+	if p.match(tokens.BIT_AND_TOKEN) {
 		ampersand := p.advance()
 		baseType := p.parseType()
 		// Handle case where baseType might be Invalid with potential nil location issues
@@ -32,26 +32,26 @@ func (p *Parser) parseType() ast.TypeNode {
 	var t ast.TypeNode
 
 	switch tok.Kind {
-	case lexer.IDENTIFIER_TOKEN:
+	case tokens.IDENTIFIER_TOKEN:
 		// Type identifier - convert IdentifierExpr to support both Expr() and TypeExpr()
 		t = p.parseIdentifier()
 
-	case lexer.OPEN_BRACKET:
+	case tokens.OPEN_BRACKET:
 		t = p.parseArrayType()
 
-	case lexer.STRUCT_TOKEN:
+	case tokens.STRUCT_TOKEN:
 		t = p.parseStructType()
 
-	case lexer.INTERFACE_TOKEN:
+	case tokens.INTERFACE_TOKEN:
 		t = p.parseInterfaceType()
 
-	case lexer.ENUM_TOKEN:
+	case tokens.ENUM_TOKEN:
 		t = p.parseEnumType()
 
-	case lexer.MAP_TOKEN:
+	case tokens.MAP_TOKEN:
 		t = p.parseMapType()
 
-	case lexer.FUNCTION_TOKEN:
+	case tokens.FUNCTION_TOKEN:
 		start := p.advance().Start
 		t = p.parseFuncType(start)
 
@@ -70,7 +70,7 @@ func (p *Parser) parseType() ast.TypeNode {
 	}
 
 	// Check for optional type T?
-	if p.match(lexer.QUESTION_TOKEN) {
+	if p.match(tokens.QUESTION_TOKEN) {
 		p.advance()
 		t = &ast.OptionalType{
 			Base:     t,
@@ -84,7 +84,7 @@ func (p *Parser) parseType() ast.TypeNode {
 	//   2. T!     - default error type (defaults to 'str')
 	// The default can be changed later to Error struct or same type as success type
 	// Note: ErrorType always has exactly two types: Value (success) and Error
-	if p.match(lexer.NOT_TOKEN) {
+	if p.match(tokens.NOT_TOKEN) {
 		notToken := p.advance() // consume '!'
 
 		var resultType ast.TypeNode
@@ -93,7 +93,7 @@ func (p *Parser) parseType() ast.TypeNode {
 		// Check if error type is provided (T ! E) or use default (T!)
 		// Default error type is 'str' for now, but this can be changed later
 		// to Error struct or same type as success type
-		if !p.match(lexer.SEMICOLON_TOKEN, lexer.CLOSE_PAREN, lexer.COMMA_TOKEN, lexer.OPEN_CURLY) {
+		if !p.match(tokens.SEMICOLON_TOKEN, tokens.CLOSE_PAREN, tokens.COMMA_TOKEN, tokens.OPEN_CURLY) {
 			// Error type is explicitly provided
 			resultType = p.parseType()
 			if resultType != nil && resultType.Loc() != nil {
@@ -122,14 +122,14 @@ func (p *Parser) parseType() ast.TypeNode {
 
 func (p *Parser) parseArrayType() *ast.ArrayType {
 
-	tok := p.expect(lexer.OPEN_BRACKET)
+	tok := p.expect(tokens.OPEN_BRACKET)
 
 	var size ast.Expression
-	if !p.match(lexer.CLOSE_BRACKET) {
+	if !p.match(tokens.CLOSE_BRACKET) {
 		size = p.parseExpr()
 	}
 
-	p.expect(lexer.CLOSE_BRACKET)
+	p.expect(tokens.CLOSE_BRACKET)
 
 	elem := p.parseType()
 
@@ -142,22 +142,22 @@ func (p *Parser) parseArrayType() *ast.ArrayType {
 
 func (p *Parser) parseStructType() *ast.StructType {
 
-	tok := p.expect(lexer.STRUCT_TOKEN)
-	p.expect(lexer.OPEN_CURLY)
+	tok := p.expect(tokens.STRUCT_TOKEN)
+	p.expect(tokens.OPEN_CURLY)
 
 	fields := []ast.Field{}
 
-	for !(p.match(lexer.CLOSE_CURLY) || p.isAtEnd()) {
+	for !(p.match(tokens.CLOSE_CURLY) || p.isAtEnd()) {
 		// Error recovery: Check if we have a dot token
-		if !p.match(lexer.DOT_TOKEN) {
+		if !p.match(tokens.DOT_TOKEN) {
 			p.error(fmt.Sprintf("expected . for struct field, got %s", p.peek().Value))
 			p.advance() // Advance to prevent infinite loop
 			continue
 		}
 
-		p.expect(lexer.DOT_TOKEN)
+		p.expect(tokens.DOT_TOKEN)
 		name := p.parseIdentifier()
-		p.expect(lexer.COLON_TOKEN)
+		p.expect(tokens.COLON_TOKEN)
 		typ := p.parseType()
 
 		fields = append(fields, ast.Field{
@@ -165,19 +165,19 @@ func (p *Parser) parseStructType() *ast.StructType {
 			Type: typ,
 		})
 
-		if p.match(lexer.CLOSE_CURLY) {
+		if p.match(tokens.CLOSE_CURLY) {
 			break
 		}
 
-		if p.checkTrailing(lexer.COMMA_TOKEN, lexer.CLOSE_CURLY, "struct type") {
+		if p.checkTrailing(tokens.COMMA_TOKEN, tokens.CLOSE_CURLY, "struct type") {
 			p.advance() // skip the token
 			break
 		}
 
-		p.expect(lexer.COMMA_TOKEN)
+		p.expect(tokens.COMMA_TOKEN)
 	}
 
-	end := p.expect(lexer.CLOSE_CURLY)
+	end := p.expect(tokens.CLOSE_CURLY)
 
 	return &ast.StructType{
 		Fields:   fields,
@@ -187,18 +187,18 @@ func (p *Parser) parseStructType() *ast.StructType {
 
 func (p *Parser) parseFuncType(start source.Position) *ast.FuncType {
 
-	p.expect(lexer.OPEN_PAREN)
+	p.expect(tokens.OPEN_PAREN)
 
 	var params []ast.Field
 
-	if p.match(lexer.CLOSE_PAREN) {
+	if p.match(tokens.CLOSE_PAREN) {
 		p.advance()
 	} else {
 		params = parseParams(p)
 	}
 
 	var result ast.TypeNode
-	if p.match(lexer.ARROW_TOKEN) {
+	if p.match(tokens.ARROW_TOKEN) {
 		p.advance()
 		result = p.parseType()
 	}
@@ -214,14 +214,14 @@ func parseParams(p *Parser) []ast.Field {
 
 	params := []ast.Field{}
 
-	for !(p.match(lexer.CLOSE_PAREN) || p.isAtEnd()) {
+	for !(p.match(tokens.CLOSE_PAREN) || p.isAtEnd()) {
 
 		name := p.parseIdentifier()
-		p.expect(lexer.COLON_TOKEN)
+		p.expect(tokens.COLON_TOKEN)
 
 		// Check for variadic parameter (...)
 		isVariadic := false
-		if p.match(lexer.THREE_DOT_TOKEN) {
+		if p.match(tokens.THREE_DOT_TOKEN) {
 			isVariadic = true
 			p.advance() // consume '...'
 		}
@@ -243,19 +243,19 @@ func parseParams(p *Parser) []ast.Field {
 			Location:   *source.NewLocation(&p.filepath, name.Start, endPos),
 		})
 
-		if p.match(lexer.CLOSE_PAREN) {
+		if p.match(tokens.CLOSE_PAREN) {
 			break
 		}
 
-		if p.checkTrailing(lexer.COMMA_TOKEN, lexer.CLOSE_PAREN, "function parameters") {
+		if p.checkTrailing(tokens.COMMA_TOKEN, tokens.CLOSE_PAREN, "function parameters") {
 			p.advance() // skip the token
 			break
 		}
 
-		p.expect(lexer.COMMA_TOKEN)
+		p.expect(tokens.COMMA_TOKEN)
 	}
 
-	p.expect(lexer.CLOSE_PAREN)
+	p.expect(tokens.CLOSE_PAREN)
 
 	return params
 }
@@ -264,11 +264,11 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 	tok := p.advance()
 
-	p.expect(lexer.OPEN_CURLY)
+	p.expect(tokens.OPEN_CURLY)
 
 	methods := []ast.Field{}
 
-	for !(p.match(lexer.CLOSE_CURLY) || p.isAtEnd()) {
+	for !(p.match(tokens.CLOSE_CURLY) || p.isAtEnd()) {
 
 		// funcname (...) -> ...
 
@@ -282,19 +282,19 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 			Location: *source.NewLocation(&p.filepath, name.Start, functype.End),
 		})
 
-		if p.match(lexer.CLOSE_CURLY) {
+		if p.match(tokens.CLOSE_CURLY) {
 			break
 		}
 
-		if p.checkTrailing(lexer.SEMICOLON_TOKEN, lexer.CLOSE_CURLY, "interface type") {
+		if p.checkTrailing(tokens.SEMICOLON_TOKEN, tokens.CLOSE_CURLY, "interface type") {
 			p.advance() // skip the token
 			break
 		}
 
-		p.expect(lexer.COMMA_TOKEN)
+		p.expect(tokens.COMMA_TOKEN)
 	}
 
-	end := p.expectError(lexer.CLOSE_CURLY, fmt.Sprintf("expected '}' to close interface type, found %s", p.peek().Kind)).End
+	end := p.expectError(tokens.CLOSE_CURLY, fmt.Sprintf("expected '}' to close interface type, found %s", p.peek().Kind)).End
 
 	return &ast.InterfaceType{
 		Methods:  methods,
@@ -304,15 +304,15 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 func (p *Parser) parseEnumType() *ast.EnumType {
 
-	tok := p.expect(lexer.ENUM_TOKEN)
+	tok := p.expect(tokens.ENUM_TOKEN)
 
-	p.expect(lexer.OPEN_CURLY)
+	p.expect(tokens.OPEN_CURLY)
 
 	fields := []ast.Field{}
 
-	for !(p.match(lexer.CLOSE_CURLY) || p.isAtEnd()) {
+	for !(p.match(tokens.CLOSE_CURLY) || p.isAtEnd()) {
 		// Error recovery: Check if we have an identifier
-		if !p.match(lexer.IDENTIFIER_TOKEN) {
+		if !p.match(tokens.IDENTIFIER_TOKEN) {
 			p.error(fmt.Sprintf("expected enum variant name, got %s", p.peek().Value))
 			p.advance() // Advance to prevent infinite loop
 			continue
@@ -323,20 +323,20 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 			Name: name,
 		})
 
-		if p.match(lexer.CLOSE_CURLY) {
+		if p.match(tokens.CLOSE_CURLY) {
 			break
 		}
 
 		// Check for trailing comma before closing brace
-		if p.checkTrailing(lexer.COMMA_TOKEN, lexer.CLOSE_CURLY, "enum type") {
+		if p.checkTrailing(tokens.COMMA_TOKEN, tokens.CLOSE_CURLY, "enum type") {
 			p.advance() // skip the token
 			break
 		}
 
-		p.expect(lexer.COMMA_TOKEN)
+		p.expect(tokens.COMMA_TOKEN)
 	}
 
-	p.expectError(lexer.CLOSE_CURLY, fmt.Sprintf("expected '}' to close enum type, found %s", p.peek().Kind))
+	p.expectError(tokens.CLOSE_CURLY, fmt.Sprintf("expected '}' to close enum type, found %s", p.peek().Kind))
 
 	return &ast.EnumType{
 		Variants: fields,
@@ -348,11 +348,11 @@ func (p *Parser) parseMapType() *ast.MapType {
 
 	tok := p.advance()
 
-	p.expect(lexer.OPEN_BRACKET)
+	p.expect(tokens.OPEN_BRACKET)
 
 	keyType := p.parseType()
 
-	p.expect(lexer.CLOSE_BRACKET)
+	p.expect(tokens.CLOSE_BRACKET)
 
 	valueType := p.parseType()
 

@@ -41,9 +41,9 @@ func (db *DiagnosticBag) AddSourceContent(filepath, content string) {
 func (db *DiagnosticBag) Add(diag *Diagnostic) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	
+
 	db.diagnostics = append(db.diagnostics, diag)
-	
+
 	switch diag.Severity {
 	case Error:
 		db.errorCount++
@@ -107,8 +107,9 @@ func (db *DiagnosticBag) EmitAllToString() string {
 
 	var buf bytes.Buffer
 	emitter := &Emitter{
-		cache:  db.sourceCache,
-		writer: &buf,
+		cache:       db.sourceCache,
+		writer:      &buf,
+		highlighter: NewSyntaxHighlighter(true),
 	}
 
 	db.mu.Lock()

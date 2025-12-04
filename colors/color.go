@@ -1,5 +1,7 @@
 package colors
 
+import "fmt"
+
 // ANSI color escape codes
 type COLOR string
 
@@ -47,7 +49,24 @@ const (
 	MAGENTA      COLOR = "\033[38;5;201m"
 	LIGHT_GREY   COLOR = "\033[38;5;250m"
 	DARK_GREY    COLOR = "\033[38;5;240m"
+	//light orange
+	LIGHT_ORANGE COLOR = "\033[38;5;215m"
 	LIGHT_BLUE   COLOR = "\033[38;5;81m"
 	LIGHT_GREEN  COLOR = "\033[38;5;120m"
 	LIGHT_YELLOW COLOR = "\033[38;5;229m"
 )
+
+func PrintAllColors() {
+	// list all colors for debug purposes
+	colors := []COLOR{
+		BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE,
+		BRIGHT_RED, BRIGHT_GREEN, BRIGHT_YELLOW, BRIGHT_BLUE, BRIGHT_PURPLE, BRIGHT_CYAN, BRIGHT_WHITE,
+		BOLD, BOLD_RED, BOLD_GREEN, BOLD_YELLOW, BOLD_BLUE, BOLD_PURPLE, BOLD_CYAN, BOLD_WHITE,
+		ORANGE, BROWN, BRIGHT_BROWN, PINK, TEAL, AQUA, MAGENTA,
+		LIGHT_GREY, DARK_GREY, LIGHT_ORANGE, LIGHT_BLUE, LIGHT_GREEN, LIGHT_YELLOW,
+	}
+
+	for _, color := range colors {
+		fmt.Printf("%sThis is a sample text in color %s%s\n", color, color, RESET)
+	}
+}

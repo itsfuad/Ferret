@@ -73,6 +73,7 @@ type Emitter struct {
 	cache               *SourceCache
 	writer              io.Writer
 	currentLineNumWidth int // gutter width for current diagnostic
+	highlighter         *SyntaxHighlighter
 }
 
 // labelContext groups parameters for printing labels
@@ -90,7 +91,30 @@ type labelContext struct {
 
 // NewEmitter creates an emitter that writes to a specific writer
 func NewEmitter(w io.Writer) *Emitter {
-	return &Emitter{cache: NewSourceCache(), writer: w}
+	return &Emitter{
+		cache:       NewSourceCache(),
+		writer:      w,
+		highlighter: NewSyntaxHighlighter(true), // Enabled by default
+	}
+}
+
+// EnableSyntaxHighlighting turns on syntax highlighting for code snippets
+func (e *Emitter) EnableSyntaxHighlighting() {
+	e.highlighter.Enable()
+}
+
+// DisableSyntaxHighlighting turns off syntax highlighting for code snippets
+func (e *Emitter) DisableSyntaxHighlighting() {
+	e.highlighter.Disable()
+}
+
+// SetSyntaxHighlighting sets the syntax highlighting mode
+func (e *Emitter) SetSyntaxHighlighting(enabled bool) {
+	if enabled {
+		e.highlighter.Enable()
+	} else {
+		e.highlighter.Disable()
+	}
 }
 
 // ---- Gutter helpers (single source of truth) ----
@@ -134,7 +158,9 @@ func (e *Emitter) printPrevNonEmptyLine(filepath string, line int) {
 		return
 	}
 	e.printGutter(line - 1)
-	colors.GREY.Fprintln(e.writer, prevLine)
+	colors.GREY.Fprint(e.writer, "")
+	e.highlighter.HighlightWithColor(prevLine, e.writer)
+	fmt.Fprintln(e.writer)
 }
 
 // calculateLineNumWidthForDiagnostic calculates the gutter width needed for all lines displayed in this diagnostic
@@ -421,7 +447,8 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 	}
 
 	e.printCurrentGutter(ctx.line)
-	fmt.Fprintln(e.writer, sourceLine)
+	e.highlighter.HighlightWithColor(sourceLine, e.writer)
+	fmt.Fprintln(e.writer)
 
 	// Underline leader
 	e.printBlankGutter()
@@ -483,7 +510,8 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 	}
 
 	e.printCurrentGutter(ctx.startLine)
-	fmt.Fprintln(e.writer, startSourceLine)
+	e.highlighter.HighlightWithColor(startSourceLine, e.writer)
+	fmt.Fprintln(e.writer)
 
 	// Print underline for start
 	e.printBlankGutterWithColor(colors.WHITE)
@@ -526,7 +554,8 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 				continue
 			}
 			e.printCurrentGutter(i)
-			fmt.Fprintln(e.writer, line)
+			e.highlighter.HighlightWithColor(line, e.writer)
+			fmt.Fprintln(e.writer)
 		}
 	}
 
@@ -535,7 +564,8 @@ func (e *Emitter) printMultiLineLabel(ctx labelContext) {
 	if err == nil {
 		// End line should be white like other displayed source lines
 		e.printCurrentGutter(ctx.endLine)
-		fmt.Fprintln(e.writer, endSourceLine)
+		e.highlighter.HighlightWithColor(endSourceLine, e.writer)
+		fmt.Fprintln(e.writer)
 
 		e.printBlankGutter()
 		endPadding := ctx.endCol - 1
@@ -614,7 +644,8 @@ func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondar
 		return
 	}
 	e.printCurrentGutter(line)
-	fmt.Fprintln(e.writer, sourceLine)
+	e.highlighter.HighlightWithColor(sourceLine, e.writer)
+	fmt.Fprintln(e.writer)
 
 	leftPadding := leftStart.Column - 1
 	leftLength := leftEnd.Column - leftStart.Column
@@ -751,7 +782,8 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 		}
 
 		e.printCurrentGutter(lineNum)
-		fmt.Fprintln(e.writer, sourceLine)
+		e.highlighter.HighlightWithColor(sourceLine, e.writer)
+		fmt.Fprintln(e.writer)
 
 		hasSecondary := false
 		for _, sec := range secondaries {
