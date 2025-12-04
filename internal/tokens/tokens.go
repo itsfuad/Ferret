@@ -3,11 +3,11 @@ package tokens
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"compiler/colors"
 	"compiler/internal/source"
 	"compiler/internal/types"
+	"compiler/internal/utils/numeric"
 )
 
 type TOKEN string
@@ -155,41 +155,37 @@ func IsKeyword(token string) bool {
 	return false
 }
 
-// Todo: improve number detection
+// IsNumber checks if a token represents any valid numeric literal
+// Supports: decimal, hex (0x), octal (0o), binary (0b), floats, scientific notation
+// Allows underscores for readability and handles large integers (128/256-bit)
 func IsNumber(token string) bool {
 	if len(token) == 0 {
 		return false
 	}
 
-	// Check for hex (0x), binary (0b), octal (0o) prefixes
-	if len(token) > 2 {
-		prefix := token[:2]
-		if prefix == "0x" || prefix == "0X" || prefix == "0b" || prefix == "0B" || prefix == "0o" || prefix == "0O" {
-			return true
-		}
-	}
-
-	// Check if it's a regular number (int or float)
-	_, err := fmt.Sscanf(token, "%f", new(float64))
-	return err == nil
+	// Check all supported number formats using numeric package regexes
+	return numeric.IsDecimal(token) ||
+		numeric.IsHexadecimal(token) ||
+		numeric.IsOctal(token) ||
+		numeric.IsBinary(token) ||
+		numeric.IsFloat(token)
 }
 
-// IsInteger checks if a token is an integer (no decimal point)
+// IsInteger checks if a token is an integer (not a float)
 func IsInteger(token string) bool {
-	if !IsNumber(token) {
+	if len(token) == 0 {
 		return false
 	}
-	// If it contains a decimal point, it's a float
-	return !strings.Contains(token, ".")
+
+	return numeric.IsDecimal(token) ||
+		numeric.IsHexadecimal(token) ||
+		numeric.IsOctal(token) ||
+		numeric.IsBinary(token)
 }
 
 // IsFloat checks if a token is a floating-point number
 func IsFloat(token string) bool {
-	if !IsNumber(token) {
-		return false
-	}
-	// Must contain a decimal point to be a float
-	return strings.Contains(token, ".")
+	return numeric.IsFloat(token)
 }
 
 func IsString(token string) bool {
