@@ -1,0 +1,27 @@
+// Test method declarations with new architecture
+
+type Point struct {
+    .x: f64,
+    .y: f64,
+};
+
+// Valid method on user-defined type
+fn (p: Point) distance() -> f64 {
+    return p.x + p.y;
+}
+
+// Another method
+fn (p: Point) scale(factor: f64) -> Point {
+    return Point{
+        .x: p.x * factor,
+        .y: p.y * factor,
+    };
+}
+
+// Test method call
+fn main() -> i32 {
+    let p := Point{.x: 3.0, .y: 4.0};
+    let dist := p.distance();
+    let scaled := p.scale(2.0);
+    return 0;
+}

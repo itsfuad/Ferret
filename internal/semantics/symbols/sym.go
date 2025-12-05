@@ -13,13 +13,21 @@ type SymbolTable interface {
 }
 
 // Symbol represents a declared entity (variable, function, type, etc.)
+// Scopes are stored in AST nodes (FuncDecl.Scope, Block.Scope, etc.), not here.
 type Symbol struct {
+	Name          string
+	Kind          SymbolKind
+	Type          types.SemType          // Semantic type of the symbol
+	Exported      bool                   // Whether symbol is accessible from other modules
+	Decl          ast.Node               // AST node that declared this symbol
+	DeclaredScope SymbolTable            // Scope where this symbol was declared
+	Methods       map[string]*MethodInfo // Methods attached to this named type (only for SymbolType)
+}
+
+// MethodInfo stores information about a method attached to a named type
+type MethodInfo struct {
 	Name     string
-	Kind     SymbolKind
-	Type     types.SemType // Semantic type of the symbol
-	Exported bool          // Whether symbol is accessible from other modules
-	Decl     ast.Node      // AST node that declared this symbol
-	Scope    SymbolTable   // For types: holds methods and associated functions
+	FuncType *types.FunctionType
 }
 
 // SymbolKind categorizes symbols

@@ -1,2 +1,6 @@
 
 const PI := 3.1416;
+
+fn Sqrt(number: i32) -> f32 {
+    return number ** 0.5;
+}

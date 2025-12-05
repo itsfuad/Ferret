@@ -203,6 +203,8 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 
 	case *ast.CastExpr:
 		resolveExpr(ctx, mod, e.X)
+		// Resolve the target type as well
+		resolveTypeNode(ctx, mod, e.Type)
 
 	case *ast.ElvisExpr:
 		resolveExpr(ctx, mod, e.Cond)
@@ -292,6 +294,10 @@ func resolveTypeNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, ty
 	}
 
 	switch t := typeNode.(type) {
+	case *ast.ScopeResolutionExpr:
+		// Handle module::Type references
+		resolveStaticAccess(ctx, mod, t)
+
 	case *ast.ReferenceType:
 		// Resolve the type name
 		if ident, ok := t.Base.(*ast.IdentifierExpr); ok {

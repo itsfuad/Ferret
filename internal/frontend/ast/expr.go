@@ -1,15 +1,15 @@
 package ast
 
 import (
-	"compiler/internal/tokens"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 )
 
 // BinaryExpr represents a binary expression
 type BinaryExpr struct {
-	X  Expression  // left operand
+	X  Expression   // left operand
 	Op tokens.Token // operator
-	Y  Expression  // right operand
+	Y  Expression   // right operand
 	source.Location
 }
 
@@ -20,7 +20,7 @@ func (b *BinaryExpr) Loc() *source.Location { return &b.Location }
 // UnaryExpr represents a unary expression
 type UnaryExpr struct {
 	Op tokens.Token // operator
-	X  Expression  // operand
+	X  Expression   // operand
 	source.Location
 }
 
@@ -31,7 +31,7 @@ func (u *UnaryExpr) Loc() *source.Location { return &u.Location }
 // PrefixExpr represents a prefix increment/decrement expression (++x, --x)
 type PrefixExpr struct {
 	Op tokens.Token // operator (++, --)
-	X  Expression  // operand
+	X  Expression   // operand
 	source.Location
 }
 
@@ -41,7 +41,7 @@ func (p *PrefixExpr) Loc() *source.Location { return &p.Location }
 
 // PostfixExpr represents a postfix increment/decrement expression (x++, x--)
 type PostfixExpr struct {
-	X  Expression  // operand
+	X  Expression   // operand
 	Op tokens.Token // operator (++, --)
 	source.Location
 }
@@ -153,6 +153,7 @@ type ScopeResolutionExpr struct {
 
 func (s *ScopeResolutionExpr) INode()                {} // Implements Node interface
 func (s *ScopeResolutionExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (s *ScopeResolutionExpr) TypeExpr()             {} // Can also be used as a type name (for module::Type)
 func (s *ScopeResolutionExpr) Loc() *source.Location { return &s.Location }
 
 // ParenExpr represents a parenthesized expression

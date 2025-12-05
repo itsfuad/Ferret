@@ -19,3 +19,17 @@ fn add(a: i32, b: i32) -> i32 {
 let result := add(10, 20);
 
 let name : i32 = utils::NAME;
+
+let point := { .x = 1, .y = 2 } as utils::Point;
+
+// add methods on Point
+fn (p: utils::Point) normalize() {
+    // manual math operation without using std/math by using ** operator
+    let length := (p.x ** 2 + p.y ** 2) ** 0.5;
+    p.x = p.x / length;
+    p.y = p.y / length;
+}
+
+point.move(5, 10);
+point.normalize();
+point.notExist();

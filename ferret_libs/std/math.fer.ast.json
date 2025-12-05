@@ -49,6 +49,192 @@
         "Index": 20
       },
       "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+    },
+    {
+      "Name": {
+        "Name": "Sqrt",
+        "Start": {
+          "Line": 4,
+          "Column": 4,
+          "Index": 25
+        },
+        "End": {
+          "Line": 4,
+          "Column": 8,
+          "Index": 29
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+      },
+      "Type": {
+        "Params": [
+          {
+            "Name": {
+              "Name": "number",
+              "Start": {
+                "Line": 4,
+                "Column": 9,
+                "Index": 30
+              },
+              "End": {
+                "Line": 4,
+                "Column": 15,
+                "Index": 36
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+            },
+            "Type": {
+              "Name": "i32",
+              "Start": {
+                "Line": 4,
+                "Column": 17,
+                "Index": 38
+              },
+              "End": {
+                "Line": 4,
+                "Column": 20,
+                "Index": 41
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+            },
+            "Value": null,
+            "IsVariadic": false,
+            "Start": {
+              "Line": 4,
+              "Column": 9,
+              "Index": 30
+            },
+            "End": {
+              "Line": 4,
+              "Column": 20,
+              "Index": 41
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+          }
+        ],
+        "Result": {
+          "Name": "f32",
+          "Start": {
+            "Line": 4,
+            "Column": 25,
+            "Index": 46
+          },
+          "End": {
+            "Line": 4,
+            "Column": 28,
+            "Index": 49
+          },
+          "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+        },
+        "Start": {
+          "Line": 4,
+          "Column": 1,
+          "Index": 22
+        },
+        "End": {
+          "Line": 4,
+          "Column": 28,
+          "Index": 49
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+      },
+      "Body": {
+        "Nodes": [
+          {
+            "Result": {
+              "X": {
+                "Name": "number",
+                "Start": {
+                  "Line": 5,
+                  "Column": 12,
+                  "Index": 63
+                },
+                "End": {
+                  "Line": 5,
+                  "Column": 18,
+                  "Index": 69
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+              },
+              "Op": {
+                "Kind": "**",
+                "Value": "**",
+                "Start": {
+                  "Line": 5,
+                  "Column": 19,
+                  "Index": 70
+                },
+                "End": {
+                  "Line": 5,
+                  "Column": 21,
+                  "Index": 72
+                }
+              },
+              "Y": {
+                "Kind": 1,
+                "Value": "0.5",
+                "Start": {
+                  "Line": 5,
+                  "Column": 22,
+                  "Index": 73
+                },
+                "End": {
+                  "Line": 5,
+                  "Column": 25,
+                  "Index": 76
+                },
+                "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+              },
+              "Start": {
+                "Line": 5,
+                "Column": 12,
+                "Index": 63
+              },
+              "End": {
+                "Line": 5,
+                "Column": 25,
+                "Index": 76
+              },
+              "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+            },
+            "IsError": false,
+            "Start": {
+              "Line": 5,
+              "Column": 5,
+              "Index": 56
+            },
+            "End": {
+              "Line": 5,
+              "Column": 25,
+              "Index": 76
+            },
+            "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+          }
+        ],
+        "Scope": null,
+        "Start": {
+          "Line": 4,
+          "Column": 29,
+          "Index": 50
+        },
+        "End": {
+          "Line": 6,
+          "Column": 2,
+          "Index": 79
+        },
+        "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
+      },
+      "Scope": null,
+      "Start": {
+        "Line": 4,
+        "Column": 1,
+        "Index": 22
+      },
+      "End": {
+        "Line": 6,
+        "Column": 2,
+        "Index": 79
+      },
+      "Filename": "/home/fuad/Documents/dev/go/Ferret/ferret_libs/std/math.fer"
     }
   ],
   "Start": null,

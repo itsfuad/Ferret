@@ -35,7 +35,13 @@ func (p *Parser) parseType() ast.TypeNode {
 	switch tok.Kind {
 	case tokens.IDENTIFIER_TOKEN:
 		// Type identifier - convert IdentifierExpr to support both Expr() and TypeExpr()
-		t = p.parseIdentifier()
+		ident := p.parseIdentifier()
+		t = ident
+		// Check for scope resolution (module::Type)
+		if p.match(tokens.SCOPE_TOKEN) {
+			// IdentifierExpr implements both Expression and TypeNode
+			t = p.parseScopeResolutionExpr(ident)
+		}
 
 	case tokens.OPEN_BRACKET:
 		t = p.parseArrayType()

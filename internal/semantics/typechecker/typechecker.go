@@ -16,8 +16,47 @@ import (
 	"sync"
 )
 
+// TypeCheckMethodSignatures only processes method signatures to attach methods to types
+// This must run before CheckModule so all methods are available
+func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	if mod.AST == nil {
+		return
+	}
+
+	if ctx.Debug {
+		fmt.Printf("    [TypeCheckMethodSignatures for %s]\n", mod.ImportPath)
+	}
+
+	// Reset CurrentScope to ModuleScope
+	mod.CurrentScope = mod.ModuleScope
+
+	// CRITICAL: Check type declarations FIRST so receiver types are resolved
+	for _, node := range mod.AST.Nodes {
+		if typeDecl, ok := node.(*ast.TypeDecl); ok {
+			checkTypeDecl(ctx, mod, typeDecl)
+		}
+	}
+
+	// Now process method declarations - attach them to types
+	methodCount := 0
+	for _, node := range mod.AST.Nodes {
+		if methodDecl, ok := node.(*ast.MethodDecl); ok {
+			if ctx.Debug {
+				fmt.Printf("      [Found method %s]\n", methodDecl.Name.Name)
+			}
+			checkMethodSignatureOnly(ctx, mod, methodDecl)
+			methodCount++
+		}
+	}
+
+	if ctx.Debug {
+		fmt.Printf("    [Processed %d methods]\n", methodCount)
+	}
+}
+
 // CheckModule performs type checking on a module.
-// It fills Symbol.Type for declarations and creates ExprTypes map for expressions.
+// Type declarations and method signatures are already checked in phase 4a.
+// This phase checks function bodies, variables, and method bodies.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 
 	// Reset CurrentScope to ModuleScope before type checking
@@ -25,17 +64,9 @@ func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	mod.CurrentScope = mod.ModuleScope
 
 	// Check all declarations in the module
-	// IMPORTANT: Check type declarations FIRST so user-defined types are available
-	// for use in variable declarations, function signatures, etc.
+	// SKIP type declarations and method signatures - already done in phase 4a
 	if mod.AST != nil {
-		// Pass 1: Check all type declarations first
-		for _, node := range mod.AST.Nodes {
-			if typeDecl, ok := node.(*ast.TypeDecl); ok {
-				checkTypeDecl(ctx, mod, typeDecl)
-			}
-		}
-
-		// Pass 2: Check everything else
+		// Check everything EXCEPT type declarations (already done in phase 4a)
 		for _, node := range mod.AST.Nodes {
 			if _, ok := node.(*ast.TypeDecl); !ok {
 				checkNode(ctx, mod, node)
@@ -471,11 +502,26 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		}
 	}
 
-	// Check if it's a method (look in type's scope)
+	// Check if it's a method on the named type
+	// Methods are attached to type symbols in their declaring module
 	if structType.Name != "" {
-		// Look up the type symbol to get its scope
-		if typeSym, ok := mod.ModuleScope.Lookup(structType.Name); ok && typeSym.Scope != nil {
-			if _, ok := typeSym.Scope.GetSymbol(fieldName); ok {
+		// Try to find the type symbol
+		typeSym, found := mod.ModuleScope.Lookup(structType.Name)
+		if !found {
+			// Not in current module, search imported modules
+			for _, importPath := range mod.ImportAliasMap {
+				if importedMod, exists := ctx.GetModule(importPath); exists {
+					if sym, ok := importedMod.ModuleScope.GetSymbol(structType.Name); ok && sym.Kind == symbols.SymbolType {
+						typeSym = sym
+						found = true
+						break
+					}
+				}
+			}
+		}
+
+		if found && typeSym.Methods != nil {
+			if _, ok := typeSym.Methods[fieldName]; ok {
 				return // Method exists
 			}
 		}
@@ -497,7 +543,76 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	}
 }
 
-// checkMethodDecl type checks a method declaration with receiver
+// checkMethodSignatureOnly processes only the method signature (receiver + parameters + return type)
+// and attaches the method to its type. Does NOT check the body.
+func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+	if ctx.Debug {
+		fmt.Printf("        [checkMethodSignatureOnly: %s]\n", decl.Name.Name)
+	}
+
+	// Get receiver type
+	if decl.Receiver == nil || decl.Receiver.Type == nil {
+		if ctx.Debug {
+			fmt.Printf("          [No receiver]\n")
+		}
+		return
+	}
+
+	receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+
+	// Only process valid named types
+	if receiverType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Get type name
+	var typeName string
+	switch rt := receiverType.(type) {
+	case *types.StructType:
+		typeName = rt.Name
+	case *types.EnumType:
+		typeName = rt.Name
+	default:
+		return
+	}
+
+	if typeName == "" {
+		return
+	}
+
+	// Find the type symbol - could be in current module or imported module
+	typeSym, found := mod.ModuleScope.Lookup(typeName)
+	if !found {
+		// Not in current module, search imported modules
+		for _, importPath := range mod.ImportAliasMap {
+			if importedMod, exists := ctx.GetModule(importPath); exists {
+				if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+					typeSym = sym
+					found = true
+					break
+				}
+			}
+		}
+	}
+
+	// Type check the method signature and attach to type symbol
+	if found && typeSym.Kind == symbols.SymbolType && decl.Type != nil {
+		funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
+
+		// Attach method to the type symbol's Methods map
+		if typeSym.Methods == nil {
+			typeSym.Methods = make(map[string]*symbols.MethodInfo)
+		}
+
+		// Create method info and attach to type symbol
+		typeSym.Methods[decl.Name.Name] = &symbols.MethodInfo{
+			Name:     decl.Name.Name,
+			FuncType: funcType,
+		}
+	}
+}
+
+// checkMethodDecl type checks method body (signature already checked in phase 4a)
 func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
 	// Safety check: Scope should be set during collection phase
 	if decl.Scope == nil {
@@ -507,34 +622,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 
 	methodScope := decl.Scope.(*table.SymbolTable)
 
-	// Get receiver type
-	if decl.Receiver == nil || decl.Receiver.Type == nil {
-		// Error already reported in collector
-	} else {
-		receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
-
-		// Validate receiver type is a named struct (not anonymous or primitive)
-		structType, ok := receiverType.(*types.StructType)
-		if !ok {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("method receiver must be a struct type").
-					WithCode(diagnostics.ErrInvalidMethodReceiver).
-					WithPrimaryLabel(decl.Receiver.Loc(), fmt.Sprintf("type %s is not a struct", receiverType.String())),
-			)
-		} else if structType.Name != "" {
-			// Look up the receiver type symbol to get its method scope
-			if typeSym, ok := mod.ModuleScope.Lookup(structType.Name); ok && typeSym.Scope != nil {
-				typeScope := typeSym.Scope.(*table.SymbolTable)
-				// Update the method symbol with actual function signature
-				if methodSym, ok := typeScope.GetSymbol(decl.Name.Name); ok && decl.Type != nil {
-					funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
-					methodSym.Type = funcType
-				}
-			}
-		}
-	}
-
-	// Enter method scope for the entire method processing (even for invalid methods)
+	// Enter method scope
 	defer mod.EnterScope(methodScope)()
 
 	// Set expected return type for validation
@@ -548,7 +636,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		mod.CurrentFunctionReturnType = oldReturnType
 	}()
 
-	// Add receiver to method scope as a parameter (even for invalid methods, to allow body analysis)
+	// Add receiver to method scope
 	if decl.Receiver != nil && decl.Receiver.Name != nil {
 		receiverSym, ok := methodScope.GetSymbol(decl.Receiver.Name.Name)
 		if ok && decl.Receiver.Type != nil {
@@ -951,6 +1039,38 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 	}
 
 	switch t := typeNode.(type) {
+	case *ast.ScopeResolutionExpr:
+		// Handle module::Type references
+		if moduleIdent, ok := t.X.(*ast.IdentifierExpr); ok {
+			moduleAlias := moduleIdent.Name
+			typeName := t.Selector.Name
+
+			// Look up the import
+			importPath, ok := mod.ImportAliasMap[moduleAlias]
+			if !ok {
+				// Module not imported - error should have been reported in resolver
+				return types.TypeUnknown
+			}
+
+			// Get the imported module
+			importedMod, exists := ctx.GetModule(importPath)
+			if !exists {
+				// Module not loaded - error should have been reported
+				return types.TypeUnknown
+			}
+
+			// Look up the type in the imported module's scope
+			sym, ok := importedMod.ModuleScope.GetSymbol(typeName)
+			if !ok || sym.Kind != symbols.SymbolType {
+				// Type not found - error should have been reported in resolver
+				return types.TypeUnknown
+			}
+
+			// Return the resolved type
+			return sym.Type
+		}
+		return types.TypeUnknown
+
 	case *ast.IdentifierExpr:
 		// Try to look up user-defined type in symbol table first
 		sym, ok := mod.CurrentScope.Lookup(t.Name)
@@ -1121,6 +1241,12 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 // - Checking argument count (regular and variadic functions)
 // - Validating argument types against parameter types
 func checkCallExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) {
+	// 0. If the function being called is a selector (method call), validate it first
+	if selector, ok := expr.Fun.(*ast.SelectorExpr); ok {
+		checkExpr(ctx, mod, selector.X, types.TypeUnknown)
+		checkSelectorExpr(ctx, mod, selector)
+	}
+
 	// 1. Infer the type of the expression being called
 	funType := inferExprType(ctx, mod, expr.Fun)
 

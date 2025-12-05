@@ -3,6 +3,7 @@ package typechecker
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
@@ -200,14 +201,30 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 			}
 		}
 
-		// If not a field, check if it's a method (look in type's scope)
+		// If not a field, check if it's a method on the named type
+		// Methods are attached to type symbols in their declaring module
 		if structType.Name != "" {
-			// Look up the type symbol to get its scope
-			if typeSym, ok := mod.ModuleScope.Lookup(structType.Name); ok && typeSym.Scope != nil {
-				typeScope := typeSym.Scope.(*table.SymbolTable)
-				if methodSym, ok := typeScope.GetSymbol(fieldName); ok {
-					// Return the method's function type (includes return type)
-					return methodSym.Type
+			// Try to find the type symbol by looking it up by name
+			// First check current module's scope
+			typeSym, found := mod.ModuleScope.Lookup(structType.Name)
+			if !found {
+				// Not in current module, might be from an imported module
+				// Search through all modules to find where this type was declared
+				// This is needed because we only have the type, not the original module reference
+				for _, importPath := range mod.ImportAliasMap {
+					if importedMod, exists := ctx.GetModule(importPath); exists {
+						if sym, ok := importedMod.ModuleScope.GetSymbol(structType.Name); ok && sym.Kind == symbols.SymbolType {
+							typeSym = sym
+							found = true
+							break
+						}
+					}
+				}
+			}
+
+			if found && typeSym.Methods != nil {
+				if method, ok := typeSym.Methods[fieldName]; ok {
+					return method.FuncType
 				}
 			}
 		}
