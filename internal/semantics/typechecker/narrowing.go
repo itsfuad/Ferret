@@ -55,7 +55,7 @@ func (nc *NarrowingContext) GetNarrowedType(varName string) (types.SemType, bool
 
 // analyzeConditionForNarrowing checks if a condition narrows optional types
 // Returns two contexts: one for the "then" branch, one for the "else" branch
-func analyzeConditionForNarrowing(ctx *context_v2.CompilerContext, mod *context_v2.Module,
+func analyzeConditionForNarrowing(_ *context_v2.CompilerContext, mod *context_v2.Module,
 	condition ast.Expression, parentNarrowing *NarrowingContext) (*NarrowingContext, *NarrowingContext) {
 
 	thenNarrowing := NewNarrowingContext(parentNarrowing)
@@ -129,22 +129,4 @@ func getOptionalVarType(mod *context_v2.Module, varName string) *types.OptionalT
 	}
 
 	return nil
-}
-
-// getEffectiveType returns the narrowed type if available, otherwise the declared type
-func getEffectiveType(mod *context_v2.Module, varName string, narrowing *NarrowingContext) types.SemType {
-	// Check for narrowed type first
-	if narrowing != nil {
-		if narrowedType, ok := narrowing.GetNarrowedType(varName); ok {
-			return narrowedType
-		}
-	}
-
-	// Fall back to declared type
-	sym, ok := mod.CurrentScope.Lookup(varName)
-	if !ok {
-		return types.TypeUnknown
-	}
-
-	return sym.Type
 }

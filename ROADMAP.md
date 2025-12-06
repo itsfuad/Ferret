@@ -41,10 +41,24 @@ This document tracks planned improvements and enhancements to the Ferret compile
   - [ ] Add examples in help text
 
 ### Type Checker Polish
-- [ ] Review and improve existing error messages
-  - [ ] Make type mismatch errors more specific
-  - [ ] Add context about where types come from
-  - [ ] Suggest possible fixes (casts, conversions)
+- [x] Review and improve existing error messages
+  - [x] Make type mismatch errors more specific
+  - [x] Add context about where types come from
+  - [x] Suggest possible fixes (casts, conversions)
+  - [x] Changed "may lose precision" → "possible data loss"
+  - [x] Only show data loss warning when target bit size < source bit size
+- [x] Optional type narrowing
+  - [x] Narrow T? to T in if/elvis/comparison contexts
+  - [x] Defer-based scope restoration for type narrowing
+- [x] Byte type improvements
+  - [x] Fixed byte literal type inference
+  - [x] Byte and u8 require explicit cast (no implicit conversion)
+  - [x] Added escape sequence support (\n, \t, \0, \xHH)
+  - [x] Validate byte values fit in 0-255 range
+- [x] Unicode support
+  - [x] Full UTF-8 support in strings and comments
+  - [x] Multi-byte character handling in position tracking
+  - [x] Byte literals restricted to ASCII only
 - [ ] Edge case handling
   - [ ] Validate all built-in type operations
   - [ ] Check array bounds in literals
@@ -283,6 +297,28 @@ This document tracks planned improvements and enhancements to the Ferret compile
 ---
 
 ## Completed Tasks
+
+### Recent Improvements (December 2025)
+- ✅ **Optional Type Narrowing**
+  - Implemented T? → T narrowing in conditional contexts
+  - Elvis operator type narrowing (x ?: default)
+  - None literal comparison narrowing
+  - Defer-based scope restoration for clean implementation
+- ✅ **Byte Type Enhancements**
+  - Fixed byte literal type inference (ast.BYTE → types.TypeByte)
+  - Enforced explicit cast requirement between byte and u8
+  - Added escape sequence support (\n, \t, \r, \0, \\, \', \", \xHH)
+  - Byte value validation (0-255 range)
+- ✅ **Unicode Support**
+  - Full UTF-8 support in string literals (CJK, emoji, etc.)
+  - Full UTF-8 support in comments (single-line and multi-line)
+  - Fixed Position.Advance() to handle multi-byte UTF-8 correctly
+  - Byte literals remain ASCII-only (0-127) as intended
+- ✅ **Improved Error Messages**
+  - Changed "may lose precision" to "possible data loss"
+  - Only show data loss warning when target bit size < source bit size
+  - Cleaner messages for same-size type conversions (byte ↔ u8)
+  - Better cast suggestions in error messages
 
 ### Phase 1-4 Implementation (v0.1.0)
 - ✅ Lexer with comprehensive token support

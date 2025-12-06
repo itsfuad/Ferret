@@ -843,14 +843,15 @@ func extractModificationKindFromNode(node ast.Node, info map[string]Modification
 
 			// Check if it's increment: a = a + 1 or a += 1
 			if binExpr, ok := n.Rhs.(*ast.BinaryExpr); ok {
-				if binExpr.Op.Kind == tokens.PLUS_TOKEN {
+				switch binExpr.Op.Kind {
+				case tokens.PLUS_TOKEN:
 					if leftIdent, ok := binExpr.X.(*ast.IdentifierExpr); ok && leftIdent.Name == varName {
 						if lit, ok := binExpr.Y.(*ast.BasicLit); ok && lit.Value == "1" {
 							info[varName] = ModIncrement
 							return
 						}
 					}
-				} else if binExpr.Op.Kind == tokens.MINUS_TOKEN {
+				case tokens.MINUS_TOKEN:
 					if leftIdent, ok := binExpr.X.(*ast.IdentifierExpr); ok && leftIdent.Name == varName {
 						if lit, ok := binExpr.Y.(*ast.BasicLit); ok && lit.Value == "1" {
 							info[varName] = ModDecrement
@@ -867,17 +868,19 @@ func extractModificationKindFromNode(node ast.Node, info map[string]Modification
 		}
 	case *ast.PostfixExpr:
 		if ident, ok := n.X.(*ast.IdentifierExpr); ok {
-			if n.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+			switch n.Op.Kind {
+			case tokens.PLUS_PLUS_TOKEN:
 				info[ident.Name] = ModIncrement
-			} else if n.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+			case tokens.MINUS_MINUS_TOKEN:
 				info[ident.Name] = ModDecrement
 			}
 		}
 	case *ast.PrefixExpr:
 		if ident, ok := n.X.(*ast.IdentifierExpr); ok {
-			if n.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+			switch n.Op.Kind {
+			case tokens.PLUS_PLUS_TOKEN:
 				info[ident.Name] = ModIncrement
-			} else if n.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+			case tokens.MINUS_MINUS_TOKEN:
 				info[ident.Name] = ModDecrement
 			}
 		}
@@ -905,17 +908,19 @@ func extractModificationKindFromNode(node ast.Node, info map[string]Modification
 		switch expr := n.X.(type) {
 		case *ast.PostfixExpr:
 			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
-				if expr.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+				switch expr.Op.Kind {
+			case tokens.PLUS_PLUS_TOKEN:
 					info[ident.Name] = ModIncrement
-				} else if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+				case tokens.MINUS_MINUS_TOKEN:
 					info[ident.Name] = ModDecrement
 				}
 			}
 		case *ast.PrefixExpr:
 			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
-				if expr.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+				switch expr.Op.Kind {
+				case tokens.PLUS_PLUS_TOKEN:
 					info[ident.Name] = ModIncrement
-				} else if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+				case tokens.MINUS_MINUS_TOKEN:
 					info[ident.Name] = ModDecrement
 				}
 			}

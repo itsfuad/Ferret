@@ -440,7 +440,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 }
 
 // checkCastExpr validates that a cast expression is valid
-func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CastExpr, sourceType, targetType types.SemType) {
+func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *ast.CastExpr, sourceType, targetType types.SemType) {
 	// Skip if target type is unknown
 	if targetType.Equals(types.TypeUnknown) {
 		return
