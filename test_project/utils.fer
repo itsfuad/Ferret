@@ -44,3 +44,6 @@ p.move(3, "s");
 p.aa;
 p.undefinedMethod(1, 2);
 p.normalize();
+
+let p2 := { .a = 1, .b = 2 } as Point;
+let someValu : i32 = { .a = 1, .b = 2 }.g;

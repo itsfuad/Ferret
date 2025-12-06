@@ -192,48 +192,57 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 		return types.TypeUnknown
 	}
 
-	// Handle struct field or method access
-	if structType, ok := baseType.(*types.StructType); ok {
-		fieldName := expr.Sel.Name // First, check if it's a struct field
+	fieldName := expr.Sel.Name
+
+	// If baseType is a NamedType, we might have methods attached to the type symbol
+	// We need to check both fields (on the underlying struct) and methods (on the named type)
+	var typeSym *symbols.Symbol
+	var structType *types.StructType
+
+	if namedType, ok := baseType.(*types.NamedType); ok {
+		// It's a named type - look up the type symbol for method resolution
+		typeName := namedType.Name
+
+		// First check current module's scope
+		if sym, found := mod.ModuleScope.Lookup(typeName); found {
+			typeSym = sym
+		} else {
+			// Not in current module, search imported modules
+			for _, importPath := range mod.ImportAliasMap {
+				if importedMod, exists := ctx.GetModule(importPath); exists {
+					if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+						typeSym = sym
+						break
+					}
+				}
+			}
+		}
+
+		// Get the underlying struct for field access
+		underlying := types.UnwrapType(namedType)
+		structType, _ = underlying.(*types.StructType)
+	} else if st, ok := baseType.(*types.StructType); ok {
+		// Anonymous struct - no methods, only fields
+		structType = st
+	}
+
+	// Check for struct fields first
+	if structType != nil {
 		for _, field := range structType.Fields {
 			if field.Name == fieldName {
 				return field.Type
 			}
 		}
-
-		// If not a field, check if it's a method on the named type
-		// Methods are attached to type symbols in their declaring module
-		if structType.Name != "" {
-			// Try to find the type symbol by looking it up by name
-			// First check current module's scope
-			typeSym, found := mod.ModuleScope.Lookup(structType.Name)
-			if !found {
-				// Not in current module, might be from an imported module
-				// Search through all modules to find where this type was declared
-				// This is needed because we only have the type, not the original module reference
-				for _, importPath := range mod.ImportAliasMap {
-					if importedMod, exists := ctx.GetModule(importPath); exists {
-						if sym, ok := importedMod.ModuleScope.GetSymbol(structType.Name); ok && sym.Kind == symbols.SymbolType {
-							typeSym = sym
-							found = true
-							break
-						}
-					}
-				}
-			}
-
-			if found && typeSym.Methods != nil {
-				if method, ok := typeSym.Methods[fieldName]; ok {
-					return method.FuncType
-				}
-			}
-		}
-
-		// Field/method not found - error will be reported by type checker
-		return types.TypeUnknown
 	}
 
-	// For non-struct types, return unknown (error will be reported by type checker)
+	// Check for methods on named types
+	if typeSym != nil && typeSym.Methods != nil {
+		if method, ok := typeSym.Methods[fieldName]; ok {
+			return method.FuncType
+		}
+	}
+
+	// Field/method not found - error will be reported by type checker
 	return types.TypeUnknown
 }
 

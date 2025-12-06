@@ -99,6 +99,7 @@ func (s *StructType) Loc() *source.Location { return &s.Location }
 // InterfaceType represents an interface type definition
 type InterfaceType struct {
 	Methods []Field // interface methods
+	ID		string  // Unique ID for anonymous interface
 	source.Location
 }
 
@@ -132,6 +133,7 @@ func (m *MapType) Loc() *source.Location { return &m.Location }
 // EnumType represents an enum type definition
 type EnumType struct {
 	Variants []Field
+	ID		string  // Unique ID for anonymous enum
 	source.Location
 }
 

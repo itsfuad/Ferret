@@ -84,8 +84,8 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		collectVarDecl(ctx, mod, n, symbols.SymbolConstant)
 	case *ast.FuncDecl:
 		collectFuncDecl(ctx, mod, n)
-	case *ast.MethodDecl:
-		collectMethodDecl(ctx, mod, n)
+	// case *ast.MethodDecl:
+	// 	collectMethodDecl(ctx, mod, n)
 	case *ast.TypeDecl:
 		collectTypeDecl(ctx, mod, n)
 	case *ast.ImportStmt:
@@ -241,11 +241,22 @@ func extractReceiverTypeName(ctx *context_v2.CompilerContext, receiverType ast.T
 				WithHelp("define a named type first: type MyType struct { ... }").
 				WithNote("methods can only be defined on named types"),
 		)
-		// Generate unique ID for error recovery
-		if structType.ID == "" {
-			structType.ID = utils.GenerateStructLitID()
-		}
+
 		return structType.ID, "", false
+	}
+
+	// check for anonymous interface, similar to anonymous structs. interfae { m1()}
+	if interfaceType, ok := receiverType.(*ast.InterfaceType); ok {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("cannot define methods on anonymous interface type").
+			WithCode(diagnostics.ErrInvalidMethodReceiver).
+			WithPrimaryLabel(interfaceType.Loc(), "anonymous interface type").
+			WithHelp("define a named type first: type Mytype interface { ... }").
+			WithNote("methods can only be defined on named types"),
+		)
+
+
+
 	}
 
 	// Handle direct identifier (most common case: fn (p: Point) ...)
@@ -395,7 +406,7 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 
 // validateParams validates function parameters including variadic rules, duplicates, and type annotations
 // This is shared by both named functions and function literals
-func validateParams(ctx *context_v2.CompilerContext, mod *context_v2.Module, params []ast.Field) {
+func validateParams(ctx *context_v2.CompilerContext, _ *context_v2.Module, params []ast.Field) {
 	if len(params) == 0 {
 		return
 	}

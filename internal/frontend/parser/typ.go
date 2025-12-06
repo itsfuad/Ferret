@@ -188,11 +188,9 @@ func (p *Parser) parseStructType() *ast.StructType {
 
 	structType := &ast.StructType{
 		Fields:   fields,
+		ID: utils.GenerateStructLitID(),
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end.End),
 	}
-
-	// Generate unique ID for this struct type (for type identity)
-	structType.ID = utils.GenerateStructLitID()
 
 	return structType
 }
@@ -310,6 +308,7 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 	return &ast.InterfaceType{
 		Methods:  methods,
+		ID: utils.GenerateInterfaceLitID(),
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end),
 	}
 }
@@ -352,6 +351,7 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 
 	return &ast.EnumType{
 		Variants: fields,
+		ID: utils.GenerateEnumLitID(),
 		Location: p.makeLocation(tok.Start),
 	}
 }

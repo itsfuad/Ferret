@@ -247,8 +247,9 @@ func TestResultType(t *testing.T) {
 		t.Errorf("ResultType.String() = %q, want %q", got, "i32 ! str")
 	}
 
-	// []i32 ! Error
-	errorType := NewStruct("Error", []StructField{{Name: "msg", Type: TypeString}})
+	// []i32 ! Error (using NamedType wrapper)
+	errorStruct := NewStruct("", []StructField{{Name: "msg", Type: TypeString}})
+	errorType := NewNamed("Error", errorStruct)
 	resultArray := NewResult(NewArray(TypeI32, -1), errorType)
 	if got := resultArray.String(); got != "[]i32 ! Error" {
 		t.Errorf("ResultType.String() = %q, want %q", got, "[]i32 ! Error")
@@ -273,19 +274,20 @@ func TestResultTypeEquals(t *testing.T) {
 }
 
 func TestStructType(t *testing.T) {
-	// Named struct: Point
-	point := NewStruct("Point", []StructField{
+	// Named struct: Point (using NamedType wrapper)
+	pointStruct := NewStruct("", []StructField{
 		{Name: "x", Type: TypeF64},
 		{Name: "y", Type: TypeF64},
 	})
+	point := NewNamed("Point", pointStruct)
 	if got := point.String(); got != "Point" {
-		t.Errorf("StructType.String() = %q, want %q", got, "Point")
+		t.Errorf("NamedType.String() = %q, want %q", got, "Point")
 	}
 	if got := point.Size(); got != 16 {
-		t.Errorf("StructType.Size() = %d, want %d", got, 16)
+		t.Errorf("NamedType.Size() = %d, want %d", got, 16)
 	}
 
-	// Anonymous struct
+	// Anonymous struct (no NamedType wrapper)
 	anon := NewStruct("", []StructField{
 		{Name: "id", Type: TypeI32},
 		{Name: "name", Type: TypeString},
@@ -296,27 +298,27 @@ func TestStructType(t *testing.T) {
 }
 
 func TestStructTypeEquals(t *testing.T) {
-	point1 := NewStruct("Point", []StructField{
+	// Named structs use nominal equality (via NamedType wrapper)
+	pointStruct1 := NewStruct("", []StructField{
 		{Name: "x", Type: TypeF64},
 		{Name: "y", Type: TypeF64},
 	})
-	point2 := NewStruct("Point", []StructField{
+	pointStruct2 := NewStruct("", []StructField{
 		{Name: "x", Type: TypeF64},
 		{Name: "y", Type: TypeF64},
 	})
-	point3 := NewStruct("Point3D", []StructField{
-		{Name: "x", Type: TypeF64},
-		{Name: "y", Type: TypeF64},
-	})
+	point1 := NewNamed("Point", pointStruct1)
+	point2 := NewNamed("Point", pointStruct2)
+	point3 := NewNamed("Point3D", pointStruct1)
 
 	if !point1.Equals(point2) {
-		t.Errorf("Point should equal Point")
+		t.Errorf("Point should equal Point (same name)")
 	}
 	if point1.Equals(point3) {
-		t.Errorf("Point should not equal Point3D")
+		t.Errorf("Point should not equal Point3D (different names)")
 	}
 
-	// Anonymous structs with same structure
+	// Anonymous structs with same structure use structural equality
 	anon1 := NewStruct("", []StructField{{Name: "x", Type: TypeI32}})
 	anon2 := NewStruct("", []StructField{{Name: "x", Type: TypeI32}})
 	if !anon1.Equals(anon2) {
@@ -325,33 +327,36 @@ func TestStructTypeEquals(t *testing.T) {
 }
 
 func TestEnumType(t *testing.T) {
-	// Simple enum: Color
-	color := NewEnum("Color", []EnumVariant{
+	// Simple enum: Color (using NamedType wrapper)
+	colorEnum := NewEnum("", []EnumVariant{
 		{Name: "Red", Type: nil},
 		{Name: "Green", Type: nil},
 		{Name: "Blue", Type: nil},
 	})
+	color := NewNamed("Color", colorEnum)
 	if got := color.String(); got != "Color" {
-		t.Errorf("EnumType.String() = %q, want %q", got, "Color")
+		t.Errorf("NamedType.String() = %q, want %q", got, "Color")
 	}
 
-	// Enum with data: Option<T>
-	option := NewEnum("Option", []EnumVariant{
+	// Enum with data: Option<T> (using NamedType wrapper)
+	optionEnum := NewEnum("", []EnumVariant{
 		{Name: "Some", Type: TypeI32},
 		{Name: "None", Type: nil},
 	})
+	option := NewNamed("Option", optionEnum)
 	if got := option.String(); got != "Option" {
-		t.Errorf("EnumType.String() = %q, want %q", got, "Option")
+		t.Errorf("NamedType.String() = %q, want %q", got, "Option")
 	}
 }
 
 func TestComplexNestedTypes(t *testing.T) {
 	// Map<str, []Point?>
-	pointStruct := NewStruct("Point", []StructField{
+	pointStruct := NewStruct("", []StructField{
 		{Name: "x", Type: TypeF64},
 		{Name: "y", Type: TypeF64},
 	})
-	optPoint := NewOptional(pointStruct)
+	point := NewNamed("Point", pointStruct)
+	optPoint := NewOptional(point)
 	arrayOptPoint := NewArray(optPoint, -1)
 	complexMap := NewMap(TypeString, arrayOptPoint)
 

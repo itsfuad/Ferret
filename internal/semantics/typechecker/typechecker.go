@@ -292,7 +292,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 // checkSelectorExpr validates that a field or method exists on a struct
 // checkBinaryExpr validates that operands of a binary expression have compatible types
-func checkBinaryExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.BinaryExpr, lhsType, rhsType types.SemType) {
+func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *ast.BinaryExpr, lhsType, rhsType types.SemType) {
 	// Skip if either type is unknown (error already reported)
 	if lhsType.Equals(types.TypeUnknown) || rhsType.Equals(types.TypeUnknown) {
 		return
@@ -361,12 +361,29 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		return
 	}
 
-	// Special case: casting composite literal to struct type
+	// Special case: casting composite literal to struct type (or named struct type)
 	// Validate that the composite literal matches the struct type
 	if compLit, ok := expr.X.(*ast.CompositeLit); ok {
-		if structType, ok := targetType.(*types.StructType); ok {
-			checkCompositeLit(ctx, mod, compLit, structType)
-			return // Composite literal validation is sufficient
+		// Unwrap NamedType to get underlying struct
+		underlyingTarget := types.UnwrapType(targetType)
+		if structType, ok := underlyingTarget.(*types.StructType); ok {
+			// Infer the source struct type from the composite literal
+			srcStruct := inferCompositeLitType(ctx, mod, compLit)
+			if srcStruct != nil {
+				if st, ok := srcStruct.(*types.StructType); ok {
+					// Check structural compatibility
+					if !areStructsCompatible(st, structType) {
+						// Not compatible - checkCompositeLit will provide detailed error (missing fields, etc.)
+						checkCompositeLit(ctx, mod, compLit, targetType)
+						return
+					}
+					// Compatible - no error needed
+					return
+				}
+			}
+			// Couldn't infer source type, validate anyway
+			checkCompositeLit(ctx, mod, compLit, targetType)
+			return
 		}
 	}
 
@@ -383,9 +400,12 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	// Check if cast is valid
 	compatibility := checkTypeCompatibility(sourceType, targetType)
 
-	// For struct types, check structural compatibility
-	if srcStruct, ok := sourceType.(*types.StructType); ok {
-		if dstStruct, ok := targetType.(*types.StructType); ok {
+	// For struct types, check structural compatibility (unwrap NamedType on both sides)
+	srcUnwrapped := types.UnwrapType(sourceType)
+	dstUnwrapped := types.UnwrapType(targetType)
+
+	if srcStruct, ok := srcUnwrapped.(*types.StructType); ok {
+		if dstStruct, ok := dstUnwrapped.(*types.StructType); ok {
 			// Check if struct types are compatible by structure
 			if !areStructsCompatible(srcStruct, dstStruct) {
 				ctx.Diagnostics.Add(
@@ -415,9 +435,12 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 }
 
 // checkCompositeLit validates that a composite literal matches its target type
-func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
+func checkCompositeLit(ctx *context_v2.CompilerContext, _ *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
+	// Unwrap NamedType to get the underlying struct
+	underlyingType := types.UnwrapType(targetType)
+
 	// Only validate struct literals
-	structType, ok := targetType.(*types.StructType)
+	structType, ok := underlyingType.(*types.StructType)
 	if !ok {
 		return
 	}
@@ -443,7 +466,9 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 
 	// Only report error if there are missing fields (extra fields are allowed and will be stripped)
 	if len(missingFields) > 0 {
-		errorMsg := fmt.Sprintf("cannot convert composite literal to type '%s'", structType.Name)
+		// Use the original type's name if available (for better error messages)
+		typeName := targetType.String()
+		errorMsg := fmt.Sprintf("cannot convert composite literal to type '%s'", typeName)
 		diag := diagnostics.NewError(errorMsg).
 			WithCode(diagnostics.ErrTypeMismatch).
 			WithPrimaryLabel(lit.Loc(), "incompatible struct literal")
@@ -458,13 +483,19 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 
 // areStructsCompatible checks if two struct types are structurally compatible
 func areStructsCompatible(src, dst *types.StructType) bool {
-	// Check if destination has all required fields with matching types
+	// Check if destination has all required fields with matching or compatible types
 	for _, dstField := range dst.Fields {
 		found := false
 		for _, srcField := range src.Fields {
 			if srcField.Name == dstField.Name {
 				found = true
-				if !srcField.Type.Equals(dstField.Type) {
+				// Check if types match or are compatible
+				if srcField.Type.Equals(dstField.Type) {
+					break // Exact match
+				}
+				// Allow untyped literals to match concrete types
+				compatibility := checkTypeCompatibility(srcField.Type, dstField.Type)
+				if compatibility == Incompatible {
 					return false // Type mismatch
 				}
 				break
@@ -486,51 +517,63 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		return
 	}
 
-	// Only validate struct field/method access
-	structType, ok := baseType.(*types.StructType)
-	if !ok {
-		// Not a struct - could be module access or other, handled elsewhere
-		return
-	}
-
 	fieldName := expr.Sel.Name
 
-	// Check if it's a field
-	for _, field := range structType.Fields {
-		if field.Name == fieldName {
-			return // Field exists
-		}
-	}
+	// Handle NamedType and anonymous StructType
+	var typeSym *symbols.Symbol
+	var structType *types.StructType
+	var typeName string
 
-	// Check if it's a method on the named type
-	// Methods are attached to type symbols in their declaring module
-	if structType.Name != "" {
-		// Try to find the type symbol
-		typeSym, found := mod.ModuleScope.Lookup(structType.Name)
-		if !found {
+	if namedType, ok := baseType.(*types.NamedType); ok {
+		// It's a named type - look up the type symbol for method resolution
+		typeName = namedType.Name
+
+		// First check current module's scope
+		if sym, found := mod.ModuleScope.Lookup(typeName); found {
+			typeSym = sym
+		} else {
 			// Not in current module, search imported modules
 			for _, importPath := range mod.ImportAliasMap {
 				if importedMod, exists := ctx.GetModule(importPath); exists {
-					if sym, ok := importedMod.ModuleScope.GetSymbol(structType.Name); ok && sym.Kind == symbols.SymbolType {
+					if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
 						typeSym = sym
-						found = true
 						break
 					}
 				}
 			}
 		}
 
-		if found && typeSym.Methods != nil {
-			if _, ok := typeSym.Methods[fieldName]; ok {
-				return // Method exists
+		// Get the underlying struct for field access
+		underlying := types.UnwrapType(namedType)
+		structType, _ = underlying.(*types.StructType)
+	} else if st, ok := baseType.(*types.StructType); ok {
+		// Anonymous struct - no methods, only fields
+		structType = st
+	} else {
+		// Not a struct or named type with struct underlying - could be module access or other
+		return
+	}
+
+	// Check if it's a field
+	if structType != nil {
+		for _, field := range structType.Fields {
+			if field.Name == fieldName {
+				return // Field exists
 			}
 		}
 	}
 
+	// Check if it's a method on the named type
+	if typeSym != nil && typeSym.Methods != nil {
+		if _, ok := typeSym.Methods[fieldName]; ok {
+			return // Method exists
+		}
+	}
+
 	// Field/method not found
-	if structType.Name != "" {
+	if typeName != "" {
 		ctx.Diagnostics.Add(
-			diagnostics.NewError(fmt.Sprintf("field or method '%s' not found on type '%s'", fieldName, structType.Name)).
+			diagnostics.NewError(fmt.Sprintf("field or method '%s' not found on type '%s'", fieldName, typeName)).
 				WithCode(diagnostics.ErrFieldNotFound).
 				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
 		)
@@ -565,14 +608,12 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		return
 	}
 
-	// Get type name
+	// Extract type name - only NamedType can have methods
 	var typeName string
-	switch rt := receiverType.(type) {
-	case *types.StructType:
-		typeName = rt.Name
-	case *types.EnumType:
-		typeName = rt.Name
-	default:
+	if namedType, ok := receiverType.(*types.NamedType); ok {
+		typeName = namedType.Name
+	} else {
+		// Anonymous types cannot have methods
 		return
 	}
 
@@ -701,17 +742,12 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	// Convert the AST type node to a semantic type
 	semType := typeFromTypeNodeWithContext(ctx, mod, decl.Type)
 
-	// For struct types, set the name and ensure ID is set
-	if structType, ok := semType.(*types.StructType); ok {
-		structType.Name = typeName
-		// If the struct doesn't have an ID yet (shouldn't happen, but be safe), use the type name
-		if structType.ID == "" {
-			structType.ID = typeName
-		}
-	}
+	// Wrap the type with a NamedType to preserve the name
+	// This enables nominal typing and method attachment
+	namedType := types.NewNamed(typeName, semType)
 
 	// Update the symbol's type
-	sym.Type = semType
+	sym.Type = namedType
 }
 
 // checkAssignStmt type checks an assignment statement
@@ -799,17 +835,39 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	case *ast.CastExpr:
 		// Check expression being cast and validate cast compatibility
-		sourceType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+		// For composite literals, provide target type as context to allow untyped literal contextualization
+		sourceType := checkExpr(ctx, mod, e.X, targetType)
 		checkCastExpr(ctx, mod, e, sourceType, targetType)
 
 	case *ast.CompositeLit:
+		// Determine expected struct type for field contextualization
+		var expectedStructType *types.StructType
+		if !expected.Equals(types.TypeUnknown) {
+			// Unwrap NamedType to get underlying struct
+			unwrapped := types.UnwrapType(expected)
+			expectedStructType, _ = unwrapped.(*types.StructType)
+		}
+
 		// Check all element expressions in the composite literal
 		for _, elem := range e.Elts {
 			if kv, ok := elem.(*ast.KeyValueExpr); ok {
-				// Struct field: check the value
+				// Struct field: check the value with field type as context
 				if kv.Value != nil {
-					checkExpr(ctx, mod, kv.Value, types.TypeUnknown)
+					fieldExpected := types.TypeUnknown
+					// If we know the expected struct type, provide field type as context
+					if expectedStructType != nil {
+						if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+							fieldName := key.Name
+							for _, field := range expectedStructType.Fields {
+								if field.Name == fieldName {
+									fieldExpected = field.Type
+									break
+								}
+							}
+						}
+					}
+					checkExpr(ctx, mod, kv.Value, fieldExpected)
 				}
 			} else {
 				// Array element: check the expression directly
@@ -839,6 +897,24 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 				expectedForLit = optType.Inner
 			}
 			resultType = contextualizeUntyped(lit, expectedForLit)
+		}
+	}
+
+	// Special handling for CompositeLit: if expected type is known and matches structure,
+	// adopt the expected type (for better compatibility with named types)
+	if compLit, ok := expr.(*ast.CompositeLit); ok && compLit.Type == nil {
+		if !expected.Equals(types.TypeUnknown) {
+			// Unwrap expected to get underlying struct
+			expectedUnwrapped := types.UnwrapType(expected)
+			if expectedStruct, ok := expectedUnwrapped.(*types.StructType); ok {
+				// Check if inferred struct is compatible with expected
+				if inferredStruct, ok := inferredType.(*types.StructType); ok {
+					if areStructsCompatible(inferredStruct, expectedStruct) {
+						// Use the expected type (preserves named type)
+						resultType = expected
+					}
+				}
+			}
 		}
 	}
 

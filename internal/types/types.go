@@ -314,25 +314,36 @@ type StructField struct {
 	Type SemType
 }
 
-// StructType represents struct types
+// StructType represents struct types (always anonymous at this level)
+// Named types like "type Point struct{}" use NamedType wrapper
 type StructType struct {
-	Name   string // Can be empty for anonymous structs
 	ID     string // Unique ID for type identity (from AST or generated)
 	Fields []StructField
 }
 
 func NewStruct(name string, fields []StructField) *StructType {
-	return &StructType{Name: name, Fields: fields}
+	// Note: 'name' parameter is deprecated - use NamedType wrapper instead
+	return &StructType{Fields: fields}
 }
 
 func (s *StructType) String() string {
-	if s.Name != "" {
-		return s.Name
-	}
-	// Anonymous struct
+	// Anonymous struct - show structure
 	fields := make([]string, len(s.Fields))
 	for i, f := range s.Fields {
-		fields[i] = fmt.Sprintf(".%s: %s", f.Name, f.Type.String())
+		fieldTypeStr := f.Type.String()
+		// Don't show "untyped" in user-facing messages - it's an internal concept
+		// Show concrete default type instead
+		if fieldTypeStr == "untyped" {
+			if p, ok := f.Type.(*PrimitiveType); ok {
+				switch p.untypedKind {
+				case UntypedInt:
+					fieldTypeStr = "i32" // Default integer type
+				case UntypedFloat:
+					fieldTypeStr = "f64" // Default float type
+				}
+			}
+		}
+		fields[i] = fmt.Sprintf(".%s: %s", f.Name, fieldTypeStr)
 	}
 	return fmt.Sprintf("struct { %s }", strings.Join(fields, ", "))
 }
@@ -349,17 +360,7 @@ func (s *StructType) isType() {}
 
 func (s *StructType) Equals(other SemType) bool {
 	if st, ok := other.(*StructType); ok {
-		// If both have IDs, compare by ID (canonical identity)
-		if s.ID != "" && st.ID != "" {
-			return s.ID == st.ID
-		}
-
-		// Named structs must have same name
-		if s.Name != "" && st.Name != "" {
-			return s.Name == st.Name
-		}
-
-		// Anonymous structs must have same structure
+		// Structs use structural equality (compare field structure)
 		if len(s.Fields) != len(st.Fields) {
 			return false
 		}
@@ -383,17 +384,24 @@ type EnumVariant struct {
 }
 
 // EnumType represents enum types (sum types/tagged unions)
+// Named types like "type Color enum{}" use NamedType wrapper
 type EnumType struct {
-	Name     string
+	ID       string // Unique ID for type identity
 	Variants []EnumVariant
 }
 
 func NewEnum(name string, variants []EnumVariant) *EnumType {
-	return &EnumType{Name: name, Variants: variants}
+	// Note: 'name' parameter is deprecated - use NamedType wrapper instead
+	return &EnumType{Variants: variants}
 }
 
 func (e *EnumType) String() string {
-	return e.Name
+	// Anonymous enum - show variants
+	variantNames := make([]string, len(e.Variants))
+	for i, v := range e.Variants {
+		variantNames[i] = v.Name
+	}
+	return fmt.Sprintf("enum { %s }", strings.Join(variantNames, ", "))
 }
 
 func (e *EnumType) Size() int {
@@ -413,9 +421,70 @@ func (e *EnumType) isType() {}
 
 func (e *EnumType) Equals(other SemType) bool {
 	if et, ok := other.(*EnumType); ok {
-		return e.Name == et.Name
+		// Enums use structural equality (compare variants)
+		if len(e.Variants) != len(et.Variants) {
+			return false
+		}
+		for i := range e.Variants {
+			if e.Variants[i].Name != et.Variants[i].Name {
+				return false
+			}
+			// Check variant types
+			if (e.Variants[i].Type == nil) != (et.Variants[i].Type == nil) {
+				return false
+			}
+			if e.Variants[i].Type != nil && !e.Variants[i].Type.Equals(et.Variants[i].Type) {
+				return false
+			}
+		}
+		return true
 	}
 	return false
+}
+
+// NamedType represents a named type declaration: type Name = UnderlyingType
+// This wraps any SemType with a name, enabling:
+// - Nominal typing for user-defined types
+// - Type aliases that preserve identity (type A X; type B A)
+// - Method attachment to named types
+type NamedType struct {
+	Name       string  // The declared name (e.g., "Point", "UserId")
+	Underlying SemType // The actual type (struct, primitive, another NamedType, etc.)
+}
+
+func NewNamed(name string, underlying SemType) *NamedType {
+	return &NamedType{Name: name, Underlying: underlying}
+}
+
+func (n *NamedType) String() string {
+	return n.Name // Named types display their name
+}
+
+func (n *NamedType) Size() int {
+	return n.Underlying.Size()
+}
+
+func (n *NamedType) isType() {}
+
+func (n *NamedType) Equals(other SemType) bool {
+	// Named types use nominal equality - must have the same name
+	if nt, ok := other.(*NamedType); ok {
+		return n.Name == nt.Name
+	}
+	return false
+}
+
+// Unwrap returns the underlying type, following the chain if nested
+// (e.g., type A X; type B A; type C B -> C.Unwrap() returns X)
+func (n *NamedType) Unwrap() SemType {
+	current := n.Underlying
+	for {
+		if named, ok := current.(*NamedType); ok {
+			current = named.Underlying
+		} else {
+			return current
+		}
+	}
 }
 
 // Commonly used types (initialized in init())
@@ -470,6 +539,23 @@ func init() {
 
 	TypeUntypedInt = NewUntypedInt()
 	TypeUntypedFloat = NewUntypedFloat()
+}
+
+// UnwrapType recursively unwraps NamedTypes to get the underlying structural type
+// This is useful when you need to work with the actual structure (e.g., struct fields)
+func UnwrapType(t SemType) SemType {
+	if named, ok := t.(*NamedType); ok {
+		return named.Unwrap()
+	}
+	return t
+}
+
+// GetTypeName returns the name of a type if it's a NamedType, empty string otherwise
+func GetTypeName(t SemType) string {
+	if named, ok := t.(*NamedType); ok {
+		return named.Name
+	}
+	return ""
 }
 
 // FromTypeName converts TYPE_NAME to Type (for backward compatibility during migration)
