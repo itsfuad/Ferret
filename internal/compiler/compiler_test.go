@@ -8,7 +8,7 @@ import (
 )
 
 func TestCompile_InMemorySimpleCode(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := 42;",
 		Debug:     false,
 		LogFormat: ANSI,
@@ -22,7 +22,7 @@ func TestCompile_InMemorySimpleCode(t *testing.T) {
 }
 
 func TestCompile_InMemoryWithSyntaxError(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := ;", // Missing value
 		Debug:     false,
 		LogFormat: ANSI,
@@ -36,7 +36,7 @@ func TestCompile_InMemoryWithSyntaxError(t *testing.T) {
 }
 
 func TestCompile_InMemoryMultipleStatements(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code: `let x := 42;
 let y := 100;
 let z := x + y;`,
@@ -52,7 +52,7 @@ let z := x + y;`,
 }
 
 func TestCompile_HTMLFormat(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := 42;",
 		Debug:     false,
 		LogFormat: HTML,
@@ -70,7 +70,7 @@ func TestCompile_HTMLFormat(t *testing.T) {
 }
 
 func TestCompile_HTMLFormatWithError(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := ;", // Syntax error
 		Debug:     false,
 		LogFormat: HTML,
@@ -94,7 +94,7 @@ func TestCompile_HTMLFormatWithError(t *testing.T) {
 }
 
 func TestCompile_FileMode_NonExistentFile(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		EntryFile: "/nonexistent/path/to/file.fer",
 		Debug:     false,
 		LogFormat: ANSI,
@@ -121,7 +121,7 @@ func TestCompile_FileMode_ValidFile(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	opts := Options{
+	opts := &Options{
 		EntryFile: testFile,
 		Debug:     false,
 		LogFormat: ANSI,
@@ -153,7 +153,7 @@ let x := 42;`
 		t.Fatalf("Failed to create main.fer: %v", err)
 	}
 
-	opts := Options{
+	opts := &Options{
 		EntryFile: mainPath,
 		Debug:     false,
 		LogFormat: ANSI,
@@ -167,7 +167,7 @@ let x := 42;`
 }
 
 func TestCompile_DebugMode(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := 42;",
 		Debug:     true, // Enable debug mode
 		LogFormat: ANSI,
@@ -181,7 +181,7 @@ func TestCompile_DebugMode(t *testing.T) {
 }
 
 func TestCompile_EmptyCode(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      " ", // Whitespace-only (truly empty causes entry point error)
 		Debug:     false,
 		LogFormat: ANSI,
@@ -196,7 +196,7 @@ func TestCompile_EmptyCode(t *testing.T) {
 }
 
 func TestCompile_ComplexExpression(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code: `let a := 10;
 let b := 20;
 let c := (a + b) * 2 - 5;`,
@@ -212,7 +212,7 @@ let c := (a + b) * 2 - 5;`,
 }
 
 func TestCompile_FunctionDeclaration(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code: `fn add(x: i32, y: i32) -> i32 {
 	return x + y;
 }`,
@@ -237,7 +237,7 @@ func TestCompile_FileMode_WithSyntaxError(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	opts := Options{
+	opts := &Options{
 		EntryFile: testFile,
 		Debug:     false,
 		LogFormat: ANSI,
@@ -251,7 +251,7 @@ func TestCompile_FileMode_WithSyntaxError(t *testing.T) {
 }
 
 func TestCompile_ResultStructure(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := 42;",
 		Debug:     false,
 		LogFormat: ANSI,
@@ -269,7 +269,7 @@ func TestCompile_ResultStructure(t *testing.T) {
 }
 
 func TestCompile_ANSIFormat(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code:      "let x := 42;",
 		Debug:     false,
 		LogFormat: ANSI,
@@ -289,7 +289,7 @@ func TestCompile_ANSIFormat(t *testing.T) {
 }
 
 func TestCompile_ImportOrderValidation(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code: `let x := 42;
 import "std/io";`, // Import after declaration - should error
 		Debug:     false,
@@ -308,7 +308,7 @@ import "std/io";`, // Import after declaration - should error
 }
 
 func TestCompile_MultipleImports(t *testing.T) {
-	opts := Options{
+	opts := &Options{
 		Code: `import "std/io";
 import "std/math";
 let x := 42;`,

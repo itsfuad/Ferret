@@ -25,3 +25,41 @@ let a : i32 = 10;
 //let b : str = a;
 
 let NAME := "Fuad";
+
+type Point struct {
+    .x: i32,
+    .y: i32,
+};
+
+fn (p: Point) move(dx: i32, dy: i32) -> Point {
+    for let i, v in 0..5 {
+        let index : str = i;
+        let value : str = v;
+    }
+
+    while a > 30 {
+        let temp := 5;
+        temp < 10;
+        a--;
+    }
+
+    return {
+        .x = p.x + dx,
+        .y = p.y + dy,
+    };
+}
+
+let p := { .x = 5, .y = 10 } as Point;
+
+p.move(3, "s");
+p.aa;
+p.undefinedMethod(1, 2);
+p.normalize();
+
+let p2 := { .a = 1, .b = 2 } as struct {
+    .a: i32,
+    .b: i32,
+    .g: i32,
+};
+
+let someValu : i32 = { .a = 1, .b = 2 }.g;

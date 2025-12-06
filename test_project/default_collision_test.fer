@@ -1,5 +1,0 @@
-// Test default name collision
-import "std/math" as utils;
-import "test_project/utils";  // defaults to 'utils' - should error
-
-let x := 42;

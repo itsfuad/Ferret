@@ -37,7 +37,7 @@ type Result struct {
 }
 
 // Compile compiles Ferret code and returns the result
-func Compile(opts Options) Result {
+func Compile(opts *Options) Result {
 	// Setup compiler config
 	projectName := "playground"
 	projectRoot := "/virtual"

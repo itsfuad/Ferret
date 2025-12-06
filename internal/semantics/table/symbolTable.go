@@ -27,6 +27,7 @@ func (st *SymbolTable) Declare(name string, symbol *symbols.Symbol) error {
 	if _, exists := st.symbols[name]; exists {
 		return fmt.Errorf("symbol '%s' already declared", name)
 	}
+	symbol.DeclaredScope = st // Set the scope where this symbol is declared
 	st.symbols[name] = symbol
 	return nil
 }

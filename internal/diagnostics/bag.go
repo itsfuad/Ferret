@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 )
 
@@ -83,23 +84,64 @@ func (db *DiagnosticBag) Diagnostics() []*Diagnostic {
 	return result
 }
 
+// sortDiagnostics sorts diagnostics by primary label location (file, line, column)
+func sortDiagnostics(diagnostics []*Diagnostic) {
+	sort.SliceStable(diagnostics, func(i, j int) bool {
+		if len(diagnostics[i].Labels) == 0 || len(diagnostics[j].Labels) == 0 {
+			return false // Keep original order if no labels
+		}
+
+		iLoc := diagnostics[i].Labels[0].Location
+		jLoc := diagnostics[j].Labels[0].Location
+
+		// Compare filenames
+		iFile := ""
+		jFile := ""
+		if iLoc.Filename != nil {
+			iFile = *iLoc.Filename
+		}
+		if jLoc.Filename != nil {
+			jFile = *jLoc.Filename
+		}
+
+		if iFile != jFile {
+			return iFile < jFile
+		}
+
+		// Same file, compare by line
+		if iLoc.Start.Line != jLoc.Start.Line {
+			return iLoc.Start.Line < jLoc.Start.Line
+		}
+
+		// Same line, keep original order (stable sort maintains phase order)
+		return false
+	})
+}
+
 func (db *DiagnosticBag) EmitAll() {
 
 	emitter := NewEmitter(os.Stderr)
 
+	db.emitAll(emitter, os.Stderr)
+}
+
+func (db *DiagnosticBag) emitAll(emitter *Emitter, w io.Writer) {
 	db.mu.Lock()
 
 	diagnostics := make([]*Diagnostic, len(db.diagnostics))
 
-	// copy diagnostics to avoid holding lock during emit
 	copy(diagnostics, db.diagnostics)
 
 	db.mu.Unlock()
+
+	// Sort diagnostics by source location
+	sortDiagnostics(diagnostics)
+
 	for _, diag := range diagnostics {
 		emitter.Emit(diag)
 	}
 
-	db.printSummary(os.Stderr)
+	db.printSummary(w)
 }
 
 // EmitAllToString emits all diagnostics to a string with ANSI codes, using provided source cache
@@ -112,18 +154,7 @@ func (db *DiagnosticBag) EmitAllToString() string {
 		highlighter: NewSyntaxHighlighter(true),
 	}
 
-	db.mu.Lock()
-	diagnostics := make([]*Diagnostic, len(db.diagnostics))
-
-	copy(diagnostics, db.diagnostics)
-
-	db.mu.Unlock()
-
-	for _, diag := range diagnostics {
-		emitter.Emit(diag)
-	}
-
-	db.printSummary(&buf)
+	db.emitAll(emitter, &buf)
 
 	return buf.String()
 }

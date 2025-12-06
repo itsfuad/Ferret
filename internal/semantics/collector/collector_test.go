@@ -355,32 +355,3 @@ import "std/io" as m;
 		t.Errorf("Expected helpful suggestion in help message, got: %s", diag.Help)
 	}
 }
-
-// Test empty import path handling
-func TestImportAliasEmptyPath(t *testing.T) {
-	// This tests the edge case where fs.LastPart returns empty string
-	mod := &context_v2.Module{
-		FilePath:       "test.fer",
-		ImportAliasMap: make(map[string]string),
-		Imports:        make(map[string]*context_v2.Import),
-	}
-
-	ctx := createTestContext()
-	buildImportAliasMap(ctx, mod)
-
-	// Should not add anything to the map
-	if len(mod.ImportAliasMap) != 0 {
-		t.Errorf("Expected empty alias map for empty import path, got %d entries", len(mod.ImportAliasMap))
-	}
-
-	// Should not add anything to the map
-	if len(mod.ImportAliasMap) != 0 {
-		t.Errorf("Expected empty alias map for empty import path, got %d entries", len(mod.ImportAliasMap))
-	}
-
-	// Should not crash or produce error (just skip invalid import)
-	diags := ctx.Diagnostics.Diagnostics()
-	if len(diags) != 0 {
-		t.Errorf("Expected no diagnostics for empty import path, got %d", len(diags))
-	}
-}

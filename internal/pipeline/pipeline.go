@@ -13,6 +13,8 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
+	"compiler/internal/phase"
+	"compiler/internal/semantics/cfganalyzer"
 	"compiler/internal/semantics/collector"
 	"compiler/internal/semantics/resolver"
 	"compiler/internal/semantics/table"
@@ -61,11 +63,19 @@ func (p *Pipeline) Run() error {
 	// Continue to later phases even if there are parse errors
 	// This allows us to collect more diagnostics from successfully parsed modules
 
-	// Phase 2: Symbol Collection
+	// Phase 2: Symbol Collection (split into 2 sub-phases)
 	if p.ctx.Debug {
-		colors.CYAN.Printf("\n[Phase 2] Symbol Collection\n")
+		colors.CYAN.Printf("\n[Phase 2a] Collect Types & Functions\n")
 	}
 	if err := p.runCollectorPhase(); err != nil {
+		return err
+	}
+
+	// Phase 2b: Collect Methods (after all types are known)
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 2b] Collect Methods\n")
+	}
+	if err := p.runMethodCollectorPhase(); err != nil {
 		return err
 	}
 
@@ -77,15 +87,31 @@ func (p *Pipeline) Run() error {
 		return err
 	}
 
-	// Phase 4: Type Checking
+	// Phase 4a: Type Check Method Signatures (attach methods to types)
 	if p.ctx.Debug {
-		colors.CYAN.Printf("\n[Phase 4] Type Checking\n")
+		colors.CYAN.Printf("\n[Phase 4a] Type Check Method Signatures\n")
+	}
+	if err := p.runMethodSignatureTypeCheckPhase(); err != nil {
+		return err
+	}
+
+	// Phase 4b: Type Check Everything Else
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 4b] Type Check Bodies\n")
 	}
 	if err := p.runTypeCheckerPhase(); err != nil {
 		return err
 	}
 
-	// Phase 5: Code Generation (future)
+	// Phase 5: Control Flow Analysis
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 5] Control Flow Analysis\n")
+	}
+	if err := p.runCFGAnalysisPhase(); err != nil {
+		return err
+	}
+
+	// Phase 6: Code Generation (future)
 
 	// Final error check
 	if p.ctx.HasErrors() {
@@ -127,7 +153,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 			FilePath:     "",
 			ImportPath:   importPath,
 			Type:         context_v2.ModuleLocal,
-			Phase:        context_v2.PhaseNotStarted,
+			Phase:        phase.PhaseNotStarted,
 			ModuleScope:  modScope,
 			CurrentScope: modScope,
 			Content:      "",
@@ -185,7 +211,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 	tokenizer := lexer.New(filePath, content, p.ctx.Diagnostics)
 	tokens := tokenizer.Tokenize(false)
 
-	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseLexed) {
+	if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseLexed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseLexed", importPath), nil)
 		return
 	}
@@ -201,7 +227,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 		astModule.SaveAST()
 	}
 
-	if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseParsed) {
+	if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseParsed) {
 		p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
 		return
 	}
@@ -311,15 +337,38 @@ func (p *Pipeline) runCollectorPhase() error {
 		}
 
 		// Check if module is at least parsed
-		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseParsed {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseParsed {
 			continue
 		}
 
 		collector.CollectModule(p.ctx, module)
 
-		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseCollected) {
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCollected) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCollected", importPath), nil)
 		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+		}
+	}
+
+	return nil
+}
+
+// runMethodCollectorPhase collects method declarations after all types are known
+func (p *Pipeline) runMethodCollectorPhase() error {
+	for _, importPath := range p.ctx.GetModuleNames() {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least collected
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseCollected {
+			continue
+		}
+
+		collector.CollectMethodsOnly(p.ctx, module)
 
 		if p.ctx.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
@@ -338,15 +387,38 @@ func (p *Pipeline) runResolverPhase() error {
 		}
 
 		// Check if module is at least collected
-		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseCollected {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseCollected {
 			continue
 		}
 
 		resolver.ResolveModule(p.ctx, module)
 
-		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseResolved) {
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseResolved) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseResolved", importPath), nil)
 		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+		}
+	}
+
+	return nil
+}
+
+// runMethodSignatureTypeCheckPhase type checks only method signatures (attaches methods to types)
+func (p *Pipeline) runMethodSignatureTypeCheckPhase() error {
+	for _, importPath := range p.ctx.GetModuleNames() {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least resolved
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseResolved {
+			continue
+		}
+
+		typechecker.TypeCheckMethodSignatures(p.ctx, module)
 
 		if p.ctx.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
@@ -365,22 +437,51 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 		}
 
 		// Check if module is at least resolved
-		if p.ctx.GetModulePhase(importPath) < context_v2.PhaseResolved {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseResolved {
 			continue
 		}
 
 		typechecker.CheckModule(p.ctx, module)
 
-		if !p.ctx.AdvanceModulePhase(importPath, context_v2.PhaseTypeChecked) {
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseTypeChecked) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseTypeChecked", importPath), nil)
 		}
 
 		if p.ctx.Debug {
-			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+			colors.PURPLE.Printf("  ✓ %s\\n", importPath)
 		}
 	}
 
 	// Don't return error here - let Run() handle final error check
 	// This allows all modules to be type checked even if some have errors
+	return nil
+}
+
+// runCFGAnalysisPhase runs control flow analysis on all type-checked modules
+func (p *Pipeline) runCFGAnalysisPhase() error {
+	for _, importPath := range p.ctx.GetModuleNames() {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least type-checked
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseTypeChecked {
+			continue
+		}
+
+		cfganalyzer.AnalyzeModule(p.ctx, module)
+
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCFGAnalyzed) {
+			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCFGAnalyzed", importPath), nil)
+		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\\n", importPath)
+		}
+	}
+
+	// Don't return error here - let Run() handle final error check
+	// This allows all modules to be analyzed even if some have errors
 	return nil
 }

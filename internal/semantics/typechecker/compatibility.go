@@ -50,6 +50,15 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Incompatible
 	}
 
+	// Special handling for none
+	// none can be assigned to any optional type (T?)
+	if source.Equals(types.TypeNone) {
+		if _, ok := target.(*types.OptionalType); ok {
+			return Assignable
+		}
+		return Incompatible
+	}
+
 	// Identical types
 	if source.Equals(target) {
 		return Identical
@@ -57,10 +66,13 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 
 	// UNTYPED literals can be assigned to any compatible concrete type
 	if types.IsUntyped(source) {
-		if types.IsUntypedInt(source) && types.IsNumeric(target) {
+		// Unwrap target if it's a NamedType to check the underlying type
+		targetUnwrapped := types.UnwrapType(target)
+
+		if types.IsUntypedInt(source) && types.IsNumeric(targetUnwrapped) {
 			return Assignable
 		}
-		if types.IsUntypedFloat(source) && types.IsFloat(target) {
+		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
 			return Assignable
 		}
 		return Incompatible
@@ -68,10 +80,39 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 
 	// Check numeric conversions
 	if types.IsNumeric(source) && types.IsNumeric(target) {
+		// Special case: byte and u8 are internally the same size but require explicit cast
+		srcName, srcOk := types.GetPrimitiveName(source)
+		tgtName, tgtOk := types.GetPrimitiveName(target)
+		if srcOk && tgtOk {
+			// byte -> u8 or u8 -> byte requires explicit cast
+			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
+				return LossyConvertible
+			}
+		}
 		if isLosslessNumericConversion(source, target) {
 			return LosslessConvertible
 		}
 		return LossyConvertible
+	}
+
+	// Check struct compatibility (unwrap NamedType to get underlying structure)
+	srcUnwrapped := types.UnwrapType(source)
+	tgtUnwrapped := types.UnwrapType(target)
+
+	// If target is a NamedType and source matches the underlying structure,
+	// allow assignment (e.g., { .x = 1, .y = 2 } can be assigned to Point if Point wraps struct { .x: i32, .y: i32 })
+	if srcStruct, srcOk := srcUnwrapped.(*types.StructType); srcOk {
+		if tgtStruct, tgtOk := tgtUnwrapped.(*types.StructType); tgtOk {
+			// Check if structs are structurally compatible
+			if areStructsCompatible(srcStruct, tgtStruct) {
+				// If target is a NamedType, this is a structural -> nominal conversion (assignable)
+				// If both are anonymous or both are named and identical, it's identical
+				if source.Equals(target) {
+					return Identical
+				}
+				return Assignable
+			}
+		}
 	}
 
 	// No implicit conversion available
@@ -124,7 +165,21 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 		return fmt.Sprintf("cannot use type '%s' as type '%s'", source, target)
 
 	case LossyConvertible:
-		return fmt.Sprintf("cannot implicitly convert '%s' to '%s' (may lose precision)", source, target)
+		// Check if target has smaller bit size than source
+		srcName, srcOk := types.GetPrimitiveName(source)
+		tgtName, tgtOk := types.GetPrimitiveName(target)
+
+		msg := fmt.Sprintf("cannot implicitly convert '%s' to '%s'", source, target)
+
+		if srcOk && tgtOk {
+			srcBits := types.GetNumberBitSize(srcName)
+			tgtBits := types.GetNumberBitSize(tgtName)
+			if tgtBits < srcBits {
+				return fmt.Sprintf("%s (possible data loss)", msg)
+			}
+		}
+		// Same size but different types (e.g., byte vs u8)
+		return msg
 
 	case Identical, Assignable, LosslessConvertible:
 		// These are not errors

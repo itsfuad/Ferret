@@ -2,10 +2,14 @@ package typechecker
 
 import (
 	"compiler/internal/context_v2"
+	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/tokens"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
+	"fmt"
+	"strings"
 )
 
 // inferExprType determines the type of an expression based on its structure and value.
@@ -36,22 +40,28 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		return inferIndexExprType(e)
 
 	case *ast.SelectorExpr:
-		return inferSelectorExprType(e)
+		return inferSelectorExprType(ctx, mod, e)
 
 	case *ast.ScopeResolutionExpr:
 		return inferScopeResolutionExprType(ctx, mod, e)
 
 	case *ast.CastExpr:
-		return inferCastExprType(e)
+		return inferCastExprType(ctx, mod, e)
 
 	case *ast.ParenExpr:
 		return inferExprType(ctx, mod, e.X)
 
 	case *ast.CompositeLit:
-		return inferCompositeLitType(e)
+		return inferCompositeLitType(ctx, mod, e)
 
 	case *ast.FuncLit:
 		return inferFuncLitType(ctx, mod, e)
+
+	case *ast.RangeExpr:
+		return inferRangeExprType(ctx, mod, e)
+
+	case *ast.ElvisExpr:
+		return inferElvisExprType(ctx, mod, e)
 
 	default:
 		return types.TypeUnknown
@@ -69,6 +79,9 @@ func inferLiteralType(lit *ast.BasicLit) types.SemType {
 		return types.TypeUntypedFloat
 	case ast.STRING:
 		return types.TypeString
+	case ast.BYTE:
+		// Byte literals have concrete type 'byte'
+		return types.TypeByte
 	case ast.BOOL:
 		return types.TypeBool
 	default:
@@ -148,8 +161,16 @@ func inferUnaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 }
 
 // inferCallExprType determines the return type of a function call
-func inferCallExprType(_ *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
-	// Look up the function
+func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) types.SemType {
+	// Get the type of the called expression (function or method)
+	funType := inferExprType(ctx, mod, expr.Fun)
+
+	// If it's a function type, return its return type
+	if funcType, ok := funType.(*types.FunctionType); ok {
+		return funcType.Return
+	}
+
+	// Fallback: handle direct function name lookup (legacy path)
 	if ident, ok := expr.Fun.(*ast.IdentifierExpr); ok {
 		sym, exists := mod.CurrentScope.Lookup(ident.Name)
 		if !exists {
@@ -159,7 +180,7 @@ func inferCallExprType(_ *context_v2.CompilerContext, mod *context_v2.Module, ex
 		// Get the function declaration
 		if funcDecl, ok := sym.Decl.(*ast.FuncDecl); ok {
 			if funcDecl.Type != nil && funcDecl.Type.Result != nil {
-				return typeFromTypeNode(funcDecl.Type.Result)
+				return typeFromTypeNodeWithContext(ctx, mod, funcDecl.Type.Result)
 			}
 		}
 	}
@@ -173,24 +194,95 @@ func inferIndexExprType(expr *ast.IndexExpr) types.SemType {
 	return types.TypeUnknown
 }
 
-// inferSelectorExprType determines the type of a field access
-func inferSelectorExprType(expr *ast.SelectorExpr) types.SemType {
-	// TODO: Implement struct field type lookup
+// inferSelectorExprType determines the type of a field access or method access
+func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.SelectorExpr) types.SemType {
+	// Infer the type of the base expression (e.g., p in p.x)
+	baseType := inferExprType(ctx, mod, expr.X)
+
+	// If base type is unknown, return unknown
+	if baseType.Equals(types.TypeUnknown) {
+		return types.TypeUnknown
+	}
+
+	fieldName := expr.Sel.Name
+
+	// If baseType is a NamedType, we might have methods attached to the type symbol
+	// We need to check both fields (on the underlying struct) and methods (on the named type)
+	var typeSym *symbols.Symbol
+	var structType *types.StructType
+
+	if namedType, ok := baseType.(*types.NamedType); ok {
+		// It's a named type - look up the type symbol for method resolution
+		typeName := namedType.Name
+
+		// First check current module's scope
+		if sym, found := mod.ModuleScope.Lookup(typeName); found {
+			typeSym = sym
+		} else {
+			// Not in current module, search imported modules
+			for _, importPath := range mod.ImportAliasMap {
+				if importedMod, exists := ctx.GetModule(importPath); exists {
+					if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+						typeSym = sym
+						break
+					}
+				}
+			}
+		}
+
+		// Get the underlying struct for field access
+		underlying := types.UnwrapType(namedType)
+		structType, _ = underlying.(*types.StructType)
+	} else if st, ok := baseType.(*types.StructType); ok {
+		// Anonymous struct - no methods, only fields
+		structType = st
+	}
+
+	// Check for struct fields first
+	if structType != nil {
+		for _, field := range structType.Fields {
+			if field.Name == fieldName {
+				return field.Type
+			}
+		}
+	}
+
+	// Check for methods on named types
+	if typeSym != nil && typeSym.Methods != nil {
+		if method, ok := typeSym.Methods[fieldName]; ok {
+			return method.FuncType
+		}
+	}
+
+	// Field/method not found - error will be reported by type checker
 	return types.TypeUnknown
 }
 
-// inferScopeResolutionExprType determines the type of a module::symbol access
+// inferScopeResolutionExprType determines the type of a module::symbol or enum::variant access
 func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ScopeResolutionExpr) types.SemType {
-	// Handle module::symbol resolution
-	// X should be an identifier representing the module name/alias
+	// Handle module::symbol or enum::variant resolution
+	// X should be an identifier representing the module name/alias or enum type name
 	if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
-		moduleName := ident.Name
-		symbolName := expr.Selector.Name
+		leftName := ident.Name
+		rightName := expr.Selector.Name
 
+		// First check if leftName is a type (enum) in the current scope
+		if typeSym, ok := mod.CurrentScope.Lookup(leftName); ok && typeSym.Kind == symbols.SymbolType {
+			// This is EnumType::Variant access
+			// Look up the qualified variant name
+			qualifiedName := leftName + "::" + rightName
+			if variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedName); ok {
+				return variantSym.Type
+			}
+			// Variant not found - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Otherwise, check if it's a module import
 		// Look up the import path from the alias/name
-		importPath, ok := mod.ImportAliasMap[moduleName]
+		importPath, ok := mod.ImportAliasMap[leftName]
 		if !ok {
-			// Module not imported - error already reported by resolver
+			// Not a module import - error already reported by resolver
 			return types.TypeUnknown
 		}
 
@@ -203,7 +295,7 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 
 		// Look up the symbol in the imported module's module scope
 		// Use ModuleScope.GetSymbol (not Lookup) to get module-level symbols only
-		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		sym, ok := importedMod.ModuleScope.GetSymbol(rightName)
 		if !ok {
 			// Symbol not found - error already reported by resolver
 			return types.TypeUnknown
@@ -213,20 +305,107 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 		return sym.Type
 	}
 
-	// For non-identifier X (e.g., enum::variant), recurse
+	// For non-identifier X (e.g., anonymous enum{...}::variant)
+	// Handle anonymous enum type validation
+	if enumType, ok := expr.X.(*ast.EnumType); ok {
+		rightName := expr.Selector.Name
+
+		// Check if the variant exists in the anonymous enum
+		found := false
+		for _, variant := range enumType.Variants {
+			if variant.Name.Name == rightName {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// Build enum string representation with truncation (like struct)
+			var enumStr string
+			if len(enumType.Variants) == 0 {
+				enumStr = "enum {}"
+			} else if len(enumType.Variants) <= 3 {
+				// Show all variants if 3 or fewer
+				parts := make([]string, len(enumType.Variants))
+				for i, v := range enumType.Variants {
+					parts[i] = v.Name.Name
+				}
+				enumStr = fmt.Sprintf("enum { %s }", strings.Join(parts, ", "))
+			} else {
+				// Truncate: first 2, ..., last 1
+				enumStr = fmt.Sprintf("enum { %s, %s, ..., %s }",
+					enumType.Variants[0].Name.Name,
+					enumType.Variants[1].Name.Name,
+					enumType.Variants[len(enumType.Variants)-1].Name.Name)
+			}
+
+			// Build list of available variants
+			variantNames := make([]string, len(enumType.Variants))
+			for i, v := range enumType.Variants {
+				variantNames[i] = v.Name.Name
+			}
+
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("variant '%s' not found in %s", rightName, enumStr)).
+					WithPrimaryLabel(expr.Selector.Loc(), fmt.Sprintf("'%s' is not a valid variant", rightName)).
+					WithHelp(fmt.Sprintf("available variants: %s", strings.Join(variantNames, ", "))),
+			)
+			return types.TypeUnknown
+		}
+
+		// Valid variant - return unknown for anonymous enums (they don't have a semantic type)
+		// This is acceptable since anonymous enums are primarily for compile-time constants
+		return types.TypeUnknown
+	}
+
+	// For other expression types, recurse
 	return inferExprType(ctx, mod, expr.X)
 }
 
 // inferCastExprType determines the target type of a cast
-func inferCastExprType(expr *ast.CastExpr) types.SemType {
-	return typeFromTypeNode(expr.Type)
+func inferCastExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CastExpr) types.SemType {
+	return typeFromTypeNodeWithContext(ctx, mod, expr.Type)
 }
 
 // inferCompositeLitType determines the type of a composite literal
-func inferCompositeLitType(lit *ast.CompositeLit) types.SemType {
+func inferCompositeLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit) types.SemType {
 	if lit.Type != nil {
-		return typeFromTypeNode(lit.Type)
+		return typeFromTypeNodeWithContext(ctx, mod, lit.Type)
 	}
+
+	// Infer anonymous struct type from field expressions
+	// Check if all elements are key-value pairs (struct literal)
+	if len(lit.Elts) > 0 {
+		allKeyValue := true
+		for _, elem := range lit.Elts {
+			if _, ok := elem.(*ast.KeyValueExpr); !ok {
+				allKeyValue = false
+				break
+			}
+		}
+
+		if allKeyValue {
+			// Build anonymous struct type from fields
+			fields := make([]types.StructField, 0, len(lit.Elts))
+			for _, elem := range lit.Elts {
+				kv := elem.(*ast.KeyValueExpr)
+				if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+					fieldName := key.Name
+					fieldType := inferExprType(ctx, mod, kv.Value)
+					fields = append(fields, types.StructField{
+						Name: fieldName,
+						Type: fieldType,
+					})
+				}
+			}
+
+			if len(fields) > 0 {
+				// Create anonymous struct type (empty name)
+				return types.NewStruct("", fields)
+			}
+		}
+	}
+
 	return types.TypeUnknown
 }
 
@@ -277,14 +456,45 @@ func finalizeUntyped(expr ast.Expression) types.SemType {
 	if lit, ok := expr.(*ast.BasicLit); ok {
 		switch lit.Kind {
 		case ast.INT:
-			// Default integer type is i64
-			return types.TypeI64
+			// Use centralized resolution to pick minimum required type
+			return resolveUntypedInt(lit.Value)
 		case ast.FLOAT:
-			// Default float type is f64
-			return types.TypeF64
+			// Use centralized default float type
+			return types.NewPrimitive(types.DEFAULT_FLOAT_TYPE)
 		}
 	}
 	return types.TypeUnknown
+}
+
+// resolveUntypedInt picks the minimum integer type that can hold the given value.
+// This is the central system for untyped integer resolution:
+// - Defaults to i32 (DEFAULT_INT_TYPE) if value fits
+// - Upgrades to i64, i128, i256 if value exceeds default bitsize
+// - For signed values, uses signed type hierarchy
+func resolveUntypedInt(valueStr string) types.SemType {
+	// Default: try to fit in i32 (DEFAULT_INT_TYPE)
+	defaultType := types.NewPrimitive(types.DEFAULT_INT_TYPE)
+	if fitsInType(valueStr, defaultType) {
+		return defaultType
+	}
+
+	// Value doesn't fit in default - try progressively larger signed types
+	signedTypes := []types.TYPE_NAME{
+		types.TYPE_I64,
+		types.TYPE_I128,
+		types.TYPE_I256,
+	}
+
+	for _, typeName := range signedTypes {
+		t := types.NewPrimitive(typeName)
+		if fitsInType(valueStr, t) {
+			return t
+		}
+	}
+
+	// Value is too large for any supported type - return i256 anyway
+	// (error will be reported elsewhere)
+	return types.NewPrimitive(types.TYPE_I256)
 }
 
 // contextualizeUntyped applies contextual typing to an UNTYPED literal
@@ -360,4 +570,76 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 	}
 
 	return types.NewFunction(params, returnType)
+}
+
+// inferRangeExprType infers the type of a range expression (start..end[:incr])
+// Returns an array type with element type inferred from start/end
+func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.RangeExpr) types.SemType {
+	// Infer types from start and end expressions
+	startType := inferExprType(ctx, mod, expr.Start)
+	endType := inferExprType(ctx, mod, expr.End)
+
+	// If both are untyped int literals, resolve to minimum required type
+	// by checking both values and taking the larger type
+	if types.IsUntypedInt(startType) && types.IsUntypedInt(endType) {
+		var resolvedType types.SemType = types.NewPrimitive(types.DEFAULT_INT_TYPE) // default to i32
+		maxBitSize := types.GetNumberBitSize(types.DEFAULT_INT_TYPE)
+
+		// Check if start literal needs a larger type
+		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
+			startResolved := resolveUntypedInt(startLit.Value)
+			if name, ok := types.GetPrimitiveName(startResolved); ok {
+				bitSize := types.GetNumberBitSize(name)
+				if bitSize > maxBitSize {
+					maxBitSize = bitSize
+					resolvedType = startResolved
+				}
+			}
+		}
+
+		// Check if end literal needs a larger type
+		if endLit, ok := expr.End.(*ast.BasicLit); ok && endLit.Kind == ast.INT {
+			endResolved := resolveUntypedInt(endLit.Value)
+			if name, ok := types.GetPrimitiveName(endResolved); ok {
+				bitSize := types.GetNumberBitSize(name)
+				if bitSize > maxBitSize {
+					resolvedType = endResolved
+				}
+			}
+		}
+
+		// Return array type with resolved element type
+		return &types.ArrayType{Element: resolvedType}
+	}
+
+	// If start is untyped, use centralized resolution
+	if types.IsUntypedInt(startType) {
+		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
+			startType = resolveUntypedInt(startLit.Value)
+		} else {
+			startType = types.NewPrimitive(types.DEFAULT_INT_TYPE)
+		}
+	}
+
+	// Return array type with element type from range
+	return &types.ArrayType{Element: startType}
+}
+
+// inferElvisExprType determines the result type of an elvis expression (a ?: b)
+// The elvis operator unwraps optional types:
+// - If 'a' has type T?, the result is T (non-optional)
+// - The fallback 'b' should have type T to match
+// - Result type is always the non-optional inner type
+func inferElvisExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ElvisExpr) types.SemType {
+	condType := inferExprType(ctx, mod, expr.Cond)
+
+	// Check if condition is an optional type
+	if optType, ok := condType.(*types.OptionalType); ok {
+		// Elvis operator unwraps the optional: T? ?: T → T
+		return optType.Inner
+	}
+
+	// If condition is not optional, elvis is redundant but still valid
+	// Result type is the condition type itself
+	return condType
 }

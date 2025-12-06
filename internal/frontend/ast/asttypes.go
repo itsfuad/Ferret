@@ -88,16 +88,19 @@ func (f *Field) Loc() *source.Location { return &f.Location }
 // StructType represents a struct type definition
 type StructType struct {
 	Fields []Field
+	ID     string // Unique ID for anonymous structs (e.g., in method receivers)
 	source.Location
 }
 
-func (s *StructType) INode()                {} // Implements Node interface
+func (s *StructType) INode() {} // Implements Node interface
+// func (s *StructType) Expr()                 {} // Can be used in expression context (for anonymous struct types)
 func (s *StructType) TypeExpr()             {} // Type nodes implement TypeExpr
 func (s *StructType) Loc() *source.Location { return &s.Location }
 
 // InterfaceType represents an interface type definition
 type InterfaceType struct {
 	Methods []Field // interface methods
+	ID      string  // Unique ID for anonymous interface
 	source.Location
 }
 
@@ -131,9 +134,11 @@ func (m *MapType) Loc() *source.Location { return &m.Location }
 // EnumType represents an enum type definition
 type EnumType struct {
 	Variants []Field
+	ID       string // Unique ID for anonymous enum
 	source.Location
 }
 
 func (e *EnumType) INode()                {} // Implements Node interface
+func (e *EnumType) Expr()                 {} // Can be used in expression context (for anonymous enum types)
 func (e *EnumType) TypeExpr()             {} // Type nodes implement TypeExpr
 func (e *EnumType) Loc() *source.Location { return &e.Location }

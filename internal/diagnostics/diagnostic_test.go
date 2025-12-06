@@ -81,10 +81,10 @@ func TestNewInfo(t *testing.T) {
 }
 
 func TestDiagnostic_WithCode(t *testing.T) {
-	diag := NewError("test error").WithCode("E0001")
+	diag := NewError("test error").WithCode("test")
 
-	if diag.Code != "E0001" {
-		t.Errorf("Expected code 'E0001', got %q", diag.Code)
+	if diag.Code != "test" {
+		t.Errorf("Expected code 'test', got %q", diag.Code)
 	}
 }
 
@@ -249,7 +249,7 @@ func TestDiagnostic_BuilderPattern(t *testing.T) {
 	)
 
 	diag := NewError("undefined variable 'myVar'").
-		WithCode("E0404").
+		WithCode("test").
 		WithPrimaryLabel(loc, "not found").
 		WithNote("Did you forget to declare this variable?").
 		WithHelp("Declare the variable before using it: let myVar := value;")
@@ -263,8 +263,8 @@ func TestDiagnostic_BuilderPattern(t *testing.T) {
 		t.Errorf("Unexpected message: %q", diag.Message)
 	}
 
-	if diag.Code != "E0404" {
-		t.Errorf("Expected code 'E0404', got %q", diag.Code)
+	if diag.Code != "test" {
+		t.Errorf("Expected code 'test', got %q", diag.Code)
 	}
 
 	if len(diag.Labels) != 1 {

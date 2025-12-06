@@ -3,8 +3,9 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/tokens"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
+	"compiler/internal/utils"
 	"fmt"
 )
 
@@ -34,7 +35,13 @@ func (p *Parser) parseType() ast.TypeNode {
 	switch tok.Kind {
 	case tokens.IDENTIFIER_TOKEN:
 		// Type identifier - convert IdentifierExpr to support both Expr() and TypeExpr()
-		t = p.parseIdentifier()
+		ident := p.parseIdentifier()
+		t = ident
+		// Check for scope resolution (module::Type)
+		if p.match(tokens.SCOPE_TOKEN) {
+			// IdentifierExpr implements both Expression and TypeNode
+			t = p.parseScopeResolutionExpr(ident)
+		}
 
 	case tokens.OPEN_BRACKET:
 		t = p.parseArrayType()
@@ -179,10 +186,13 @@ func (p *Parser) parseStructType() *ast.StructType {
 
 	end := p.expect(tokens.CLOSE_CURLY)
 
-	return &ast.StructType{
+	structType := &ast.StructType{
 		Fields:   fields,
+		ID:       utils.GenerateStructLitID(),
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end.End),
 	}
+
+	return structType
 }
 
 func (p *Parser) parseFuncType(start source.Position) *ast.FuncType {
@@ -298,6 +308,7 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 	return &ast.InterfaceType{
 		Methods:  methods,
+		ID:       utils.GenerateInterfaceLitID(),
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end),
 	}
 }
@@ -319,9 +330,17 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 		}
 
 		name := p.parseIdentifier()
-		fields = append(fields, ast.Field{
+		field := ast.Field{
 			Name: name,
-		})
+		}
+
+		// Check for optional value assignment (e.g., Red = 10)
+		if p.match(tokens.EQUALS_TOKEN) {
+			p.advance() // consume '='
+			field.Value = p.parseExpr()
+		}
+
+		fields = append(fields, field)
 
 		if p.match(tokens.CLOSE_CURLY) {
 			break
@@ -340,6 +359,7 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 
 	return &ast.EnumType{
 		Variants: fields,
+		ID:       utils.GenerateEnumLitID(),
 		Location: p.makeLocation(tok.Start),
 	}
 }

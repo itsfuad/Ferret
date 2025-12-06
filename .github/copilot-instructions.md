@@ -6,7 +6,7 @@ Ferret is a Go-based compiler for a modern systems programming language with:
 - Go-style AST architecture
 - Rust-style error diagnostics with rich source context
 - Module system with import path resolution (local, builtin, remote)
-- Parallel compilation pipeline with bounded worker pools
+- Parallel compilation pipeline with unbounded goroutines (one per module)
 
 **Module:** `compiler` (not a typical `github.com/...` path)
 
@@ -30,7 +30,6 @@ PhaseNotStarted → PhaseLexed → PhaseParsed → PhaseCollected → PhaseResol
 
 **Critical invariants** (enforced by `pipeline_test.go`):
 - Each module is parsed exactly once (deduplicated by import path)
-- Parallel parsing uses semaphore-bounded workers (`runtime.NumCPU()`)
 - Diagnostic collection is thread-safe (`sync.Mutex` in `DiagnosticBag`)
 - Phase advancement requires prerequisites (checked via `phasePrerequisites` map)
 - Phases run in topological order after parallel parsing completes
@@ -73,9 +72,10 @@ Thread-safe collection via `DiagnosticBag.Add()` with internal mutex.
 
 ### Lexer (internal/frontend/lexer/)
 
-Regex-based tokenizer that:
-- Continues on errors instead of panicking (collects all errors in `Errors` slice)
+Regex-based tokenizer (`tokenizer.go`) that:
+- Continues on errors instead of panicking (adds to `DiagnosticBag`)
 - Reports unrecognized characters as diagnostics
+- Skips invalid characters and continues tokenizing
 - Allows parser to find additional errors downstream
 
 ### AST Structure (internal/frontend/ast/)
@@ -86,7 +86,8 @@ Regex-based tokenizer that:
 
 **Parser state tracking:**
 - `seenNonImport` flag enforces imports-first ordering
-- Error recovery via `synchronize()` at statement boundaries
+- Error recovery: reports error and continues parsing (minimal recovery)
+- Special handling for missing semicolons (points to insertion location)
 
 ## Development Workflows
 
@@ -140,13 +141,23 @@ Entry point resolution order:
 
 ### Concurrency Patterns
 
-- Module state protected by `CompilerContext.mu` (RWMutex) for read/write access
-- Module field updates protected by `Module.Mu` (Mutex) during parsing
-- Diagnostic collection protected by `DiagnosticBag.mu`
-- SourceCache protected by `sync.RWMutex` for concurrent file content access
-- Pipeline uses `sync.WaitGroup` + semaphore channel for bounded parallelism
-- Always check state before state transitions (3-state: Unseen/Parsing/Done)
-- `GetModulePhase()` uses `RLock`, `SetModulePhase()` uses `Lock`
+**Parallel Parsing Strategy:**
+- Each module spawns its own goroutine (unbounded, simpler than worker pools)
+- Module deduplication via `sync.Map` (lock-free for reads)
+- `sync.WaitGroup` tracks parsing completion
+- Works well for typical project sizes (< 100s of modules)
+
+**Lock Hierarchy** (acquire in this order to prevent deadlocks):
+1. `CompilerContext.mu` (RWMutex) - Protects `Modules` map and `DepGraph`
+2. `Module.Mu` (Mutex) - Protects individual module fields during updates
+3. `DiagnosticBag.mu` (Mutex) - Protects concurrent diagnostic collection
+4. `SourceCache.mu` (RWMutex) - Protects cached source file contents
+
+**Usage patterns:**
+- `GetModulePhase()` uses `RLock` (read-only access)
+- `SetModulePhase()` uses `Lock` (exclusive access)
+- Always use deferred unlocks: `defer mu.Unlock()`
+- Module parsing completion updates use `Module.Mu.Lock()`
 
 ### Naming Conventions
 

@@ -1,6 +1,6 @@
 import "std";
 
-import { read } from "io"; // imports read function from io module
+import "io"; // imports read function from io module
 
 // single line comment
 

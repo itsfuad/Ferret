@@ -7,13 +7,57 @@ import (
 	"compiler/internal/semantics/controlflow"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
+	str "compiler/internal/utils/strings"
+
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 )
 
+// TypeCheckMethodSignatures only processes method signatures to attach methods to types
+// This must run before CheckModule so all methods are available
+func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	if mod.AST == nil {
+		return
+	}
+
+	if ctx.Debug {
+		fmt.Printf("    [TypeCheckMethodSignatures for %s]\n", mod.ImportPath)
+	}
+
+	// Reset CurrentScope to ModuleScope
+	mod.CurrentScope = mod.ModuleScope
+
+	// CRITICAL: Check type declarations FIRST so receiver types are resolved
+	for _, node := range mod.AST.Nodes {
+		if typeDecl, ok := node.(*ast.TypeDecl); ok {
+			checkTypeDecl(ctx, mod, typeDecl)
+		}
+	}
+
+	// Now process method declarations - attach them to types
+	methodCount := 0
+	for _, node := range mod.AST.Nodes {
+		if methodDecl, ok := node.(*ast.MethodDecl); ok {
+			if ctx.Debug {
+				fmt.Printf("      [Found method %s]\n", methodDecl.Name.Name)
+			}
+			checkMethodSignatureOnly(ctx, mod, methodDecl)
+			methodCount++
+		}
+	}
+
+	if ctx.Debug {
+		fmt.Printf("    [Processed %d methods]\n", methodCount)
+	}
+}
+
 // CheckModule performs type checking on a module.
-// It fills Symbol.Type for declarations and creates ExprTypes map for expressions.
+// Type declarations and method signatures are already checked in phase 4a.
+// This phase checks function bodies, variables, and method bodies.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 
 	// Reset CurrentScope to ModuleScope before type checking
@@ -21,9 +65,13 @@ func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	mod.CurrentScope = mod.ModuleScope
 
 	// Check all declarations in the module
+	// SKIP type declarations and method signatures - already done in phase 4a
 	if mod.AST != nil {
+		// Check everything EXCEPT type declarations (already done in phase 4a)
 		for _, node := range mod.AST.Nodes {
-			checkNode(ctx, mod, node)
+			if _, ok := node.(*ast.TypeDecl); !ok {
+				checkNode(ctx, mod, node)
+			}
 		}
 	}
 }
@@ -41,6 +89,10 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		checkVarDecl(ctx, mod, n, true)
 	case *ast.FuncDecl:
 		checkFuncDecl(ctx, mod, n)
+	case *ast.MethodDecl:
+		checkMethodDecl(ctx, mod, n)
+	case *ast.TypeDecl:
+		checkTypeDecl(ctx, mod, n)
 	case *ast.AssignStmt:
 		checkAssignStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
@@ -58,7 +110,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 				if compatibility == Incompatible {
 					ctx.Diagnostics.Add(
 						diagnostics.NewError("type mismatch in return statement").
-							WithCode("T0015").
+							WithCode(diagnostics.ErrTypeMismatch).
 							WithPrimaryLabel(n.Result.Loc(),
 								fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
 					)
@@ -71,10 +123,20 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
+		// Check condition
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
-		checkBlock(ctx, mod, n.Body)
+
+		// Analyze condition for type narrowing
+		thenNarrowing, elseNarrowing := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+
+		// Check then branch with narrowing
+		if n.Body != nil {
+			applyNarrowingToBlock(ctx, mod, n.Body, thenNarrowing)
+		}
+
+		// Check else/else-if chain with narrowing
 		if n.Else != nil {
-			checkNode(ctx, mod, n.Else)
+			applyNarrowingToElse(ctx, mod, n.Else, elseNarrowing)
 		}
 	case *ast.ForStmt:
 		// Enter for loop scope if it exists
@@ -82,14 +144,51 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
-		if n.Init != nil {
-			checkNode(ctx, mod, n.Init)
+		// Check range expression first to infer element type
+		var rangeElemType types.SemType = types.TypeUnknown
+		if n.Range != nil {
+			rangeType := checkExpr(ctx, mod, n.Range, types.TypeUnknown)
+			// Extract element type from array - for integer ranges this will be i32
+			if arrayType, ok := rangeType.(*types.ArrayType); ok {
+				rangeElemType = arrayType.Element
+			}
 		}
-		if n.Cond != nil {
-			checkExpr(ctx, mod, n.Cond, types.TypeBool)
-		}
-		if n.Post != nil {
-			checkNode(ctx, mod, n.Post)
+
+		// Check iterator
+		if n.Iterator != nil {
+			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok {
+				// For VarDecl iterator: apply types and validate structure
+				// Both single and dual variables get the same type (range element type)
+				for _, item := range varDecl.Decls {
+					// Validate iterator declaration structure
+					if item.Value != nil {
+						ctx.Diagnostics.Add(diagnostics.NewError("for loop iterator cannot have initializer").
+							WithPrimaryLabel(item.Value.Loc(), "remove this initializer"))
+					}
+
+					// Skip placeholder '_' - it doesn't get a symbol or type
+					if item.Name.Name == "_" {
+						continue
+					}
+
+					if item.Type != nil {
+						// Explicit type annotation - use it
+						declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
+						if sym, ok := mod.CurrentScope.GetSymbol(item.Name.Name); ok {
+							sym.Type = declType
+						}
+					} else {
+						// Infer type: all variables get range element type
+						// For numeric ranges like 0..10, both index and value are i32
+						if sym, ok := mod.CurrentScope.GetSymbol(item.Name.Name); ok {
+							sym.Type = rangeElemType
+						}
+					}
+				}
+			} else {
+				// For IdentifierExpr iterator: validate it exists
+				checkNode(ctx, mod, n.Iterator)
+			}
 		}
 		checkBlock(ctx, mod, n.Body)
 	case *ast.WhileStmt:
@@ -99,7 +198,10 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		}
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
-		checkBlock(ctx, mod, n.Body)
+
+		// Analyze condition for narrowing in loop body
+		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
 	case *ast.Block:
 		checkBlock(ctx, mod, n)
 	case *ast.DeclStmt:
@@ -134,7 +236,23 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		// Determine the type
 		if item.Type != nil {
 			// Explicit type annotation
-			declType := typeFromTypeNode(item.Type)
+			declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
+
+			// Disallow 'none' as a variable/const type
+			if declType.Equals(types.TypeNone) {
+				declKind := "variable"
+				if isConst {
+					declKind = "constant"
+				}
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("%s '%s' cannot have type 'none'", declKind, name)).
+						WithPrimaryLabel(item.Name.Loc(), "'none' is not a valid type for variables or constants").
+						WithHelp("'none' is only used as a value for optional types like i32?"),
+				)
+				sym.Type = types.TypeUnknown
+				continue
+			}
+
 			sym.Type = declType
 
 			// Check initializer if present
@@ -202,7 +320,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	// Set expected return type for validation
 	var expectedReturnType types.SemType = types.TypeVoid
 	if decl.Type != nil && decl.Type.Result != nil {
-		expectedReturnType = typeFromTypeNode(decl.Type.Result)
+		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, decl.Type.Result)
 	}
 	oldReturnType := mod.CurrentFunctionReturnType
 	mod.CurrentFunctionReturnType = expectedReturnType
@@ -214,7 +332,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	if decl.Type != nil && decl.Type.Params != nil {
 		for _, param := range decl.Type.Params {
 			if param.Name != nil {
-				paramType := typeFromTypeNode(param.Type)
+				paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
 				// update the param type
 				psym, ok := funcScope.GetSymbol(param.Name.Name)
 				if !ok {
@@ -236,6 +354,572 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 		// Analyze return paths
 		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
+	}
+}
+
+// checkSelectorExpr validates that a field or method exists on a struct
+// checkBinaryExpr validates that operands of a binary expression have compatible types
+func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *ast.BinaryExpr, lhsType, rhsType types.SemType) {
+	// Skip if either type is unknown (error already reported)
+	if lhsType.Equals(types.TypeUnknown) || rhsType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Allow untyped operands - they will be contextualized
+	if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
+		return
+	}
+
+	// For arithmetic operators, both operands must be numeric
+	switch expr.Op.Kind {
+	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
+		lhsNumeric := types.IsNumericType(lhsType)
+		rhsNumeric := types.IsNumericType(rhsType)
+
+		if !lhsNumeric || !rhsNumeric {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '%s' operator with %s and %s", expr.Op.Value, lhsType.String(), rhsType.String())),
+			)
+			return
+		}
+
+	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
+		// Special case: allow comparing optional with none
+		lhsOptional := false
+		rhsOptional := false
+		lhsNone := lhsType == types.TypeNone
+		rhsNone := rhsType == types.TypeNone
+
+		if _, ok := lhsType.(*types.OptionalType); ok {
+			lhsOptional = true
+		}
+		if _, ok := rhsType.(*types.OptionalType); ok {
+			rhsOptional = true
+		}
+
+		// Allow T? == none or none == T?
+		if (lhsOptional && rhsNone) || (rhsOptional && lhsNone) {
+			return // Valid comparison
+		}
+
+		// Comparison operators require compatible types
+		compatibility := checkTypeCompatibility(lhsType, rhsType)
+		if compatibility == Incompatible {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: cannot compare %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "incompatible types in comparison"),
+			)
+		}
+
+	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+		// Ordering operators require numeric types
+		lhsNumeric := types.IsNumericType(lhsType)
+		rhsNumeric := types.IsNumericType(rhsType)
+
+		if !lhsNumeric || !rhsNumeric {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: cannot compare %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "ordering comparison requires numeric types"),
+			)
+		}
+
+	case tokens.AND_TOKEN, tokens.OR_TOKEN:
+		// Logical operators require bool types
+		if !lhsType.Equals(types.TypeBool) || !rhsType.Equals(types.TypeBool) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: logical operator requires bool operands, got %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "logical operators require bool types"),
+			)
+		}
+	}
+}
+
+// checkCastExpr validates that a cast expression is valid
+func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *ast.CastExpr, sourceType, targetType types.SemType) {
+	// Skip if target type is unknown
+	if targetType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Skip further validation if source type is unknown (error already reported)
+	if sourceType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Allow untyped literals to be cast to any compatible type
+	if types.IsUntyped(sourceType) {
+		return
+	}
+
+	// Check if cast is valid
+	compatibility := checkTypeCompatibility(sourceType, targetType)
+
+	// For struct types, check structural compatibility (unwrap NamedType on both sides)
+	srcUnwrapped := types.UnwrapType(sourceType)
+	dstUnwrapped := types.UnwrapType(targetType)
+
+	if srcStruct, ok := srcUnwrapped.(*types.StructType); ok {
+		if dstStruct, ok := dstUnwrapped.(*types.StructType); ok {
+			// Check if struct types are compatible by structure
+			if missingFields, mismatchedFields := analyzeStructCompatibility(srcStruct, dstStruct); len(missingFields) > 0 || len(mismatchedFields) > 0 {
+				// Build detailed error message
+				diag := diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+					WithCode(diagnostics.ErrInvalidCast).
+					WithPrimaryLabel(expr.Loc(), "invalid cast")
+
+				// Add help message with field details
+				var helpParts []string
+				if len(missingFields) > 0 {
+					helpParts = append(helpParts, fmt.Sprintf("missing %s: %s", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", ")))
+				}
+				if len(mismatchedFields) > 0 {
+					helpParts = append(helpParts, fmt.Sprintf("type mismatch in %s: %s", str.Pluralize("field", "fields", len(mismatchedFields)), strings.Join(mismatchedFields, ", ")))
+				}
+				if len(helpParts) > 0 {
+					diag = diag.WithHelp(strings.Join(helpParts, "; "))
+				}
+
+				ctx.Diagnostics.Add(diag)
+			}
+			return
+		}
+	}
+
+	// Allow explicit casts between numeric types
+	if types.IsNumericType(sourceType) && types.IsNumericType(targetType) {
+		return
+	}
+
+	// Otherwise, check standard compatibility
+	if compatibility == Incompatible {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+				WithCode(diagnostics.ErrInvalidCast).
+				WithPrimaryLabel(expr.Loc(), "invalid cast"),
+		)
+	}
+}
+
+// checkCompositeLit validates that a composite literal matches its target type
+func checkCompositeLit(ctx *context_v2.CompilerContext, _ *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
+	// Unwrap NamedType to get the underlying struct
+	underlyingType := types.UnwrapType(targetType)
+
+	// Only validate struct literals
+	structType, ok := underlyingType.(*types.StructType)
+	if !ok {
+		return
+	}
+
+	// Build a map of provided fields
+	providedFields := make(map[string]bool)
+	for _, elem := range lit.Elts {
+		if kv, ok := elem.(*ast.KeyValueExpr); ok {
+			if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+				fieldName := key.Name
+				providedFields[fieldName] = true
+			}
+		}
+	}
+
+	// Check for missing required fields
+	var missingFields []string
+	for _, field := range structType.Fields {
+		if !providedFields[field.Name] {
+			missingFields = append(missingFields, field.Name)
+		}
+	}
+
+	// Only report error if there are missing fields (extra fields are allowed and will be stripped)
+	if len(missingFields) > 0 {
+		// Use the original type's name if available (for better error messages)
+		typeName := targetType.String()
+		errorMsg := fmt.Sprintf("cannot convert composite literal to type '%s'", typeName)
+		diag := diagnostics.NewError(errorMsg).
+			WithCode(diagnostics.ErrTypeMismatch).
+			WithPrimaryLabel(lit.Loc(), "incompatible struct literal")
+
+		// Build note with missing fields list
+		noteMsg := fmt.Sprintf("missing %s (%s)", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", "))
+		diag = diag.WithNote(noteMsg)
+
+		ctx.Diagnostics.Add(diag)
+	}
+}
+
+// areStructsCompatible checks if two struct types are structurally compatible
+func areStructsCompatible(src, dst *types.StructType) bool {
+	missing, mismatched := analyzeStructCompatibility(src, dst)
+	return len(missing) == 0 && len(mismatched) == 0
+}
+
+// analyzeStructCompatibility checks struct compatibility and returns detailed mismatch info
+// Returns:
+//   - missingFields: list of field names that are required in dst but missing in src
+//   - mismatchedFields: list of "fieldName (expected Type, found Type)" for type mismatches
+func analyzeStructCompatibility(src, dst *types.StructType) (missingFields []string, mismatchedFields []string) {
+	// Check if destination has all required fields with matching or compatible types
+	for _, dstField := range dst.Fields {
+		found := false
+		for _, srcField := range src.Fields {
+			if srcField.Name == dstField.Name {
+				found = true
+				// Check if types match or are compatible
+				if srcField.Type.Equals(dstField.Type) {
+					break // Exact match
+				}
+				// Allow untyped literals to match concrete types
+				compatibility := checkTypeCompatibility(srcField.Type, dstField.Type)
+				if compatibility == Incompatible {
+					// Type mismatch
+					mismatchedFields = append(mismatchedFields,
+						fmt.Sprintf("%s (expected %s, found %s)", dstField.Name, dstField.Type.String(), srcField.Type.String()))
+				}
+				break
+			}
+		}
+		if !found {
+			// Missing required field
+			missingFields = append(missingFields, dstField.Name)
+		}
+	}
+	return missingFields, mismatchedFields
+}
+
+func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.SelectorExpr) {
+	// Infer the base type
+	baseType := inferExprType(ctx, mod, expr.X)
+
+	// Skip validation if base type is unknown (error already reported)
+	if baseType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	fieldName := expr.Sel.Name
+
+	// Handle NamedType and anonymous StructType
+	var typeSym *symbols.Symbol
+	var structType *types.StructType
+	var typeName string
+
+	if namedType, ok := baseType.(*types.NamedType); ok {
+		// It's a named type - look up the type symbol for method resolution
+		typeName = namedType.Name
+
+		// First check current module's scope
+		if sym, found := mod.ModuleScope.Lookup(typeName); found {
+			typeSym = sym
+		} else {
+			// Not in current module, search imported modules
+			for _, importPath := range mod.ImportAliasMap {
+				if importedMod, exists := ctx.GetModule(importPath); exists {
+					if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+						typeSym = sym
+						break
+					}
+				}
+			}
+		}
+
+		// Get the underlying struct for field access
+		underlying := types.UnwrapType(namedType)
+		structType, _ = underlying.(*types.StructType)
+	} else if st, ok := baseType.(*types.StructType); ok {
+		// Anonymous struct - no methods, only fields
+		structType = st
+	} else {
+		// Not a struct or named type with struct underlying - could be module access or other
+		return
+	}
+
+	// Check if it's a field
+	if structType != nil {
+		for _, field := range structType.Fields {
+			if field.Name == fieldName {
+				return // Field exists
+			}
+		}
+	}
+
+	// Check if it's a method on the named type
+	if typeSym != nil && typeSym.Methods != nil {
+		if _, ok := typeSym.Methods[fieldName]; ok {
+			return // Method exists
+		}
+	}
+
+	// Field/method not found
+	if typeName != "" {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("field or method '%s' not found on type '%s'", fieldName, typeName)).
+				WithCode(diagnostics.ErrFieldNotFound).
+				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
+		)
+	} else {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("field '%s' not found on anonymous struct", fieldName)).
+				WithCode(diagnostics.ErrFieldNotFound).
+				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
+		)
+	}
+}
+
+// checkMethodSignatureOnly processes only the method signature (receiver + parameters + return type)
+// and attaches the method to its type. Does NOT check the body.
+func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+	if ctx.Debug {
+		fmt.Printf("        [checkMethodSignatureOnly: %s]\n", decl.Name.Name)
+	}
+
+	// Get receiver type
+	if decl.Receiver == nil || decl.Receiver.Type == nil {
+		if ctx.Debug {
+			fmt.Printf("          [No receiver]\n")
+		}
+		return
+	}
+
+	receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+
+	// Only process valid named types
+	if receiverType.Equals(types.TypeUnknown) {
+		return
+	}
+
+	// Extract type name - only NamedType can have methods
+	var typeName string
+	if namedType, ok := receiverType.(*types.NamedType); ok {
+		typeName = namedType.Name
+	} else {
+		// Anonymous types cannot have methods
+		return
+	}
+
+	if typeName == "" {
+		return
+	}
+
+	// Find the type symbol - could be in current module or imported module
+	typeSym, found := mod.ModuleScope.Lookup(typeName)
+	if !found {
+		// Not in current module, search imported modules
+		for _, importPath := range mod.ImportAliasMap {
+			if importedMod, exists := ctx.GetModule(importPath); exists {
+				if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+					typeSym = sym
+					found = true
+					break
+				}
+			}
+		}
+	}
+
+	// Type check the method signature and attach to type symbol
+	if found && typeSym.Kind == symbols.SymbolType && decl.Type != nil {
+		funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
+
+		// Attach method to the type symbol's Methods map
+		if typeSym.Methods == nil {
+			typeSym.Methods = make(map[string]*symbols.MethodInfo)
+		}
+
+		// Create method info and attach to type symbol
+		typeSym.Methods[decl.Name.Name] = &symbols.MethodInfo{
+			Name:     decl.Name.Name,
+			FuncType: funcType,
+		}
+	}
+}
+
+// checkMethodDecl type checks method body (signature already checked in phase 4a)
+func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+	// Safety check: Scope should be set during collection phase
+	if decl.Scope == nil {
+		ctx.ReportError(fmt.Sprintf("internal error: method '%s' has nil scope", decl.Name.Name), decl.Loc())
+		return
+	}
+
+	methodScope := decl.Scope.(*table.SymbolTable)
+
+	// Enter method scope
+	defer mod.EnterScope(methodScope)()
+
+	// Set expected return type for validation
+	var expectedReturnType types.SemType = types.TypeVoid
+	if decl.Type != nil && decl.Type.Result != nil {
+		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, decl.Type.Result)
+	}
+	oldReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = expectedReturnType
+	defer func() {
+		mod.CurrentFunctionReturnType = oldReturnType
+	}()
+
+	// Add receiver to method scope
+	if decl.Receiver != nil && decl.Receiver.Name != nil {
+		receiverSym, ok := methodScope.GetSymbol(decl.Receiver.Name.Name)
+		if ok && decl.Receiver.Type != nil {
+			receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+			receiverSym.Type = receiverType
+		}
+	}
+
+	// Add parameters to the method scope with type information
+	if decl.Type != nil && decl.Type.Params != nil {
+		for _, param := range decl.Type.Params {
+			if param.Name != nil {
+				paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
+				psym, ok := methodScope.GetSymbol(param.Name.Name)
+				if !ok {
+					continue
+				}
+				psym.Type = paramType
+			}
+		}
+	}
+
+	// Check the body with the method scope
+	if decl.Body != nil {
+		checkBlock(ctx, mod, decl.Body)
+
+		// Build control flow graph for the method
+		// We'll wrap the method in a FuncDecl for CFG analysis
+		// Create a temporary FuncDecl for CFG construction
+		tempFuncDecl := &ast.FuncDecl{
+			Name:     decl.Name,
+			Type:     decl.Type,
+			Body:     decl.Body,
+			Scope:    decl.Scope,
+			Location: decl.Location,
+		}
+
+		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
+		cfg := cfgBuilder.BuildFunctionCFG(tempFuncDecl)
+
+		// Analyze return paths
+		controlflow.AnalyzeReturns(ctx, mod, tempFuncDecl, cfg)
+	}
+}
+
+// checkTypeDecl fills in the type for user-defined type declarations
+func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.TypeDecl) {
+	if decl.Name == nil || decl.Type == nil {
+		return
+	}
+
+	typeName := decl.Name.Name
+
+	// Look up the type symbol (created during collection)
+	sym, ok := mod.CurrentScope.Lookup(typeName)
+	if !ok {
+		// Symbol should exist from collection phase
+		ctx.ReportError(fmt.Sprintf("internal error: type symbol '%s' not found", typeName), decl.Loc())
+		return
+	}
+
+	// Convert the AST type node to a semantic type
+	semType := typeFromTypeNodeWithContext(ctx, mod, decl.Type)
+
+	// Wrap the type with a NamedType to preserve the name
+	// This enables nominal typing and method attachment
+	namedType := types.NewNamed(typeName, semType)
+
+	// Update the symbol's type
+	sym.Type = namedType
+
+	// Special handling for enums: compute variant values and update variant symbols
+	if enumNode, ok := decl.Type.(*ast.EnumType); ok {
+		// Current value tracker for sequential numbering
+		currentValue := int64(0)
+
+		for _, variant := range enumNode.Variants {
+			variantName := variant.Name.Name
+			qualifiedName := typeName + "::" + variantName
+
+			// Compute variant value
+			if variant.Value != nil {
+				// Explicit value provided
+				switch val := variant.Value.(type) {
+				case *ast.BasicLit:
+					if val.Kind == ast.INT {
+						// Parse the integer literal
+						parsedValue, err := strconv.ParseInt(val.Value, 0, 64)
+						if err != nil {
+							ctx.Diagnostics.Add(
+								diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
+									WithPrimaryLabel(val.Loc(), "cannot parse as integer").
+									WithHelp("use a valid integer literal"),
+							)
+							continue
+						}
+						currentValue = parsedValue
+					} else {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
+								WithPrimaryLabel(val.Loc(), "expected integer literal").
+								WithHelp("use an integer literal (e.g., 42)"),
+						)
+						continue
+					}
+				case *ast.UnaryExpr:
+					// Handle negative literals like -1
+					if val.Op.Kind == tokens.MINUS_TOKEN {
+						if lit, ok := val.X.(*ast.BasicLit); ok && lit.Kind == ast.INT {
+							parsedValue, err := strconv.ParseInt(lit.Value, 0, 64)
+							if err != nil {
+								ctx.Diagnostics.Add(
+									diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
+										WithPrimaryLabel(lit.Loc(), "cannot parse as integer").
+										WithHelp("use a valid integer literal"),
+								)
+								continue
+							}
+							currentValue = -parsedValue
+						} else {
+							ctx.Diagnostics.Add(
+								diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
+									WithPrimaryLabel(val.Loc(), "expected integer literal").
+									WithHelp("use an integer literal (e.g., -42)"),
+							)
+							continue
+						}
+					} else {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
+								WithPrimaryLabel(val.Loc(), "unexpected expression").
+								WithHelp("use an integer literal"),
+						)
+						continue
+					}
+				default:
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have constant integer value", variantName)).
+							WithPrimaryLabel(variant.Value.Loc(), "expected integer literal").
+							WithHelp("use an integer literal (e.g., 42)"),
+					)
+					continue
+				}
+			}
+			// else: use currentValue as is (sequential numbering)
+
+			// Look up the variant symbol (created during collection phase)
+			variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedName)
+			if !ok {
+				ctx.ReportError(fmt.Sprintf("internal error: enum variant symbol '%s' not found", qualifiedName), variant.Name.Loc())
+				continue
+			}
+
+			// Update the variant symbol's type to the named enum type
+			variantSym.Type = namedType
+
+			// Increment for next variant (if no explicit value provided)
+			currentValue++
+		}
 	}
 }
 
@@ -292,20 +976,93 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		return types.TypeUnknown
 	}
 
-	// Special handling for call expressions - validate before inference
-	if callExpr, ok := expr.(*ast.CallExpr); ok {
-		checkCallExpr(ctx, mod, callExpr)
-		// Continue with normal type inference for return type
+	// Recursively validate subexpressions before type inference
+	switch e := expr.(type) {
+	case *ast.CallExpr:
+		checkCallExpr(ctx, mod, e)
+
+	case *ast.SelectorExpr:
+		// Validate base expression first
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkSelectorExpr(ctx, mod, e)
+
+	case *ast.BinaryExpr:
+		// Recursively check operands
+		lhsType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+		// Validate operand type compatibility
+		checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
+
+	case *ast.UnaryExpr:
+		// Recursively check operand
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+
+	case *ast.IndexExpr:
+		// Check both array and index expressions
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
+
+	case *ast.ParenExpr:
+		// Check inner expression
+		return checkExpr(ctx, mod, e.X, expected)
+
+	case *ast.CastExpr:
+		// Check expression being cast and validate cast compatibility
+		targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+		// For composite literals, provide target type as context to allow untyped literal contextualization
+		sourceType := checkExpr(ctx, mod, e.X, targetType)
+		checkCastExpr(ctx, mod, e, sourceType, targetType)
+
+	case *ast.CompositeLit:
+		// Determine expected struct type for field contextualization
+		var expectedStructType *types.StructType
+		if !expected.Equals(types.TypeUnknown) {
+			// Unwrap NamedType to get underlying struct
+			unwrapped := types.UnwrapType(expected)
+			expectedStructType, _ = unwrapped.(*types.StructType)
+		}
+
+		// Check all element expressions in the composite literal
+		for _, elem := range e.Elts {
+			if kv, ok := elem.(*ast.KeyValueExpr); ok {
+				// Struct field: check the value with field type as context
+				if kv.Value != nil {
+					fieldExpected := types.TypeUnknown
+					// If we know the expected struct type, provide field type as context
+					if expectedStructType != nil {
+						if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+							fieldName := key.Name
+							for _, field := range expectedStructType.Fields {
+								if field.Name == fieldName {
+									fieldExpected = field.Type
+									break
+								}
+							}
+						}
+					}
+					checkExpr(ctx, mod, kv.Value, fieldExpected)
+				}
+			} else {
+				// Array element: check the expression directly
+				checkExpr(ctx, mod, elem, types.TypeUnknown)
+			}
+		}
+		// Validate composite literal matches target type if specified
+		if e.Type != nil {
+			targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+			checkCompositeLit(ctx, mod, e, targetType)
+		}
 	}
 
 	// First, infer the type based on the expression structure
 	inferredType := inferExprType(ctx, mod, expr)
 
-	// Apply contextual typing
+	// Apply contextual typing for UNTYPED numeric literals only
+	// Note: Struct literals, string literals, bool literals have concrete types immediately
 	resultType := inferredType
 
-	// 1. Handle UNTYPED numeric literals
 	if types.IsUntyped(inferredType) && !expected.Equals(types.TypeUnknown) {
+		// Only numeric literals (int/float) are untyped and need contextualization
 		if lit, ok := expr.(*ast.BasicLit); ok {
 			// If expected is optional, contextualize to inner type
 			expectedForLit := expected
@@ -316,15 +1073,25 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		}
 	}
 
-	// 2. Handle composite literals (arrays, structs) without explicit type
-	if inferredType.Equals(types.TypeUnknown) && !expected.Equals(types.TypeUnknown) {
-		if lit, ok := expr.(*ast.CompositeLit); ok && lit.Type == nil {
-			// Empty composite literal adopts expected type
-			resultType = expected
+	// Special handling for CompositeLit: if expected type is known and matches structure,
+	// adopt the expected type (for better compatibility with named types)
+	if compLit, ok := expr.(*ast.CompositeLit); ok && compLit.Type == nil {
+		if !expected.Equals(types.TypeUnknown) {
+			// Unwrap expected to get underlying struct
+			expectedUnwrapped := types.UnwrapType(expected)
+			if expectedStruct, ok := expectedUnwrapped.(*types.StructType); ok {
+				// Check if inferred struct is compatible with expected
+				if inferredStruct, ok := inferredType.(*types.StructType); ok {
+					if areStructsCompatible(inferredStruct, expectedStruct) {
+						// Use the expected type (preserves named type)
+						resultType = expected
+					}
+				}
+			}
 		}
 	}
 
-	// 3. Handle optional type wrapping (T -> T?)
+	// Handle optional type wrapping (T -> T?)
 	if !expected.Equals(types.TypeUnknown) {
 		if optType, ok := expected.(*types.OptionalType); ok {
 			// If assigning non-optional to optional, check if inner types match
@@ -514,6 +1281,117 @@ func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.Sem
 	return true
 }
 
+// typeFromTypeNodeWithContext resolves type nodes including user-defined types by looking them up in the symbol table
+func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeNode ast.TypeNode) types.SemType {
+	if typeNode == nil {
+		return types.TypeUnknown
+	}
+
+	switch t := typeNode.(type) {
+	case *ast.ScopeResolutionExpr:
+		// Handle module::Type references
+		if moduleIdent, ok := t.X.(*ast.IdentifierExpr); ok {
+			moduleAlias := moduleIdent.Name
+			typeName := t.Selector.Name
+
+			// Look up the import
+			importPath, ok := mod.ImportAliasMap[moduleAlias]
+			if !ok {
+				// Module not imported - error should have been reported in resolver
+				return types.TypeUnknown
+			}
+
+			// Get the imported module
+			importedMod, exists := ctx.GetModule(importPath)
+			if !exists {
+				// Module not loaded - error should have been reported
+				return types.TypeUnknown
+			}
+
+			// Look up the type in the imported module's scope
+			sym, ok := importedMod.ModuleScope.GetSymbol(typeName)
+			if !ok || sym.Kind != symbols.SymbolType {
+				// Type not found - error should have been reported in resolver
+				return types.TypeUnknown
+			}
+
+			// Return the resolved type
+			return sym.Type
+		}
+		return types.TypeUnknown
+
+	case *ast.IdentifierExpr:
+		// Try to look up user-defined type in symbol table first
+		sym, ok := mod.CurrentScope.Lookup(t.Name)
+		if ok && sym.Kind == symbols.SymbolType {
+			// Return the resolved user-defined type
+			return sym.Type
+		}
+
+		// Not a user-defined type, check if it's a primitive type
+		primitiveType := types.FromTypeName(types.TYPE_NAME(t.Name))
+		if !primitiveType.Equals(types.TypeUnknown) {
+			return primitiveType
+		}
+
+		// Type not found
+		return types.TypeUnknown
+
+	case *ast.ArrayType:
+		// Array type: [N]T or []T
+		elementType := typeFromTypeNodeWithContext(ctx, mod, t.ElType)
+		length := -1
+		if t.Len != nil {
+			// TODO: keep all array dynamic now
+		}
+		return types.NewArray(elementType, length)
+
+	case *ast.OptionalType:
+		// Optional type: T?
+		innerType := typeFromTypeNodeWithContext(ctx, mod, t.Base)
+		return types.NewOptional(innerType)
+
+	case *ast.ResultType:
+		// Result type: T ! E
+		okType := typeFromTypeNodeWithContext(ctx, mod, t.Value)
+		errType := typeFromTypeNodeWithContext(ctx, mod, t.Error)
+		return types.NewResult(okType, errType)
+
+	case *ast.StructType:
+		// Anonymous struct
+		fields := make([]types.StructField, len(t.Fields))
+		for i, f := range t.Fields {
+			fieldName := ""
+			if f.Name != nil {
+				fieldName = f.Name.Name
+			}
+			fields[i] = types.StructField{
+				Name: fieldName,
+				Type: typeFromTypeNodeWithContext(ctx, mod, f.Type),
+			}
+		}
+		structType := types.NewStruct("", fields)
+		// Propagate the ID from AST to semantic type for identity tracking
+		structType.ID = t.ID
+		return structType
+
+	case *ast.FuncType:
+		// Function type: fn(T1, T2) -> R
+		params := make([]types.ParamType, len(t.Params))
+		for i, param := range t.Params {
+			params[i].Name = param.Name.Name
+			params[i].Type = typeFromTypeNodeWithContext(ctx, mod, param.Type)
+			params[i].IsVariadic = param.IsVariadic
+		}
+		returnType := typeFromTypeNodeWithContext(ctx, mod, t.Result)
+		return types.NewFunction(params, returnType)
+
+	default:
+		// Fallback to simple version
+		return typeFromTypeNode(typeNode)
+	}
+}
+
 // typeFromTypeNode converts AST type nodes to semantic types
 func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 	if typeNode == nil {
@@ -612,6 +1490,12 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 // - Checking argument count (regular and variadic functions)
 // - Validating argument types against parameter types
 func checkCallExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) {
+	// 0. If the function being called is a selector (method call), validate it first
+	if selector, ok := expr.Fun.(*ast.SelectorExpr); ok {
+		checkExpr(ctx, mod, selector.X, types.TypeUnknown)
+		checkSelectorExpr(ctx, mod, selector)
+	}
+
 	// 1. Infer the type of the expression being called
 	funType := inferExprType(ctx, mod, expr.Fun)
 
@@ -761,5 +1645,120 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 	for i := maxChecked; i < argCount; i++ {
 		checkExpr(ctx, mod, expr.Args[i], types.TypeUnknown)
+	}
+}
+
+// applyNarrowingToBlock temporarily overrides symbol types based on narrowing context
+// and checks the block. Uses defer to automatically restore original types.
+func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, narrowing *NarrowingContext) {
+	if block == nil {
+		return
+	}
+
+	if narrowing == nil {
+		checkBlock(ctx, mod, block)
+		return
+	}
+
+	// Collect all narrowed variables from this context and parent chain
+	narrowedVars := make(map[string]types.SemType)
+	collectNarrowedTypes(narrowing, narrowedVars)
+
+	if len(narrowedVars) == 0 {
+		checkBlock(ctx, mod, block)
+		return
+	}
+
+	// Apply narrowing using defer for automatic restoration
+	defer restoreSymbolTypes(mod, narrowedVars)()
+
+	// Apply narrowed types
+	for varName, narrowedType := range narrowedVars {
+		if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+			sym.Type = narrowedType
+		}
+	}
+
+	// Check the block with narrowed types
+	checkBlock(ctx, mod, block)
+}
+
+// collectNarrowedTypes walks the narrowing context chain and collects all narrowed types
+// Child contexts override parent contexts for the same variable
+func collectNarrowedTypes(nc *NarrowingContext, result map[string]types.SemType) {
+	if nc == nil {
+		return
+	}
+
+	// First collect from parent (so child can override)
+	if nc.parent != nil {
+		collectNarrowedTypes(nc.parent, result)
+	}
+
+	// Then add/override with current level
+	for varName, narrowedType := range nc.narrowedTypes {
+		result[varName] = narrowedType
+	}
+}
+
+// restoreSymbolTypes returns a function that restores original types
+// This allows using defer for automatic cleanup
+func restoreSymbolTypes(mod *context_v2.Module, narrowedVars map[string]types.SemType) func() {
+	// Capture original types at the time of narrowing
+	originalTypes := make(map[string]types.SemType)
+
+	for varName := range narrowedVars {
+		if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+			originalTypes[varName] = sym.Type
+		}
+	}
+
+	// Return restoration function
+	return func() {
+		for varName, origType := range originalTypes {
+			if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+				sym.Type = origType
+			}
+		}
+	}
+}
+
+// applyNarrowingToElse handles else and else-if branches with narrowing
+func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Module, elseNode ast.Node, elseNarrowing *NarrowingContext) {
+	if elseNode == nil {
+		return
+	}
+
+	// Check if it's an else-if (IfStmt) or plain else (Block)
+	switch e := elseNode.(type) {
+	case *ast.IfStmt:
+		// For else-if, re-analyze the condition with parent narrowing from else branch
+		elseIfThenNarrowing, elseIfElseNarrowing := analyzeConditionForNarrowing(ctx, mod, e.Cond, elseNarrowing)
+
+		// Enter scope if exists
+		if e.Scope != nil {
+			defer mod.EnterScope(e.Scope.(*table.SymbolTable))()
+		}
+
+		// Check condition
+		checkExpr(ctx, mod, e.Cond, types.TypeBool)
+
+		// Check then branch with combined narrowing
+		if e.Body != nil {
+			applyNarrowingToBlock(ctx, mod, e.Body, elseIfThenNarrowing)
+		}
+
+		// Recursively handle nested else-if/else
+		if e.Else != nil {
+			applyNarrowingToElse(ctx, mod, e.Else, elseIfElseNarrowing)
+		}
+
+	case *ast.Block:
+		// Plain else block - apply narrowing from condition
+		applyNarrowingToBlock(ctx, mod, e, elseNarrowing)
+
+	default:
+		// Fallback for unexpected node types
+		checkNode(ctx, mod, elseNode)
 	}
 }

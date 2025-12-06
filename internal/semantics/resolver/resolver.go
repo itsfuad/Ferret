@@ -4,6 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 
 	"fmt"
@@ -57,6 +58,22 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 			resolveBlock(ctx, mod, n.Body)
 		}
 
+	case *ast.MethodDecl:
+		// switch to method scope
+		if n.Scope != nil {
+			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
+		// Resolve receiver type (if it's a reference type)
+		if n.Receiver != nil && n.Receiver.Type != nil {
+			resolveTypeNode(ctx, mod, n.Receiver.Type)
+		}
+
+		// Bind names in method body
+		if n.Body != nil {
+			resolveBlock(ctx, mod, n.Body)
+		}
+
 	case *ast.AssignStmt:
 		resolveExpr(ctx, mod, n.Lhs)
 		resolveExpr(ctx, mod, n.Rhs)
@@ -84,14 +101,13 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
-		if n.Init != nil {
-			resolveNode(ctx, mod, n.Init)
+		// Resolve iterator (VarDecl or IdentifierExpr)
+		if n.Iterator != nil {
+			resolveNode(ctx, mod, n.Iterator)
 		}
-		if n.Cond != nil {
-			resolveExpr(ctx, mod, n.Cond)
-		}
-		if n.Post != nil {
-			resolveNode(ctx, mod, n.Post)
+		// Resolve range expression
+		if n.Range != nil {
+			resolveExpr(ctx, mod, n.Range)
 		}
 		resolveBlock(ctx, mod, n.Body)
 
@@ -186,6 +202,8 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 
 	case *ast.CastExpr:
 		resolveExpr(ctx, mod, e.X)
+		// Resolve the target type as well
+		resolveTypeNode(ctx, mod, e.Type)
 
 	case *ast.ElvisExpr:
 		resolveExpr(ctx, mod, e.Cond)
@@ -209,42 +227,63 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 }
 
 func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module, e *ast.ScopeResolutionExpr) {
-	// Handle module::symbol resolution
-	// X should be an identifier representing the module name/alias
-	if ident, ok := e.X.(*ast.IdentifierExpr); ok {
-		moduleAlias := ident.Name
-		symbolName := e.Selector.Name
+	// Handle X::Y resolution where X can be:
+	// 1. Module alias (module::symbol)
+	// 2. Enum type (EnumType::Variant)
 
-		// Look up the import path from the alias/name
-		importPath, ok := mod.ImportAliasMap[moduleAlias]
+	if ident, ok := e.X.(*ast.IdentifierExpr); ok {
+		leftName := ident.Name
+		rightName := e.Selector.Name
+
+		// First check if leftName is an enum type in current scope
+		if sym, ok := mod.CurrentScope.Lookup(leftName); ok && sym.Kind == symbols.SymbolType {
+			// It's a type - check if it's an enum by looking up the qualified variant name
+			qualifiedVariantName := leftName + "::" + rightName
+
+			if variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedVariantName); ok {
+				// Valid enum variant access
+				// The variant symbol exists and has been registered during type checking
+				_ = variantSym // Validation successful
+				return
+			} else {
+				// Type exists but variant doesn't
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("variant '%s' not found in enum '%s'", rightName, leftName)).
+						WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is not a variant of '%s'", rightName, leftName)),
+				)
+				return
+			}
+		}
+
+		// Not an enum type, check if it's a module alias
+		importPath, ok := mod.ImportAliasMap[leftName]
 		if !ok {
+			// Not a module either - report error
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleAlias)).
-					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleAlias)).
-					WithNote("Make sure to import this module first"),
+				diagnostics.NewError(fmt.Sprintf("'%s' is not a module or enum type", leftName)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' not found", leftName)).
+					WithNote("Make sure to import the module or declare the enum type first"),
 			)
 			return
 		}
 
-		// Get the imported module from context
+		// It's a module - proceed with module::symbol resolution
 		importedMod, exists := ctx.GetModule(importPath)
-
 		if !exists {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
-					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleAlias)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", leftName)).
 					WithNote("This is likely a compiler bug"),
 			)
 			return
 		}
 
-		// Look up symbol in the imported module's module scope (not CurrentScope)
-		// Use ModuleScope to access module-level symbols
-		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		// Look up symbol in the imported module's module scope
+		sym, ok := importedMod.ModuleScope.GetSymbol(rightName)
 		if !ok {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, importPath)).
-					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)),
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", rightName, importPath)).
+					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' not found", rightName)),
 			)
 			return
 		}
@@ -252,8 +291,8 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		// Check if symbol is exported
 		if !sym.Exported {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, importPath)).
-					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", rightName, importPath)).
+					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", rightName)).
 					WithSecondaryLabel(sym.Decl.Loc(), "declared here").
 					WithNote("only symbols starting with uppercase letters are exported"),
 			)
@@ -263,7 +302,77 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		mod.Imports[importPath].IsUsed = true
 
 	} else {
-		// For now, just resolve the left side (could be enum::variant later)
+		// For anonymous types (enum{...}::variant, struct{...}, etc.)
+		// Just resolve the expression - validation happens in typechecker
 		resolveExpr(ctx, mod, e.X)
+	}
+}
+
+// resolveTypeNode resolves type references in type nodes
+func resolveTypeNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeNode ast.TypeNode) {
+	if typeNode == nil {
+		return
+	}
+
+	switch t := typeNode.(type) {
+	case *ast.ScopeResolutionExpr:
+		// Handle module::Type references
+		resolveStaticAccess(ctx, mod, t)
+
+	case *ast.ReferenceType:
+		// Resolve the type name
+		if ident, ok := t.Base.(*ast.IdentifierExpr); ok {
+			// Look up the type in the current scope
+			sym, found := mod.CurrentScope.Lookup(ident.Name)
+			if !found {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("undefined type '%s'", ident.Name)).
+						WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' not declared", ident.Name)),
+				)
+			} else if sym.Kind != symbols.SymbolType {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("'%s' is not a type", ident.Name)).
+						WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is a %v", ident.Name, sym.Kind)),
+				)
+			}
+		}
+
+	case *ast.ArrayType:
+		// Resolve element type
+		resolveTypeNode(ctx, mod, t.ElType)
+
+	case *ast.OptionalType:
+		// Resolve inner type
+		resolveTypeNode(ctx, mod, t.Base)
+
+	case *ast.ResultType:
+		// Resolve value and error types
+		resolveTypeNode(ctx, mod, t.Value)
+		resolveTypeNode(ctx, mod, t.Error)
+
+	case *ast.MapType:
+		// Resolve key and value types
+		resolveTypeNode(ctx, mod, t.Key)
+		resolveTypeNode(ctx, mod, t.Value)
+
+	case *ast.StructType:
+		// Resolve field types
+		for i := range t.Fields {
+			resolveTypeNode(ctx, mod, t.Fields[i].Type)
+		}
+
+	case *ast.FuncType:
+		// Resolve parameter types
+		for i := range t.Params {
+			resolveTypeNode(ctx, mod, t.Params[i].Type)
+		}
+		// Resolve return type
+		if t.Result != nil {
+			resolveTypeNode(ctx, mod, t.Result)
+		}
+
+	// Other type nodes don't need resolution (primitives, etc.)
+	default:
+		// Nothing to resolve
 	}
 }

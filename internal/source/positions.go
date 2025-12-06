@@ -18,20 +18,27 @@ type Position struct {
 // Returns:
 // - A pointer to the updated Position.
 func (p *Position) Advance(toSkip string) *Position {
-	for i, char := range toSkip {
+	prevWasTab := false
+	for _, char := range toSkip {
 		switch char {
 		case '\n':
 			p.Line++
 			p.Column = 1
+			p.Index++
+			prevWasTab = false
 		case '\t':
 			p.Column += 4 // Standard tab width
+			p.Index++
+			prevWasTab = true
 		default:
-			// Only increment column if this is not the first character after a tab
-			if i == 0 || toSkip[i-1] != '\t' {
+			// Original behavior: don't increment column immediately after a tab
+			if !prevWasTab {
 				p.Column++
 			}
+			// Advance Index by the number of bytes this rune occupies
+			p.Index += len(string(char))
+			prevWasTab = false
 		}
-		p.Index++
 	}
 	return p
 }

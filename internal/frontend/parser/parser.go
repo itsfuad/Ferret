@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/tokens"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 	"fmt"
 )
 
@@ -79,6 +79,12 @@ func (p *Parser) parseTopLevel() ast.Node {
 	case tokens.IF_TOKEN:
 		p.seenNonImport = true
 		return p.parseIfStmt()
+	case tokens.FOR_TOKEN:
+		p.seenNonImport = true
+		return p.parseForStmt()
+	case tokens.WHILE_TOKEN:
+		p.seenNonImport = true
+		return p.parseWhileStmt()
 	case tokens.FUNCTION_TOKEN:
 		p.seenNonImport = true
 		return p.parseFuncDecl()
@@ -150,9 +156,9 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 	p.expect(tokens.SEMICOLON_TOKEN)
 
 	return &ast.ImportStmt{
-		Path:     	path,
-		Alias: 		alias,
-		Location: 	p.makeLocation(start),
+		Path:     path,
+		Alias:    alias,
+		Location: p.makeLocation(start),
 	}
 }
 
@@ -168,6 +174,10 @@ func (p *Parser) parseStmt() ast.Node {
 		return p.parseReturnStmt()
 	case tokens.IF_TOKEN:
 		return p.parseIfStmt()
+	case tokens.FOR_TOKEN:
+		return p.parseForStmt()
+	case tokens.WHILE_TOKEN:
+		return p.parseWhileStmt()
 	case tokens.OPEN_CURLY:
 		return p.parseBlock()
 	default:
@@ -417,7 +427,7 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		tok := p.peek()
 		p.diagnostics.Add(
 			diagnostics.NewError("too many nested unary operators (maximum 100)").
-				WithCode("P0002").
+				WithCode(diagnostics.ErrMax).
 				WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), "excessive nesting"),
 		)
 		return p.parsePostfix()
@@ -427,6 +437,17 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		op := p.advance()
 		expr := p.parseUnaryDepth(depth + 1)
 		return &ast.UnaryExpr{
+			Op:       op,
+			X:        expr,
+			Location: *source.NewLocation(&p.filepath, &op.Start, expr.Loc().End),
+		}
+	}
+
+	// Prefix increment/decrement: ++a or --a
+	if p.match(tokens.PLUS_PLUS_TOKEN, tokens.MINUS_MINUS_TOKEN) {
+		op := p.advance()
+		expr := p.parseUnaryDepth(depth + 1)
+		return &ast.PrefixExpr{
 			Op:       op,
 			X:        expr,
 			Location: *source.NewLocation(&p.filepath, &op.Start, expr.Loc().End),
@@ -456,6 +477,14 @@ func (p *Parser) parsePostfix() ast.Expression {
 		} else if p.match(tokens.AS_TOKEN) {
 			// Type casting: expr as Type
 			expr = p.parseCastExpr(expr)
+		} else if p.match(tokens.PLUS_PLUS_TOKEN, tokens.MINUS_MINUS_TOKEN) {
+			// Postfix increment/decrement: expr++ or expr--
+			op := p.advance()
+			expr = &ast.PostfixExpr{
+				X:        expr,
+				Op:       op,
+				Location: *source.NewLocation(&p.filepath, expr.Loc().Start, &op.End),
+			}
 		} else {
 			break
 		}
@@ -730,6 +759,11 @@ func (p *Parser) parsePrimary() ast.Expression {
 		// Parse as function literal
 		return p.parseFuncLit(start, params)
 
+	case tokens.ENUM_TOKEN:
+		// Anonymous enum type in expression context: enum { A, B, C }
+		// This allows constructs like: enum { A, B, C }::A
+		return p.parseEnumType()
+
 	case tokens.OPEN_CURLY:
 		// Anonymous struct/map literal: { .field = value } or { key => value }
 		if !p.isCompositeLiteral() {
@@ -753,7 +787,7 @@ func (p *Parser) parsePrimary() ast.Expression {
 
 		// Create a detailed error message with helpful labels
 		diag := diagnostics.NewError(fmt.Sprintf("unexpected token '%s' in expression", tok.Value)).
-			WithCode("P0001").
+			WithCode(diagnostics.ErrUnexpectedToken).
 			WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End),
 				fmt.Sprintf("cannot use '%s' here", tok.Value))
 
@@ -910,7 +944,7 @@ func (p *Parser) error(msg string) {
 	loc := source.NewLocation(&p.filepath, &tok.Start, &tok.End)
 	p.diagnostics.Add(
 		diagnostics.NewError(msg).
-			WithCode("P0001").
+			WithCode(diagnostics.ErrUnexpectedToken).
 			WithPrimaryLabel(loc, ""),
 	)
 }
@@ -948,4 +982,150 @@ func (p *Parser) checkTrailing(target, closingToken tokens.TOKEN, contextName st
 func (p *Parser) makeLocation(start source.Position) source.Location {
 	end := p.previous().End
 	return *source.NewLocation(&p.filepath, &start, &end)
+}
+
+// parseForStmt parses: for [let] i in range { } or for [let] i, v in range { }
+func (p *Parser) parseForStmt() *ast.ForStmt {
+	start := p.expect(tokens.FOR_TOKEN).Start
+
+	// Check for optional 'let' keyword
+	hasLet := p.match(tokens.LET_TOKEN)
+	if hasLet {
+		p.advance()
+	}
+
+	// Parse first iterator variable name (index or value)
+	firstTok := p.expect(tokens.IDENTIFIER_TOKEN)
+
+	// Check for comma (indicates index, value pair)
+	var secondTok tokens.Token
+	hasSecond := false
+	if p.match(tokens.COMMA_TOKEN) {
+		p.advance()
+		secondTok = p.expect(tokens.IDENTIFIER_TOKEN)
+		hasSecond = true
+	}
+
+	// Expect 'in' keyword
+	p.expect(tokens.IN_TOKEN)
+
+	// Parse range expression (e.g., 0..10 or 0..10:2)
+	rangeExpr := p.parseRangeExpr()
+
+	// Parse body
+	body := p.parseBlock()
+
+	// Create iterator node (VarDecl if 'let' was used, IdentifierExpr otherwise)
+	var iterator ast.Node
+	if hasLet {
+		// Create VarDecl for 'for let i in ...' or 'for let i, v in ...'
+		declItems := []ast.DeclItem{
+			{
+				Name:  &ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
+				Type:  nil, // Type inferred from range
+				Value: nil, // Value comes from range iteration
+			},
+		}
+		if hasSecond {
+			declItems = append(declItems, ast.DeclItem{
+				Name:  &ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
+				Type:  nil, // Type inferred from range element type
+				Value: nil, // Value comes from range iteration
+			})
+		}
+		iterator = &ast.VarDecl{
+			Decls:    declItems,
+			Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End),
+		}
+	} else {
+		// For non-let form with comma, we need a different representation
+		// We'll use a special marker or handle it differently
+		if hasSecond {
+			// Create a VarDecl-like structure even without 'let' for consistency
+			// This represents reusing existing variables
+			iterator = &ast.VarDecl{
+				Decls: []ast.DeclItem{
+					{
+						Name:  &ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
+						Type:  nil,
+						Value: nil,
+					},
+					{
+						Name:  &ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
+						Type:  nil,
+						Value: nil,
+					},
+				},
+				Location: *source.NewLocation(&p.filepath, &firstTok.Start, &secondTok.End),
+			}
+		} else {
+			// Single identifier - references existing variable
+			iterator = &ast.IdentifierExpr{
+				Name:     firstTok.Value,
+				Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End),
+			}
+		}
+	}
+
+	return &ast.ForStmt{
+		Iterator: iterator,
+		Range:    rangeExpr,
+		Body:     body,
+		Location: *source.NewLocation(&p.filepath, &start, body.Location.End),
+	}
+}
+
+// parseRangeExpr parses: start..end or start..end:incr
+func (p *Parser) parseRangeExpr() *ast.RangeExpr {
+	// Parse start expression
+	start := p.parseAdditive()
+
+	// Expect '..' token
+	if !p.match(tokens.RANGE_TOKEN) {
+		p.error("expected '..' in range expression")
+		return &ast.RangeExpr{Start: start, End: start, Location: *start.Loc()}
+	}
+	p.advance()
+
+	// Parse end expression
+	end := p.parseAdditive()
+
+	// Check for optional increment (:incr)
+	var incr ast.Expression
+	if p.match(tokens.COLON_TOKEN) {
+		p.advance()
+		incr = p.parseAdditive()
+	}
+
+	endPos := end.Loc().End
+	if incr != nil {
+		endPos = incr.Loc().End
+	}
+
+	return &ast.RangeExpr{
+		Start:    start,
+		End:      end,
+		Incr:     incr,
+		Location: *source.NewLocation(&p.filepath, start.Loc().Start, endPos),
+	}
+}
+
+// parseWhileStmt parses: while [cond] { }
+func (p *Parser) parseWhileStmt() *ast.WhileStmt {
+	start := p.expect(tokens.WHILE_TOKEN).Start
+
+	// Parse condition (optional - nil means infinite loop)
+	var cond ast.Expression
+	if !p.match(tokens.OPEN_CURLY) {
+		cond = p.parseExpr()
+	}
+
+	// Parse body
+	body := p.parseBlock()
+
+	return &ast.WhileStmt{
+		Cond:     cond,
+		Body:     body,
+		Location: *source.NewLocation(&p.filepath, &start, body.Location.End),
+	}
 }

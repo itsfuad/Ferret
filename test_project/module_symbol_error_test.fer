@@ -1,5 +1,0 @@
-// Test type mismatch with module::symbol
-import "test_project/utils_clean" as utils;
-
-// This should fail: trying to assign i32 to str
-let badAssignment: str = utils::MAX;

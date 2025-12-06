@@ -1,9 +1,32 @@
 import "test_project/utils";
 import "std/math";
 
+// Unicode test: 你好世界 こんにちは 안녕하세요 🚀 ✅
+/* Multi-line comment with Unicode:
+ * Chinese: 中文测试
+ * Japanese: 日本語テスト
+ * Korean: 한국어 테스트
+ * Emoji: 🎉 🌍 💻 ✨
+ */
+
 let x := 42;
 const PI := 3.14;
 
+// Unicode in strings
+let greeting: str = "Hello 世界! 🌍";
+let chinese: str = "你好，这是中文";
+let japanese: str = "こんにちは、日本語です";
+let korean: str = "안녕하세요, 한국어입니다";
+let emoji: str = "🎉 🚀 ✨ 💻 ✅ ❌ 🔥 💯";
+let mixed: str = "Multi-language: English 中文 日本語 한국어 with emoji 🌟";
+
+// Byte literals (ASCII only)
+let ascii_a: byte = 'A';
+let ascii_z: byte = 'z';
+let ascii_0: byte = '0';
+let byte_newline: byte = '\n';
+let byte_tab: byte = '\t';
+let byte_escape: byte = '\\';
 
 struct{
     .x: i32,
@@ -19,3 +42,26 @@ fn add(a: i32, b: i32) -> i32 {
 let result := add(10, 20);
 
 let name : i32 = utils::NAME;
+
+let point := { .x = 1, .y = 2 } as utils::Point;
+
+// add methods on Point
+fn (p: utils::Point) normalize() {
+    // manual math operation without using std/math by using ** operator
+    let length := (p.x ** 2 + p.y ** 2) ** 0.5;
+    p.x = p.x / length;
+    p.y = p.y / length;
+}
+
+point.move(5, 10);
+point.normalize();
+point.notExist();
+
+type Direction enum {
+    North,
+    East,
+    South,
+    West
+};
+
+let dir : i32 = enum{UP, DOWN}::East;
