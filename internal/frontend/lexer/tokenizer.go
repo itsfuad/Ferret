@@ -18,13 +18,13 @@ type regexPattern struct {
 }
 
 type Lexer struct {
-//	Errors     []error
+	//	Errors     []error
 	diagnostics *diagnostics.DiagnosticBag
-	Tokens     []tokens.Token
-	Position   source.Position
-	sourceCode []byte
-	patterns   []regexPattern
-	FilePath   string
+	Tokens      []tokens.Token
+	Position    source.Position
+	sourceCode  []byte
+	patterns    []regexPattern
+	FilePath    string
 }
 
 func (lex *Lexer) advance(match string) {
@@ -167,17 +167,17 @@ func byteHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
-	
+
 	// Validate that byte literal is ASCII (0-127)
 	if len(byteLiteral) > 0 && byteLiteral[0] > 127 {
 		lex.diagnostics.Add(
 			diagnostics.NewError("byte literal must be ASCII (0-127)").
-				WithPrimaryLabel(source.NewLocation(&lex.FilePath, &start, &end), 
+				WithPrimaryLabel(source.NewLocation(&lex.FilePath, &start, &end),
 					fmt.Sprintf("character '%s' is not valid for byte type", byteLiteral)).
 				WithHelp("byte type is 8-bit and only supports ASCII characters"),
 		)
 	}
-	
+
 	lex.push(tokens.NewToken(tokens.BYTE_TOKEN, byteLiteral, start, end))
 }
 

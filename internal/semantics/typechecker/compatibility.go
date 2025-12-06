@@ -80,6 +80,15 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 
 	// Check numeric conversions
 	if types.IsNumeric(source) && types.IsNumeric(target) {
+		// Special case: byte and u8 are internally the same size but require explicit cast
+		srcName, srcOk := types.GetPrimitiveName(source)
+		tgtName, tgtOk := types.GetPrimitiveName(target)
+		if srcOk && tgtOk {
+			// byte -> u8 or u8 -> byte requires explicit cast
+			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
+				return LossyConvertible
+			}
+		}
 		if isLosslessNumericConversion(source, target) {
 			return LosslessConvertible
 		}

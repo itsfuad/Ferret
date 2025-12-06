@@ -79,6 +79,9 @@ func inferLiteralType(lit *ast.BasicLit) types.SemType {
 		return types.TypeUntypedFloat
 	case ast.STRING:
 		return types.TypeString
+	case ast.BYTE:
+		// Byte literals have concrete type 'byte'
+		return types.TypeByte
 	case ast.BOOL:
 		return types.TypeBool
 	default:
