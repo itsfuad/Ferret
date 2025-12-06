@@ -310,12 +310,8 @@ func (b *CFGBuilder) buildIf(stmt *ast.IfStmt, current *BasicBlock, exitBlock *B
 
 // buildFor handles for loops
 func (b *CFGBuilder) buildFor(stmt *ast.ForStmt, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
-	// Add init to current block if present
-	if stmt.Init != nil {
-		current.Nodes = append(current.Nodes, stmt)
-	}
-
-	// Create loop header (condition check)
+	// For loops iterate over a range - always finite, cannot be infinite
+	// Create loop header
 	headerBlock := b.newBlock()
 	headerBlock.Reachable = current.Reachable
 	headerBlock.Location = stmt.Loc()
@@ -328,42 +324,31 @@ func (b *CFGBuilder) buildFor(stmt *ast.ForStmt, current *BasicBlock, exitBlock 
 	bodyBlock.Location = stmt.Body.Loc()
 	addEdge(headerBlock, bodyBlock)
 
-	// Create post block (for increment)
-	postBlock := b.newBlock()
-	postBlock.Reachable = bodyBlock.Reachable
-	postBlock.Location = stmt.Loc()
-	if stmt.Post != nil {
-		postBlock.Nodes = append(postBlock.Nodes, stmt)
-	}
-
-	// After block (loop exit)
+	// After block (loop exit when range is exhausted)
 	afterBlock := b.newBlock()
 	afterBlock.Location = stmt.Loc()
-	addEdge(headerBlock, afterBlock) // Condition false exits loop
+	addEdge(headerBlock, afterBlock)
 
 	// Set up loop context for break/continue
 	oldLoop := b.currentLoop
 	b.currentLoop = &loopContext{
 		breakTarget:    afterBlock,
-		continueTarget: postBlock,
+		continueTarget: headerBlock, // Continue goes back to range check
 		parent:         oldLoop,
 	}
 
-	// Process body
-	afterBody := b.buildBlock(stmt.Body, bodyBlock, exitBlock)
+	// Build loop body
+	lastBlock := b.buildBlock(stmt.Body, bodyBlock, exitBlock)
 
-	// Connect body to post block
-	if afterBody != nil && afterBody.CanFallThru {
-		addEdge(afterBody, postBlock)
+	// Connect last block back to header for next iteration
+	if lastBlock != nil && lastBlock.CanFallThru {
+		addEdge(lastBlock, headerBlock)
 	}
-
-	// Post block loops back to header
-	addEdge(postBlock, headerBlock)
 
 	// Restore loop context
 	b.currentLoop = oldLoop
 
-	afterBlock.Reachable = true // Can always exit via condition
+	afterBlock.Reachable = true // Can always exit when range is exhausted
 	return afterBlock
 }
 
@@ -426,8 +411,8 @@ func (b *CFGBuilder) reportUnreachableCodeRange(start, end ast.Node) {
 	// Merge locations
 	rangeLocation := &source.Location{
 		Filename: start.Loc().Filename,
-		Start: startLoc.Start,
-		End:   endLoc.End,
+		Start:    startLoc.Start,
+		End:      endLoc.End,
 	}
 
 	b.ctx.Diagnostics.Add(

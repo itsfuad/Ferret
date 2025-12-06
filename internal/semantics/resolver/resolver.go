@@ -101,14 +101,13 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
-		if n.Init != nil {
-			resolveNode(ctx, mod, n.Init)
+		// Resolve iterator (VarDecl or IdentifierExpr)
+		if n.Iterator != nil {
+			resolveNode(ctx, mod, n.Iterator)
 		}
-		if n.Cond != nil {
-			resolveExpr(ctx, mod, n.Cond)
-		}
-		if n.Post != nil {
-			resolveNode(ctx, mod, n.Post)
+		// Resolve range expression
+		if n.Range != nil {
+			resolveExpr(ctx, mod, n.Range)
 		}
 		resolveBlock(ctx, mod, n.Body)
 

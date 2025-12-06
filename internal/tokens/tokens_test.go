@@ -22,7 +22,7 @@ func TestIsKeyword(t *testing.T) {
 		{"struct", true},
 		{"fn", true},
 		{"return", true},
-		{"in", false},
+		{"in", true},
 		{"unknown", false},
 	}
 

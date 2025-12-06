@@ -57,6 +57,9 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	case *ast.FuncLit:
 		return inferFuncLitType(ctx, mod, e)
 
+	case *ast.RangeExpr:
+		return inferRangeExprType(ctx, mod, e)
+
 	default:
 		return types.TypeUnknown
 	}
@@ -447,14 +450,45 @@ func finalizeUntyped(expr ast.Expression) types.SemType {
 	if lit, ok := expr.(*ast.BasicLit); ok {
 		switch lit.Kind {
 		case ast.INT:
-			// Use centralized default integer type
-			return types.NewPrimitive(types.DEFAULT_INT_TYPE)
+			// Use centralized resolution to pick minimum required type
+			return resolveUntypedInt(lit.Value)
 		case ast.FLOAT:
 			// Use centralized default float type
 			return types.NewPrimitive(types.DEFAULT_FLOAT_TYPE)
 		}
 	}
 	return types.TypeUnknown
+}
+
+// resolveUntypedInt picks the minimum integer type that can hold the given value.
+// This is the central system for untyped integer resolution:
+// - Defaults to i32 (DEFAULT_INT_TYPE) if value fits
+// - Upgrades to i64, i128, i256 if value exceeds default bitsize
+// - For signed values, uses signed type hierarchy
+func resolveUntypedInt(valueStr string) types.SemType {
+	// Default: try to fit in i32 (DEFAULT_INT_TYPE)
+	defaultType := types.NewPrimitive(types.DEFAULT_INT_TYPE)
+	if fitsInType(valueStr, defaultType) {
+		return defaultType
+	}
+
+	// Value doesn't fit in default - try progressively larger signed types
+	signedTypes := []types.TYPE_NAME{
+		types.TYPE_I64,
+		types.TYPE_I128,
+		types.TYPE_I256,
+	}
+
+	for _, typeName := range signedTypes {
+		t := types.NewPrimitive(typeName)
+		if fitsInType(valueStr, t) {
+			return t
+		}
+	}
+
+	// Value is too large for any supported type - return i256 anyway
+	// (error will be reported elsewhere)
+	return types.NewPrimitive(types.TYPE_I256)
 }
 
 // contextualizeUntyped applies contextual typing to an UNTYPED literal
@@ -530,4 +564,57 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 	}
 
 	return types.NewFunction(params, returnType)
+}
+
+// inferRangeExprType infers the type of a range expression (start..end[:incr])
+// Returns an array type with element type inferred from start/end
+func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.RangeExpr) types.SemType {
+	// Infer types from start and end expressions
+	startType := inferExprType(ctx, mod, expr.Start)
+	endType := inferExprType(ctx, mod, expr.End)
+
+	// If both are untyped int literals, resolve to minimum required type
+	// by checking both values and taking the larger type
+	if types.IsUntypedInt(startType) && types.IsUntypedInt(endType) {
+		var resolvedType types.SemType = types.NewPrimitive(types.DEFAULT_INT_TYPE) // default to i32
+		maxBitSize := types.GetNumberBitSize(types.DEFAULT_INT_TYPE)
+
+		// Check if start literal needs a larger type
+		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
+			startResolved := resolveUntypedInt(startLit.Value)
+			if name, ok := types.GetPrimitiveName(startResolved); ok {
+				bitSize := types.GetNumberBitSize(name)
+				if bitSize > maxBitSize {
+					maxBitSize = bitSize
+					resolvedType = startResolved
+				}
+			}
+		}
+
+		// Check if end literal needs a larger type
+		if endLit, ok := expr.End.(*ast.BasicLit); ok && endLit.Kind == ast.INT {
+			endResolved := resolveUntypedInt(endLit.Value)
+			if name, ok := types.GetPrimitiveName(endResolved); ok {
+				bitSize := types.GetNumberBitSize(name)
+				if bitSize > maxBitSize {
+					resolvedType = endResolved
+				}
+			}
+		}
+
+		// Return array type with resolved element type
+		return &types.ArrayType{Element: resolvedType}
+	}
+
+	// If start is untyped, use centralized resolution
+	if types.IsUntypedInt(startType) {
+		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
+			startType = resolveUntypedInt(startLit.Value)
+		} else {
+			startType = types.NewPrimitive(types.DEFAULT_INT_TYPE)
+		}
+	}
+
+	// Return array type with element type from range
+	return &types.ArrayType{Element: startType}
 }

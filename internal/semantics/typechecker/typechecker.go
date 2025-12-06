@@ -134,14 +134,51 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
-		if n.Init != nil {
-			checkNode(ctx, mod, n.Init)
+		// Check range expression first to infer element type
+		var rangeElemType types.SemType = types.TypeUnknown
+		if n.Range != nil {
+			rangeType := checkExpr(ctx, mod, n.Range, types.TypeUnknown)
+			// Extract element type from array - for integer ranges this will be i32
+			if arrayType, ok := rangeType.(*types.ArrayType); ok {
+				rangeElemType = arrayType.Element
+			}
 		}
-		if n.Cond != nil {
-			checkExpr(ctx, mod, n.Cond, types.TypeBool)
-		}
-		if n.Post != nil {
-			checkNode(ctx, mod, n.Post)
+
+		// Check iterator
+		if n.Iterator != nil {
+			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok {
+				// For VarDecl iterator: apply types and validate structure
+				// Both single and dual variables get the same type (range element type)
+				for _, item := range varDecl.Decls {
+					// Validate iterator declaration structure
+					if item.Value != nil {
+						ctx.Diagnostics.Add(diagnostics.NewError("for loop iterator cannot have initializer").
+							WithPrimaryLabel(item.Value.Loc(), "remove this initializer"))
+					}
+
+					// Skip placeholder '_' - it doesn't get a symbol or type
+					if item.Name.Name == "_" {
+						continue
+					}
+
+					if item.Type != nil {
+						// Explicit type annotation - use it
+						declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
+						if sym, ok := mod.CurrentScope.GetSymbol(item.Name.Name); ok {
+							sym.Type = declType
+						}
+					} else {
+						// Infer type: all variables get range element type
+						// For numeric ranges like 0..10, both index and value are i32
+						if sym, ok := mod.CurrentScope.GetSymbol(item.Name.Name); ok {
+							sym.Type = rangeElemType
+						}
+					}
+				}
+			} else {
+				// For IdentifierExpr iterator: validate it exists
+				checkNode(ctx, mod, n.Iterator)
+			}
 		}
 		checkBlock(ctx, mod, n.Body)
 	case *ast.WhileStmt:

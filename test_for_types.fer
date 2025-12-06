@@ -1,0 +1,17 @@
+fn main() {
+    // Test i32 inference
+    for let i in 0..10 {
+        let x := i + 5;
+    }
+
+    // Test with increment
+    for let j in 0..20:2 {
+        let y := j * 2;
+    }
+
+    // Test existing variable
+    let k: i32 = 0;
+    for k in 10..20 {
+        let z := k - 1;
+    }
+}

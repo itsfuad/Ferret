@@ -32,6 +32,16 @@ type Point struct {
 };
 
 fn (p: Point) move(dx: i32, dy: i32) -> Point {
+    for let i, v in 0..5 {
+        let index : str = i;
+        let value : str = v;
+    }
+
+    while a > 4 {
+        let temp := 5;
+        temp < 10;
+    }
+
     return {
         .x = p.x + dx,
         .y = p.y + dy,

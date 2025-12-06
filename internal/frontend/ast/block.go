@@ -58,13 +58,14 @@ func (i *IfStmt) INode()                {} // Implements Node interface
 func (i *IfStmt) Block()                {} // Block is a marker interface for all statements
 func (i *IfStmt) Loc() *source.Location { return &i.Location }
 
-// ForStmt represents a for loop
+// ForStmt represents a for-in loop: for [let] i in range { }
+// Range can be start..end or start..end:incr
+// Iterator can be IdentifierExpr (for i in ...) or VarDecl (for let i in ...)
 type ForStmt struct {
-	Init  Expression  // initialization (can be nil)
-	Cond  Expression  // condition (can be nil for infinite loop)
-	Post  Expression  // post iteration (can be nil)
-	Body  *Block      // loop body
-	Scope SymbolTable // Symbol table for for loop scope (filled during collection)
+	Iterator Node        // loop variable: IdentifierExpr or VarDecl
+	Range    Expression  // range expression (e.g., 0..10 or 0..10:2)
+	Body     *Block      // loop body
+	Scope    SymbolTable // Symbol table for for loop scope (filled during collection)
 	source.Location
 }
 
@@ -72,9 +73,10 @@ func (f *ForStmt) INode()                {} // Implements Node interface
 func (f *ForStmt) Block()                {} // Block is a marker interface for all statements
 func (f *ForStmt) Loc() *source.Location { return &f.Location }
 
-// WhileStmt represents a while loop
+// WhileStmt represents a while loop: while [cond] { }
+// Condition is optional - nil means infinite loop
 type WhileStmt struct {
-	Cond  Expression  // condition
+	Cond  Expression  // condition (nil for infinite loop)
 	Body  *Block      // loop body
 	Scope SymbolTable // Symbol table for while loop scope (filled during collection)
 	source.Location

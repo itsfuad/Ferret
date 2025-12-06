@@ -20,6 +20,7 @@ const (
 	IF_TOKEN         TOKEN = "if"
 	ELSE_TOKEN       TOKEN = "else"
 	FOR_TOKEN        TOKEN = "for"
+	IN_TOKEN         TOKEN = "in"
 	FOREACH_TOKEN    TOKEN = "foreach"
 	WHILE_TOKEN      TOKEN = "while"
 	DO_TOKEN         TOKEN = "do"
@@ -105,6 +106,7 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	IF_TOKEN:        true,
 	ELSE_TOKEN:      true,
 	FOR_TOKEN:       true,
+	IN_TOKEN:        true,
 	WHILE_TOKEN:     true,
 	TYPE_TOKEN:      true,
 	STRUCT_TOKEN:    true,

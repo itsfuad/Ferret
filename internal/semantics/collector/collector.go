@@ -67,10 +67,6 @@ func CollectMethodsOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module)
 		}
 	}
 
-	if ctx.Debug && methodCount > 0 {
-		fmt.Printf("    [Collected %d methods in %s]\n", methodCount, mod.ImportPath)
-	}
-
 	// Reset CurrentScope
 	mod.CurrentScope = mod.ModuleScope
 }
@@ -95,10 +91,34 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 	case *ast.Block:
 		collectBlock(ctx, mod, n)
 	case *ast.IfStmt:
+		// Check if at module scope (top level)
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("if statement not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("control flow statements must be inside functions"),
+			)
+		}
 		collectIfStmt(ctx, mod, n)
 	case *ast.ForStmt:
+		// Check if at module scope (top level)
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("for loop not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("control flow statements must be inside functions"),
+			)
+		}
 		collectForStmt(ctx, mod, n)
 	case *ast.WhileStmt:
+		// Check if at module scope (top level)
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("while loop not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("control flow statements must be inside functions"),
+			)
+		}
 		collectWhileStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
 		// Collect function literals in return expressions
@@ -154,6 +174,15 @@ func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, dec
 
 	for _, item := range declItems {
 		name := item.Name.Name
+
+		// Skip placeholder '_' - it's not a real symbol
+		if name == "_" {
+			// Still collect function literals in initializer if present
+			if item.Value != nil {
+				collectExpr(ctx, mod, item.Value)
+			}
+			continue
+		}
 
 		// Check for duplicate declaration
 		if existing, ok := mod.CurrentScope.GetSymbol(name); ok {
@@ -547,8 +576,6 @@ func collectImport(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt
 		alias = fs.LastPart(path)
 	}
 
-	fmt.Printf("Import path '%s' -> '%s'\n", path, alias)
-
 	// Get or create import entry
 	imp, exists := mod.Imports[path]
 	if !exists {
@@ -618,6 +645,13 @@ func collectForStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stm
 
 	// Enter for scope and ensure it's restored on exit
 	defer mod.EnterScope(forScope)()
+
+	// Collect iterator (VarDecl or IdentifierExpr)
+	// If it's a VarDecl, it will be declared in the for scope
+	// If it's an IdentifierExpr, it references an existing variable
+	if stmt.Iterator != nil {
+		collectNode(ctx, mod, stmt.Iterator)
+	}
 
 	// Collect symbols in the for body
 	if stmt.Body != nil {
