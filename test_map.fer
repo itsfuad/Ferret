@@ -1,0 +1,19 @@
+// Test map type with optional-returning indexing
+
+fn main() {
+    // Map literal with explicit type annotation
+    let ages := {
+        "alice" => 25,
+        "bob" => 30,
+        "charlie" => 35
+    } as map[str]i32;
+
+    // Access returns optional type (i32?)
+    // Map indexing always returns V? for map[K]V
+    let alice_age: i32? = ages["alice"];      // Some(25)
+    let missing_age: i32? = ages["unknown"];  // None
+
+    // Use elvis operator to unwrap with default value
+    let age := ages["alice"] ?: 0;            // 25 (unwrapped from optional)
+    let unknown := ages["xyz"] ?: -1;         // -1 (key doesn't exist, use default)
+}

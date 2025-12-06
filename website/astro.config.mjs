@@ -90,6 +90,9 @@ export default defineConfig({
                     { label: 'Enums', slug: 'type-system/enums' },
                     { label: 'Interfaces', slug: 'type-system/interfaces' },
                     { label: 'Optional Types', slug: 'type-system/optionals' },
+                    { label: 'Maps', slug: 'type-system/maps' },
+                    { label: 'Methods', slug: 'type-system/methods' },
+                    { label: 'References', slug: 'type-system/references' },
                 ],
             },
             {

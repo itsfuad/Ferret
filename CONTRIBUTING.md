@@ -250,7 +250,7 @@ let empty := [];                   // Empty array (type inferred from usage)
 
 #### Maps
 ```ferret
-type MyMap = map[str]i32;
+type MyMap map[str]i32;
 
 let scores: map[str]i32 = map[str]i32{
     "Alice" => 95,

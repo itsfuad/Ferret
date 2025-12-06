@@ -37,7 +37,7 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		return inferCallExprType(ctx, mod, e)
 
 	case *ast.IndexExpr:
-		return inferIndexExprType(e)
+		return inferIndexExprType(ctx, mod, e)
 
 	case *ast.SelectorExpr:
 		return inferSelectorExprType(ctx, mod, e)
@@ -189,9 +189,29 @@ func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 }
 
 // inferIndexExprType determines the element type of an index expression
-func inferIndexExprType(expr *ast.IndexExpr) types.SemType {
-	// TODO: Implement array/map element type extraction
-	return types.TypeUnknown
+// For arrays: returns the element type T for []T or [N]T
+// For maps: returns optional value type V? for map[K]V (since key might not exist)
+func inferIndexExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.IndexExpr) types.SemType {
+	// Infer the type of the base expression (the thing being indexed)
+	baseType := inferExprType(ctx, mod, expr.X)
+
+	// Unwrap any named types to get to the underlying structure
+	baseType = types.UnwrapType(baseType)
+
+	switch bt := baseType.(type) {
+	case *types.ArrayType:
+		// Array indexing: arr[i] returns element type T
+		return bt.Element
+
+	case *types.MapType:
+		// Map indexing: map[key] returns optional value type V?
+		// This forces handling of missing keys at compile time
+		return types.NewOptional(bt.Value)
+
+	default:
+		// Not an indexable type (error will be reported by type checker)
+		return types.TypeUnknown
+	}
 }
 
 // inferSelectorExprType determines the type of a field access or method access
@@ -373,35 +393,82 @@ func inferCompositeLitType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 		return typeFromTypeNodeWithContext(ctx, mod, lit.Type)
 	}
 
-	// Infer anonymous struct type from field expressions
-	// Check if all elements are key-value pairs (struct literal)
+	// Infer type from elements
+	// Distinguish between struct literals (.field = value) and map literals (key => value)
 	if len(lit.Elts) > 0 {
 		allKeyValue := true
+		hasStructSyntax := false // .field = value
+		hasMapSyntax := false    // key => value
+
 		for _, elem := range lit.Elts {
-			if _, ok := elem.(*ast.KeyValueExpr); !ok {
+			kv, ok := elem.(*ast.KeyValueExpr)
+			if !ok {
 				allKeyValue = false
 				break
+			}
+
+			// Check if key is an identifier (struct field or map key)
+			if _, ok := kv.Key.(*ast.IdentifierExpr); ok {
+				// Check if it looks like struct field syntax (.field)
+				// Parser doesn't store dot prefix, so we infer from context
+				// For now, treat plain identifiers as struct fields
+				// Map keys should be arbitrary expressions
+				hasStructSyntax = true
+			} else {
+				// Non-identifier key (expression) means map syntax
+				hasMapSyntax = true
 			}
 		}
 
 		if allKeyValue {
-			// Build anonymous struct type from fields
-			fields := make([]types.StructField, 0, len(lit.Elts))
-			for _, elem := range lit.Elts {
-				kv := elem.(*ast.KeyValueExpr)
-				if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
-					fieldName := key.Name
-					fieldType := inferExprType(ctx, mod, kv.Value)
-					fields = append(fields, types.StructField{
-						Name: fieldName,
-						Type: fieldType,
-					})
+			// Determine if this is a struct or map literal
+			// Struct: all keys are identifiers (field names)
+			// Map: keys are arbitrary expressions
+			if hasStructSyntax && !hasMapSyntax {
+				// Struct literal: { .x: 10, .y: 20 }
+				fields := make([]types.StructField, 0, len(lit.Elts))
+				for _, elem := range lit.Elts {
+					kv := elem.(*ast.KeyValueExpr)
+					if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
+						fieldName := key.Name
+						fieldType := inferExprType(ctx, mod, kv.Value)
+						fields = append(fields, types.StructField{
+							Name: fieldName,
+							Type: fieldType,
+						})
+					}
 				}
-			}
 
-			if len(fields) > 0 {
-				// Create anonymous struct type (empty name)
-				return types.NewStruct("", fields)
+				if len(fields) > 0 {
+					// Create anonymous struct type (empty name)
+					return types.NewStruct("", fields)
+				}
+			} else if hasMapSyntax || len(lit.Elts) > 0 {
+				// Map literal: { "key" => value, "key2" => value2 }
+				// Infer key and value types from first element
+				// All keys must have compatible types, all values must have compatible types
+				var keyType, valueType types.SemType = types.TypeUnknown, types.TypeUnknown
+
+				for _, elem := range lit.Elts {
+					kv := elem.(*ast.KeyValueExpr)
+					elemKeyType := inferExprType(ctx, mod, kv.Key)
+					elemValueType := inferExprType(ctx, mod, kv.Value)
+
+					// Use first element's types as baseline
+					if keyType.Equals(types.TypeUnknown) {
+						keyType = elemKeyType
+					}
+					if valueType.Equals(types.TypeUnknown) {
+						valueType = elemValueType
+					}
+
+					// TODO: Validate all keys/values have compatible types
+					// For now, just use the first element's types
+				}
+
+				if !keyType.Equals(types.TypeUnknown) && !valueType.Equals(types.TypeUnknown) {
+					return types.NewMap(keyType, valueType)
+				}
 			}
 		}
 	}

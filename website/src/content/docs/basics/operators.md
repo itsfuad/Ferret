@@ -228,7 +228,15 @@ let max_items: i32? = get_config("max");
 let limit := max_items ?: 100;  // Default to 100 if not configured
 ```
 
-Learn more about [Optional Types](/optionals).
+This is especially useful with maps, since indexing returns optional values:
+
+```ferret
+let scores := { "Alice" => 95, "Bob" => 87 } as map[str]i32;
+let alice_score := scores["Alice"] ?: 0;   // 95
+let charlie_score := scores["Charlie"] ?: 0;  // 0 (key not found)
+```
+
+Learn more about [Optional Types](/optionals) and [Maps](/type-system/maps).
 
 ### Range Operator (`..` and `..=`)
 
@@ -262,7 +270,7 @@ struct Point {
     .y: i32,
 }
 
-let p := Point{ .x = 10, .y = 20 };
+let p := Point{ .x: 10, .y: 20 };
 let x_value := p.x;  // Access the x field: 10
 let y_value := p.y;  // Access the y field: 20
 ```

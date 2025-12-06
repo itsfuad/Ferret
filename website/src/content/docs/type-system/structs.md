@@ -17,13 +17,26 @@ type Person struct {
 
 ## Creating Instances
 
+Create struct instances using composite literal syntax with the `as` cast:
+
 ```ferret
-let person := Person{
-    .name = "Alice",
-    .age = 30,
-    .email = "alice@example.com",
-};
+let person := {
+    .name: "Alice",
+    .age: 30,
+    .email: "alice@example.com"
+} as Person;
+
+// Or with explicit type annotation
+let another_person: Person = {
+    .name: "Bob",
+    .age: 25,
+    .email: "bob@example.com"
+} as Person;
 ```
+
+:::tip
+Notice we use `:` (colon) in struct literals, not `=` (equals). The `.` prefix indicates a struct field.
+:::
 
 ## Accessing Fields
 
@@ -32,65 +45,56 @@ let name := person.name;   // Alice
 let age := person.age;     // 30
 ```
 
-## Methods
-
-Define methods on structs using receiver syntax:
-
-```ferret
-type Person struct {
-    .name: str,
-    .age: i32,
-};
-
-fn (p: Person) greet() -> str {
-    return "Hello, I'm " + p.name;
-}
-
-fn (p: Person) is_adult() -> bool {
-    return p.age >= 18;
-}
-
-let person := Person{.name = "Bob", .age = 25};
-let greeting := person.greet();
-```
+Structs can also have methods that define behavior. Since methods work with any named type in Ferret, they're covered in detail on a separate page—see [Methods](/type-system/methods).
 
 ## Nested Structs
 
 ```ferret
 type Address struct {
     .street: str,
-    .city: str,
+    .city: str
 };
 
 type Person struct {
     .name: str,
-    .address: Address,
+    .address: Address
 };
 
-let person := Person{
-    .name = "Carol",
-    .address = Address{
-        .street = "123 Main St",
-        .city = "Springfield",
-    },
-};
+let person := {
+    .name: "Carol",
+    .address: {
+        .street: "123 Main St",
+        .city: "Springfield"
+    } as Address
+} as Person;
+
+// Access nested fields
+let city := person.address.city;  // "Springfield"
 ```
 
-## Annonymous Structs
+## Anonymous Structs
 
-You can just use structs without defining a type:
+You can create structs without defining a named type. This is useful for temporary data structures:
 
 ```ferret
-let point : struct{ .x: i32, .y: i32}; // Define an anonymous struct type
+// Anonymous struct with explicit type
+let point: struct{ .x: i32, .y: i32 } = {
+    .x: 10,
+    .y: 20
+} as struct{ .x: i32, .y: i32 };
+
+// Inferred anonymous struct (Ferret figures out the type)
+let coordinate := {
+    .x: 5,
+    .y: 15
+};  // Type is inferred from the literal
 ```
 
-You can use `{}` to create instances of anonymous structs:
-
-```ferret 
-let point := { .x = 10, .y = 20 };
-```
+Anonymous structs are great for one-off data grouping when you don't need a named type.
 
 ## Next Steps
 
-- [Learn about Enums](/enums)
-- [Explore Interfaces](/interfaces)
+- [Learn about Methods](/type-system/methods) - Add behavior to your types
+- [Explore Enums](/type-system/enums) - Define sets of named values
+- [Understand Maps](/type-system/maps) - Store key-value pairs
+- [Master Interfaces](/type-system/interfaces) - Define behavior contracts

@@ -45,4 +45,4 @@ let result := sum(1, 2, 3, 4, 5);  // 15
 ## Next Steps
 
 - [Learn about Structs](/structs)
-- [Explore Methods](/structs)
+- [Explore Methods](/type-system/methods)

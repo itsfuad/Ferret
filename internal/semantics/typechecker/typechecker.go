@@ -463,6 +463,30 @@ func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *
 	srcUnwrapped := types.UnwrapType(sourceType)
 	dstUnwrapped := types.UnwrapType(targetType)
 
+	// Handle map type casts
+	if srcMap, ok := srcUnwrapped.(*types.MapType); ok {
+		if dstMap, ok := dstUnwrapped.(*types.MapType); ok {
+			// Allow cast if key and value types are compatible
+			keyCompat := checkTypeCompatibility(srcMap.Key, dstMap.Key)
+			valueCompat := checkTypeCompatibility(srcMap.Value, dstMap.Value)
+
+			if keyCompat != Incompatible && valueCompat != Incompatible {
+				return // Compatible map cast
+			}
+
+			// Build error for incompatible map cast
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+					WithCode(diagnostics.ErrInvalidCast).
+					WithPrimaryLabel(expr.Loc(), "incompatible map types").
+					WithHelp(fmt.Sprintf("key types: %s vs %s, value types: %s vs %s",
+						srcMap.Key.String(), dstMap.Key.String(),
+						srcMap.Value.String(), dstMap.Value.String())),
+			)
+			return
+		}
+	}
+
 	if srcStruct, ok := srcUnwrapped.(*types.StructType); ok {
 		if dstStruct, ok := dstUnwrapped.(*types.StructType); ok {
 			// Check if struct types are compatible by structure
@@ -506,16 +530,25 @@ func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *
 }
 
 // checkCompositeLit validates that a composite literal matches its target type
-func checkCompositeLit(ctx *context_v2.CompilerContext, _ *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
-	// Unwrap NamedType to get the underlying struct
+func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
+	// Unwrap NamedType to get the underlying type
 	underlyingType := types.UnwrapType(targetType)
 
-	// Only validate struct literals
-	structType, ok := underlyingType.(*types.StructType)
-	if !ok {
+	// Handle struct literals
+	if structType, ok := underlyingType.(*types.StructType); ok {
+		checkStructLiteral(ctx, lit, structType, targetType)
 		return
 	}
 
+	// Handle map literals
+	if mapType, ok := underlyingType.(*types.MapType); ok {
+		checkMapLiteral(ctx, mod, lit, mapType)
+		return
+	}
+}
+
+// checkStructLiteral validates struct literal elements
+func checkStructLiteral(ctx *context_v2.CompilerContext, lit *ast.CompositeLit, structType *types.StructType, targetType types.SemType) {
 	// Build a map of provided fields
 	providedFields := make(map[string]bool)
 	for _, elem := range lit.Elts {
@@ -549,6 +582,41 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, _ *context_v2.Module, li
 		diag = diag.WithNote(noteMsg)
 
 		ctx.Diagnostics.Add(diag)
+	}
+}
+
+// checkMapLiteral validates map literal key/value types
+func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, mapType *types.MapType) {
+	// Validate that all keys have compatible types with the map's key type
+	// Validate that all values have compatible types with the map's value type
+	for _, elem := range lit.Elts {
+		kv, ok := elem.(*ast.KeyValueExpr)
+		if !ok {
+			// Non key-value elements in map literal (shouldn't happen with correct parsing)
+			continue
+		}
+
+		// Check key type compatibility
+		keyType := inferExprType(ctx, mod, kv.Key)
+		keyCompat := checkTypeCompatibility(keyType, mapType.Key)
+		if keyCompat == Incompatible {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("map key type mismatch: expected %s, found %s", mapType.Key.String(), keyType.String())).
+					WithPrimaryLabel(kv.Key.Loc(), "incompatible key type").
+					WithHelp(fmt.Sprintf("expected type %s", mapType.Key.String())),
+			)
+		}
+
+		// Check value type compatibility
+		valueType := inferExprType(ctx, mod, kv.Value)
+		valueCompat := checkTypeCompatibility(valueType, mapType.Value)
+		if valueCompat == Incompatible {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("map value type mismatch: expected %s, found %s", mapType.Value.String(), valueType.String())).
+					WithPrimaryLabel(kv.Value.Loc(), "incompatible value type").
+					WithHelp(fmt.Sprintf("expected type %s", mapType.Value.String())),
+			)
+		}
 	}
 }
 
@@ -1386,6 +1454,12 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		returnType := typeFromTypeNodeWithContext(ctx, mod, t.Result)
 		return types.NewFunction(params, returnType)
 
+	case *ast.MapType:
+		// Map type: map[K]V
+		keyType := typeFromTypeNodeWithContext(ctx, mod, t.Key)
+		valueType := typeFromTypeNodeWithContext(ctx, mod, t.Value)
+		return types.NewMap(keyType, valueType)
+
 	default:
 		// Fallback to simple version
 		return typeFromTypeNode(typeNode)
@@ -1478,6 +1552,12 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 		returns := typeFromTypeNode(t.Result)
 
 		return types.NewFunction(params, returns)
+
+	case *ast.MapType:
+		// Map type: map[K]V
+		keyType := typeFromTypeNode(t.Key)
+		valueType := typeFromTypeNode(t.Value)
+		return types.NewMap(keyType, valueType)
 
 	default:
 		return types.TypeUnknown

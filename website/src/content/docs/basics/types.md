@@ -141,6 +141,56 @@ let coordinates: [3]f64 = [1.0, 2.5, 3.7];
 
 The number in brackets `[7]` tells you exactly how many items the array holds. This can't change after you create it.
 
+### Maps
+
+Maps are collections that store key-value pairs. Think of them like a dictionary where you look up values using keys instead of positions.
+
+Unlike arrays which use numbers (0, 1, 2...) to access elements, maps let you use any type as a key - strings, numbers, or even custom types!
+
+```ferret
+let scores: map[str]i32 = {
+    "alice" => 95,
+    "bob" => 87,
+    "charlie" => 92
+} as map[str]i32;
+
+let prices: map[str]f64 = {
+    "apple" => 1.99,
+    "banana" => 0.99
+} as map[str]f64;
+```
+
+The syntax `map[KeyType]ValueType` tells Ferret what types the keys and values should be.
+
+#### Accessing Map Values
+
+Here's something really important: when you access a map value, you get an **optional type** back. Why? Because the key might not exist in the map!
+
+```ferret
+let ages := {"alice" => 25, "bob" => 30} as map[str]i32;
+
+// Returns i32? (optional i32) - key might not exist!
+let alice_age: i32? = ages["alice"];  // Some(25)
+let missing: i32? = ages["unknown"];  // none
+```
+
+This is a safety feature! It forces you to think about what happens when a key doesn't exist, preventing crashes.
+
+#### The Elvis Operator with Maps
+
+The elvis operator `?:` is perfect for providing default values:
+
+```ferret
+let scores := {"alice" => 95} as map[str]i32;
+
+let alice_score := scores["alice"] ?: 0;    // 95
+let bob_score := scores["bob"] ?: 0;        // 0 (key doesn't exist)
+```
+
+This pattern is so common you'll use it all the time when working with maps!
+
+**Learn more:** Maps are covered in detail in the [Type System section](/type-system/maps).
+
 ## Optional Types
 
 Sometimes you need to represent "I might have a value, or I might not." That's what optional types do.
@@ -168,25 +218,60 @@ if username != none {
 
 This is much safer than many other languages where missing values can cause crashes!
 
-## Custom Types
+## Reference Types
 
-### Type Aliases
+:::caution[Experimental Feature]
+Reference types are currently being implemented. This is a preview of planned functionality.
+:::
 
-Sometimes you want to give a type a more meaningful name for your specific use case. Type aliases let you create a new name for an existing type.
-
-Think of it like giving someone a nickname - the person is the same, but the name helps clarify their role in a specific context.
+Reference types let you pass data by reference rather than by copy. Add `&` before a type to make it a reference:
 
 ```ferret
-type UserId = i64;
-type Email = str;
-type Distance = f64;
+type LargeData struct {
+    .buffer: [1000]i32,
+    .metadata: str,
+};
 
-let user_id: UserId = 12345;
-let email: Email = "user@example.com";
-let miles: Distance = 42.5;
+// Passes by copy (copies entire struct)
+fn process_copy(data: LargeData) { }
+
+// Passes by reference (only copies pointer)
+fn process_ref(data: &LargeData) { }
 ```
 
-This makes your code more readable. When you see `UserId`, you immediately know it's an ID for a user, not just any random number. The underlying type is still `i64`, but the name gives it meaning.
+References are useful for:
+- Avoiding expensive copies of large data
+- Sharing data between functions
+
+**Learn more:** References are covered in detail in the [Type System section](/type-system/references).
+
+## Custom Types
+
+Ferret lets you define your own types beyond the built-in ones. The most common custom types are structs, enums, and interfaces.
+
+### Defining Custom Types
+
+You use the `type` keyword to define new structured types:
+
+```ferret
+// Define a struct type
+type Point struct {
+    .x: f64,
+    .y: f64
+};
+
+// Define an enum type
+type Color enum {
+    Red,
+    Green,
+    Blue
+};
+
+let point: Point = { .x: 10.0, .y: 20.0 } as Point;
+let color: Color = Color::Red;
+```
+
+These custom types make your code more organized and type-safe. We'll dive deeper into structs, enums, and interfaces in the Type System section.
 
 ## Type Conversion
 
@@ -219,9 +304,9 @@ There is no built-in way to convert between strings and other types yet. This is
 You've learned about Ferret's type system! Here's what we covered:
 
 * **Primitive types**: Integers (`i32`, `i64`, `u32`, `u64`), floats (`f32`, `f64`), strings (`str`), booleans (`bool`), and characters (`byte`)
-* **Compound types**: Arrays that hold multiple values
+* **Compound types**: Arrays and maps that hold multiple values
 * **Optional types**: Types that can be a value or `none`
-* **Type aliases**: Custom names for existing types
+* **Reference types**: Pass data by reference with `&T` (experimental)
 * **Type inference**: Letting Ferret figure out types automatically
 * **Type conversion**: Explicitly changing between types
 

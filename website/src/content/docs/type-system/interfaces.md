@@ -39,10 +39,10 @@ fn (c: Circle) get_bounds() -> struct {
     .y_max: i32
 } {
     return {
-        .x_min = c.x - c.radius,
-        .y_min = c.y - c.radius,
-        .x_max = c.x + c.radius,
-        .y_max = c.y + c.radius
+        .x_min: c.x - c.radius,
+        .y_min: c.y - c.radius,
+        .x_max: c.x + c.radius,
+        .y_max: c.y + c.radius
     };
 }
 ```
@@ -54,7 +54,7 @@ fn render(shape: Drawable) {
     shape.draw();
 }
 
-let circle := Circle{.x = 10, .y = 20, .radius = 5};
+let circle := Circle{.x: 10, .y: 20, .radius: 5};
 render(circle);
 ```
 

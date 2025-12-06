@@ -1,0 +1,39 @@
+// Demonstration of optional-returning map indexing benefits
+
+fn main() {
+    // Real-world example: User database
+    let user_scores := {
+        "alice" => 95,
+        "bob" => 87,
+        "charlie" => 92
+    } as map[str]i32;
+
+    // ✅ Compile-time safety: Must handle optional
+    // This forces the developer to think about missing keys
+    
+    // Pattern 1: Default value (most common)
+    let score1 := user_scores["alice"] ?: 0;        // 95
+    let score2 := user_scores["unknown"] ?: 0;      // 0 (safe default)
+
+    // Pattern 2: Store optional for later checking
+    let maybe_score: i32? = user_scores["bob"];
+    // Can check with future pattern matching or other optional methods
+
+    // Pattern 3: Chain with other optionals
+    let nested := user_scores["charlie"] ?: -1;
+
+    // Nested map example
+    let team_scores := {
+        "team_a" => 100,
+        "team_b" => 85,
+        "team_c" => 92
+    } as map[str]i32;
+
+    // Safe access with defaults
+    let team_a := team_scores["team_a"] ?: 0;
+    let team_unknown := team_scores["team_z"] ?: 0;
+
+    // No runtime panics, no exceptions!
+    // If a key doesn't exist, you get None, not a crash
+    let will_not_crash := user_scores["this_key_does_not_exist"] ?: -999;
+}

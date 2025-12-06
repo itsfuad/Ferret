@@ -158,7 +158,7 @@ func (a *ArrayType) Equals(other SemType) bool {
 
 // Map Types
 
-// MapType represents map types: Map<K, V>
+// MapType represents map types: map[K]V
 type MapType struct {
 	Key   SemType
 	Value SemType
@@ -169,11 +169,11 @@ func NewMap(key, value SemType) *MapType {
 }
 
 func (m *MapType) String() string {
-	return fmt.Sprintf("Map<%s, %s>", m.Key.String(), m.Value.String())
+	return fmt.Sprintf("map[%s]%s", m.Key.String(), m.Value.String())
 }
 
 func (m *MapType) Size() int {
-	return 8 // pointer to map structure
+	return 8 // pointer to map structure (hash table)
 }
 
 func (m *MapType) isType() {}
@@ -458,7 +458,7 @@ func (e *EnumType) Equals(other SemType) bool {
 	return false
 }
 
-// NamedType represents a named type declaration: type Name = UnderlyingType
+// NamedType represents a named type declaration: type Name UnderlyingType
 // This wraps any SemType with a name, enabling:
 // - Nominal typing for user-defined types
 // - Type aliases that preserve identity (type A X; type B A)

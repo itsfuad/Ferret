@@ -111,19 +111,19 @@ func TestArrayTypeEquals(t *testing.T) {
 }
 
 func TestMapType(t *testing.T) {
-	// Map<str, i32>
+	// map[str]i32
 	mapType := NewMap(TypeString, TypeI32)
-	if got := mapType.String(); got != "Map<str, i32>" {
-		t.Errorf("MapType.String() = %q, want %q", got, "Map<str, i32>")
+	if got := mapType.String(); got != "map[str]i32" {
+		t.Errorf("MapType.String() = %q, want %q", got, "map[str]i32")
 	}
 	if got := mapType.Size(); got != 8 {
 		t.Errorf("MapType.Size() = %d, want %d", got, 8)
 	}
 
-	// Nested: Map<str, []i32>
+	// Nested: map[str][]i32
 	nestedMap := NewMap(TypeString, NewArray(TypeI32, -1))
-	if got := nestedMap.String(); got != "Map<str, []i32>" {
-		t.Errorf("MapType.String() = %q, want %q", got, "Map<str, []i32>")
+	if got := nestedMap.String(); got != "map[str][]i32" {
+		t.Errorf("MapType.String() = %q, want %q", got, "map[str][]i32")
 	}
 }
 
@@ -134,13 +134,13 @@ func TestMapTypeEquals(t *testing.T) {
 	map4 := NewMap(TypeI32, TypeString)
 
 	if !map1.Equals(map2) {
-		t.Errorf("Map<str, i32> should equal Map<str, i32>")
+		t.Errorf("map[str]i32 should equal map[str]i32")
 	}
 	if map1.Equals(map3) {
-		t.Errorf("Map<str, i32> should not equal Map<str, i64>")
+		t.Errorf("map[str]i32 should not equal map[str]i64")
 	}
 	if map1.Equals(map4) {
-		t.Errorf("Map<str, i32> should not equal Map<i32, str>")
+		t.Errorf("map[str]i32 should not equal map[i32]str")
 	}
 }
 
@@ -350,7 +350,7 @@ func TestEnumType(t *testing.T) {
 }
 
 func TestComplexNestedTypes(t *testing.T) {
-	// Map<str, []Point?>
+	// map[str][]Point?
 	pointStruct := NewStruct("", []StructField{
 		{Name: "x", Type: TypeF64},
 		{Name: "y", Type: TypeF64},
@@ -360,7 +360,7 @@ func TestComplexNestedTypes(t *testing.T) {
 	arrayOptPoint := NewArray(optPoint, -1)
 	complexMap := NewMap(TypeString, arrayOptPoint)
 
-	want := "Map<str, []Point?>"
+	want := "map[str][]Point?"
 	if got := complexMap.String(); got != want {
 		t.Errorf("Complex nested type = %q, want %q", got, want)
 	}

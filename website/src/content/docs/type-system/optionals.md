@@ -155,18 +155,42 @@ let result: i32? = safeDivide(10, 2);
 let value: i32 = result ?: 0;  // value is 5
 ```
 
+### Working with Maps
+
+Optionals and maps work together beautifully since map access always returns optional values:
+
+```ferret
+let scores := {
+    "alice" => 95,
+    "bob" => 87
+} as map[str]i32;
+
+// Map access returns i32?
+let alice_score: i32? = scores["alice"];  // Some(95)
+let carol_score: i32? = scores["carol"];  // none
+
+// Use elvis for defaults
+let score1 := scores["alice"] ?: 0;  // 95
+let score2 := scores["carol"] ?: 0;  // 0
+
+// Chain lookups with multiple fallbacks
+let primary := scores["primary"] ?: scores["backup"] ?: 0;
+```
+
+See the [Maps](/type-system/maps) section for more details on how maps use optionals for safety.
+
 ### Configuration with Defaults
 
 ```ferret
-struct Config {
+type Config struct {
     .port: i32?,
-    .host: str?,
-}
-
-let config := Config{
-    .port = none,
-    .host = "localhost",
+    .host: str?
 };
+
+let config := {
+    .port: none,
+    .host: "localhost"
+} as Config;
 
 let actualPort: i32 = config.port ?: 8080;
 let actualHost: str = config.host ?: "0.0.0.0";
@@ -174,8 +198,8 @@ let actualHost: str = config.host ?: "0.0.0.0";
 
 ## Next Steps
 
-- [Learn about error handling](/errors)
-- [Explore functions](/functions)
-- [See more examples](/examples)
+- [Learn about Maps](/type-system/maps) - See optionals in action with collections
+- [Explore error handling](/advanced/errors) - Handle errors safely
+- [Understand Structs](/type-system/structs) - Create custom types
 
 
