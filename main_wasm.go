@@ -10,7 +10,7 @@ import (
 
 func main() {
 	js.Global().Set("ferretCompile", js.FuncOf(compile))
-	js.Global().Set("ferretWasmVersion", "0.0.4")
+	js.Global().Set("ferretWasmVersion", "0.0.5-alpha")
 	println("Ferret WASM compiler ready")
 	<-make(chan struct{})
 }
