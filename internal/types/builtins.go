@@ -1,28 +1,5 @@
 package types
 
-// TODO: TYPE_NAME is a simple string alias that works for primitive types
-// but is insufficient for complex types. Before implementing generics, optionals,
-// or complex type features, we need to refactor to a proper Type interface:
-//
-//   type Type interface {
-//       String() string
-//       Equals(other Type) bool
-//   }
-//
-//   type PrimitiveType struct { Name string }
-//   type ArrayType struct { Element Type }
-//   type MapType struct { Key, Value Type }
-//   type FunctionType struct { Params []Type; Return Type }
-//   type OptionalType struct { Inner Type }     // i32?
-//   type ResultType struct { Ok, Err Type }     // i32 ! Error
-//   type GenericType struct { Name string; Args []Type }  // Vec<i32>
-//
-// This will enable proper type checking for:
-// - Generic instantiation: Vec<T> -> Vec<i32>
-// - Function signatures: fn(i32, str) -> bool
-// - Nested structures: Map<str, Array<i32>>
-// - Type parameters and constraints
-
 type TYPE_NAME string
 
 const (
@@ -59,6 +36,12 @@ const (
 	TYPE_UNKNOWN TYPE_NAME = "unknown"
 )
 
-func (t TYPE_NAME) String() string {
-	return string(t)
-}
+// Default type sizes for untyped literals
+// Centralized here so users can configure default sizes in one place
+const (
+	// DEFAULT_INT_TYPE is the default type for untyped integer literals
+	DEFAULT_INT_TYPE TYPE_NAME = TYPE_I32
+
+	// DEFAULT_FLOAT_TYPE is the default type for untyped float literals
+	DEFAULT_FLOAT_TYPE TYPE_NAME = TYPE_F64
+)

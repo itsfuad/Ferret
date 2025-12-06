@@ -378,11 +378,11 @@ func finalizeUntyped(expr ast.Expression) types.SemType {
 	if lit, ok := expr.(*ast.BasicLit); ok {
 		switch lit.Kind {
 		case ast.INT:
-			// Default integer type is i64
-			return types.TypeI64
+			// Use centralized default integer type
+			return types.NewPrimitive(types.DEFAULT_INT_TYPE)
 		case ast.FLOAT:
-			// Default float type is f64
-			return types.TypeF64
+			// Use centralized default float type
+			return types.NewPrimitive(types.DEFAULT_FLOAT_TYPE)
 		}
 	}
 	return types.TypeUnknown

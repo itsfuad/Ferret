@@ -327,9 +327,40 @@ func NewStruct(name string, fields []StructField) *StructType {
 }
 
 func (s *StructType) String() string {
-	// Anonymous struct - show simplified representation
-	// Use "struct { ... }" to avoid showing untyped text and keep error messages clean
-	return "struct { ... }"
+	// Anonymous struct - show structure with smart truncation
+	const maxFieldsToShow = 3 // Show first 2 and last 1 if there are many fields
+
+	fields := make([]string, 0, len(s.Fields))
+	for i, f := range s.Fields {
+		fieldTypeStr := f.Type.String()
+
+		// Replace "untyped" with concrete default type for better error messages
+		if fieldTypeStr == "untyped" {
+			if p, ok := f.Type.(*PrimitiveType); ok {
+				switch p.untypedKind {
+				case UntypedInt:
+					fieldTypeStr = string(DEFAULT_INT_TYPE)
+				case UntypedFloat:
+					fieldTypeStr = string(DEFAULT_FLOAT_TYPE)
+				}
+			}
+		}
+
+		// For long field lists, show: first 2, ..., last 1
+		if len(s.Fields) > maxFieldsToShow+1 {
+			if i < 2 {
+				fields = append(fields, fmt.Sprintf(".%s: %s", f.Name, fieldTypeStr))
+			} else if i == 2 {
+				fields = append(fields, "...")
+			} else if i == len(s.Fields)-1 {
+				fields = append(fields, fmt.Sprintf(".%s: %s", f.Name, fieldTypeStr))
+			}
+		} else {
+			fields = append(fields, fmt.Sprintf(".%s: %s", f.Name, fieldTypeStr))
+		}
+	}
+
+	return fmt.Sprintf("struct { %s }", strings.Join(fields, ", "))
 }
 
 func (s *StructType) Size() int {
