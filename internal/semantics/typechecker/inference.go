@@ -629,13 +629,13 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 // - Result type is always the non-optional inner type
 func inferElvisExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ElvisExpr) types.SemType {
 	condType := inferExprType(ctx, mod, expr.Cond)
-	
+
 	// Check if condition is an optional type
 	if optType, ok := condType.(*types.OptionalType); ok {
 		// Elvis operator unwraps the optional: T? ?: T → T
 		return optType.Inner
 	}
-	
+
 	// If condition is not optional, elvis is redundant but still valid
 	// Result type is the condition type itself
 	return condType
