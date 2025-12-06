@@ -394,8 +394,9 @@ func (s *StructType) Equals(other SemType) bool {
 
 // EnumVariant represents a variant in an enum
 type EnumVariant struct {
-	Name string
-	Type SemType // nil for unit variants
+	Name  string
+	Value int64   // numeric value for this variant
+	Type  SemType // nil for simple numeric enums, non-nil for complex enums (future)
 }
 
 // EnumType represents enum types (sum types/tagged unions)

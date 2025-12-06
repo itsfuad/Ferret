@@ -2,11 +2,14 @@ package typechecker
 
 import (
 	"compiler/internal/context_v2"
+	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
+	"fmt"
+	"strings"
 )
 
 // inferExprType determines the type of an expression based on its structure and value.
@@ -246,18 +249,31 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	return types.TypeUnknown
 }
 
-// inferScopeResolutionExprType determines the type of a module::symbol access
+// inferScopeResolutionExprType determines the type of a module::symbol or enum::variant access
 func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ScopeResolutionExpr) types.SemType {
-	// Handle module::symbol resolution
-	// X should be an identifier representing the module name/alias
+	// Handle module::symbol or enum::variant resolution
+	// X should be an identifier representing the module name/alias or enum type name
 	if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
-		moduleName := ident.Name
-		symbolName := expr.Selector.Name
+		leftName := ident.Name
+		rightName := expr.Selector.Name
 
+		// First check if leftName is a type (enum) in the current scope
+		if typeSym, ok := mod.CurrentScope.Lookup(leftName); ok && typeSym.Kind == symbols.SymbolType {
+			// This is EnumType::Variant access
+			// Look up the qualified variant name
+			qualifiedName := leftName + "::" + rightName
+			if variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedName); ok {
+				return variantSym.Type
+			}
+			// Variant not found - error already reported by resolver
+			return types.TypeUnknown
+		}
+
+		// Otherwise, check if it's a module import
 		// Look up the import path from the alias/name
-		importPath, ok := mod.ImportAliasMap[moduleName]
+		importPath, ok := mod.ImportAliasMap[leftName]
 		if !ok {
-			// Module not imported - error already reported by resolver
+			// Not a module import - error already reported by resolver
 			return types.TypeUnknown
 		}
 
@@ -270,7 +286,7 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 
 		// Look up the symbol in the imported module's module scope
 		// Use ModuleScope.GetSymbol (not Lookup) to get module-level symbols only
-		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		sym, ok := importedMod.ModuleScope.GetSymbol(rightName)
 		if !ok {
 			// Symbol not found - error already reported by resolver
 			return types.TypeUnknown
@@ -280,7 +296,60 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 		return sym.Type
 	}
 
-	// For non-identifier X (e.g., enum::variant), recurse
+	// For non-identifier X (e.g., anonymous enum{...}::variant)
+	// Handle anonymous enum type validation
+	if enumType, ok := expr.X.(*ast.EnumType); ok {
+		rightName := expr.Selector.Name
+
+		// Check if the variant exists in the anonymous enum
+		found := false
+		for _, variant := range enumType.Variants {
+			if variant.Name.Name == rightName {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// Build enum string representation with truncation (like struct)
+			var enumStr string
+			if len(enumType.Variants) == 0 {
+				enumStr = "enum {}"
+			} else if len(enumType.Variants) <= 3 {
+				// Show all variants if 3 or fewer
+				parts := make([]string, len(enumType.Variants))
+				for i, v := range enumType.Variants {
+					parts[i] = v.Name.Name
+				}
+				enumStr = fmt.Sprintf("enum { %s }", strings.Join(parts, ", "))
+			} else {
+				// Truncate: first 2, ..., last 1
+				enumStr = fmt.Sprintf("enum { %s, %s, ..., %s }",
+					enumType.Variants[0].Name.Name,
+					enumType.Variants[1].Name.Name,
+					enumType.Variants[len(enumType.Variants)-1].Name.Name)
+			}
+
+			// Build list of available variants
+			variantNames := make([]string, len(enumType.Variants))
+			for i, v := range enumType.Variants {
+				variantNames[i] = v.Name.Name
+			}
+
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("variant '%s' not found in %s", rightName, enumStr)).
+					WithPrimaryLabel(expr.Selector.Loc(), fmt.Sprintf("'%s' is not a valid variant", rightName)).
+					WithHelp(fmt.Sprintf("available variants: %s", strings.Join(variantNames, ", "))),
+			)
+			return types.TypeUnknown
+		}
+
+		// Valid variant - return unknown for anonymous enums (they don't have a semantic type)
+		// This is acceptable since anonymous enums are primarily for compile-time constants
+		return types.TypeUnknown
+	}
+
+	// For other expression types, recurse
 	return inferExprType(ctx, mod, expr.X)
 }
 

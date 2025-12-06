@@ -249,13 +249,11 @@ func extractReceiverTypeName(ctx *context_v2.CompilerContext, receiverType ast.T
 	if interfaceType, ok := receiverType.(*ast.InterfaceType); ok {
 		ctx.Diagnostics.Add(
 			diagnostics.NewError("cannot define methods on anonymous interface type").
-			WithCode(diagnostics.ErrInvalidMethodReceiver).
-			WithPrimaryLabel(interfaceType.Loc(), "anonymous interface type").
-			WithHelp("define a named type first: type Mytype interface { ... }").
-			WithNote("methods can only be defined on named types"),
+				WithCode(diagnostics.ErrInvalidMethodReceiver).
+				WithPrimaryLabel(interfaceType.Loc(), "anonymous interface type").
+				WithHelp("define a named type first: type Mytype interface { ... }").
+				WithNote("methods can only be defined on named types"),
 		)
-
-
 
 	}
 
@@ -505,6 +503,37 @@ func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	}
 
 	mod.CurrentScope.Declare(name, sym)
+
+	// Special handling for enums: register variants as placeholders
+	// The actual values will be computed during type checking
+	if enumType, ok := decl.Type.(*ast.EnumType); ok {
+		for _, variant := range enumType.Variants {
+			variantName := variant.Name.Name
+			qualifiedName := name + "::" + variantName
+
+			// Check for duplicate variant name
+			if existing, ok := mod.ModuleScope.GetSymbol(qualifiedName); ok {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("duplicate enum variant '%s'", variantName)).
+						WithCode(diagnostics.ErrRedeclaredSymbol).
+						WithPrimaryLabel(variant.Name.Loc(), "variant already defined").
+						WithSecondaryLabel(existing.Decl.Loc(), "previous definition here"),
+				)
+				continue
+			}
+
+			// Register variant as a placeholder symbol
+			// Type will be filled in during type checking
+			variantSym := &symbols.Symbol{
+				Name:     qualifiedName,
+				Kind:     symbols.SymbolConstant,
+				Type:     types.TypeUnknown, // Will be set to the enum type during type checking
+				Exported: isExported(variantName),
+				Decl:     variant.Name,
+			}
+			mod.ModuleScope.Declare(qualifiedName, variantSym)
+		}
+	}
 }
 
 // collectImport handles import statements

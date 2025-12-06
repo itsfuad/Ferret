@@ -228,42 +228,63 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 }
 
 func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module, e *ast.ScopeResolutionExpr) {
-	// Handle module::symbol resolution
-	// X should be an identifier representing the module name/alias
-	if ident, ok := e.X.(*ast.IdentifierExpr); ok {
-		moduleAlias := ident.Name
-		symbolName := e.Selector.Name
+	// Handle X::Y resolution where X can be:
+	// 1. Module alias (module::symbol)
+	// 2. Enum type (EnumType::Variant)
 
-		// Look up the import path from the alias/name
-		importPath, ok := mod.ImportAliasMap[moduleAlias]
+	if ident, ok := e.X.(*ast.IdentifierExpr); ok {
+		leftName := ident.Name
+		rightName := e.Selector.Name
+
+		// First check if leftName is an enum type in current scope
+		if sym, ok := mod.CurrentScope.Lookup(leftName); ok && sym.Kind == symbols.SymbolType {
+			// It's a type - check if it's an enum by looking up the qualified variant name
+			qualifiedVariantName := leftName + "::" + rightName
+
+			if variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedVariantName); ok {
+				// Valid enum variant access
+				// The variant symbol exists and has been registered during type checking
+				_ = variantSym // Validation successful
+				return
+			} else {
+				// Type exists but variant doesn't
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("variant '%s' not found in enum '%s'", rightName, leftName)).
+						WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is not a variant of '%s'", rightName, leftName)),
+				)
+				return
+			}
+		}
+
+		// Not an enum type, check if it's a module alias
+		importPath, ok := mod.ImportAliasMap[leftName]
 		if !ok {
+			// Not a module either - report error
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("module '%s' not imported", moduleAlias)).
-					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' is not an imported module", moduleAlias)).
-					WithNote("Make sure to import this module first"),
+				diagnostics.NewError(fmt.Sprintf("'%s' is not a module or enum type", leftName)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("'%s' not found", leftName)).
+					WithNote("Make sure to import the module or declare the enum type first"),
 			)
 			return
 		}
 
-		// Get the imported module from context
+		// It's a module - proceed with module::symbol resolution
 		importedMod, exists := ctx.GetModule(importPath)
-
 		if !exists {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("imported module '%s' not found", importPath)).
-					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", moduleAlias)).
+					WithPrimaryLabel(ident.Loc(), fmt.Sprintf("module '%s' not loaded", leftName)).
 					WithNote("This is likely a compiler bug"),
 			)
 			return
 		}
 
-		// Look up symbol in the imported module's module scope (not CurrentScope)
-		// Use ModuleScope to access module-level symbols
-		sym, ok := importedMod.ModuleScope.GetSymbol(symbolName)
+		// Look up symbol in the imported module's module scope
+		sym, ok := importedMod.ModuleScope.GetSymbol(rightName)
 		if !ok {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", symbolName, importPath)).
-					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' not found", symbolName)),
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found in module '%s'", rightName, importPath)).
+					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' not found", rightName)),
 			)
 			return
 		}
@@ -271,8 +292,8 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		// Check if symbol is exported
 		if !sym.Exported {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", symbolName, importPath)).
-					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", symbolName)).
+				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", rightName, importPath)).
+					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", rightName)).
 					WithSecondaryLabel(sym.Decl.Loc(), "declared here").
 					WithNote("only symbols starting with uppercase letters are exported"),
 			)
@@ -282,7 +303,8 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		mod.Imports[importPath].IsUsed = true
 
 	} else {
-		// For now, just resolve the left side (could be enum::variant later)
+		// For anonymous types (enum{...}::variant, struct{...}, etc.)
+		// Just resolve the expression - validation happens in typechecker
 		resolveExpr(ctx, mod, e.X)
 	}
 }

@@ -3,8 +3,8 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/tokens"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 	"fmt"
 )
 
@@ -150,9 +150,9 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 	p.expect(tokens.SEMICOLON_TOKEN)
 
 	return &ast.ImportStmt{
-		Path:     	path,
-		Alias: 		alias,
-		Location: 	p.makeLocation(start),
+		Path:     path,
+		Alias:    alias,
+		Location: p.makeLocation(start),
 	}
 }
 
@@ -729,6 +729,11 @@ func (p *Parser) parsePrimary() ast.Expression {
 
 		// Parse as function literal
 		return p.parseFuncLit(start, params)
+
+	case tokens.ENUM_TOKEN:
+		// Anonymous enum type in expression context: enum { A, B, C }
+		// This allows constructs like: enum { A, B, C }::A
+		return p.parseEnumType()
 
 	case tokens.OPEN_CURLY:
 		// Anonymous struct/map literal: { .field = value } or { key => value }

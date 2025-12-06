@@ -33,3 +33,12 @@ fn (p: utils::Point) normalize() {
 point.move(5, 10);
 point.normalize();
 point.notExist();
+
+type Direction enum {
+    North,
+    East,
+    South,
+    West
+};
+
+let dir : i32 = enum{UP, DOWN}::East;

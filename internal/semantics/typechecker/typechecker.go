@@ -12,6 +12,7 @@ import (
 	str "compiler/internal/utils/strings"
 
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -746,6 +747,96 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	// Update the symbol's type
 	sym.Type = namedType
+
+	// Special handling for enums: compute variant values and update variant symbols
+	if enumNode, ok := decl.Type.(*ast.EnumType); ok {
+		// Current value tracker for sequential numbering
+		currentValue := int64(0)
+
+		for _, variant := range enumNode.Variants {
+			variantName := variant.Name.Name
+			qualifiedName := typeName + "::" + variantName
+
+			// Compute variant value
+			if variant.Value != nil {
+				// Explicit value provided
+				switch val := variant.Value.(type) {
+				case *ast.BasicLit:
+					if val.Kind == ast.INT {
+						// Parse the integer literal
+						parsedValue, err := strconv.ParseInt(val.Value, 0, 64)
+						if err != nil {
+							ctx.Diagnostics.Add(
+								diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
+									WithPrimaryLabel(val.Loc(), "cannot parse as integer").
+									WithHelp("use a valid integer literal"),
+							)
+							continue
+						}
+						currentValue = parsedValue
+					} else {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
+								WithPrimaryLabel(val.Loc(), "expected integer literal").
+								WithHelp("use an integer literal (e.g., 42)"),
+						)
+						continue
+					}
+				case *ast.UnaryExpr:
+					// Handle negative literals like -1
+					if val.Op.Kind == tokens.MINUS_TOKEN {
+						if lit, ok := val.X.(*ast.BasicLit); ok && lit.Kind == ast.INT {
+							parsedValue, err := strconv.ParseInt(lit.Value, 0, 64)
+							if err != nil {
+								ctx.Diagnostics.Add(
+									diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
+										WithPrimaryLabel(lit.Loc(), "cannot parse as integer").
+										WithHelp("use a valid integer literal"),
+								)
+								continue
+							}
+							currentValue = -parsedValue
+						} else {
+							ctx.Diagnostics.Add(
+								diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
+									WithPrimaryLabel(val.Loc(), "expected integer literal").
+									WithHelp("use an integer literal (e.g., -42)"),
+							)
+							continue
+						}
+					} else {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
+								WithPrimaryLabel(val.Loc(), "unexpected expression").
+								WithHelp("use an integer literal"),
+						)
+						continue
+					}
+				default:
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have constant integer value", variantName)).
+							WithPrimaryLabel(variant.Value.Loc(), "expected integer literal").
+							WithHelp("use an integer literal (e.g., 42)"),
+					)
+					continue
+				}
+			}
+			// else: use currentValue as is (sequential numbering)
+
+			// Look up the variant symbol (created during collection phase)
+			variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedName)
+			if !ok {
+				ctx.ReportError(fmt.Sprintf("internal error: enum variant symbol '%s' not found", qualifiedName), variant.Name.Loc())
+				continue
+			}
+
+			// Update the variant symbol's type to the named enum type
+			variantSym.Type = namedType
+
+			// Increment for next variant (if no explicit value provided)
+			currentValue++
+		}
+	}
 }
 
 // checkAssignStmt type checks an assignment statement

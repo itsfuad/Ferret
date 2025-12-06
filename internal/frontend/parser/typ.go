@@ -188,7 +188,7 @@ func (p *Parser) parseStructType() *ast.StructType {
 
 	structType := &ast.StructType{
 		Fields:   fields,
-		ID: utils.GenerateStructLitID(),
+		ID:       utils.GenerateStructLitID(),
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end.End),
 	}
 
@@ -308,7 +308,7 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 	return &ast.InterfaceType{
 		Methods:  methods,
-		ID: utils.GenerateInterfaceLitID(),
+		ID:       utils.GenerateInterfaceLitID(),
 		Location: *source.NewLocation(&p.filepath, &tok.Start, &end),
 	}
 }
@@ -330,9 +330,17 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 		}
 
 		name := p.parseIdentifier()
-		fields = append(fields, ast.Field{
+		field := ast.Field{
 			Name: name,
-		})
+		}
+
+		// Check for optional value assignment (e.g., Red = 10)
+		if p.match(tokens.EQUALS_TOKEN) {
+			p.advance() // consume '='
+			field.Value = p.parseExpr()
+		}
+
+		fields = append(fields, field)
 
 		if p.match(tokens.CLOSE_CURLY) {
 			break
@@ -351,7 +359,7 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 
 	return &ast.EnumType{
 		Variants: fields,
-		ID: utils.GenerateEnumLitID(),
+		ID:       utils.GenerateEnumLitID(),
 		Location: p.makeLocation(tok.Start),
 	}
 }
