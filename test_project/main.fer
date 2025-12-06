@@ -24,6 +24,9 @@ let mixed: str = "Multi-language: English 中文 日本語 한국어 with emoji 
 let ascii_a: byte = 'A';
 let ascii_z: byte = 'z';
 let ascii_0: byte = '0';
+let byte_newline: byte = '\n';
+let byte_tab: byte = '\t';
+let byte_escape: byte = '\\';
 
 struct{
     .x: i32,

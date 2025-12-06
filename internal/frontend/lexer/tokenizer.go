@@ -60,13 +60,13 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 
 		patterns: []regexPattern{
 			//{regexp.MustCompile(`\n`), skipHandler}, // newlines
-			{regexp.MustCompile(`\s+`), skipHandler},                          // whitespace
-			{regexp.MustCompile(`//[^\n\r]*`), skipHandler},                   // single line comments (Unicode support)
-			{regexp.MustCompile(`(?s)/\*.*?\*/`), skipHandler},                // multi line comments (Unicode support)
-			{regexp.MustCompile(`"[^"]*"`), stringHandler},                    // string literals (Unicode support)
-			{regexp.MustCompile(`'[\x00-\x7F]'`), byteHandler},                // byte literals (ASCII only, 8-bit)
-			{regexp.MustCompile(numeric.NumberPattern), numberHandler},        // numbers (hex, octal, binary, float, integer)
-			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
+			{regexp.MustCompile(`\s+`), skipHandler},                                     // whitespace
+			{regexp.MustCompile(`//[^\n\r]*`), skipHandler},                              // single line comments (Unicode support)
+			{regexp.MustCompile(`(?s)/\*.*?\*/`), skipHandler},                           // multi line comments (Unicode support)
+			{regexp.MustCompile(`"[^"]*"`), stringHandler},                               // string literals (Unicode support)
+			{regexp.MustCompile(`'(?:\\x[0-9a-fA-F]{2}|\\.|[\x00-\x7F])'`), byteHandler}, // byte literals (ASCII + escapes, 8-bit)
+			{regexp.MustCompile(numeric.NumberPattern), numberHandler},                   // numbers (hex, octal, binary, float, integer)
+			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler},            // identifiers
 			{regexp.MustCompile(`\+\+`), defaultHandler(tokens.PLUS_PLUS_TOKEN)},
 			{regexp.MustCompile(`\-\-`), defaultHandler(tokens.MINUS_MINUS_TOKEN)},
 			{regexp.MustCompile(`\->`), defaultHandler(tokens.ARROW_TOKEN)},
@@ -168,17 +168,89 @@ func byteHandler(lex *Lexer, regex *regexp.Regexp) {
 	lex.advance(match)
 	end := lex.Position
 
-	// Validate that byte literal is ASCII (0-127)
-	if len(byteLiteral) > 0 && byteLiteral[0] > 127 {
+	// Parse escape sequences and validate size
+	parsedValue, byteValue, err := parseByteEscape(byteLiteral)
+	if err != nil {
 		lex.diagnostics.Add(
-			diagnostics.NewError("byte literal must be ASCII (0-127)").
+			diagnostics.NewError(err.Error()).
 				WithPrimaryLabel(source.NewLocation(&lex.FilePath, &start, &end),
-					fmt.Sprintf("character '%s' is not valid for byte type", byteLiteral)).
-				WithHelp("byte type is 8-bit and only supports ASCII characters"),
+					fmt.Sprintf("invalid byte literal '%s'", byteLiteral)),
+		)
+		lex.push(tokens.NewToken(tokens.BYTE_TOKEN, byteLiteral, start, end))
+		return
+	}
+
+	// Validate that byte value fits in 8 bits (0-255)
+	if byteValue > 255 {
+		lex.diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("byte literal value %d does not fit in byte (0-255)", byteValue)).
+				WithPrimaryLabel(source.NewLocation(&lex.FilePath, &start, &end),
+					"value too large for byte type"),
 		)
 	}
 
-	lex.push(tokens.NewToken(tokens.BYTE_TOKEN, byteLiteral, start, end))
+	lex.push(tokens.NewToken(tokens.BYTE_TOKEN, parsedValue, start, end))
+}
+
+// parseByteEscape parses escape sequences in byte literals and returns the parsed string and numeric value
+func parseByteEscape(literal string) (string, int, error) {
+	if len(literal) == 0 {
+		return "", 0, fmt.Errorf("empty byte literal")
+	}
+
+	// Handle escape sequences
+	if literal[0] == '\\' && len(literal) > 1 {
+		switch literal[1] {
+		case 'n':
+			return "\n", 10, nil
+		case 'r':
+			return "\r", 13, nil
+		case 't':
+			return "\t", 9, nil
+		case '0':
+			return "\x00", 0, nil
+		case '\\':
+			return "\\", 92, nil
+		case '\'':
+			return "'", 39, nil
+		case '"':
+			return "\"", 34, nil
+		case 'x':
+			// Hex escape: \xHH
+			if len(literal) < 4 {
+				return "", 0, fmt.Errorf("incomplete hex escape sequence")
+			}
+			hexStr := literal[2:4]
+			value := 0
+			for _, ch := range hexStr {
+				value *= 16
+				if ch >= '0' && ch <= '9' {
+					value += int(ch - '0')
+				} else if ch >= 'a' && ch <= 'f' {
+					value += int(ch - 'a' + 10)
+				} else if ch >= 'A' && ch <= 'F' {
+					value += int(ch - 'A' + 10)
+				} else {
+					return "", 0, fmt.Errorf("invalid hex digit in escape sequence")
+				}
+			}
+			return fmt.Sprintf("\\x%02x", value), value, nil
+		default:
+			return "", 0, fmt.Errorf("unknown escape sequence '\\%c'", literal[1])
+		}
+	}
+
+	// Regular character - must be ASCII
+	if len(literal) == 1 {
+		ch := literal[0]
+		if ch > 127 {
+			return "", 0, fmt.Errorf("byte literal must be ASCII (0-127)")
+		}
+		return literal, int(ch), nil
+	}
+
+	// Multi-byte UTF-8 character not allowed
+	return "", 0, fmt.Errorf("byte literal must be a single ASCII character")
 }
 
 // skipHandler processes a token that should be skipped by the lexer.
