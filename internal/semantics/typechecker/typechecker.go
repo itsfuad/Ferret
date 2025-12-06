@@ -361,32 +361,6 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		return
 	}
 
-	// Special case: casting composite literal to struct type (or named struct type)
-	// Validate that the composite literal matches the struct type
-	if compLit, ok := expr.X.(*ast.CompositeLit); ok {
-		// Unwrap NamedType to get underlying struct
-		underlyingTarget := types.UnwrapType(targetType)
-		if structType, ok := underlyingTarget.(*types.StructType); ok {
-			// Infer the source struct type from the composite literal
-			srcStruct := inferCompositeLitType(ctx, mod, compLit)
-			if srcStruct != nil {
-				if st, ok := srcStruct.(*types.StructType); ok {
-					// Check structural compatibility
-					if !areStructsCompatible(st, structType) {
-						// Not compatible - checkCompositeLit will provide detailed error (missing fields, etc.)
-						checkCompositeLit(ctx, mod, compLit, targetType)
-						return
-					}
-					// Compatible - no error needed
-					return
-				}
-			}
-			// Couldn't infer source type, validate anyway
-			checkCompositeLit(ctx, mod, compLit, targetType)
-			return
-		}
-	}
-
 	// Skip further validation if source type is unknown (error already reported)
 	if sourceType.Equals(types.TypeUnknown) {
 		return
@@ -407,13 +381,25 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	if srcStruct, ok := srcUnwrapped.(*types.StructType); ok {
 		if dstStruct, ok := dstUnwrapped.(*types.StructType); ok {
 			// Check if struct types are compatible by structure
-			if !areStructsCompatible(srcStruct, dstStruct) {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError("cannot cast incompatible struct types").
-						WithCode(diagnostics.ErrTypeMismatch).
-						WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot cast from %s to %s: field mismatch", sourceType.String(), targetType.String())).
-						WithHelp("ensure the source has all required fields with matching types"),
-				)
+			if missingFields, mismatchedFields := analyzeStructCompatibility(srcStruct, dstStruct); len(missingFields) > 0 || len(mismatchedFields) > 0 {
+				// Build detailed error message
+				diag := diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+					WithCode(diagnostics.ErrInvalidCast).
+					WithPrimaryLabel(expr.Loc(), "invalid cast")
+
+				// Add help message with field details
+				var helpParts []string
+				if len(missingFields) > 0 {
+					helpParts = append(helpParts, fmt.Sprintf("missing %s: %s", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", ")))
+				}
+				if len(mismatchedFields) > 0 {
+					helpParts = append(helpParts, fmt.Sprintf("type mismatch in %s: %s", str.Pluralize("field", "fields", len(mismatchedFields)), strings.Join(mismatchedFields, ", ")))
+				}
+				if len(helpParts) > 0 {
+					diag = diag.WithHelp(strings.Join(helpParts, "; "))
+				}
+
+				ctx.Diagnostics.Add(diag)
 			}
 			return
 		}
@@ -483,6 +469,15 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, _ *context_v2.Module, li
 
 // areStructsCompatible checks if two struct types are structurally compatible
 func areStructsCompatible(src, dst *types.StructType) bool {
+	missing, mismatched := analyzeStructCompatibility(src, dst)
+	return len(missing) == 0 && len(mismatched) == 0
+}
+
+// analyzeStructCompatibility checks struct compatibility and returns detailed mismatch info
+// Returns:
+//   - missingFields: list of field names that are required in dst but missing in src
+//   - mismatchedFields: list of "fieldName (expected Type, found Type)" for type mismatches
+func analyzeStructCompatibility(src, dst *types.StructType) (missingFields []string, mismatchedFields []string) {
 	// Check if destination has all required fields with matching or compatible types
 	for _, dstField := range dst.Fields {
 		found := false
@@ -496,16 +491,19 @@ func areStructsCompatible(src, dst *types.StructType) bool {
 				// Allow untyped literals to match concrete types
 				compatibility := checkTypeCompatibility(srcField.Type, dstField.Type)
 				if compatibility == Incompatible {
-					return false // Type mismatch
+					// Type mismatch
+					mismatchedFields = append(mismatchedFields,
+						fmt.Sprintf("%s (expected %s, found %s)", dstField.Name, dstField.Type.String(), srcField.Type.String()))
 				}
 				break
 			}
 		}
 		if !found {
-			return false // Missing required field
+			// Missing required field
+			missingFields = append(missingFields, dstField.Name)
 		}
 	}
-	return true
+	return missingFields, mismatchedFields
 }
 
 func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.SelectorExpr) {

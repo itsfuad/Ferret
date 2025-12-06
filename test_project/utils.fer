@@ -45,5 +45,10 @@ p.aa;
 p.undefinedMethod(1, 2);
 p.normalize();
 
-let p2 := { .a = 1, .b = 2 } as Point;
+let p2 := { .a = 1, .b = 2 } as struct {
+    .a: i32,
+    .b: i32,
+    .g: i32,
+};
+
 let someValu : i32 = { .a = 1, .b = 2 }.g;

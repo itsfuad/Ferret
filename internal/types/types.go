@@ -327,25 +327,9 @@ func NewStruct(name string, fields []StructField) *StructType {
 }
 
 func (s *StructType) String() string {
-	// Anonymous struct - show structure
-	fields := make([]string, len(s.Fields))
-	for i, f := range s.Fields {
-		fieldTypeStr := f.Type.String()
-		// Don't show "untyped" in user-facing messages - it's an internal concept
-		// Show concrete default type instead
-		if fieldTypeStr == "untyped" {
-			if p, ok := f.Type.(*PrimitiveType); ok {
-				switch p.untypedKind {
-				case UntypedInt:
-					fieldTypeStr = "i32" // Default integer type
-				case UntypedFloat:
-					fieldTypeStr = "f64" // Default float type
-				}
-			}
-		}
-		fields[i] = fmt.Sprintf(".%s: %s", f.Name, fieldTypeStr)
-	}
-	return fmt.Sprintf("struct { %s }", strings.Join(fields, ", "))
+	// Anonymous struct - show simplified representation
+	// Use "struct { ... }" to avoid showing untyped text and keep error messages clean
+	return "struct { ... }"
 }
 
 func (s *StructType) Size() int {

@@ -292,8 +292,8 @@ func TestStructType(t *testing.T) {
 		{Name: "id", Type: TypeI32},
 		{Name: "name", Type: TypeString},
 	})
-	if got := anon.String(); got != "struct { .id: i32, .name: str }" {
-		t.Errorf("Anonymous StructType.String() = %q, want %q", got, "struct { .id: i32, .name: str }")
+	if got := anon.String(); got != "struct { ... }" {
+		t.Errorf("Anonymous StructType.String() = %q, want %q", got, "struct { ... }")
 	}
 }
 
