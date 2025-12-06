@@ -276,6 +276,32 @@ func (o *OptionalType) Equals(other SemType) bool {
 	return false
 }
 
+// ReferenceType represents reference types: &T
+type ReferenceType struct {
+	Inner SemType
+}
+
+func NewReference(inner SemType) *ReferenceType {
+	return &ReferenceType{Inner: inner}
+}
+
+func (r *ReferenceType) String() string {
+	return fmt.Sprintf("&%s", r.Inner.String())
+}
+
+func (r *ReferenceType) Size() int {
+	return 8 // pointer size
+}
+
+func (r *ReferenceType) isType() {}
+
+func (r *ReferenceType) Equals(other SemType) bool {
+	if rt, ok := other.(*ReferenceType); ok {
+		return r.Inner.Equals(rt.Inner)
+	}
+	return false
+}
+
 // ResultType represents result types with error handling: T ! E
 type ResultType struct {
 	Ok  SemType

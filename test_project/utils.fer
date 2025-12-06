@@ -63,3 +63,9 @@ let p2 := { .a = 1, .b = 2 } as struct {
 };
 
 let someValu : i32 = { .a = 1, .b = 2 }.g;
+
+// test reference type
+fn (p: &Point) scale(factor: i32) {
+    p.x = p.x * factor;
+    p.y = p.y * factor;
+}

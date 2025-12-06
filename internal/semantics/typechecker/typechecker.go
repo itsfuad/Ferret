@@ -759,6 +759,11 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		return
 	}
 
+	// Unwrap reference types: &T -> T
+	if refType, ok := receiverType.(*types.ReferenceType); ok {
+		receiverType = refType.Inner
+	}
+
 	// Extract type name - only NamedType can have methods
 	var typeName string
 	if namedType, ok := receiverType.(*types.NamedType); ok {
@@ -1418,6 +1423,11 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		// Optional type: T?
 		innerType := typeFromTypeNodeWithContext(ctx, mod, t.Base)
 		return types.NewOptional(innerType)
+
+	case *ast.ReferenceType:
+		// Reference type: &T
+		innerType := typeFromTypeNodeWithContext(ctx, mod, t.Base)
+		return types.NewReference(innerType)
 
 	case *ast.ResultType:
 		// Result type: T ! E

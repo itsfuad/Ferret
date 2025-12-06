@@ -74,3 +74,4 @@ fn (p: struct{.x: f64, .y: f64}) magnitude() -> f64 {
 }
 
 let newPoint : i32 = p.move(1, 2);
+

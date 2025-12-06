@@ -50,6 +50,15 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Incompatible
 	}
 
+	// Automatic dereferencing: &T is compatible with T
+	// This allows reference types to be used transparently
+	if refType, ok := source.(*types.ReferenceType); ok {
+		source = refType.Inner
+	}
+	if refType, ok := target.(*types.ReferenceType); ok {
+		target = refType.Inner
+	}
+
 	// Special handling for none
 	// none can be assigned to any optional type (T?)
 	if source.Equals(types.TypeNone) {

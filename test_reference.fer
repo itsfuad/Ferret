@@ -1,0 +1,34 @@
+type Point struct {
+    .x: i32,
+    .y: i32,
+};
+
+// Method with reference receiver
+fn (p: &Point) scale(factor: i32) {
+    p.x = p.x * factor;
+    p.y = p.y * factor;
+}
+
+// Method with value receiver
+fn (p: Point) display() {
+    // Just reading fields
+}
+
+// Regular method returning new value
+fn (p: Point) move(dx: i32, dy: i32) -> Point {
+    return {
+        .x = p.x + dx,
+        .y = p.y + dy
+    } as Point;
+}
+
+let point := { .x = 10, .y = 20 } as Point;
+
+// Test field access through reference type parameter
+point.scale(2);
+
+// Test value receiver
+point.display();
+
+// Test regular method
+let moved := point.move(5, 5);

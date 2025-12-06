@@ -224,6 +224,11 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 		return types.TypeUnknown
 	}
 
+	// Automatic dereferencing: &T -> T
+	if refType, ok := baseType.(*types.ReferenceType); ok {
+		baseType = refType.Inner
+	}
+
 	fieldName := expr.Sel.Name
 
 	// If baseType is a NamedType, we might have methods attached to the type symbol
