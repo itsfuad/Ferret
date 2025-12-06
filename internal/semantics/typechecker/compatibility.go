@@ -50,6 +50,15 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Incompatible
 	}
 
+	// Special handling for none
+	// none can be assigned to any optional type (T?)
+	if source.Equals(types.TypeNone) {
+		if _, ok := target.(*types.OptionalType); ok {
+			return Assignable
+		}
+		return Incompatible
+	}
+
 	// Identical types
 	if source.Equals(target) {
 		return Identical

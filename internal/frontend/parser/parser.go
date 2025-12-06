@@ -443,6 +443,17 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		}
 	}
 
+	// Prefix increment/decrement: ++a or --a
+	if p.match(tokens.PLUS_PLUS_TOKEN, tokens.MINUS_MINUS_TOKEN) {
+		op := p.advance()
+		expr := p.parseUnaryDepth(depth + 1)
+		return &ast.PrefixExpr{
+			Op:       op,
+			X:        expr,
+			Location: *source.NewLocation(&p.filepath, &op.Start, expr.Loc().End),
+		}
+	}
+
 	return p.parsePostfix()
 }
 

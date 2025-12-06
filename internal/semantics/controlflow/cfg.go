@@ -5,6 +5,7 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 	"fmt"
 )
 
@@ -55,6 +56,10 @@ type loopContext struct {
 	breakTarget    *BasicBlock
 	continueTarget *BasicBlock
 	parent         *loopContext
+	loopStmt       ast.Node    // The loop statement (ForStmt or WhileStmt)
+	bodyBlock      *BasicBlock // Loop body entry block
+	hasBreak       bool        // Whether loop body contains break
+	hasReturn      bool        // Whether loop body contains return
 }
 
 // NewCFGBuilder creates a new control flow graph builder
@@ -162,6 +167,10 @@ func (b *CFGBuilder) buildNode(node ast.Node, current *BasicBlock, exitBlock *Ba
 
 	switch n := node.(type) {
 	case *ast.ReturnStmt:
+		// Mark loop context if inside a loop
+		if b.currentLoop != nil {
+			b.currentLoop.hasReturn = true
+		}
 		return b.buildReturn(n, current, exitBlock)
 
 	case *ast.BreakStmt:
@@ -213,6 +222,9 @@ func (b *CFGBuilder) buildBreak(stmt *ast.BreakStmt, current *BasicBlock) *Basic
 		)
 		return current
 	}
+
+	// Mark that this loop has a break (escape path)
+	b.currentLoop.hasBreak = true
 
 	current.Nodes = append(current.Nodes, stmt)
 	current.Terminator = FlowBreak
@@ -354,6 +366,12 @@ func (b *CFGBuilder) buildFor(stmt *ast.ForStmt, current *BasicBlock, exitBlock 
 
 // buildWhile handles while loops
 func (b *CFGBuilder) buildWhile(stmt *ast.WhileStmt, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
+	// Check if condition is literally true (infinite loop candidate)
+	isLiteralTrue := isLiteralTrue(stmt.Cond)
+
+	// Extract variables used in the condition
+	conditionVars := extractVariablesFromExpr(stmt.Cond)
+
 	// Create loop header (condition check)
 	headerBlock := b.newBlock()
 	headerBlock.Reachable = current.Reachable
@@ -378,10 +396,38 @@ func (b *CFGBuilder) buildWhile(stmt *ast.WhileStmt, current *BasicBlock, exitBl
 		breakTarget:    afterBlock,
 		continueTarget: headerBlock, // Continue goes back to condition
 		parent:         oldLoop,
+		loopStmt:       stmt,
+		bodyBlock:      bodyBlock,
+		hasBreak:       false,
+		hasReturn:      false,
 	}
 
 	// Process body
 	afterBody := b.buildBlock(stmt.Body, bodyBlock, exitBlock)
+
+	// Check if loop body has break or return (escape paths)
+	loopHasBreak := b.currentLoop.hasBreak
+	loopHasReturn := b.currentLoop.hasReturn
+
+	// Check if condition variables are modified in the loop body
+	conditionVarsModified := false
+	wrongDirectionModifications := make(map[string]bool) // Track if modification goes in wrong direction
+
+	if len(conditionVars) > 0 {
+		modifiedVars := extractModifiedVariables(stmt.Body)
+		modificationInfo := extractModificationInfo(stmt.Body)
+
+		for _, condVar := range conditionVars {
+			if modifiedVars[condVar] {
+				conditionVarsModified = true
+
+				// Check if the modification is in the wrong direction
+				if isWrongDirection(stmt.Cond, condVar, modificationInfo[condVar]) {
+					wrongDirectionModifications[condVar] = true
+				}
+			}
+		}
+	}
 
 	// Connect body back to header
 	if afterBody != nil && afterBody.CanFallThru {
@@ -391,7 +437,46 @@ func (b *CFGBuilder) buildWhile(stmt *ast.WhileStmt, current *BasicBlock, exitBl
 	// Restore loop context
 	b.currentLoop = oldLoop
 
-	afterBlock.Reachable = true // Can always exit via condition
+	// Check for infinite loop without escape
+	// All of these are ERRORS (not warnings) - they're obvious infinite loops:
+	// 1. while true with no break/return - definitely infinite
+	// 2. Condition variable modified in WRONG direction AND no break/return - obviously infinite
+	//    e.g., while a > 4 with a++, or while a < 10 with a--
+	// 3. Condition variables NEVER modified AND no break/return - definitely infinite
+
+	if !loopHasBreak && !loopHasReturn {
+		if isLiteralTrue {
+			// Definite infinite loop: while true { ... }
+			b.ctx.Diagnostics.Add(
+				diagnostics.NewError("infinite loop without escape").
+					WithPrimaryLabel(stmt.Loc(), "this loop has no way to exit").
+					WithNote("add a break statement, return statement, or use a non-constant condition").
+					WithHelp("consider adding a break statement inside the loop"),
+			)
+		} else if len(wrongDirectionModifications) > 0 {
+			// Obvious infinite loop: modification goes in wrong direction
+			vars := make([]string, 0, len(wrongDirectionModifications))
+			for v := range wrongDirectionModifications {
+				vars = append(vars, v)
+			}
+			b.ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("infinite loop: variable(s) %v modified in wrong direction", vars)).
+					WithPrimaryLabel(stmt.Loc(), "this loop will never terminate").
+					WithNote("the loop condition requires the variable to change in the opposite direction").
+					WithHelp("check the loop condition and ensure modifications work toward termination"),
+			)
+		} else if len(conditionVars) > 0 && !conditionVarsModified {
+			// Definite infinite loop: condition variables never modified
+			b.ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("infinite loop: variable(s) %v never modified", conditionVars)).
+					WithPrimaryLabel(stmt.Loc(), "this loop has no way to exit").
+					WithNote("the variables in the loop condition are not modified in the loop body").
+					WithHelp("modify the condition variable(s) or add a break statement"),
+			)
+		}
+	}
+
+	afterBlock.Reachable = true // Can always exit via condition (or break)
 	return afterBlock
 }
 
@@ -598,6 +683,300 @@ func traceToAllBranches(block *BasicBlock) []*BasicBlock {
 	}
 
 	return branches
+}
+
+// isLiteralTrue checks if an expression is literally the boolean true
+func isLiteralTrue(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	// Check for BasicLit with BOOL kind
+	if lit, ok := expr.(*ast.BasicLit); ok {
+		return lit.Kind == ast.BOOL && lit.Value == "true"
+	}
+
+	// Check for identifier "true" (since true/false are not keywords but built-in identifiers)
+	if ident, ok := expr.(*ast.IdentifierExpr); ok {
+		return ident.Name == "true"
+	}
+
+	return false
+}
+
+// extractVariablesFromExpr extracts all variable names used in an expression
+func extractVariablesFromExpr(expr ast.Expression) []string {
+	vars := make([]string, 0)
+	if expr == nil {
+		return vars
+	}
+
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		// Only include if it's not a literal constant (true, false, none)
+		if e.Name != "true" && e.Name != "false" && e.Name != "none" {
+			vars = append(vars, e.Name)
+		}
+	case *ast.BinaryExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
+		vars = append(vars, extractVariablesFromExpr(e.Y)...)
+	case *ast.UnaryExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
+	case *ast.ParenExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
+	case *ast.CallExpr:
+		vars = append(vars, extractVariablesFromExpr(e.Fun)...)
+		for _, arg := range e.Args {
+			vars = append(vars, extractVariablesFromExpr(arg)...)
+		}
+	case *ast.SelectorExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
+	case *ast.IndexExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
+		vars = append(vars, extractVariablesFromExpr(e.Index)...)
+	}
+
+	return vars
+}
+
+// extractModifiedVariables extracts all variable names that are modified in a block
+func extractModifiedVariables(block *ast.Block) map[string]bool {
+	modified := make(map[string]bool)
+	if block == nil {
+		return modified
+	}
+
+	for _, node := range block.Nodes {
+		extractModifiedFromNode(node, modified)
+	}
+
+	return modified
+}
+
+// extractModifiedFromNode recursively extracts modified variables from a node
+func extractModifiedFromNode(node ast.Node, modified map[string]bool) {
+	if node == nil {
+		return
+	}
+
+	switch n := node.(type) {
+	case *ast.AssignStmt:
+		// Extract variable name from left-hand side
+		if ident, ok := n.Lhs.(*ast.IdentifierExpr); ok {
+			modified[ident.Name] = true
+		}
+	case *ast.VarDecl:
+		// Variable declarations with initialization count as modification
+		for _, decl := range n.Decls {
+			if decl.Value != nil {
+				modified[decl.Name.Name] = true
+			}
+		}
+	case *ast.IfStmt:
+		extractModifiedFromNode(n.Body, modified)
+		if n.Else != nil {
+			extractModifiedFromNode(n.Else, modified)
+		}
+	case *ast.ForStmt:
+		if n.Body != nil {
+			extractModifiedFromNode(n.Body, modified)
+		}
+	case *ast.WhileStmt:
+		if n.Body != nil {
+			extractModifiedFromNode(n.Body, modified)
+		}
+	case *ast.Block:
+		for _, stmt := range n.Nodes {
+			extractModifiedFromNode(stmt, modified)
+		}
+	case *ast.DeclStmt:
+		extractModifiedFromNode(n.Decl, modified)
+	case *ast.ExprStmt:
+		// Check if expression statement modifies variables (e.g., a++, --a)
+		switch expr := n.X.(type) {
+		case *ast.PostfixExpr:
+			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+				modified[ident.Name] = true
+			}
+		case *ast.PrefixExpr:
+			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+				modified[ident.Name] = true
+			}
+		}
+	}
+}
+
+// ModificationKind represents how a variable is modified
+type ModificationKind int
+
+const (
+	ModUnknown    ModificationKind = iota // Unknown modification (complex expression, function call, etc.)
+	ModIncrement                          // a++, a = a + 1, a += 1
+	ModDecrement                          // a--, a = a - 1, a -= 1
+	ModAssignment                         // a = expr (not increment/decrement)
+)
+
+// extractModificationInfo extracts detailed modification information for variables
+func extractModificationInfo(block *ast.Block) map[string]ModificationKind {
+	info := make(map[string]ModificationKind)
+	if block == nil {
+		return info
+	}
+
+	for _, node := range block.Nodes {
+		extractModificationKindFromNode(node, info)
+	}
+
+	return info
+}
+
+// extractModificationKindFromNode recursively extracts modification kinds from a node
+func extractModificationKindFromNode(node ast.Node, info map[string]ModificationKind) {
+	if node == nil {
+		return
+	}
+
+	switch n := node.(type) {
+	case *ast.AssignStmt:
+		if ident, ok := n.Lhs.(*ast.IdentifierExpr); ok {
+			varName := ident.Name
+
+			// Check if it's increment: a = a + 1 or a += 1
+			if binExpr, ok := n.Rhs.(*ast.BinaryExpr); ok {
+				if binExpr.Op.Kind == tokens.PLUS_TOKEN {
+					if leftIdent, ok := binExpr.X.(*ast.IdentifierExpr); ok && leftIdent.Name == varName {
+						if lit, ok := binExpr.Y.(*ast.BasicLit); ok && lit.Value == "1" {
+							info[varName] = ModIncrement
+							return
+						}
+					}
+				} else if binExpr.Op.Kind == tokens.MINUS_TOKEN {
+					if leftIdent, ok := binExpr.X.(*ast.IdentifierExpr); ok && leftIdent.Name == varName {
+						if lit, ok := binExpr.Y.(*ast.BasicLit); ok && lit.Value == "1" {
+							info[varName] = ModDecrement
+							return
+						}
+					}
+				}
+			}
+
+			// Otherwise it's a general assignment
+			if _, exists := info[varName]; !exists {
+				info[varName] = ModAssignment
+			}
+		}
+	case *ast.PostfixExpr:
+		if ident, ok := n.X.(*ast.IdentifierExpr); ok {
+			if n.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+				info[ident.Name] = ModIncrement
+			} else if n.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+				info[ident.Name] = ModDecrement
+			}
+		}
+	case *ast.PrefixExpr:
+		if ident, ok := n.X.(*ast.IdentifierExpr); ok {
+			if n.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+				info[ident.Name] = ModIncrement
+			} else if n.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+				info[ident.Name] = ModDecrement
+			}
+		}
+	case *ast.IfStmt:
+		extractModificationKindFromNode(n.Body, info)
+		if n.Else != nil {
+			extractModificationKindFromNode(n.Else, info)
+		}
+	case *ast.ForStmt:
+		if n.Body != nil {
+			extractModificationKindFromNode(n.Body, info)
+		}
+	case *ast.WhileStmt:
+		if n.Body != nil {
+			extractModificationKindFromNode(n.Body, info)
+		}
+	case *ast.Block:
+		for _, stmt := range n.Nodes {
+			extractModificationKindFromNode(stmt, info)
+		}
+	case *ast.DeclStmt:
+		extractModificationKindFromNode(n.Decl, info)
+	case *ast.ExprStmt:
+		// Handle expression statements (a++, --a, etc.)
+		switch expr := n.X.(type) {
+		case *ast.PostfixExpr:
+			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+				if expr.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+					info[ident.Name] = ModIncrement
+				} else if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+					info[ident.Name] = ModDecrement
+				}
+			}
+		case *ast.PrefixExpr:
+			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+				if expr.Op.Kind == tokens.PLUS_PLUS_TOKEN {
+					info[ident.Name] = ModIncrement
+				} else if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+					info[ident.Name] = ModDecrement
+				}
+			}
+		}
+	}
+}
+
+// isWrongDirection checks if a variable modification goes in the wrong direction
+// Returns true if the loop will obviously never terminate due to wrong direction
+func isWrongDirection(condition ast.Expression, varName string, modKind ModificationKind) bool {
+	if condition == nil || modKind == ModUnknown || modKind == ModAssignment {
+		return false // Can't determine for unknown/complex modifications
+	}
+
+	// Extract comparison operator and check if varName is on the left or right
+	if binExpr, ok := condition.(*ast.BinaryExpr); ok {
+		var isVarOnLeft bool
+		var hasVar bool
+
+		if ident, ok := binExpr.X.(*ast.IdentifierExpr); ok && ident.Name == varName {
+			isVarOnLeft = true
+			hasVar = true
+		} else if ident, ok := binExpr.Y.(*ast.IdentifierExpr); ok && ident.Name == varName {
+			isVarOnLeft = false
+			hasVar = true
+		}
+
+		if !hasVar {
+			return false
+		}
+
+		// Check if modification direction is wrong for the condition
+		// while a > N: needs a--, wrong if a++
+		// while a < N: needs a++, wrong if a--
+		// while a >= N: needs a--, wrong if a++
+		// while a <= N: needs a++, wrong if a--
+
+		op := binExpr.Op.Kind
+		if isVarOnLeft {
+			switch op {
+			case tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+				// Need to decrease, so increment is wrong
+				return modKind == ModIncrement
+			case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN:
+				// Need to increase, so decrement is wrong
+				return modKind == ModDecrement
+			}
+		} else {
+			// Variable on right side, logic is reversed
+			switch op {
+			case tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+				// N > a means a needs to increase
+				return modKind == ModDecrement
+			case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN:
+				// N < a means a needs to decrease
+				return modKind == ModIncrement
+			}
+		}
+	}
+
+	return false
 }
 
 // isVoidType checks if a type node represents void

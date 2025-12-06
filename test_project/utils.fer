@@ -37,9 +37,10 @@ fn (p: Point) move(dx: i32, dy: i32) -> Point {
         let value : str = v;
     }
 
-    while a > 4 {
+    while a > 30 {
         let temp := 5;
         temp < 10;
+        a--;
     }
 
     return {

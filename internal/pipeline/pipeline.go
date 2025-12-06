@@ -14,6 +14,7 @@ import (
 	"compiler/internal/frontend/lexer"
 	"compiler/internal/frontend/parser"
 	"compiler/internal/phase"
+	"compiler/internal/semantics/cfganalyzer"
 	"compiler/internal/semantics/collector"
 	"compiler/internal/semantics/resolver"
 	"compiler/internal/semantics/table"
@@ -102,7 +103,15 @@ func (p *Pipeline) Run() error {
 		return err
 	}
 
-	// Phase 5: Code Generation (future)
+	// Phase 5: Control Flow Analysis
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 5] Control Flow Analysis\n")
+	}
+	if err := p.runCFGAnalysisPhase(); err != nil {
+		return err
+	}
+
+	// Phase 6: Code Generation (future)
 
 	// Final error check
 	if p.ctx.HasErrors() {
@@ -439,11 +448,40 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 		}
 
 		if p.ctx.Debug {
-			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+			colors.PURPLE.Printf("  ✓ %s\\n", importPath)
 		}
 	}
 
 	// Don't return error here - let Run() handle final error check
 	// This allows all modules to be type checked even if some have errors
+	return nil
+}
+
+// runCFGAnalysisPhase runs control flow analysis on all type-checked modules
+func (p *Pipeline) runCFGAnalysisPhase() error {
+	for _, importPath := range p.ctx.GetModuleNames() {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Check if module is at least type-checked
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseTypeChecked {
+			continue
+		}
+
+		cfganalyzer.AnalyzeModule(p.ctx, module)
+
+		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCFGAnalyzed) {
+			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCFGAnalyzed", importPath), nil)
+		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\\n", importPath)
+		}
+	}
+
+	// Don't return error here - let Run() handle final error check
+	// This allows all modules to be analyzed even if some have errors
 	return nil
 }

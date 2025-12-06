@@ -523,6 +523,7 @@ var (
 	TypeF256    SemType
 	TypeBool    SemType
 	TypeString  SemType
+	TypeNone    SemType
 	TypeVoid    SemType
 	TypeUnknown SemType
 
@@ -550,6 +551,7 @@ func init() {
 	TypeF256 = NewPrimitive(TYPE_F256)
 	TypeBool = NewPrimitive(TYPE_BOOL)
 	TypeString = NewPrimitive(TYPE_STRING)
+	TypeNone = NewPrimitive(TYPE_NONE)
 	TypeVoid = NewPrimitive(TYPE_VOID)
 	TypeUnknown = NewPrimitive(TYPE_UNKNOWN)
 

@@ -123,10 +123,20 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
+		// Check condition
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
-		checkBlock(ctx, mod, n.Body)
+
+		// Analyze condition for type narrowing
+		thenNarrowing, elseNarrowing := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+
+		// Check then branch with narrowing
+		if n.Body != nil {
+			applyNarrowingToBlock(ctx, mod, n.Body, thenNarrowing)
+		}
+
+		// Check else/else-if chain with narrowing
 		if n.Else != nil {
-			checkNode(ctx, mod, n.Else)
+			applyNarrowingToElse(ctx, mod, n.Else, elseNarrowing)
 		}
 	case *ast.ForStmt:
 		// Enter for loop scope if it exists
@@ -188,7 +198,10 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		}
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
-		checkBlock(ctx, mod, n.Body)
+
+		// Analyze condition for narrowing in loop body
+		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
 	case *ast.Block:
 		checkBlock(ctx, mod, n)
 	case *ast.DeclStmt:
@@ -224,6 +237,22 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		if item.Type != nil {
 			// Explicit type annotation
 			declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
+
+			// Disallow 'none' as a variable/const type
+			if declType.Equals(types.TypeNone) {
+				declKind := "variable"
+				if isConst {
+					declKind = "constant"
+				}
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("%s '%s' cannot have type 'none'", declKind, name)).
+						WithPrimaryLabel(item.Name.Loc(), "'none' is not a valid type for variables or constants").
+						WithHelp("'none' is only used as a value for optional types like i32?"),
+				)
+				sym.Type = types.TypeUnknown
+				continue
+			}
+
 			sym.Type = declType
 
 			// Check initializer if present
@@ -357,6 +386,24 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		}
 
 	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
+		// Special case: allow comparing optional with none
+		lhsOptional := false
+		rhsOptional := false
+		lhsNone := lhsType == types.TypeNone
+		rhsNone := rhsType == types.TypeNone
+
+		if _, ok := lhsType.(*types.OptionalType); ok {
+			lhsOptional = true
+		}
+		if _, ok := rhsType.(*types.OptionalType); ok {
+			rhsOptional = true
+		}
+
+		// Allow T? == none or none == T?
+		if (lhsOptional && rhsNone) || (rhsOptional && lhsNone) {
+			return // Valid comparison
+		}
+
 		// Comparison operators require compatible types
 		compatibility := checkTypeCompatibility(lhsType, rhsType)
 		if compatibility == Incompatible {
@@ -1598,5 +1645,120 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 	for i := maxChecked; i < argCount; i++ {
 		checkExpr(ctx, mod, expr.Args[i], types.TypeUnknown)
+	}
+}
+
+// applyNarrowingToBlock temporarily overrides symbol types based on narrowing context
+// and checks the block. Uses defer to automatically restore original types.
+func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, narrowing *NarrowingContext) {
+	if block == nil {
+		return
+	}
+
+	if narrowing == nil {
+		checkBlock(ctx, mod, block)
+		return
+	}
+
+	// Collect all narrowed variables from this context and parent chain
+	narrowedVars := make(map[string]types.SemType)
+	collectNarrowedTypes(narrowing, narrowedVars)
+
+	if len(narrowedVars) == 0 {
+		checkBlock(ctx, mod, block)
+		return
+	}
+
+	// Apply narrowing using defer for automatic restoration
+	defer restoreSymbolTypes(mod, narrowedVars)()
+
+	// Apply narrowed types
+	for varName, narrowedType := range narrowedVars {
+		if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+			sym.Type = narrowedType
+		}
+	}
+
+	// Check the block with narrowed types
+	checkBlock(ctx, mod, block)
+}
+
+// collectNarrowedTypes walks the narrowing context chain and collects all narrowed types
+// Child contexts override parent contexts for the same variable
+func collectNarrowedTypes(nc *NarrowingContext, result map[string]types.SemType) {
+	if nc == nil {
+		return
+	}
+
+	// First collect from parent (so child can override)
+	if nc.parent != nil {
+		collectNarrowedTypes(nc.parent, result)
+	}
+
+	// Then add/override with current level
+	for varName, narrowedType := range nc.narrowedTypes {
+		result[varName] = narrowedType
+	}
+}
+
+// restoreSymbolTypes returns a function that restores original types
+// This allows using defer for automatic cleanup
+func restoreSymbolTypes(mod *context_v2.Module, narrowedVars map[string]types.SemType) func() {
+	// Capture original types at the time of narrowing
+	originalTypes := make(map[string]types.SemType)
+
+	for varName := range narrowedVars {
+		if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+			originalTypes[varName] = sym.Type
+		}
+	}
+
+	// Return restoration function
+	return func() {
+		for varName, origType := range originalTypes {
+			if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+				sym.Type = origType
+			}
+		}
+	}
+}
+
+// applyNarrowingToElse handles else and else-if branches with narrowing
+func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Module, elseNode ast.Node, elseNarrowing *NarrowingContext) {
+	if elseNode == nil {
+		return
+	}
+
+	// Check if it's an else-if (IfStmt) or plain else (Block)
+	switch e := elseNode.(type) {
+	case *ast.IfStmt:
+		// For else-if, re-analyze the condition with parent narrowing from else branch
+		elseIfThenNarrowing, elseIfElseNarrowing := analyzeConditionForNarrowing(ctx, mod, e.Cond, elseNarrowing)
+
+		// Enter scope if exists
+		if e.Scope != nil {
+			defer mod.EnterScope(e.Scope.(*table.SymbolTable))()
+		}
+
+		// Check condition
+		checkExpr(ctx, mod, e.Cond, types.TypeBool)
+
+		// Check then branch with combined narrowing
+		if e.Body != nil {
+			applyNarrowingToBlock(ctx, mod, e.Body, elseIfThenNarrowing)
+		}
+
+		// Recursively handle nested else-if/else
+		if e.Else != nil {
+			applyNarrowingToElse(ctx, mod, e.Else, elseIfElseNarrowing)
+		}
+
+	case *ast.Block:
+		// Plain else block - apply narrowing from condition
+		applyNarrowingToBlock(ctx, mod, e, elseNarrowing)
+
+	default:
+		// Fallback for unexpected node types
+		checkNode(ctx, mod, elseNode)
 	}
 }

@@ -1,6 +1,5 @@
 package phase
 
-
 // ModulePhase tracks the compilation phase of an individual module
 //
 // Phase progression must be sequential and respect dependencies:
@@ -22,6 +21,7 @@ const (
 	PhaseCollected                      // Symbols collected (first pass)
 	PhaseResolved                       // Imports and symbols resolved
 	PhaseTypeChecked                    // Type checking complete
+	PhaseCFGAnalyzed                    // Control flow analysis complete
 	PhaseCodeGen                        // Code generation complete
 )
 
@@ -33,7 +33,8 @@ var PhasePrerequisites = map[ModulePhase]ModulePhase{
 	PhaseCollected:   PhaseParsed,
 	PhaseResolved:    PhaseCollected,
 	PhaseTypeChecked: PhaseResolved,
-	PhaseCodeGen:     PhaseTypeChecked,
+	PhaseCFGAnalyzed: PhaseTypeChecked,
+	PhaseCodeGen:     PhaseCFGAnalyzed,
 }
 
 func (p ModulePhase) String() string {
@@ -50,6 +51,8 @@ func (p ModulePhase) String() string {
 		return "Resolved"
 	case PhaseTypeChecked:
 		return "TypeChecked"
+	case PhaseCFGAnalyzed:
+		return "CFGAnalyzed"
 	case PhaseCodeGen:
 		return "CodeGen"
 	default:

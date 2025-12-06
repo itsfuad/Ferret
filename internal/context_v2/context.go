@@ -258,6 +258,12 @@ func registerBuiltins(universe *table.SymbolTable) {
 		Type:     types.TypeBool,
 		Exported: true,
 	})
+	universe.Declare("none", &symbols.Symbol{
+		Name:     "none",
+		Kind:     symbols.SymbolConstant,
+		Type:     types.TypeNone, // Special none type for optional unwrapping
+		Exported: true,
+	})
 }
 
 // SetEntryPoint sets the entry point for compilation

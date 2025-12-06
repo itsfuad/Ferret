@@ -94,6 +94,7 @@ func TestModulePhaseTracking(t *testing.T) {
 		phase.PhaseCollected,
 		phase.PhaseResolved,
 		phase.PhaseTypeChecked,
+		phase.PhaseCFGAnalyzed,
 		phase.PhaseCodeGen,
 	}
 
