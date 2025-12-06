@@ -61,10 +61,10 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 		patterns: []regexPattern{
 			//{regexp.MustCompile(`\n`), skipHandler}, // newlines
 			{regexp.MustCompile(`\s+`), skipHandler},                          // whitespace
-			{regexp.MustCompile(`\/\/.*`), skipHandler},                       // single line comments
-			{regexp.MustCompile(`\/\*[\s\S]*?\*\/`), skipHandler},             // multi line comments
-			{regexp.MustCompile(`"[^"]*"`), stringHandler},                    // string literals
-			{regexp.MustCompile(`'[^']'`), byteHandler},                       // byte literals
+			{regexp.MustCompile(`//[^\n\r]*`), skipHandler},                   // single line comments (Unicode support)
+			{regexp.MustCompile(`(?s)/\*.*?\*/`), skipHandler},                // multi line comments (Unicode support)
+			{regexp.MustCompile(`"[^"]*"`), stringHandler},                    // string literals (Unicode support)
+			{regexp.MustCompile(`'[\x00-\x7F]'`), byteHandler},                // byte literals (ASCII only, 8-bit)
 			{regexp.MustCompile(numeric.NumberPattern), numberHandler},        // numbers (hex, octal, binary, float, integer)
 			{regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`), identifierHandler}, // identifiers
 			{regexp.MustCompile(`\+\+`), defaultHandler(tokens.PLUS_PLUS_TOKEN)},
@@ -167,6 +167,17 @@ func byteHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
+	
+	// Validate that byte literal is ASCII (0-127)
+	if len(byteLiteral) > 0 && byteLiteral[0] > 127 {
+		lex.diagnostics.Add(
+			diagnostics.NewError("byte literal must be ASCII (0-127)").
+				WithPrimaryLabel(source.NewLocation(&lex.FilePath, &start, &end), 
+					fmt.Sprintf("character '%s' is not valid for byte type", byteLiteral)).
+				WithHelp("byte type is 8-bit and only supports ASCII characters"),
+		)
+	}
+	
 	lex.push(tokens.NewToken(tokens.BYTE_TOKEN, byteLiteral, start, end))
 }
 
