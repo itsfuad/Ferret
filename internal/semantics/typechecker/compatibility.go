@@ -168,15 +168,18 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 		// Check if target has smaller bit size than source
 		srcName, srcOk := types.GetPrimitiveName(source)
 		tgtName, tgtOk := types.GetPrimitiveName(target)
+
+		msg := fmt.Sprintf("cannot implicitly convert '%s' to '%s'", source, target)
+
 		if srcOk && tgtOk {
 			srcBits := types.GetNumberBitSize(srcName)
 			tgtBits := types.GetNumberBitSize(tgtName)
 			if tgtBits < srcBits {
-				return fmt.Sprintf("cannot implicitly convert '%s' to '%s' (possible data loss)", source, target)
+				return fmt.Sprintf("%s (possible data loss)", msg)
 			}
 		}
 		// Same size but different types (e.g., byte vs u8)
-		return fmt.Sprintf("cannot implicitly convert '%s' to '%s'", source, target)
+		return msg
 
 	case Identical, Assignable, LosslessConvertible:
 		// These are not errors
