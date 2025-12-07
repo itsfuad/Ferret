@@ -81,7 +81,7 @@ export default defineConfig({
             {
                 label: 'Functions',
                 items: [
-                    { label: 'Function Basics', slug: 'functions/functions' },
+                    { label: 'Function Basics', slug: 'functions/basics' },
                     { label: 'Parameters & Returns', slug: 'functions/parameters' },
                 ],
             },

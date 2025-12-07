@@ -58,12 +58,12 @@ str, bool, byte           // String, boolean, byte
 i32?                      // Nullable integer
 
 // Result types
-Data ! Error              // Used with functions that can fail
+Error ! Data              // Used with functions that can fail
 
-fn get_data() -> i32 ! str { // we can return either an i32 or a str. But what is the error value?
+fn get_data() -> str ! i32 { // Error type first, success type second
     // ...
     if fail {
-        return "Failed to get data"!;  // returning str as error. See the `!` operator. Yeah it marks an expression as error 
+        return "Failed to get data"!;  // returning str as error. The `!` operator marks an expression as error 
     }
 
     return 42; // returning i32 as success value

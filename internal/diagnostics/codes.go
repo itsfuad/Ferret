@@ -47,6 +47,10 @@ const (
 	ErrInvalidContinue         = "T0020"
 	ErrInvalidType             = "T0021"
 	ErrInvalidMethodReceiver   = "T0022"
+	ErrUncaughtError           = "T0023"
+	ErrInvalidCatch            = "T0024"
+	ErrInvalidErrorReturn      = "T0025"
+	ErrMissingCatch            = "T0026"
 
 	// Module/Import errors (M prefix)
 	ErrModuleNotFound    = "M0001"

@@ -165,9 +165,17 @@ func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	// Get the type of the called expression (function or method)
 	funType := inferExprType(ctx, mod, expr.Fun)
 
-	// If it's a function type, return its return type
+	// If it's a function type, get its return type
 	if funcType, ok := funType.(*types.FunctionType); ok {
-		return funcType.Return
+		returnType := funcType.Return
+
+		// If the function returns a Result type and has a catch clause,
+		// unwrap to get the success type (T ! E -> T)
+		if resultType, isResult := returnType.(*types.ResultType); isResult && expr.Catch != nil {
+			return resultType.Ok
+		}
+
+		return returnType
 	}
 
 	// Fallback: handle direct function name lookup (legacy path)
@@ -180,7 +188,14 @@ func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		// Get the function declaration
 		if funcDecl, ok := sym.Decl.(*ast.FuncDecl); ok {
 			if funcDecl.Type != nil && funcDecl.Type.Result != nil {
-				return typeFromTypeNodeWithContext(ctx, mod, funcDecl.Type.Result)
+				returnType := typeFromTypeNodeWithContext(ctx, mod, funcDecl.Type.Result)
+
+				// Unwrap Result type if catch clause present
+				if resultType, isResult := returnType.(*types.ResultType); isResult && expr.Catch != nil {
+					return resultType.Ok
+				}
+
+				return returnType
 			}
 		}
 	}
@@ -526,80 +541,38 @@ func widerType(a, b types.SemType) types.SemType {
 // finalizeUntyped converts an UNTYPED literal to a concrete default type
 func finalizeUntyped(expr ast.Expression) types.SemType {
 	if lit, ok := expr.(*ast.BasicLit); ok {
-		switch lit.Kind {
-		case ast.INT:
-			// Use centralized resolution to pick minimum required type
-			return resolveUntypedInt(lit.Value)
-		case ast.FLOAT:
-			// Use centralized default float type
-			return types.NewPrimitive(types.DEFAULT_FLOAT_TYPE)
-		}
+		return resolveUntyped(lit, types.TypeUnknown)
 	}
 	return types.TypeUnknown
 }
 
-// resolveUntypedInt picks the minimum integer type that can hold the given value.
-// This is the central system for untyped integer resolution:
-// - Defaults to i32 (DEFAULT_INT_TYPE) if value fits
-// - Upgrades to i64, i128, i256 if value exceeds default bitsize
-// - For signed values, uses signed type hierarchy
-func resolveUntypedInt(valueStr string) types.SemType {
-	// Default: try to fit in i32 (DEFAULT_INT_TYPE)
-	defaultType := types.NewPrimitive(types.DEFAULT_INT_TYPE)
-	if fitsInType(valueStr, defaultType) {
-		return defaultType
+// resolveUntypedType resolves an untyped type to a concrete type.
+// For expressions without literals (e.g., binary expr results), uses contextual or default types.
+func resolveUntypedType(untypedType types.SemType, expected types.SemType) types.SemType {
+	if !types.IsUntyped(untypedType) {
+		return untypedType
 	}
 
-	// Value doesn't fit in default - try progressively larger signed types
-	signedTypes := []types.TYPE_NAME{
-		types.TYPE_I64,
-		types.TYPE_I128,
-		types.TYPE_I256,
-	}
-
-	for _, typeName := range signedTypes {
-		t := types.NewPrimitive(typeName)
-		if fitsInType(valueStr, t) {
-			return t
+	// Try to use expected type if compatible
+	if !expected.Equals(types.TypeUnknown) {
+		if types.IsUntypedInt(untypedType) && types.IsNumeric(expected) {
+			return expected
+		}
+		if types.IsUntypedFloat(untypedType) && types.IsFloat(expected) {
+			return expected
 		}
 	}
 
-	// Value is too large for any supported type - return i256 anyway
-	// (error will be reported elsewhere)
-	return types.NewPrimitive(types.TYPE_I256)
-}
-
-// contextualizeUntyped applies contextual typing to an UNTYPED literal
-func contextualizeUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
-	switch lit.Kind {
-	case ast.INT:
-		// Try to fit into expected type
-		if types.IsNumeric(expected) {
-			if _, ok := types.GetPrimitiveName(expected); ok {
-				// Use big.Int for all integer validation (simpler, more maintainable)
-				if fitsInType(lit.Value, expected) {
-					return expected
-				}
-			}
+	// Default to standard default types
+	if primType, ok := untypedType.(*types.PrimitiveType); ok {
+		if primType.IsUntypedInt() {
+			return types.FromTypeName(types.DEFAULT_INT_TYPE)
+		} else if primType.IsUntypedFloat() {
+			return types.FromTypeName(types.DEFAULT_FLOAT_TYPE)
 		}
-		// Can't contextualize - stay untyped for better error messages
-		return types.TypeUntypedInt
-
-	case ast.FLOAT:
-		// Try to fit into expected float type (check precision)
-		if types.IsFloat(expected) {
-			if _, ok := types.GetPrimitiveName(expected); ok {
-				if fitsInType(lit.Value, expected) {
-					return expected
-				}
-			}
-		}
-		// Can't contextualize - stay untyped for better error messages
-		return types.TypeUntypedFloat
-
-	default:
-		return types.TypeUnknown
 	}
+
+	return untypedType
 }
 
 // inferFuncLitType infers the type of a function literal
@@ -659,7 +632,7 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 
 		// Check if start literal needs a larger type
 		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
-			startResolved := resolveUntypedInt(startLit.Value)
+			startResolved := resolveUntyped(startLit, types.TypeUnknown)
 			if name, ok := types.GetPrimitiveName(startResolved); ok {
 				bitSize := types.GetNumberBitSize(name)
 				if bitSize > maxBitSize {
@@ -671,7 +644,7 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 
 		// Check if end literal needs a larger type
 		if endLit, ok := expr.End.(*ast.BasicLit); ok && endLit.Kind == ast.INT {
-			endResolved := resolveUntypedInt(endLit.Value)
+			endResolved := resolveUntyped(endLit, types.TypeUnknown)
 			if name, ok := types.GetPrimitiveName(endResolved); ok {
 				bitSize := types.GetNumberBitSize(name)
 				if bitSize > maxBitSize {
@@ -687,7 +660,7 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	// If start is untyped, use centralized resolution
 	if types.IsUntypedInt(startType) {
 		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
-			startType = resolveUntypedInt(startLit.Value)
+			startType = resolveUntyped(startLit, types.TypeUnknown)
 		} else {
 			startType = types.NewPrimitive(types.DEFAULT_INT_TYPE)
 		}

@@ -55,7 +55,7 @@ Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: Code
 - **Rich Type Features**:
   - Basic types: `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`, `str`, `bool`, `byte`
   - Optional types: `T?` for nullable values
-  - Error types: `T ! E` for error handling
+  - Result types: `E ! T` for error handling
   - Reference types: `&T` for references (parsed, semantics pending)
   - Arrays: `[]T` (dynamic), `[N]T` (fixed-size)
   - Maps: `map[K]V`
@@ -77,7 +77,7 @@ Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: Code
 - Maps
 - Functions (regular and anonymous)
 - Control flow (`if`, `else`, `for`, `while`, `when`)
-- Error handling (`T!`, `T ! E`, `catch` expressions)
+- Error handling (`E ! T`, `catch` expressions)
 - Optional types (`T?`, elvis operator `?:`)
 - Scope resolution (`::` for enums and modules)
 - Composite literals (structs, arrays, maps)
@@ -361,9 +361,9 @@ let result: str? = getValue()?;
 #### Error Types and Handling
 ```ferret
 // Function returning error
-fn divide(a: i32, b: i32) -> i32 ! str {
+fn divide(a: i32, b: i32) -> str ! i32 {
     if b == 0 {
-        return error: "division by zero";
+        return "division by zero"!;
     }
     return a / b;
 }
@@ -646,7 +646,7 @@ Ferret/
 - **Type Parsing**: All type expressions (basic, optional, error, reference, arrays, maps, structs, interfaces, enums)
 - **Expressions**: All expression types including composite literals, method calls, error handling
 - **Statements**: All statement types (declarations, control flow, assignments)
-- **Error Handling**: `T!` and `T ! E` syntax with `catch` expressions
+- **Error Handling**: `E ! T` syntax with `catch` expressions
 - **Advanced Features**: Variadic parameters, method receivers, scope resolution
 
 ### 🚧 In Progress (Semantic Analysis)

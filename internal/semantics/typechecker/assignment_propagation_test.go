@@ -71,7 +71,7 @@ func TestConstantPropagationThroughAssignments(t *testing.T) {
 			name: "assignment clears constant after non-constant operation",
 			code: `fn test(n: i32) {
 				let arr: [10]i32 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-				let i := 5;
+				let i: i32 = 5;  // Explicitly typed to match parameter n
 				i = n;  // i is now non-constant
 				let x := arr[i];  // No error - can't determine at compile time
 			}`,

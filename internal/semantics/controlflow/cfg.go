@@ -524,7 +524,7 @@ func AnalyzeReturns(
 	}
 
 	// Check if all paths lead to return
-	if !allPathsReturn(cfg) {
+	if !AllPathsReturn(cfg) {
 		returnType := "value"
 		if funcDecl.Type.Result != nil {
 			if ident, ok := funcDecl.Type.Result.(*ast.IdentifierExpr); ok {
@@ -566,8 +566,8 @@ func AnalyzeReturns(
 	}
 }
 
-// allPathsReturn checks if all paths through the CFG lead to a return
-func allPathsReturn(cfg *ControlFlowGraph) bool {
+// AllPathsReturn checks if all paths through the CFG lead to a return
+func AllPathsReturn(cfg *ControlFlowGraph) bool {
 	// DFS to check if we can reach exit without returning
 	visited := make(map[*BasicBlock]bool)
 	return !canReachExitWithoutReturn(cfg.Entry, cfg.Exit, visited)
@@ -909,7 +909,7 @@ func extractModificationKindFromNode(node ast.Node, info map[string]Modification
 		case *ast.PostfixExpr:
 			if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
 				switch expr.Op.Kind {
-			case tokens.PLUS_PLUS_TOKEN:
+				case tokens.PLUS_PLUS_TOKEN:
 					info[ident.Name] = ModIncrement
 				case tokens.MINUS_MINUS_TOKEN:
 					info[ident.Name] = ModDecrement

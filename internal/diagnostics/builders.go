@@ -43,7 +43,7 @@ func WrongArgumentCountVariadic(filepath string, loc *source.Location, minExpect
 
 // ArgumentTypeMismatch creates a diagnostic for argument type mismatch
 func ArgumentTypeMismatch(filepath string, loc *source.Location, param, expected, found string) *Diagnostic {
-	
+
 	msg := fmt.Sprintf("type mismatch in parameter '%s'", param)
 
 	return NewError(msg).
@@ -65,4 +65,44 @@ func FieldNotFound(filepath string, loc *source.Location, fieldName, typeName st
 		WithCode(ErrFieldNotFound).
 		WithPrimaryLabel(loc, fmt.Sprintf("%s has no field %s", typeName, fieldName)).
 		WithHelp("check the field name spelling")
+}
+
+// UncaughtError creates a diagnostic for calling a function that returns a Result type without handling the error
+func UncaughtError(filepath string, loc *source.Location, resultType string) *Diagnostic {
+	return NewError("function returns a result type but error is not handled").
+		WithCode(ErrUncaughtError).
+		WithPrimaryLabel(loc, fmt.Sprintf("function returns %s", resultType)).
+		WithHelp("add a 'catch' clause to handle the potential error")
+}
+
+// InvalidCatch creates a diagnostic for using catch on a non-Result function
+func InvalidCatch(filepath string, loc *source.Location, actualType string) *Diagnostic {
+	return NewError("cannot use 'catch' on function that does not return a result type").
+		WithCode(ErrInvalidCatch).
+		WithPrimaryLabel(loc, fmt.Sprintf("function returns %s, not a result type", actualType)).
+		WithHelp("remove the 'catch' clause or call a function that can return an error")
+}
+
+// InvalidErrorReturn creates a diagnostic for returning error from non-Result function
+func InvalidErrorReturn(filepath string, loc *source.Location, returnType string) *Diagnostic {
+	return NewError("cannot return error from function that does not declare error type").
+		WithCode(ErrInvalidErrorReturn).
+		WithPrimaryLabel(loc, fmt.Sprintf("function returns %s, not a result type", returnType)).
+		WithHelp("change function return type to 'T ! E' to allow error returns")
+}
+
+// MissingCatchFallback creates a diagnostic for catch clause without fallback or early return
+func MissingCatchFallback(filepath string, loc *source.Location) *Diagnostic {
+	return NewError("catch handler must either provide a fallback value or return early").
+		WithCode(ErrInvalidCatch).
+		WithPrimaryLabel(loc, "no fallback value provided and handler does not return").
+		WithHelp("add a fallback value after the catch block or use 'return' in the handler")
+}
+
+// CatchTypeMismatch creates a diagnostic for catch fallback type mismatch
+func CatchTypeMismatch(filepath string, loc *source.Location, expected, found string) *Diagnostic {
+	return NewError("catch fallback type does not match expected type").
+		WithCode(ErrTypeMismatch).
+		WithPrimaryLabel(loc, fmt.Sprintf("expected %s, found %s", expected, found)).
+		WithHelp("ensure fallback value has the same type as the success value")
 }

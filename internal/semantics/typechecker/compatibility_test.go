@@ -144,18 +144,18 @@ func TestFitsInTypeIntegers(t *testing.T) {
 func TestGetMinimumFloatTypeForDigits(t *testing.T) {
 	tests := []struct {
 		digits   int
-		expected string
+		expected types.TYPE_NAME
 	}{
-		{1, "f32"},
-		{7, "f32"},
-		{8, "f64"},
-		{16, "f64"},
-		{17, "f128"},
-		{34, "f128"},
-		{35, "f256"},
-		{71, "f256"},
-		{72, "exceeds f256 precision"},
-		{100, "exceeds f256 precision"},
+		{1, types.TYPE_F32},
+		{7, types.TYPE_F32},
+		{8, types.TYPE_F64},
+		{16, types.TYPE_F64},
+		{17, types.TYPE_F128},
+		{34, types.TYPE_F128},
+		{35, types.TYPE_F256},
+		{71, types.TYPE_F256},
+		{72, types.TYPE_UNKNOWN},
+		{100, types.TYPE_UNKNOWN},
 	}
 
 	for _, tt := range tests {

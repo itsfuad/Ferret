@@ -302,10 +302,11 @@ func (r *ReferenceType) Equals(other SemType) bool {
 	return false
 }
 
-// ResultType represents result types with error handling: T ! E
+// ResultType represents result types with error handling: E ! T
+// Error type first, then success type (consistent with expr! syntax)
 type ResultType struct {
-	Ok  SemType
-	Err SemType
+	Ok  SemType // Success type
+	Err SemType // Error type
 }
 
 func NewResult(ok, err SemType) *ResultType {
@@ -313,7 +314,7 @@ func NewResult(ok, err SemType) *ResultType {
 }
 
 func (r *ResultType) String() string {
-	return fmt.Sprintf("%s ! %s", r.Ok.String(), r.Err.String())
+	return fmt.Sprintf("%s ! %s", r.Err.String(), r.Ok.String())
 }
 
 func (r *ResultType) Size() int {

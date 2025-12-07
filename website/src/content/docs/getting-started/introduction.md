@@ -15,7 +15,7 @@ Ferret's powerful type system catches errors at compile-time, not runtime. With 
 Clean, expressive syntax that's easy to learn and pleasant to write. Inspired by the best features of modern languages.
 
 ### Error Handling
-First-class error handling with error types (`T ! E`) that make dealing with failures explicit and safe.
+First-class error handling with result types (`E ! T`) that make dealing with failures explicit and safe.
 
 ### Optional Types
 No more null pointer exceptions! Optional types (`T?`) and the elvis operator (`?:`) make handling missing values a breeze.

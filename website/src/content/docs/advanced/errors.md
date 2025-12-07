@@ -7,27 +7,20 @@ Ferret uses explicit error handling with Error Types to manage failures safely.
 
 ## Result Types
 
-Functions that can fail return `T ! E` (Error type). Here `T` is the normal return type, and `E` is the error type.
+Functions or methods that can fail return `E ! T` (Result type), where `E` is the error type and `T` is the success type.
+
+The syntax is consistent with the error return operator: just as you write `return "error"!` to return an error, you write `E ! T` for the type.
 
 ```ferret
-fn divide(a: i32, b: i32) -> i32 ! str {
+fn divide(a: i32, b: i32) -> str ! i32 {
     if b == 0 {
-        return "Division by zero"!; // Look at the `!` operator here. It constructs an error value.
+        return "Division by zero"!; // The `!` operator constructs an error value
     }
     return a / b;
 }
 ```
 
-You can skip the error type if you don't care about the specific error. Ferret will use `str` as the default error type. At least for now (Lol).
-
-```ferret
-fn divide(a: i32, b: i32) -> i32 ! {
-    if b == 0 {
-        return "Division by zero"!;
-    }
-    return a / b;
-}
-```
+**Both types are required** - you must specify both the error type and success type.
 
 ## Handling Errors
 

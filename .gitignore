@@ -3,3 +3,6 @@ node_modules
 .astro
 dist
 *.ast.json
+
+# Ignore ferret files from being tracked by git from the root directory
+/*.fer

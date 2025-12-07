@@ -70,4 +70,4 @@ This allows for greater flexibility in how functions are used and composed.
 ## Next Steps
 
 - [Learn about Parameters](/parameters)
-- [Explore Error Handling](/errors)
+- [Explore Error Handling](/advanced/errors)

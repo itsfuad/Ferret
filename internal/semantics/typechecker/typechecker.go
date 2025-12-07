@@ -113,18 +113,81 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			if expectedReturnType == nil {
 				expectedReturnType = types.TypeUnknown
 			}
-			returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
 
-			// Validate return type matches function signature
-			if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
-				compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
-				if compatibility == Incompatible {
+			// Handle Result type returns: return value! (error) or return value (success)
+			if resultType, isResult := expectedReturnType.(*types.ResultType); isResult {
+				if n.IsError {
+					// Returning error: return "error message"!
+					returnedType := checkExpr(ctx, mod, n.Result, resultType.Err)
+
+					// Resolve untyped literals
+					if types.IsUntyped(returnedType) {
+						if lit, ok := n.Result.(*ast.BasicLit); ok {
+							returnedType = resolveUntyped(lit, resultType.Err)
+						} else {
+							returnedType = resolveUntypedType(returnedType, resultType.Err)
+						}
+					}
+
+					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
+						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
+						if compatibility == Incompatible {
+							// Use formatTypeDescription for better error messages
+							returnedDesc := formatTypeDescription(returnedType)
+							ctx.Diagnostics.Add(
+								diagnostics.NewError("error return type mismatch").
+									WithCode(diagnostics.ErrTypeMismatch).
+									WithPrimaryLabel(n.Result.Loc(),
+										fmt.Sprintf("expected error type %s, found %s", resultType.Err.String(), returnedDesc)),
+							)
+						}
+					}
+				} else {
+					// Returning success: return value
+					returnedType := checkExpr(ctx, mod, n.Result, resultType.Ok)
+
+					// Resolve untyped literals
+					if types.IsUntyped(returnedType) {
+						if lit, ok := n.Result.(*ast.BasicLit); ok {
+							returnedType = resolveUntyped(lit, resultType.Ok)
+						} else {
+							returnedType = resolveUntypedType(returnedType, resultType.Ok)
+						}
+					}
+
+					if !returnedType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
+						compatibility := checkTypeCompatibility(returnedType, resultType.Ok)
+						if compatibility == Incompatible {
+							ctx.Diagnostics.Add(
+								diagnostics.NewError("return type mismatch").
+									WithCode(diagnostics.ErrTypeMismatch).
+									WithPrimaryLabel(n.Result.Loc(),
+										fmt.Sprintf("expected %s, found %s", resultType.Ok.String(), returnedType.String())),
+							)
+						}
+					}
+				}
+			} else {
+				// Non-Result type function
+				if n.IsError {
+					// Cannot use error return syntax in non-Result function
 					ctx.Diagnostics.Add(
-						diagnostics.NewError("type mismatch in return statement").
-							WithCode(diagnostics.ErrTypeMismatch).
-							WithPrimaryLabel(n.Result.Loc(),
-								fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
+						diagnostics.InvalidErrorReturn(mod.FilePath, n.Loc(), expectedReturnType.String()),
 					)
+				} else {
+					// Normal return type checking
+					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
+					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
+						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
+						if compatibility == Incompatible {
+							ctx.Diagnostics.Add(
+								diagnostics.NewError("type mismatch in return statement").
+									WithCode(diagnostics.ErrTypeMismatch).
+									WithPrimaryLabel(n.Result.Loc(),
+										fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
+							)
+						}
+					}
 				}
 			}
 		}
@@ -1170,6 +1233,10 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	switch e := expr.(type) {
 	case *ast.CallExpr:
 		checkCallExpr(ctx, mod, e)
+		// Validate catch clause if present
+		if e.Catch != nil {
+			checkCatchClause(ctx, mod, e)
+		}
 
 	case *ast.SelectorExpr:
 		// Validate base expression first
@@ -1270,7 +1337,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			if optType, ok := expected.(*types.OptionalType); ok {
 				expectedForLit = optType.Inner
 			}
-			resultType = contextualizeUntyped(lit, expectedForLit)
+			resultType = resolveUntyped(lit, expectedForLit)
 		}
 	}
 
@@ -1309,10 +1376,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		}
 	}
 
-	// If still UNTYPED and we need a concrete type, finalize it
-	if types.IsUntyped(resultType) && expected.Equals(types.TypeUnknown) {
-		// Keep as UNTYPED for now - will be finalized when needed
-	}
+	// Keep untyped literals untyped for better error messages
+	// They will be resolved in specific contexts that need concrete types
 
 	return resultType
 }
@@ -1374,7 +1439,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 		// Add dual labels if we have type node location
 		if leftNode != nil {
 			// Format value description (special handling for untyped literals)
-			valueDesc := formatValueDescription(rhsType)
+			valueDesc := formatValueDescription(rhsType, rightNode)
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), valueDesc).
 				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		} else {
@@ -1386,27 +1451,36 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 }
 
 // formatValueDescription formats a user-friendly description for a value in error messages.
-// For untyped literals, it returns "integer literal" or "float literal" instead of "type 'untyped'".
-func formatValueDescription(typ types.SemType) string {
-	// Handle untyped literals specially
-	if types.IsUntypedInt(typ) {
-		return "integer literal"
-	}
-	if types.IsUntypedFloat(typ) {
-		return "float literal"
+// For untyped literals, it shows the minimum type needed (e.g., "integer literal (needs i32)").
+func formatValueDescription(typ types.SemType, expr ast.Expression) string {
+	// Handle untyped literals specially - show what type they would resolve to
+	if types.IsUntyped(typ) {
+		if basicLit, ok := expr.(*ast.BasicLit); ok {
+			// Resolve to see what type it needs
+			resolvedType := resolveUntyped(basicLit, types.TypeUnknown)
+			if types.IsUntypedInt(typ) {
+				return fmt.Sprintf("integer literal (needs %s)", resolvedType.String())
+			} else if types.IsUntypedFloat(typ) {
+				return fmt.Sprintf("float literal (needs %s)", resolvedType.String())
+			}
+		}
+		// Fallback for non-literal untyped expressions
+		if types.IsUntypedInt(typ) {
+			return "integer value"
+		} else if types.IsUntypedFloat(typ) {
+			return "float value"
+		}
 	}
 	return fmt.Sprintf("type '%s'", typ.String())
 }
 
 // formatTypeDescription formats a user-friendly type description (without "type" prefix).
-// For untyped literals, it returns "integer" or "float" instead of "untyped".
+// For untyped types, shows what they would default to.
 func formatTypeDescription(typ types.SemType) string {
-	// Handle untyped literals specially
-	if types.IsUntypedInt(typ) {
-		return "integer"
-	}
-	if types.IsUntypedFloat(typ) {
-		return "float"
+	if types.IsUntyped(typ) {
+		// Show default type instead of "untyped"
+		resolvedType := resolveUntypedType(typ, types.TypeUnknown)
+		return resolvedType.String()
 	}
 	return typ.String()
 }
@@ -1872,6 +1946,114 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 	for i := maxChecked; i < argCount; i++ {
 		checkExpr(ctx, mod, expr.Args[i], types.TypeUnknown)
+	}
+
+	// Validate Result type handling: check if function returns Result and needs catch
+	validateResultTypeHandling(ctx, mod, expr, funcType)
+}
+
+// validateResultTypeHandling checks if Result types are properly handled with catch clauses
+func validateResultTypeHandling(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr, funcType *types.FunctionType) {
+	returnType := funcType.Return
+	_, isResult := returnType.(*types.ResultType)
+
+	if isResult {
+		// Function returns a Result type
+		if expr.Catch == nil {
+			// No catch clause - error must be handled
+			ctx.Diagnostics.Add(
+				diagnostics.UncaughtError(mod.FilePath, expr.Loc(), returnType.String()),
+			)
+		}
+	} else {
+		// Function does not return a Result type
+		if expr.Catch != nil {
+			// Cannot use catch on non-Result function
+			ctx.Diagnostics.Add(
+				diagnostics.InvalidCatch(mod.FilePath, expr.Catch.Loc(), returnType.String()),
+			)
+		}
+	}
+}
+
+// checkCatchClause validates catch clause semantics
+func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, callExpr *ast.CallExpr) {
+	catch := callExpr.Catch
+	if catch == nil {
+		return
+	}
+
+	// Get the function's return type to determine error type
+	funType := inferExprType(ctx, mod, callExpr.Fun)
+	funcType, ok := funType.(*types.FunctionType)
+	if !ok {
+		return // Error already reported in checkCallExpr
+	}
+
+	resultType, isResult := funcType.Return.(*types.ResultType)
+	if !isResult {
+		return // Error already reported in validateResultTypeHandling
+	}
+
+	// If error identifier is provided, create a symbol for it in the handler block
+	if catch.ErrIdent != nil && catch.Handler != nil {
+		// Create error variable symbol in handler scope
+		if catch.Handler.Scope != nil {
+			handlerScope := catch.Handler.Scope.(*table.SymbolTable)
+			errSymbol := &symbols.Symbol{
+				Name: catch.ErrIdent.Name,
+				Kind: symbols.SymbolVariable,
+				Type: resultType.Err,
+				Decl: catch.ErrIdent, // Store the identifier as declaration
+			}
+			// Add to handler scope
+			handlerScope.Declare(catch.ErrIdent.Name, errSymbol)
+		}
+	}
+
+	// Check handler block if present
+	if catch.Handler != nil {
+		oldScope := mod.CurrentScope
+		if catch.Handler.Scope != nil {
+			mod.CurrentScope = catch.Handler.Scope.(*table.SymbolTable)
+		}
+		checkBlock(ctx, mod, catch.Handler)
+		mod.CurrentScope = oldScope
+	}
+
+	// Check fallback value type if present
+	if catch.Fallback != nil {
+		fallbackType := checkExpr(ctx, mod, catch.Fallback, resultType.Ok)
+
+		if !fallbackType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
+			compatibility := checkTypeCompatibility(fallbackType, resultType.Ok)
+			if compatibility == Incompatible {
+				ctx.Diagnostics.Add(
+					diagnostics.CatchTypeMismatch(mod.FilePath, catch.Fallback.Loc(),
+						resultType.Ok.String(), fallbackType.String()),
+				)
+			}
+		}
+	} else if catch.Handler != nil {
+		// Handler exists but no fallback - use CFG analysis to check if all paths return
+		// Build CFG for the handler block (wrap in a temporary function for analysis)
+		tempFuncDecl := &ast.FuncDecl{
+			Name: &ast.IdentifierExpr{Name: "__catch_handler__"},
+			Body: catch.Handler,
+			Type: &ast.FuncType{
+				Result: &ast.IdentifierExpr{Name: "void"},
+			},
+		}
+
+		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
+		cfg := cfgBuilder.BuildFunctionCFG(tempFuncDecl)
+
+		// Check if all paths return (using existing CFG analysis)
+		if !controlflow.AllPathsReturn(cfg) {
+			ctx.Diagnostics.Add(
+				diagnostics.MissingCatchFallback(mod.FilePath, catch.Loc()),
+			)
+		}
 	}
 }
 

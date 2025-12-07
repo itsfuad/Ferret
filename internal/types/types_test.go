@@ -241,18 +241,18 @@ func TestOptionalTypeEquals(t *testing.T) {
 }
 
 func TestResultType(t *testing.T) {
-	// i32 ! str
+	// str ! i32 (error type first, success type second)
 	result := NewResult(TypeI32, TypeString)
-	if got := result.String(); got != "i32 ! str" {
-		t.Errorf("ResultType.String() = %q, want %q", got, "i32 ! str")
+	if got := result.String(); got != "str ! i32" {
+		t.Errorf("ResultType.String() = %q, want %q", got, "str ! i32")
 	}
 
-	// []i32 ! Error (using NamedType wrapper)
+	// Error ! []i32 (using NamedType wrapper)
 	errorStruct := NewStruct("", []StructField{{Name: "msg", Type: TypeString}})
 	errorType := NewNamed("Error", errorStruct)
 	resultArray := NewResult(NewArray(TypeI32, -1), errorType)
-	if got := resultArray.String(); got != "[]i32 ! Error" {
-		t.Errorf("ResultType.String() = %q, want %q", got, "[]i32 ! Error")
+	if got := resultArray.String(); got != "Error ! []i32" {
+		t.Errorf("ResultType.String() = %q, want %q", got, "Error ! []i32")
 	}
 }
 

@@ -65,3 +65,26 @@ type Direction enum {
 };
 
 let dir : i32 = enum{UP, DOWN}::East;
+
+// Error/sucess type
+// The T ! E is only usable with functions or methods that can return errors
+fn divide(a: i32, b: i32) -> i32 ! str { // the str is the error type and i32 is the success type
+    if b == 0 {
+        return "Division by zero"!; // the `!` operator creates an error value. Its just a sugar for the error type. Actual type is string
+    }
+    return a / b; // normal return for success value (i32)
+}
+
+// Fixed: Added catch to handle the error
+let divisionResult := divide(10, 0) catch 0; // Now properly handles the error with fallback
+
+let divisionResult2 := divide(10, 2) catch err {
+    // we may do something with the error here. err is of type str here as declared in the function signature
+    return; // early return from the current function, divisionResult2 will be unknown but as we returned early, its ok as we won't use it
+
+    // but if we do not return early, we must provide a value for divisionResult2
+} 0 ; // this 0 or the default value of type i32 will be used if there was an error. Its mandatory to provide a default value if we do not return early. But can be just }; // if we returned earlyt. Here we used 0, but it can be any i32 value
+
+// shorthand error handling
+
+let divisionResult3 := divide(20, 4) catch 1; // if there was an error, 1 will be used as the default value

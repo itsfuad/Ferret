@@ -85,41 +85,45 @@ func (p *Parser) parseType() ast.TypeNode {
 		}
 	}
 
-	// Check for error type T ! E or T!
-	// Supports two syntaxes:
-	//   1. T ! E - explicit error type (e.g., i32 ! str, User ! HttpError)
-	//   2. T!     - default error type (defaults to 'str')
-	// The default can be changed later to Error struct or same type as success type
-	// Note: ErrorType always has exactly two types: Value (success) and Error
+	// Check for result type: E ! T
+	// Error type first, then success type (consistent with expr! syntax)
+	// Both types are required, no optional syntax
+	// Example: str ! i32 means "returns i32 on success, str on error"
 	if p.match(tokens.NOT_TOKEN) {
 		notToken := p.advance() // consume '!'
 
-		var resultType ast.TypeNode
-		var endPos *source.Position
+		// Success type is required after '!'
+		if p.match(tokens.SEMICOLON_TOKEN, tokens.CLOSE_PAREN, tokens.COMMA_TOKEN, tokens.OPEN_CURLY) {
+			loc := source.NewLocation(&p.filepath, &notToken.End, &notToken.End)
+			p.diagnostics.Add(
+				diagnostics.NewError("expected success type after '!'").
+					WithPrimaryLabel(loc, ""),
+			)
+			return t
+		}
 
-		// Check if error type is provided (T ! E) or use default (T!)
-		// Default error type is 'str' for now, but this can be changed later
-		// to Error struct or same type as success type
-		if !p.match(tokens.SEMICOLON_TOKEN, tokens.CLOSE_PAREN, tokens.COMMA_TOKEN, tokens.OPEN_CURLY) {
-			// Error type is explicitly provided
-			resultType = p.parseType()
-			if resultType != nil && resultType.Loc() != nil {
-				endPos = resultType.Loc().End
-			} else {
-				endPos = &notToken.End
-			}
+		successType := p.parseType()
+		if successType == nil {
+			loc := source.NewLocation(&p.filepath, &notToken.End, &notToken.End)
+			p.diagnostics.Add(
+				diagnostics.NewError("expected success type after '!'").
+					WithPrimaryLabel(loc, ""),
+			)
+			return t
+		}
+
+		var endPos *source.Position
+		if successType.Loc() != nil {
+			endPos = successType.Loc().End
 		} else {
-			// No error type provided, use default 'str'
-			resultType = &ast.IdentifierExpr{
-				Name:     "str",
-				Location: *source.NewLocation(&p.filepath, &notToken.End, &notToken.End),
-			}
 			endPos = &notToken.End
 		}
 
-		t = &ast.ResultType{
-			Value:    t,
-			Error:    resultType,
+		// t is the error type, successType is the success type
+		// But AST expects Value (success) then Error, so we swap
+		return &ast.ResultType{
+			Error:    t,           // Error type (what was parsed first)
+			Value:    successType, // Success type (what was parsed after !)
 			Location: *source.NewLocation(&p.filepath, t.Loc().Start, endPos),
 		}
 	}

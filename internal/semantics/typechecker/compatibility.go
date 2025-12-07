@@ -1,6 +1,7 @@
 package typechecker
 
 import (
+	"compiler/internal/frontend/ast"
 	"compiler/internal/types"
 	"compiler/internal/utils/numeric"
 	"fmt"
@@ -331,27 +332,27 @@ func fitsInType(valueStr string, t types.SemType) bool {
 }
 
 // getMinimumTypeForValue returns the smallest type that can hold the given value.
-// For positive values, returns both unsigned and signed alternatives (e.g., "u8 or i16").
+// For positive values, prefers signed types (more natural for integers).
 // Uses NumericValue interface which automatically chooses optimal representation.
-func getMinimumTypeForValue(valueStr string) string {
+func getMinimumTypeForValue(valueStr string) types.TYPE_NAME {
 	// Use NumericValue interface (automatically chooses int64 fast path or big.Int)
 	numValue, err := numeric.NewNumericValue(valueStr)
 	if err != nil {
-		return "unknown"
+		return types.TYPE_UNKNOWN
 	}
 
 	// Check signed types first if negative
 	if numValue.IsNegative() {
 		signedTypes := []struct {
-			name    string
+			name    types.TYPE_NAME
 			bitSize int
 		}{
-			{"i8", 8},
-			{"i16", 16},
-			{"i32", 32},
-			{"i64", 64},
-			{"i128", 128},
-			{"i256", 256},
+			{types.TYPE_I8, 8},
+			{types.TYPE_I16, 16},
+			{types.TYPE_I32, 32},
+			{types.TYPE_I64, 64},
+			{types.TYPE_I128, 128},
+			{types.TYPE_I256, 256},
 		}
 
 		for _, t := range signedTypes {
@@ -360,51 +361,84 @@ func getMinimumTypeForValue(valueStr string) string {
 			}
 		}
 	} else {
-		// For positive values, show both unsigned and next signed alternative
+		// For positive values, prefer signed types (more natural)
+		// Use the next larger signed type to accommodate the value
 		types := []struct {
-			unsigned    string
 			unsignedBit int
-			signed      string
-			signedBit   int
+			preferred   types.TYPE_NAME // Prefer signed type
 		}{
-			{"u8", 8, "i16", 16},
-			{"u16", 16, "i32", 32},
-			{"u32", 32, "i64", 64},
-			{"u64", 64, "i128", 128},
-			{"u128", 128, "i256", 256},
-			{"u256", 256, "", 0},
+			{8, types.TYPE_I16},    // 0-255 fits in i16
+			{16, types.TYPE_I32},   // 0-65535 fits in i32
+			{32, types.TYPE_I64},   // 0-4B fits in i64
+			{64, types.TYPE_I128},  // 0-18Q fits in i128
+			{128, types.TYPE_I256}, // 0-340U fits in i256
+			{256, types.TYPE_U256}, // No larger signed type exists
 		}
 
 		for _, t := range types {
 			if numValue.FitsInBitSize(t.unsignedBit, false) {
-				if t.signed != "" {
-					// Show both unsigned and signed alternatives
-					return fmt.Sprintf("%s or %s", t.unsigned, t.signed)
-				}
-				// u256 has no larger signed type
-				return t.unsigned
+				return t.preferred
 			}
 		}
 	}
 
-	return "too large for any supported type"
+	return types.TYPE_UNKNOWN
 }
 
 // getMinimumFloatTypeForDigits returns the smallest float type that can hold the given precision
-func getMinimumFloatTypeForDigits(digits int) string {
+func getMinimumFloatTypeForDigits(digits int) types.TYPE_NAME {
 	if digits <= 7 {
-		return "f32"
+		return types.TYPE_F32
 	}
 	if digits <= 16 {
-		return "f64"
+		return types.TYPE_F64
 	}
 	if digits <= 34 {
-		return "f128"
+		return types.TYPE_F128
 	}
 	if digits <= 71 {
-		return "f256"
+		return types.TYPE_F256
 	}
-	return "exceeds f256 precision"
+	return types.TYPE_UNKNOWN
+}
+
+// resolveUntyped resolves an untyped literal to a concrete type.
+// Strategy: Use expected type if it fits, otherwise use minimum required type.
+// This is the SINGLE source of truth for all untyped literal resolution.
+func resolveUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
+	switch lit.Kind {
+	case ast.INT:
+		// Try expected type first
+		if types.IsNumeric(expected) && !expected.Equals(types.TypeUnknown) {
+			if _, ok := types.GetPrimitiveName(expected); ok {
+				if fitsInType(lit.Value, expected) {
+					return expected
+				}
+			}
+		}
+
+		// Use minimum required type (prefers signed types)
+		minTypeName := getMinimumTypeForValue(lit.Value)
+		return types.FromTypeName(minTypeName)
+
+	case ast.FLOAT:
+		// Try expected type first
+		if types.IsFloat(expected) && !expected.Equals(types.TypeUnknown) {
+			if _, ok := types.GetPrimitiveName(expected); ok {
+				if fitsInType(lit.Value, expected) {
+					return expected
+				}
+			}
+		}
+
+		// Use minimum required type based on precision
+		digits := countSignificantDigits(lit.Value)
+		minTypeName := getMinimumFloatTypeForDigits(digits)
+		return types.FromTypeName(minTypeName)
+
+	default:
+		return types.TypeUnknown
+	}
 }
 
 // getTypeRange returns a human-readable range for integer types

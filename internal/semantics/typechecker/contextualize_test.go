@@ -25,9 +25,9 @@ func TestContextualizeUntypedWithLargeIntegers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := contextualizeUntyped(lit, tt.expected)
+			result := resolveUntyped(lit, tt.expected)
 			if !result.Equals(tt.expected) {
-				t.Errorf("contextualizeUntyped(100, %s) = %s, want %s", tt.name, result, tt.expected)
+				t.Errorf("resolveUntyped(100, %s) = %s, want %s", tt.name, result, tt.expected)
 			}
 		})
 	}

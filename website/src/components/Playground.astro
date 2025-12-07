@@ -138,6 +138,9 @@
             ) => { success: boolean; output?: string; error?: string };
             ferretWasmVersion?: string;
             ferretEditor?: monaco.editor.IStandaloneCodeEditor;
+            MonacoEnvironment?: {
+                getWorker: () => Worker;
+            };
         }
         class Go {
             importObject: any;
