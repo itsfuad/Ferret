@@ -132,8 +132,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
 						if compatibility == Incompatible {
-							// Use formatTypeDescription for better error messages
-							returnedDesc := formatTypeDescription(returnedType)
+							returnedDesc := resolveType(returnedType, resultType.Err)
 							ctx.Diagnostics.Add(
 								diagnostics.NewError("error return type mismatch").
 									WithCode(diagnostics.ErrTypeMismatch).
@@ -1376,7 +1375,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 						compat := checkTypeCompatibility(elemType, arrayType.Element)
 						if compat == Incompatible {
 							// Format type description for better error messages
-							elemTypeStr := formatTypeDescription(elemType)
+							elemTypeStr := resolveType(elemType, types.TypeUnknown)
 							ctx.Diagnostics.Add(
 								diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
 									WithCode(diagnostics.ErrTypeMismatch).
@@ -1548,17 +1547,6 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 		}
 	}
 	return fmt.Sprintf("type '%s'", typ.String())
-}
-
-// formatTypeDescription formats a user-friendly type description (without "type" prefix).
-// For untyped types, shows what they would default to.
-func formatTypeDescription(typ types.SemType) string {
-	if types.IsUntyped(typ) {
-		// Show default type instead of "untyped"
-		resolvedType := resolveType(typ, types.TypeUnknown)
-		return resolvedType.String()
-	}
-	return typ.String()
 }
 
 func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
@@ -1968,14 +1956,14 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 		if compatibility == Incompatible {
 			// Format the argument type in a user-friendly way
-			argTypeDesc := formatTypeDescription(argType)
+			argTypeDesc := resolveType(argType, param.Type)
 			ctx.Diagnostics.Add(
 				diagnostics.ArgumentTypeMismatch(
 					mod.FilePath,
 					arg.Loc(),
 					param.Name,
 					param.Type.String(),
-					argTypeDesc,
+					argTypeDesc.String(),
 				),
 			)
 		}
@@ -1997,14 +1985,14 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 			if compatibility == Incompatible {
 				// Format the argument type in a user-friendly way
-				argTypeDesc := formatTypeDescription(argType)
+				argTypeDesc := resolveType(argType, variadicElemType)
 				ctx.Diagnostics.Add(
 					diagnostics.ArgumentTypeMismatch(
 						mod.FilePath,
 						arg.Loc(),
 						variadicParam.Name,
 						variadicElemType.String(),
-						argTypeDesc,
+						argTypeDesc.String(),
 					),
 				)
 			}
