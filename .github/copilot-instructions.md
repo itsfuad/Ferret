@@ -196,11 +196,15 @@ internal/
 ## Language Features (for test cases)
 
 - **Type inference:** `let x := 42` infers `i32`
+- **Fixed-size arrays:** `[5]i32` with compile-time bounds checking for constant indices
+- **Dynamic arrays:** `[]i32` with auto-growth (no bounds checking) - `arr[5] = x` grows array to size 6
+- **Negative indexing:** Both array types support `arr[-1]` for reverse access
 - **Optional types:** `i32?` with elvis operator `value ?: default`
 - **Error types:** `Result ! Error` with `catch` blocks
 - **Structs:** `type Point struct { .x: f64, .y: f64 };`
 - **Enums:** `type Color enum { Red, Green, Blue };`
 - **Methods:** `fn (p: Point) distance() -> f64 { ... }`
+- **Import restrictions:** Import aliases reserve their names (cannot declare symbols with same name)
 
 ## Common Pitfalls
 
@@ -209,6 +213,8 @@ internal/
 3. **Import paths ≠ file paths** (use `ImportPathToFilePath()` for resolution)
 4. **Include 3+ lines context** when modifying parser error messages (helps locate code)
 5. **WASM build uses different entry point** (`main_wasm.go` vs `main.go`)
+6. **Import aliases are reserved names** - collector phase checks prevent symbol declarations with import alias names
+7. **Array type parsing** - Fixed-size array length is extracted from AST via `extractConstantIndex()` helper
 
 ## Semantic Analysis Architecture
 
@@ -218,6 +224,8 @@ internal/
 - Validates parameter definitions (variadic rules, duplicates)
 - No type resolution yet - symbols get `TypeUnknown` initially
 - Builds import alias maps for qualified access
+- **Enforces import alias exclusivity:** Prevents declaring symbols with names that conflict with import aliases
+- **Cross-module method restriction:** Methods must be defined in the same module as their type
 
 ### Phase 3: Resolution (`resolver/`)
 - Binds identifiers to their declarations via scope lookup
@@ -226,10 +234,17 @@ internal/
 - Validates scope access rules
 
 ### Phase 4: Type Checking (`typechecker/`)
-- **Type inference** (`inference.go`): Infers types from expressions
+- **Type inference** (`inference.go`): Infers types from expressions, includes array type adoption from context
 - **Type compatibility** (`compatibility.go`): Checks assignability, conversions
 - **Type checking** (`typechecker.go`): Validates declarations, statements, expressions
+- **Array bounds checking:** Compile-time validation for fixed-size arrays with constant indices
+  - Fixed-size arrays (`[N]T`): Parse array size from type annotation, validate constant indices
+  - Supports negative indices: `-1` to `-N` map to last element to first element
+  - Dynamic arrays (`[]T`): No bounds checking - auto-grow on access/assignment instead
+  - Error code: `ErrArrayOutOfBounds` (T0009)
 - **Control flow** (`controlflow/`): CFG construction, return path analysis, unreachable code detection
+  - Only reports obvious infinite loops (no break/return statements)
+  - Conservative approach avoids false positives
 - Contextual typing for untyped literals
 - Optional type wrapping (T → T?)
 
@@ -241,14 +256,26 @@ internal/
 - `Module.CurrentScope` tracks active scope during traversal
 - `Module.EnterScope(scope)` returns defer-able restore function
 
+## Error Codes Reference
+
+All error codes are defined in `internal/diagnostics/codes.go`:
+- **T0003** (`ErrRedeclaredSymbol`): Symbol/import alias redeclaration
+- **T0009** (`ErrArrayOutOfBounds`): Array index out of bounds (compile-time)
+- **T0010+**: Other type system errors (renumbered to accommodate T0009)
+
+Always use error code constants from the `diagnostics` package, never hardcoded strings.
+
 ## Key Files to Reference
 
 - `internal/context_v2/context.go`: Architecture comments (lines 1-20), module phase system
 - `internal/pipeline/pipeline.go`: Multi-phase pipeline, concurrency patterns
-- `internal/semantics/collector/collector.go`: Symbol table construction
+- `internal/semantics/collector/collector.go`: Symbol table construction, import alias validation
 - `internal/semantics/resolver/resolver.go`: Name binding and resolution
-- `internal/semantics/typechecker/typechecker.go`: Type checking logic
+- `internal/semantics/typechecker/typechecker.go`: Type checking logic, array bounds checking
+- `internal/semantics/typechecker/inference.go`: Type inference, array type adoption
 - `internal/semantics/controlflow/cfg.go`: Control flow graph and analysis
+- `internal/diagnostics/codes.go`: Central error code definitions
 - `internal/diagnostics/emitter.go`: Error rendering with colors
 - `internal/frontend/parser/parser.go`: Recursive descent patterns
+- `internal/frontend/parser/typ.go`: Type annotation parsing (array types)
 - `test_project/`: Example `.fer` files for testing imports/features

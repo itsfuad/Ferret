@@ -50,8 +50,9 @@ f32, f64                  // Floats
 str, bool, byte           // String, boolean, byte
 
 // Arrays
-[3]i32                    // Fixed size array
-[]i32                     // Dynamic array
+[3]i32                    // Fixed-size array (compile-time bounds checking)
+[]i32                     // Dynamic array (auto-grows, no bounds checking)
+// Both support negative indexing: arr[-1] accesses last element
 
 // Optional types
 i32?                      // Nullable integer
@@ -100,6 +101,21 @@ let color := Color::Red;
 
 The `::` operator is used to access static members of types like enums and modules (symbols on other files).
 
+### Module System & Import Restrictions
+
+```ferret
+import "std/math";
+// The alias 'math' is now reserved
+// Cannot declare variables, constants, functions, or types named 'math'
+
+// This would cause a compile error:
+// let math := 42;  // Error: 'math' is already used as an import alias
+
+// Use custom aliases to avoid conflicts:
+import "std/math" as m;
+let math := 42;  // OK now, 'm' is the import alias
+```
+
 ### Functions
 
 ```ferret
@@ -134,6 +150,27 @@ If you return from the handler block, the function will return early with that v
 Also you can use shorthand syntax like,
 ```ferret
 const result := divide(10, 2) catch 0;  // Fallback value
+```
+
+### Arrays and Indexing
+
+```ferret
+// Fixed-size arrays with compile-time bounds checking
+let arr: [5]i32 = [1, 2, 3, 4, 5];
+let x := arr[2];   // OK
+let y := arr[10];  // Compile error: index out of bounds
+
+// Dynamic arrays auto-grow (no bounds checking)
+let dyn := [1, 2, 4];  // size 3
+dyn[5] = 43;           // grows to [1, 2, 4, 0, 0, 43]
+
+// Negative indexing (both fixed-size and dynamic)
+let last := arr[-1];   // Last element
+let second_last := arr[-2];  // Second to last
+
+// Dynamic arrays (runtime bounds checking)
+let dyn: []i32 = [1, 2, 3];
+let val := dyn[100];  // Runtime check, not compile-time
 ```
 
 ### Control Flow

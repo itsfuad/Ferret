@@ -122,24 +122,69 @@ Arrays are collections that store multiple values of the same type in a specific
 
 There are two kinds of arrays in Ferret:
 
-**Dynamic arrays** can grow or shrink:
+**Dynamic arrays** automatically grow when you access or assign beyond their current size:
 
 ```ferret
 let numbers: []i32 = [1, 2, 3, 4, 5];
 let names: []str = ["Alice", "Bob", "Charlie"];
 let scores := [95, 87, 92];  // Inferred as []i32
+
+// Dynamic arrays grow automatically
+let arr := [1, 2, 4];  // size 3
+arr[5] = 43;           // grows to [1, 2, 4, 0, 0, 43]
 ```
 
-Notice the `[]` before the type - this means "an array of" that type.
+Notice the `[]` before the type - this means "an array of" that type. Dynamic arrays have **no bounds checking** - they grow to accommodate any index you use.
 
-**Fixed-size arrays** have a set number of elements:
+**Fixed-size arrays** have a set number of elements that cannot change:
 
 ```ferret
 let days: [7]str = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let coordinates: [3]f64 = [1.0, 2.5, 3.7];
 ```
 
-The number in brackets `[7]` tells you exactly how many items the array holds. This can't change after you create it.
+The number in brackets `[7]` tells you exactly how many items the array holds. Fixed-size arrays have **compile-time bounds checking** for constant indices:
+
+```ferret
+let arr: [5]i32 = [1, 2, 3, 4, 5];
+let x := arr[2];   // OK - index 2 is valid
+let y := arr[10];  // Compile error: constant index 10 is out of bounds!
+
+// Runtime indices are safe - return last item if out of bounds
+let i := 10;
+let z := arr[i];   // No error - returns arr[4] (last item)
+```
+
+#### Negative Indexing
+
+Both array types support **negative indices** to access elements from the end:
+
+```ferret
+let numbers: [5]i32 = [10, 20, 30, 40, 50];
+let last := numbers[-1];        // 50 (last element)
+let second_last := numbers[-2]; // 40 (second to last)
+```
+
+Negative indices count backwards: `-1` is the last element, `-2` is second to last, and so on. For fixed-size arrays, out-of-bounds negative **constant** indices are caught at compile-time:
+
+```ferret
+let arr: [5]i32 = [1, 2, 3, 4, 5];
+let valid := arr[-5];   // OK - first element
+let invalid := arr[-6]; // Compile error: constant index -6 is out of bounds!
+
+// Runtime negative indices safely clamp to bounds
+let i := -10;
+let safe := arr[i];     // No error - returns arr[0] (first item)
+```
+
+#### Array Safety Summary
+
+| Array Type | Constant Indices | Runtime Indices | Negative Indexing |
+|------------|------------------|-----------------|-------------------|
+| Fixed-size `[N]T` | ✅ Compile error if out of bounds | Returns last/first item (safe clamp) | ✅ Same behavior |
+| Dynamic `[]T` | No checking (auto-grows) | Auto-grows to fit | ✅ No checking |
+
+This approach gives you both safety and flexibility: fixed-size arrays catch constant index errors at compile-time and safely clamp runtime indices, while dynamic arrays automatically grow to accommodate any index.
 
 ## Optional Types
 

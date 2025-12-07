@@ -34,6 +34,34 @@ import "your_project/utils/math" as m;
 let result := m::Some_function();
 ```
 
+### Import Alias Restrictions
+
+:::caution[Important]
+When you import a module, the import alias (the last part of the path, or your custom alias) becomes **reserved** in that module. You cannot declare variables, constants, functions, or types with the same name as an import alias.
+:::
+
+```ferret
+import "std/math";
+
+// ❌ Error: 'math' is already used as an import alias
+let math := 42;
+
+// ❌ Error: 'math' is already used as an import alias
+fn math() { }
+
+// ❌ Error: 'math' is already used as an import alias
+type math struct { .x: i32; }
+```
+
+This restriction prevents naming conflicts and keeps your code clear. If you need to use the name, provide a different import alias:
+
+```ferret
+import "std/math" as m;  // Use 'm' as the alias instead
+
+// ✅ Now 'math' is available for other uses
+let math := 42;
+```
+
 ## Exporting from Modules
 Exporting means, which symbols (functions, variables, types) are accessible from outside the module. The public symbols are usually written in UpperCase, while private symbols are in lowercase. We follow this convention to differentiate between public and private symbol.
 ```ferret
