@@ -36,6 +36,32 @@ func (sc *SourceCache) AddSource(filepath, content string) {
 	sc.mu.Unlock()
 }
 
+// GetLinesRange retrieves a range of lines from the cache.
+// Returns the lines and true if found in cache, or nil and false if not cached.
+// Implements source.SourceCache interface.
+func (sc *SourceCache) GetLinesRange(filepath string, startLine, endLine int) ([]string, bool) {
+	sc.mu.RLock()
+	lines, ok := sc.files[filepath]
+	sc.mu.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	// Validate range
+	if startLine < 1 || endLine < startLine || startLine > len(lines) {
+		return nil, false
+	}
+
+	// Adjust endLine if it exceeds file length
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+
+	// Return the requested range (convert to 0-indexed)
+	return lines[startLine-1 : endLine], true
+}
+
 // GetLine retrieves a specific line from a source file.
 // Uses source.GetSourceLinesRange for efficient reading when file is not cached.
 // For files with multiple errors, the entire file is cached after first access.

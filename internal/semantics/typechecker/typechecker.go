@@ -1414,8 +1414,12 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion may lose precision")
 		}
 
+		exprText := rightNode.Loc().GetText(ctx.Diagnostics.GetSourceCache())
+		if exprText == "" {
+			exprText = "expression"
+		}
 		ctx.Diagnostics.Add(
-			diag.WithHelp(fmt.Sprintf("use an explicit cast: %s as %s", rightNode.Loc().GetText(), leftType.String())),
+			diag.WithHelp(fmt.Sprintf("use an explicit cast: %s as %s", exprText, leftType.String())),
 		)
 
 	case Incompatible:
@@ -1962,7 +1966,7 @@ func validateResultTypeHandling(ctx *context_v2.CompilerContext, mod *context_v2
 		if expr.Catch == nil {
 			// No catch clause - error must be handled
 			ctx.Diagnostics.Add(
-				diagnostics.UncaughtError(mod.FilePath, expr.Loc(), returnType.String()),
+				diagnostics.UncaughtError(ctx.Diagnostics.GetSourceCache(), mod.FilePath, expr.Loc(), returnType.String()),
 			)
 		}
 	} else {

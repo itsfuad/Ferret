@@ -92,7 +92,7 @@ let z := x + y;`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.location.GetText()
+			result := tt.location.GetText(nil)
 			if result != tt.expected {
 				t.Errorf("GetText() = %q, want %q", result, tt.expected)
 			}
@@ -224,8 +224,7 @@ func TestGetSourceLinesRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lines, err := GetSourceLinesRange(testFile, tt.startLine, tt.endLine)
-
+			lines, err := GetSourceLinesRange(testFile, tt.startLine, tt.endLine, nil)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("GetSourceLinesRange() expected error, got nil")
@@ -251,7 +250,7 @@ func TestGetSourceLinesRange(t *testing.T) {
 }
 
 func TestGetSourceLinesRangeNonexistent(t *testing.T) {
-	_, err := GetSourceLinesRange("/nonexistent/file.fer", 1, 5)
+	_, err := GetSourceLinesRange("/nonexistent/file.fer", 1, 5, nil)
 	if err == nil {
 		t.Error("GetSourceLinesRange() expected error for nonexistent file, got nil")
 	}

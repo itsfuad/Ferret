@@ -6,6 +6,12 @@ import (
 	"os"
 )
 
+// SourceCache is an interface for retrieving cached source lines.
+// Implemented by diagnostics.SourceCache to support WASM mode.
+type SourceCache interface {
+	GetLinesRange(filepath string, startLine, endLine int) ([]string, bool)
+}
+
 // Location represents a span of source code with start and end positions
 type Location struct {
 	Start    *Position
@@ -43,8 +49,8 @@ func (l *Location) String() string {
 
 // GetText extracts the source code text for this location.
 // Returns empty string if the location is invalid or file cannot be read.
-// Optimized to read only the required lines from the file.
-func (l *Location) GetText() string {
+// Pass a SourceCache (from diagnostics) to support WASM mode, or nil for filesystem-only.
+func (l *Location) GetText(cache SourceCache) string {
 	if l.Filename == nil || l.Start == nil || l.End == nil {
 		return ""
 	}
@@ -60,7 +66,7 @@ func (l *Location) GetText() string {
 	}
 
 	// Read only the lines we need
-	lines, err := GetSourceLinesRange(*l.Filename, lineStart, lineEnd)
+	lines, err := GetSourceLinesRange(*l.Filename, lineStart, lineEnd, cache)
 	if err != nil {
 		return ""
 	}
@@ -137,11 +143,20 @@ func GetSourceLines(filepath string) ([]string, error) {
 // GetSourceLinesRange reads only the specified range of lines from a file.
 // This is more efficient than reading the entire file when you only need a few lines.
 // Lines are 1-indexed. Returns the lines from startLine to endLine (inclusive).
-func GetSourceLinesRange(filepath string, startLine, endLine int) ([]string, error) {
+// Pass a SourceCache to check cache first (WASM mode), or nil for filesystem-only.
+func GetSourceLinesRange(filepath string, startLine, endLine int, cache SourceCache) ([]string, error) {
 	if startLine < 1 || endLine < startLine {
 		return nil, fmt.Errorf("invalid line range: %d-%d", startLine, endLine)
 	}
 
+	// Try cache first (for WASM/in-memory mode)
+	if cache != nil {
+		if lines, ok := cache.GetLinesRange(filepath, startLine, endLine); ok {
+			return lines, nil
+		}
+	}
+
+	// Fall back to filesystem
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, err

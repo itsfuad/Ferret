@@ -38,6 +38,11 @@ func (db *DiagnosticBag) AddSourceContent(filepath, content string) {
 	db.sourceCache.AddSource(filepath, content)
 }
 
+// GetSourceCache returns the source cache for accessing source content
+func (db *DiagnosticBag) GetSourceCache() *SourceCache {
+	return db.sourceCache
+}
+
 // Add adds a diagnostic to the bag
 func (db *DiagnosticBag) Add(diag *Diagnostic) {
 	db.mu.Lock()

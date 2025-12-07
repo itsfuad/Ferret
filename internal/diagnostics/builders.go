@@ -68,11 +68,18 @@ func FieldNotFound(filepath string, loc *source.Location, fieldName, typeName st
 }
 
 // UncaughtError creates a diagnostic for calling a function that returns a Result type without handling the error
-func UncaughtError(filepath string, loc *source.Location, resultType string) *Diagnostic {
+func UncaughtError(cache *SourceCache, filepath string, loc *source.Location, resultType string) *Diagnostic {
+	var exprText string
+	if cache != nil {
+		exprText = loc.GetText(cache)
+	}
+	if exprText == "" {
+		exprText = "expression"
+	}
 	return NewError("function returns a result type but error is not handled").
 		WithCode(ErrUncaughtError).
 		WithPrimaryLabel(loc, fmt.Sprintf("function returns %s", resultType)).
-		WithHelp("add a 'catch' clause to handle the potential error")
+		WithHelp(fmt.Sprintf("add a '%s catch err { ... }' clause to handle the potential error", exprText))
 }
 
 // InvalidCatch creates a diagnostic for using catch on a non-Result function

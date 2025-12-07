@@ -49,7 +49,7 @@ func BenchmarkGetSourceLinesRange(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Read only line 500
-		_, _ = GetSourceLinesRange(testFile, 500, 500)
+		_, _ = GetSourceLinesRange(testFile, 500, 500, nil)
 	}
 }
 
@@ -78,7 +78,7 @@ func BenchmarkGetTextSingleLine(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = loc.GetText()
+		_ = loc.GetText(nil)
 	}
 }
 
@@ -107,6 +107,6 @@ func BenchmarkGetTextMultiLine(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = loc.GetText()
+		_ = loc.GetText(nil)
 	}
 }
