@@ -123,9 +123,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Resolve untyped literals
 					if types.IsUntyped(returnedType) {
 						if lit, ok := n.Result.(*ast.BasicLit); ok {
-							returnedType = resolveUntyped(lit, resultType.Err)
+							returnedType = resolveLiteral(lit, resultType.Err)
 						} else {
-							returnedType = resolveUntypedType(returnedType, resultType.Err)
+							returnedType = resolveType(returnedType, resultType.Err)
 						}
 					}
 
@@ -149,9 +149,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Resolve untyped literals
 					if types.IsUntyped(returnedType) {
 						if lit, ok := n.Result.(*ast.BasicLit); ok {
-							returnedType = resolveUntyped(lit, resultType.Ok)
+							returnedType = resolveLiteral(lit, resultType.Ok)
 						} else {
-							returnedType = resolveUntypedType(returnedType, resultType.Ok)
+							returnedType = resolveType(returnedType, resultType.Ok)
 						}
 					}
 
@@ -395,7 +395,9 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 			// If the RHS is UNTYPED, finalize it to a default type
 			if types.IsUntyped(rhsType) {
-				rhsType = finalizeUntyped(item.Value)
+				if lit, ok := item.Value.(*ast.BasicLit); ok {
+					rhsType = resolveLiteral(lit, types.TypeUnknown)
+				}
 			}
 
 			sym.Type = rhsType
@@ -516,7 +518,6 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 			return
 		}
 
-		
 		if lhsNumericOrUntyped && rhsNumericOrUntyped {
 			return
 		}
@@ -769,8 +770,8 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 			continue
 		}
 
-		// Check key type compatibility
-		keyType := inferExprType(ctx, mod, kv.Key)
+		// Check key type compatibility - with contextualization
+		keyType := checkExpr(ctx, mod, kv.Key, mapType.Key)
 		keyCompat := checkTypeCompatibility(keyType, mapType.Key)
 		if keyCompat == Incompatible {
 			ctx.Diagnostics.Add(
@@ -780,8 +781,8 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 			)
 		}
 
-		// Check value type compatibility
-		valueType := inferExprType(ctx, mod, kv.Value)
+		// Check value type compatibility - with contextualization
+		valueType := checkExpr(ctx, mod, kv.Value, mapType.Value)
 		valueCompat := checkTypeCompatibility(valueType, mapType.Value)
 		if valueCompat == Incompatible {
 			ctx.Diagnostics.Add(
@@ -1385,7 +1386,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			if untypedCompatibility == Incompatible {
 				resultType = inferredType
 			} else {
-				resultType = resolveUntyped(lit, expectedForLit)
+				resultType = resolveLiteral(lit, expectedForLit)
 			}
 		}
 	}
@@ -1509,7 +1510,7 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 	if types.IsUntyped(typ) {
 		if basicLit, ok := expr.(*ast.BasicLit); ok {
 			// Resolve to see what type it needs
-			resolvedType := resolveUntyped(basicLit, types.TypeUnknown)
+			resolvedType := resolveLiteral(basicLit, types.TypeUnknown)
 			if types.IsUntypedInt(typ) {
 				return fmt.Sprintf("integer literal (needs %s)", resolvedType.String())
 			} else if types.IsUntypedFloat(typ) {
@@ -1531,7 +1532,7 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 func formatTypeDescription(typ types.SemType) string {
 	if types.IsUntyped(typ) {
 		// Show default type instead of "untyped"
-		resolvedType := resolveUntypedType(typ, types.TypeUnknown)
+		resolvedType := resolveType(typ, types.TypeUnknown)
 		return resolvedType.String()
 	}
 	return typ.String()

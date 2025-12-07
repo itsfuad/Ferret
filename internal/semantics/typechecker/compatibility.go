@@ -98,7 +98,7 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 				if isLosslessNumericConversion(source, target) {
 					return Assignable
 				}
-				
+
 				return LossyConvertible
 			}
 
@@ -106,7 +106,7 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 				return LossyConvertible
 			}
 		}
-		
+
 		if isLosslessNumericConversion(source, target) {
 			return Assignable
 		}
@@ -410,12 +410,13 @@ func getMinimumFloatTypeForDigits(digits int) types.TYPE_NAME {
 	return types.TYPE_UNKNOWN
 }
 
-// resolveUntyped resolves an untyped literal to a concrete type.
+// resolveLiteral resolves an untyped literal to a concrete type.
 // Strategy: Use expected type if it fits, otherwise use minimum required type.
 // This is the SINGLE source of truth for all untyped literal resolution.
-func resolveUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
+func resolveLiteral(lit *ast.BasicLit, expected types.SemType) types.SemType {
 	switch lit.Kind {
 	case ast.INT:
+		// 1. Try expected type first (if it's an integer type and value fits)
 		if types.IsInteger(expected) && !expected.Equals(types.TypeUnknown) {
 			if _, ok := types.GetPrimitiveName(expected); ok {
 				if fitsInType(lit.Value, expected) {
@@ -423,11 +424,32 @@ func resolveUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
 				}
 			}
 		}
-		minTypeName := getMinimumTypeForValue(lit.Value)
-		return types.FromTypeName(minTypeName)
+
+		// 2. Use DEFAULT_INT_TYPE (i32) as baseline
+		defaultType := types.FromTypeName(types.DEFAULT_INT_TYPE)
+		if fitsInType(lit.Value, defaultType) {
+			return defaultType
+		}
+
+		// 3. Gradually promote: i32 -> i64 -> i128 -> i256
+		promotionSequence := []types.TYPE_NAME{
+			types.TYPE_I64,
+			types.TYPE_I128,
+			types.TYPE_I256,
+		}
+
+		for _, typeName := range promotionSequence {
+			promotedType := types.FromTypeName(typeName)
+			if fitsInType(lit.Value, promotedType) {
+				return promotedType
+			}
+		}
+
+		// 4. Doesn't fit even in maximum - return i256 (error will be reported elsewhere)
+		return types.FromTypeName(types.TYPE_I256)
 
 	case ast.FLOAT:
-		// Try expected type first
+		// 1. Try expected type first
 		if types.IsFloat(expected) && !expected.Equals(types.TypeUnknown) {
 			if _, ok := types.GetPrimitiveName(expected); ok {
 				if fitsInType(lit.Value, expected) {
@@ -436,10 +458,27 @@ func resolveUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
 			}
 		}
 
-		// Use minimum required type based on precision
-		digits := countSignificantDigits(lit.Value)
-		minTypeName := getMinimumFloatTypeForDigits(digits)
-		return types.FromTypeName(minTypeName)
+		// 2. Use DEFAULT_FLOAT_TYPE (f64) as baseline
+		defaultType := types.FromTypeName(types.DEFAULT_FLOAT_TYPE)
+		if fitsInType(lit.Value, defaultType) {
+			return defaultType
+		}
+
+		// 3. Gradually promote: f64 -> f128 -> f256
+		promotionSequence := []types.TYPE_NAME{
+			types.TYPE_F128,
+			types.TYPE_F256,
+		}
+
+		for _, typeName := range promotionSequence {
+			promotedType := types.FromTypeName(typeName)
+			if fitsInType(lit.Value, promotedType) {
+				return promotedType
+			}
+		}
+
+		// 4. Doesn't fit even in maximum - return f256 (error will be reported elsewhere)
+		return types.FromTypeName(types.TYPE_F256)
 
 	default:
 		return types.TypeUnknown

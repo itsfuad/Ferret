@@ -449,6 +449,30 @@ func inferCompositeLitType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 			}
 		}
 
+		// Array literal: [1, 2, 3] - elements without keys
+		if !allKeyValue {
+			if len(lit.Elts) == 0 {
+				// Empty array literal - type unknown without context
+				return types.TypeUnknown
+			}
+
+			// Infer type from first element
+			firstElemType := inferExprType(ctx, mod, lit.Elts[0])
+
+			// If first element is untyped, finalize it to default type (i32/f64)
+			if types.IsUntyped(firstElemType) {
+				firstElemType = resolveType(firstElemType, types.TypeUnknown)
+			}
+
+			// All subsequent elements must match the first element's type
+			// This is already enforced by type checking, so we just use first element's type
+
+			if !firstElemType.Equals(types.TypeUnknown) {
+				// Create dynamic array type: []T
+				return types.NewArray(firstElemType, -1)
+			}
+		}
+
 		if allKeyValue {
 			// Determine if this is a struct or map literal
 			// Struct: all keys are identifiers (field names)
@@ -547,17 +571,9 @@ func widerType(a, b types.SemType) types.SemType {
 	return b
 }
 
-// finalizeUntyped converts an UNTYPED literal to a concrete default type
-func finalizeUntyped(expr ast.Expression) types.SemType {
-	if lit, ok := expr.(*ast.BasicLit); ok {
-		return resolveUntyped(lit, types.TypeUnknown)
-	}
-	return types.TypeUnknown
-}
-
-// resolveUntypedType resolves an untyped type to a concrete type.
+// resolveType resolves an untyped type to a concrete type.
 // For expressions without literals (e.g., binary expr results), uses contextual or default types.
-func resolveUntypedType(untypedType types.SemType, expected types.SemType) types.SemType {
+func resolveType(untypedType types.SemType, expected types.SemType) types.SemType {
 	if !types.IsUntyped(untypedType) {
 		return untypedType
 	}
@@ -641,7 +657,7 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 
 		// Check if start literal needs a larger type
 		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
-			startResolved := resolveUntyped(startLit, types.TypeUnknown)
+			startResolved := resolveLiteral(startLit, types.TypeUnknown)
 			if name, ok := types.GetPrimitiveName(startResolved); ok {
 				bitSize := types.GetNumberBitSize(name)
 				if bitSize > maxBitSize {
@@ -653,7 +669,7 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 
 		// Check if end literal needs a larger type
 		if endLit, ok := expr.End.(*ast.BasicLit); ok && endLit.Kind == ast.INT {
-			endResolved := resolveUntyped(endLit, types.TypeUnknown)
+			endResolved := resolveLiteral(endLit, types.TypeUnknown)
 			if name, ok := types.GetPrimitiveName(endResolved); ok {
 				bitSize := types.GetNumberBitSize(name)
 				if bitSize > maxBitSize {
@@ -669,7 +685,7 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	// If start is untyped, use centralized resolution
 	if types.IsUntypedInt(startType) {
 		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
-			startType = resolveUntyped(startLit, types.TypeUnknown)
+			startType = resolveLiteral(startLit, types.TypeUnknown)
 		} else {
 			startType = types.NewPrimitive(types.DEFAULT_INT_TYPE)
 		}
