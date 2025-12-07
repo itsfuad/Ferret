@@ -43,8 +43,9 @@ const (
 
 	THREE_DOT_TOKEN TOKEN = "..."
 
-	//array range operator
-	RANGE_TOKEN TOKEN = ".."
+	//array range operators
+	RANGE_TOKEN           TOKEN = ".."  // exclusive end (0..10 -> [0,1,2,...,9])
+	RANGE_INCLUSIVE_TOKEN TOKEN = "..=" // inclusive end (0..=10 -> [0,1,2,...,10])
 	//increment and decrement
 	PLUS_PLUS_TOKEN   TOKEN = "++"
 	MINUS_MINUS_TOKEN TOKEN = "--"

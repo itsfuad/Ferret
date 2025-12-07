@@ -238,30 +238,45 @@ let charlie_score := scores["Charlie"] ?: 0;  // 0 (key not found)
 
 Learn more about [Optional Types](/optionals) and [Maps](/type-system/maps).
 
-### Range Operator (`..`)
+### Range Operators (`..` and `..=`)
 
-The range operator creates sequences of numbers:
+Range operators create sequences of numbers. Ferret provides two variants:
+
+- `..` - **Exclusive end**: doesn't include the end value
+- `..=` - **Inclusive end**: includes the end value
 
 ```ferret
-let numbers := 1..5;     // Generates array [1, 2, 3, 4, 5]
-let countdown := 10..1;  // Generates [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+let exclusive := 0..5;   // [0, 1, 2, 3, 4] - stops before 5
+let inclusive := 0..=5;  // [0, 1, 2, 3, 4, 5] - includes 5
 ```
 
-You can also specify a step/increment value:
+This distinction is important when iterating:
 
 ```ferret
-let evens := 0..10:2;    // [0, 2, 4, 6, 8, 10] - step by 2
-let odds := 1..10:2;     // [1, 3, 5, 7, 9] - start at 1, step by 2
-```
+// Exclusive: iterates 0 to 4 (5 iterations)
+for i in 0..5 {
+    print(i);  // Prints: 0, 1, 2, 3, 4
+}
 
-Ranges are particularly useful in loops:
-
-```ferret
-// Print numbers 1 through 10
-for i in 1..10 {
-    print(i);
+// Inclusive: iterates 0 to 5 (6 iterations)
+for i in 0..=5 {
+    print(i);  // Prints: 0, 1, 2, 3, 4, 5
 }
 ```
+
+You can also specify a step/increment value with both operators:
+
+```ferret
+let evens := 0..10:2;     // [0, 2, 4, 6, 8] - exclusive, step by 2
+let evens_inc := 0..=10:2; // [0, 2, 4, 6, 8, 10] - inclusive, step by 2
+let odds := 1..10:2;      // [1, 3, 5, 7, 9] - exclusive
+let odds_inc := 1..=10:2; // [1, 3, 5, 7, 9] - inclusive (10 not divisible by step)
+```
+
+**When to use which?**
+
+- Use `..` when you want to exclude the end (like array indices: `0..arr.length`)
+- Use `..=` when you want to include the end (like counting days: `1..=7` for a week)
 
 ## Member Access Operators
 

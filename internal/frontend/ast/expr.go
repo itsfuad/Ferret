@@ -100,12 +100,14 @@ func (s *SelectorExpr) INode()                {} // Implements Node interface
 func (s *SelectorExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (s *SelectorExpr) Loc() *source.Location { return &s.Location }
 
-// RangeExpr represents a range expression: start..end or start..end:incr
+// RangeExpr represents a range expression: start..end or start..=end or start..end:incr
 // Generates an array from start to end with optional increment
+// Inclusive controls whether end is included: .. (false) or ..= (true)
 type RangeExpr struct {
-	Start Expression // start value (e.g., 0)
-	End   Expression // end value (e.g., 10)
-	Incr  Expression // increment (optional, default 1)
+	Start     Expression // start value (e.g., 0)
+	End       Expression // end value (e.g., 10)
+	Incr      Expression // increment (optional, default 1)
+	Inclusive bool       // true for ..=, false for ..
 	source.Location
 }
 

@@ -363,13 +363,14 @@ func (p *Parser) parseComparison() ast.Expression {
 	return left
 }
 
-// parseRange parses range expressions: start..end or start..end:incr
-// This allows ranges to be used as standalone expressions: let arr := 0..10
+// parseRange parses range expressions: start..end, start..=end, or start..end:incr
+// This allows ranges to be used as standalone expressions: let arr := 0..10 or 0..=10
 func (p *Parser) parseRange() ast.Expression {
 	left := p.parseAdditive()
 
-	// Check for range operator '..'
-	if p.match(tokens.RANGE_TOKEN) {
+	// Check for range operators '..' or '..='
+	if p.match(tokens.RANGE_TOKEN, tokens.RANGE_INCLUSIVE_TOKEN) {
+		inclusive := p.match(tokens.RANGE_INCLUSIVE_TOKEN)
 		p.advance()
 		end := p.parseAdditive()
 
@@ -386,10 +387,11 @@ func (p *Parser) parseRange() ast.Expression {
 		}
 
 		return &ast.RangeExpr{
-			Start:    left,
-			End:      end,
-			Incr:     incr,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, endPos),
+			Start:     left,
+			End:       end,
+			Incr:      incr,
+			Inclusive: inclusive,
+			Location:  *source.NewLocation(&p.filepath, left.Loc().Start, endPos),
 		}
 	}
 
