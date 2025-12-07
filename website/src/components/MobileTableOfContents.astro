@@ -1,0 +1,73 @@
+---
+import MobileTableOfContents from '@astrojs/starlight/components/MobileTableOfContents.astro';
+---
+
+<div class="mobile-toc-wrapper">
+    <MobileTableOfContents {...Astro.props} />
+    
+    <!-- Burger menu button right after TOC -->
+    <button class="mobile-sidebar-toggle" id="mobile-sidebar-toggle" aria-label="Toggle sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </button>
+</div>
+
+<style>
+    .mobile-toc-wrapper {
+        display: contents;
+    }
+
+    .mobile-sidebar-toggle {
+        display: none;
+        position: fixed;
+        top: calc(var(--sl-nav-height) + var(--sl-mobile-toc-height) - 5px);
+        transform: translateY(-100%);
+        right: 3px;
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0.5rem;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--foreground);
+        cursor: pointer;
+        border-radius: 0.5rem;
+        box-shadow: none;
+        transition: all 0.15s ease;
+    } 
+
+    .mobile-sidebar-toggle:hover {
+        background: transparent;
+        color: var(--primary);
+    }
+
+    .mobile-sidebar-toggle svg {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    /* Show button only on mobile */
+    @media (max-width: 50rem) {
+        .mobile-sidebar-toggle {
+            display: flex;
+        }
+    }
+</style>
+
+<script>
+    // Mobile sidebar toggle handler
+    const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+    mobileSidebarToggle?.addEventListener('click', () => {
+        // Toggle Starlight's sidebar
+        const menuButton = document.querySelector('starlight-menu-button');
+        if (menuButton) {
+            const button = menuButton.querySelector('button');
+            button?.click();
+        }
+    });
+</script>

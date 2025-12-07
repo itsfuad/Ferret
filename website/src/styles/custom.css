@@ -111,6 +111,13 @@ mobile-starlight-toc {
   margin-bottom: 4rem !important;
 }
 
+/* Hide navbar burger menu on mobile - we show it below TOC instead */
+@media (max-width: 50rem) {
+  .navbar .mobile-menu-toggle {
+    display: none !important;
+  }
+}
+
 pre:has(code) {
   border-radius: 10px;
 }
@@ -135,6 +142,14 @@ pre:has(code) {
 .sidebar {
   background-image: var(--pattern-dots);
   background-size: 20px 20px;
+}
+
+.sidebar-pane {
+  top: calc(var(--sl-nav-height) + var(--sl-mobile-toc-height));
+}
+
+#starlight__on-this-page--mobile{
+  padding: 0.5rem !important;
 }
 
 /* Mobile sidebar - hide theme toggle and social links (already in navbar) */

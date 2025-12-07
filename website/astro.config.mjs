@@ -48,6 +48,8 @@ export default defineConfig({
             SiteTitle: './src/components/SiteTitle.astro',
             // Use custom navbar for all pages
             Header: './src/components/Header.astro',
+            // Custom mobile TOC with integrated burger menu
+            MobileTableOfContents: './src/components/MobileTableOfContents.astro',
         },
 
         sidebar: [
