@@ -3,6 +3,7 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/lexer"
+	"compiler/internal/utils/strings"
 	"testing"
 )
 
@@ -147,7 +148,7 @@ func TestParserEdgeCases(t *testing.T) {
 			if tt.errorContains != "" && hasError {
 				found := false
 				for _, d := range diag.Diagnostics() {
-					if d.Severity == diagnostics.Error && containsString(d.Message, tt.errorContains) {
+					if d.Severity == diagnostics.Error && strings.Contains(d.Message, tt.errorContains) {
 						found = true
 						break
 					}
@@ -238,18 +239,4 @@ func TestParserValidPrograms(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function to check if a string contains a substring
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

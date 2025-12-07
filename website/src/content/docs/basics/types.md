@@ -141,6 +141,33 @@ let coordinates: [3]f64 = [1.0, 2.5, 3.7];
 
 The number in brackets `[7]` tells you exactly how many items the array holds. This can't change after you create it.
 
+## Optional Types
+
+Sometimes you need to represent "I might have a value, or I might not." That's what optional types do.
+
+You make any type optional by adding a question mark `?` after it. An optional type can hold either a real value or `none` (which means "no value").
+
+```ferret
+let maybe_number: i32? = 42;      // Has a value
+let no_value: str? = none;         // No value
+let age: i32? = none;              // Starts with no value
+```
+
+Optional types help prevent bugs. Instead of crashing when something is missing, Ferret forces you to check if a value exists before using it.
+
+```ferret
+let username: str? = get_username();
+
+if username != none {
+    // Safe to use username here
+    print("Hello, " + username);
+} else {
+    print("No username provided");
+}
+```
+
+This is much safer than many other languages where missing values can cause crashes!
+
 ### Maps
 
 Maps are collections that store key-value pairs. Think of them like a dictionary where you look up values using keys instead of positions.
@@ -190,33 +217,6 @@ let bob_score := scores["bob"] ?: 0;        // 0 (key doesn't exist)
 This pattern is so common you'll use it all the time when working with maps!
 
 **Learn more:** Maps are covered in detail in the [Type System section](/type-system/maps).
-
-## Optional Types
-
-Sometimes you need to represent "I might have a value, or I might not." That's what optional types do.
-
-You make any type optional by adding a question mark `?` after it. An optional type can hold either a real value or `none` (which means "no value").
-
-```ferret
-let maybe_number: i32? = 42;      // Has a value
-let no_value: str? = none;         // No value
-let age: i32? = none;              // Starts with no value
-```
-
-Optional types help prevent bugs. Instead of crashing when something is missing, Ferret forces you to check if a value exists before using it.
-
-```ferret
-let username: str? = get_username();
-
-if username != none {
-    // Safe to use username here
-    print("Hello, " + username);
-} else {
-    print("No username provided");
-}
-```
-
-This is much safer than many other languages where missing values can cause crashes!
 
 ## Reference Types
 

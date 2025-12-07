@@ -127,8 +127,8 @@ import "std/io" as m;  // duplicate alias 'm'
 	}
 
 	// Verify the error has the correct code
-	if diag.Code != "C-DUP-ALIAS" {
-		t.Errorf("Expected error code 'C-DUP-ALIAS', got: %s", diag.Code)
+	if diag.Code != diagnostics.ErrRedeclaredSymbol {
+		t.Errorf("Expected error code %s, got: %s", diagnostics.ErrRedeclaredSymbol, diag.Code)
 	}
 }
 

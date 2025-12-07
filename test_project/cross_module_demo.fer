@@ -1,0 +1,19 @@
+// This file demonstrates the cross-module method restriction
+// Methods must be defined in the same module as their type
+
+type LocalType struct {
+	.value: i32
+};
+
+// ✅ Valid: Method on local type
+fn (l: LocalType) getValue() -> i32 {
+	return l.value;
+}
+
+// Note: The following cross-module method definition would be rejected:
+// import "other_module";
+// ❌ Invalid: Cannot define method on type from another module
+// fn (o: other_module::OtherType) someMethod() {}
+//
+// Error: "cannot define methods on types from other modules"
+// Help: "methods must be defined in the same module as the type"

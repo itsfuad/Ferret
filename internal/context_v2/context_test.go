@@ -2,6 +2,7 @@ package context_v2
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"compiler/internal/frontend/ast"
@@ -177,7 +178,7 @@ func TestCycleDetection(t *testing.T) {
 		t.Error("Expected error for circular dependency")
 	}
 
-	if err != nil && !contains(err.Error(), "circular import") {
+	if err != nil && !strings.Contains(err.Error(), "circular import") {
 		t.Errorf("Expected 'circular import' in error message, got: %v", err)
 	}
 }
@@ -500,7 +501,7 @@ func TestComputeTopologicalOrder_CycleIgnored(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when adding cycle b -> a")
 	}
-	if err != nil && !contains(err.Error(), "circular import") {
+	if err != nil && !strings.Contains(err.Error(), "circular import") {
 		t.Errorf("Expected 'circular import' error, got: %v", err)
 	}
 
@@ -525,11 +526,4 @@ func TestComputeTopologicalOrder_CycleIgnored(t *testing.T) {
 	if index("b") >= index("a") {
 		t.Errorf("Expected 'b' before 'a' in topological order, got %v", order)
 	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			len(s) > len(substr)+1 && s[1:len(substr)+1] == substr))
 }

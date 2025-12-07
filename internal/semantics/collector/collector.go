@@ -334,7 +334,18 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	if isValidReceiver {
 		// Check if it's a cross-module type
 		if moduleAlias != "" {
-			// Look up the import
+			// DISALLOW cross-module method definitions
+			// Report error but continue processing the method body for better diagnostics
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("cannot define methods on types from other modules").
+					WithCode(diagnostics.ErrInvalidMethodReceiver).
+					WithPrimaryLabel(decl.Receiver.Loc(), fmt.Sprintf("type '%s::%s' is from another module", moduleAlias, typeName)).
+					WithHelp("methods must be defined in the same module as the type").
+					WithNote("this restriction ensures type safety and prevents cross-module coupling"),
+			)
+			isValidReceiver = false
+
+			// Still validate the import exists for better error messages
 			importPath, ok := mod.ImportAliasMap[moduleAlias]
 			if !ok {
 				ctx.Diagnostics.Add(
@@ -343,9 +354,8 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 						WithPrimaryLabel(decl.Receiver.Loc(), fmt.Sprintf("cannot use type from non-imported module '%s'", moduleAlias)).
 						WithHelp(fmt.Sprintf("add: import \"%s\"", moduleAlias)),
 				)
-				isValidReceiver = false
 			} else {
-				// Get the imported module
+				// Get the imported module (for potential additional validation)
 				importedMod, exists := ctx.GetModule(importPath)
 				if !exists {
 					ctx.Diagnostics.Add(
@@ -353,7 +363,6 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 							WithCode(diagnostics.ErrInvalidMethodReceiver).
 							WithPrimaryLabel(decl.Receiver.Loc(), "module not loaded"),
 					)
-					isValidReceiver = false
 				} else {
 					// Look up type in the imported module's scope
 					typeSym, found = importedMod.ModuleScope.GetSymbol(typeName)
@@ -363,7 +372,6 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 								WithCode(diagnostics.ErrInvalidMethodReceiver).
 								WithPrimaryLabel(decl.Receiver.Loc(), fmt.Sprintf("'%s' not found", typeName)),
 						)
-						isValidReceiver = false
 					}
 				}
 			}

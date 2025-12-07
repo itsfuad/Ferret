@@ -30,3 +30,9 @@ func Pluralize(singular, plural string, count int) string {
 	}
 	return plural
 }
+
+// Contains checks if a string contains a substring.
+// This is a more efficient implementation than manual searching.
+func Contains(s, substr string) bool {
+	return strings.Contains(s, substr)
+}

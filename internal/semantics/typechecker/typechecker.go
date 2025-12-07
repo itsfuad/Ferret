@@ -1074,6 +1074,9 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Check both array and index expressions
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
+		
+		// Perform bounds checking for fixed-size arrays with constant indices
+		checkArrayBounds(ctx, mod, e)
 
 	case *ast.ParenExpr:
 		// Check inner expression
@@ -1089,10 +1092,14 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.CompositeLit:
 		// Determine expected struct type for field contextualization
 		var expectedStructType *types.StructType
+		var expectedArrayType *types.ArrayType
 		if !expected.Equals(types.TypeUnknown) {
-			// Unwrap NamedType to get underlying struct
+			// Unwrap NamedType to get underlying struct or array
 			unwrapped := types.UnwrapType(expected)
 			expectedStructType, _ = unwrapped.(*types.StructType)
+			if expectedStructType == nil {
+				expectedArrayType, _ = unwrapped.(*types.ArrayType)
+			}
 		}
 
 		// Check all element expressions in the composite literal
@@ -1116,8 +1123,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 					checkExpr(ctx, mod, kv.Value, fieldExpected)
 				}
 			} else {
-				// Array element: check the expression directly
-				checkExpr(ctx, mod, elem, types.TypeUnknown)
+				// Array element: check with element type if known
+				elemExpected := types.TypeUnknown
+				if expectedArrayType != nil {
+					elemExpected = expectedArrayType.Element
+				}
+				checkExpr(ctx, mod, elem, elemExpected)
 			}
 		}
 		// Validate composite literal matches target type if specified
@@ -1150,7 +1161,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	// adopt the expected type (for better compatibility with named types)
 	if compLit, ok := expr.(*ast.CompositeLit); ok && compLit.Type == nil {
 		if !expected.Equals(types.TypeUnknown) {
-			// Unwrap expected to get underlying struct
+			// Unwrap expected to get underlying struct or array
 			expectedUnwrapped := types.UnwrapType(expected)
 			if expectedStruct, ok := expectedUnwrapped.(*types.StructType); ok {
 				// Check if inferred struct is compatible with expected
@@ -1160,6 +1171,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 						resultType = expected
 					}
 				}
+			} else if _, ok := expectedUnwrapped.(*types.ArrayType); ok {
+				// For array literals without explicit type, adopt the expected array type
+				// This allows [1, 2, 3] to adopt type [3]i32 when that's expected
+				resultType = expected
+				// Validate the composite literal against the expected array type
+				checkCompositeLit(ctx, mod, compLit, expected)
 			}
 		}
 	}
@@ -1415,7 +1432,10 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		elementType := typeFromTypeNodeWithContext(ctx, mod, t.ElType)
 		length := -1
 		if t.Len != nil {
-			// TODO: keep all array dynamic now
+			// Extract constant length from array size expression
+			if constLength, ok := extractConstantIndex(t.Len); ok && constLength >= 0 {
+				length = constLength
+			}
 		}
 		return types.NewArray(elementType, length)
 
@@ -1851,4 +1871,72 @@ func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 		// Fallback for unexpected node types
 		checkNode(ctx, mod, elseNode)
 	}
+}
+
+// checkArrayBounds validates array indexing for compile-time bounds checking
+// For fixed-size arrays with constant indices, reports errors for out-of-bounds access
+// For dynamic arrays or runtime indices, skips validation (runtime check)
+func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, indexExpr *ast.IndexExpr) {
+	// Get the type of the array being indexed
+	arrayType := inferExprType(ctx, mod, indexExpr.X)
+	arrayType = types.UnwrapType(arrayType)
+	
+	// Only check fixed-size arrays
+	arrType, ok := arrayType.(*types.ArrayType)
+	if !ok || arrType.Length < 0 {
+		// Not an array, or dynamic array - skip bounds checking
+		// Dynamic arrays grow automatically, negative indices access from end
+		return
+	}
+	
+	// Try to extract compile-time constant index
+	indexValue, isConstant := extractConstantIndex(indexExpr.Index)
+	if !isConstant {
+		// Runtime value - cannot check at compile time
+		return
+	}
+	
+	// Handle negative indices (access from end)
+	if indexValue < 0 {
+		indexValue = arrType.Length + indexValue
+	}
+	
+	// Check bounds
+	if indexValue < 0 || indexValue >= arrType.Length {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", indexValue, arrType.Length)).
+				WithCode(diagnostics.ErrArrayOutOfBounds).
+				WithPrimaryLabel(indexExpr.Index.Loc(), "index out of range").
+				WithNote(fmt.Sprintf("valid indices are 0 to %d, or -%d to -1 for reverse access", arrType.Length-1, arrType.Length)).
+				WithHelp("check the array length before accessing"),
+		)
+	}
+}
+
+// extractConstantIndex attempts to extract a compile-time constant integer from an expression
+// Returns the integer value and whether it's a constant
+func extractConstantIndex(expr ast.Expression) (int, bool) {
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		// Direct integer literal
+		if e.Kind == ast.INT {
+			// Parse the integer value
+			var val int64
+			fmt.Sscanf(e.Value, "%d", &val)
+			return int(val), true
+		}
+	
+	case *ast.UnaryExpr:
+		// Handle negative literals: -5
+		if e.Op.Kind == tokens.MINUS_TOKEN {
+			if val, ok := extractConstantIndex(e.X); ok {
+				return -val, true
+			}
+		}
+	
+	// Could extend to handle constant folding of expressions like 2+3
+	// For now, only handle direct literals
+	}
+	
+	return 0, false
 }
