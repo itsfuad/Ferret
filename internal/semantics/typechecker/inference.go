@@ -103,7 +103,18 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	lhsType := inferExprType(ctx, mod, expr.X)
 	rhsType := inferExprType(ctx, mod, expr.Y)
 
-	// Handle UNTYPED operands
+	switch expr.Op.Kind {
+	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN,
+		tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN,
+		tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+		// Comparison: result is always bool
+		return types.TypeBool
+
+	case tokens.AND_TOKEN, tokens.OR_TOKEN:
+		// Logical: result is always bool
+		return types.TypeBool
+	}
+
 	lhsUntyped := types.IsUntyped(lhsType)
 	rhsUntyped := types.IsUntyped(rhsType)
 
@@ -121,21 +132,19 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		return lhsType
 	}
 
-	// Determine result type based on operator
+	// Arithmetic operators - result depends on operand types
 	switch expr.Op.Kind {
-	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
-		// Arithmetic: result is the wider of the two types
+	case tokens.PLUS_TOKEN:
+		// PLUS can be numeric addition or string concatenation
+		if lhsType.Equals(types.TypeString) && rhsType.Equals(types.TypeString) {
+			return types.TypeString
+		}
+		// Otherwise numeric addition: result is the wider of the two types
 		return widerType(lhsType, rhsType)
 
-	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN,
-		tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN,
-		tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
-		// Comparison: result is always bool
-		return types.TypeBool
-
-	case tokens.AND_TOKEN, tokens.OR_TOKEN:
-		// Logical: result is always bool
-		return types.TypeBool
+	case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
+		// Arithmetic: result is the wider of the two types
+		return widerType(lhsType, rhsType)
 
 	default:
 		return types.TypeUnknown

@@ -24,22 +24,27 @@ No more null pointer exceptions! Optional types (`T?`) and the elvis operator (`
 
 ```ferret
 // Variables with type inference
-let name: str = "Ferret";
-let version: i32 = 1;
-
-// Optional types
-let maybeValue: i32? = 42;
-
-if maybeValue != none {
-    // Type narrowing - maybeValue is i32 here
-    let doubled: i32 = maybeValue * 2;
-}
-
-// Elvis operator for default values
-let value: i32 = maybeValue ?: 0;
-
 // Functions
 fn greet(name: str) -> str {
     return "Hello, " + name + "!";
 }
+
+fn main() {
+    let name: str = "Ferret";
+    let version: i32 = 1;
+
+    // Optional types
+    let maybeValue: i32? = 42;
+
+    if maybeValue != none {
+        // Type narrowing - maybeValue is i32 here
+        let doubled: i32 = maybeValue * 2;
+    }
+
+    // Elvis operator for default values
+    let value: i32 = maybeValue ?: 0;
+
+    greet(name);
+}
+
 ```

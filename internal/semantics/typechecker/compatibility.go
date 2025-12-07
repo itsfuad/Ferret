@@ -20,9 +20,6 @@ const (
 	// Assignable means source can be assigned to target (may involve implicit conversion)
 	Assignable
 
-	// LosslessConvertible means conversion is safe and doesn't lose information
-	LosslessConvertible
-
 	// LossyConvertible means conversion may lose information (requires explicit cast)
 	LossyConvertible
 )
@@ -35,8 +32,6 @@ func (tc TypeCompatibility) String() string {
 		return "identical"
 	case Assignable:
 		return "assignable"
-	case LosslessConvertible:
-		return "lossless convertible"
 	case LossyConvertible:
 		return "lossy convertible"
 	default:
@@ -74,12 +69,12 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Identical
 	}
 
-	// UNTYPED literals can be assigned to any compatible concrete type
+	// UNTYPED literals can be assigned to compatible concrete types with restrictions
 	if types.IsUntyped(source) {
 		// Unwrap target if it's a NamedType to check the underlying type
 		targetUnwrapped := types.UnwrapType(target)
 
-		if types.IsUntypedInt(source) && types.IsNumeric(targetUnwrapped) {
+		if types.IsUntypedInt(source) && types.IsInteger(targetUnwrapped) {
 			return Assignable
 		}
 		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
@@ -98,9 +93,22 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
 				return LossyConvertible
 			}
+			if types.IsIntegerTypeName(srcName) && types.IsFloatTypeName(tgtName) {
+
+				if isLosslessNumericConversion(source, target) {
+					return Assignable
+				}
+				
+				return LossyConvertible
+			}
+
+			if types.IsFloatTypeName(srcName) && types.IsIntegerTypeName(tgtName) {
+				return LossyConvertible
+			}
 		}
+		
 		if isLosslessNumericConversion(source, target) {
-			return LosslessConvertible
+			return Assignable
 		}
 		return LossyConvertible
 	}
@@ -191,7 +199,7 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 		// Same size but different types (e.g., byte vs u8)
 		return msg
 
-	case Identical, Assignable, LosslessConvertible:
+	case Identical, Assignable:
 		// These are not errors
 		return ""
 
@@ -408,16 +416,13 @@ func getMinimumFloatTypeForDigits(digits int) types.TYPE_NAME {
 func resolveUntyped(lit *ast.BasicLit, expected types.SemType) types.SemType {
 	switch lit.Kind {
 	case ast.INT:
-		// Try expected type first
-		if types.IsNumeric(expected) && !expected.Equals(types.TypeUnknown) {
+		if types.IsInteger(expected) && !expected.Equals(types.TypeUnknown) {
 			if _, ok := types.GetPrimitiveName(expected); ok {
 				if fitsInType(lit.Value, expected) {
 					return expected
 				}
 			}
 		}
-
-		// Use minimum required type (prefers signed types)
 		minTypeName := getMinimumTypeForValue(lit.Value)
 		return types.FromTypeName(minTypeName)
 

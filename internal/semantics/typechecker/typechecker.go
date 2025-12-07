@@ -494,14 +494,48 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		return
 	}
 
-	// Allow untyped operands - they will be contextualized
-	if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
-		return
-	}
-
-	// For arithmetic operators, both operands must be numeric
 	switch expr.Op.Kind {
-	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
+	case tokens.PLUS_TOKEN:
+		lhsString := lhsType.Equals(types.TypeString)
+		rhsString := rhsType.Equals(types.TypeString)
+		lhsNumericOrUntyped := types.IsNumericType(lhsType) || types.IsUntyped(lhsType)
+		rhsNumericOrUntyped := types.IsNumericType(rhsType) || types.IsUntyped(rhsType)
+
+		// If one side is string and the other is not, that's an error
+		if (lhsString && !rhsString) || (!lhsString && rhsString) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '+' with %s and %s", lhsType.String(), rhsType.String())).
+					WithHelp("'+' operator requires both operands to be numeric or both to be strings"),
+			)
+			return
+		}
+
+		if lhsString && rhsString {
+			return
+		}
+
+		
+		if lhsNumericOrUntyped && rhsNumericOrUntyped {
+			return
+		}
+
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
+				WithCode(diagnostics.ErrTypeMismatch).
+				WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '+' with %s and %s", lhsType.String(), rhsType.String())).
+				WithHelp("'+' operator requires both operands to be numeric or both to be strings"),
+		)
+		return
+
+	case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
+		// Allow untyped operands - they will be contextualized
+		if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
+			return
+		}
+
+		// These operators only work with numeric types
 		lhsNumeric := types.IsNumericType(lhsType)
 		rhsNumeric := types.IsNumericType(rhsType)
 
@@ -515,6 +549,11 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		}
 
 	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
+		// Allow untyped operands for comparisons - they will be contextualized
+		if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
+			return
+		}
+
 		// Special case: allow comparing optional with none
 		lhsOptional := false
 		rhsOptional := false
@@ -544,6 +583,11 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		}
 
 	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+		// Allow untyped operands for ordering comparisons - they will be contextualized
+		if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
+			return
+		}
+
 		// Ordering operators require numeric types
 		lhsNumeric := types.IsNumericType(lhsType)
 		rhsNumeric := types.IsNumericType(rhsType)
@@ -1337,7 +1381,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			if optType, ok := expected.(*types.OptionalType); ok {
 				expectedForLit = optType.Inner
 			}
-			resultType = resolveUntyped(lit, expectedForLit)
+			untypedCompatibility := checkTypeCompatibility(inferredType, expectedForLit)
+			if untypedCompatibility == Incompatible {
+				resultType = inferredType
+			} else {
+				resultType = resolveUntyped(lit, expectedForLit)
+			}
 		}
 	}
 
@@ -1398,8 +1447,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 	compatibility := checkTypeCompatibility(rhsType, leftType)
 
 	switch compatibility {
-	case Identical, Assignable, LosslessConvertible:
-		// OK - assignment is valid
+	case Identical, Assignable:
 		return
 
 	case LossyConvertible:
