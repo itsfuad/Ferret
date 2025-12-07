@@ -238,22 +238,27 @@ let charlie_score := scores["Charlie"] ?: 0;  // 0 (key not found)
 
 Learn more about [Optional Types](/optionals) and [Maps](/type-system/maps).
 
-### Range Operator (`..` and `..=`)
+### Range Operator (`..`)
 
-Ranges let you create sequences of numbers easily:
+The range operator creates sequences of numbers:
 
 ```ferret
-let range := 1..5;       // [1, 2, 3, 4] - excludes the end
-let inclusive := 1..=5;  // [1, 2, 3, 4, 5] - includes the end
+let numbers := 1..5;     // Generates array [1, 2, 3, 4, 5]
+let countdown := 10..1;  // Generates [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
 ```
 
-Think of `..` as "up to but not including" and `..=` as "up to and including."
+You can also specify a step/increment value:
 
-Ranges are particularly useful in loops (which you'll learn about soon):
+```ferret
+let evens := 0..10:2;    // [0, 2, 4, 6, 8, 10] - step by 2
+let odds := 1..10:2;     // [1, 3, 5, 7, 9] - start at 1, step by 2
+```
+
+Ranges are particularly useful in loops:
 
 ```ferret
 // Print numbers 1 through 10
-for i in 1..=10 {
+for i in 1..10 {
     print(i);
 }
 ```

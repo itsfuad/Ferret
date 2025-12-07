@@ -37,7 +37,7 @@ if a > 50 {
 }
 
 let arr : []int = [1, 2, 3, 4, 5];
-let arr2 := [10..15];
+let arr2 := 10..15;
 
 for i := 0; i < 10; i++ {
     println(i);

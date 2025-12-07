@@ -1,0 +1,26 @@
+// Test for loop variable scoping
+
+fn test_with_let() {
+    // With 'let' - declares new variable
+    for let i in 0..5 {
+        let x := i;
+    }
+    // i is not accessible here (scoped to loop)
+}
+
+fn test_without_let() {
+    // Without 'let' - must use existing variable
+    let i := 0;
+    for i in 0..5 {
+        let x := i;
+    }
+    // i is now 5 (last value from loop)
+    let final := i;
+}
+
+fn test_range_as_variable() {
+    let numbers := 1..10;
+    for let i in numbers {
+        let x := i;
+    }
+}

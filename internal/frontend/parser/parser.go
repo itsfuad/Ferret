@@ -347,16 +347,49 @@ func (p *Parser) parseEquality() ast.Expression {
 }
 
 func (p *Parser) parseComparison() ast.Expression {
-	left := p.parseAdditive()
+	left := p.parseRange()
 
 	for p.match(tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN) {
 		op := p.advance()
-		right := p.parseAdditive()
+		right := p.parseRange()
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
 			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+		}
+	}
+
+	return left
+}
+
+// parseRange parses range expressions: start..end or start..end:incr
+// This allows ranges to be used as standalone expressions: let arr := 0..10
+func (p *Parser) parseRange() ast.Expression {
+	left := p.parseAdditive()
+
+	// Check for range operator '..'
+	if p.match(tokens.RANGE_TOKEN) {
+		p.advance()
+		end := p.parseAdditive()
+
+		// Check for optional increment (:incr)
+		var incr ast.Expression
+		if p.match(tokens.COLON_TOKEN) {
+			p.advance()
+			incr = p.parseAdditive()
+		}
+
+		endPos := end.Loc().End
+		if incr != nil {
+			endPos = incr.Loc().End
+		}
+
+		return &ast.RangeExpr{
+			Start:    left,
+			End:      end,
+			Incr:     incr,
+			Location: *source.NewLocation(&p.filepath, left.Loc().Start, endPos),
 		}
 	}
 
@@ -1038,23 +1071,18 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 			Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End),
 		}
 	} else {
-		// For non-let form with comma, we need a different representation
-		// We'll use a special marker or handle it differently
+		// Without 'let', use existing variables (IdentifierExpr)
+		// For dual variables (i, v), we need a way to represent both
+		// We'll use a custom structure or handle it in semantic analysis
 		if hasSecond {
-			// Create a VarDecl-like structure even without 'let' for consistency
-			// This represents reusing existing variables
-			iterator = &ast.VarDecl{
-				Decls: []ast.DeclItem{
-					{
-						Name:  &ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
-						Type:  nil,
-						Value: nil,
-					},
-					{
-						Name:  &ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
-						Type:  nil,
-						Value: nil,
-					},
+			// For dual variables without 'let', create a tuple-like structure
+			// Since we don't have a TupleExpr, we'll use a CompositeLit to hold both identifiers
+			// The semantic analyzer will understand this pattern
+			iterator = &ast.CompositeLit{
+				Type: nil,
+				Elts: []ast.Expression{
+					&ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
+					&ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
 				},
 				Location: *source.NewLocation(&p.filepath, &firstTok.Start, &secondTok.End),
 			}
@@ -1075,39 +1103,11 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 	}
 }
 
-// parseRangeExpr parses: start..end or start..end:incr
-func (p *Parser) parseRangeExpr() *ast.RangeExpr {
-	// Parse start expression
-	start := p.parseAdditive()
-
-	// Expect '..' token
-	if !p.match(tokens.RANGE_TOKEN) {
-		p.error("expected '..' in range expression")
-		return &ast.RangeExpr{Start: start, End: start, Location: *start.Loc()}
-	}
-	p.advance()
-
-	// Parse end expression
-	end := p.parseAdditive()
-
-	// Check for optional increment (:incr)
-	var incr ast.Expression
-	if p.match(tokens.COLON_TOKEN) {
-		p.advance()
-		incr = p.parseAdditive()
-	}
-
-	endPos := end.Loc().End
-	if incr != nil {
-		endPos = incr.Loc().End
-	}
-
-	return &ast.RangeExpr{
-		Start:    start,
-		End:      end,
-		Incr:     incr,
-		Location: *source.NewLocation(&p.filepath, start.Loc().Start, endPos),
-	}
+// parseRangeExpr parses range expression in for loops
+// It accepts any expression (range, identifier, array literal, etc.)
+func (p *Parser) parseRangeExpr() ast.Expression {
+	// Parse as a normal expression which will handle ranges, identifiers, etc.
+	return p.parseExpr()
 }
 
 // parseWhileStmt parses: while [cond] { }
