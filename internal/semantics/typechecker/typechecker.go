@@ -1364,6 +1364,29 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		if e.Type != nil {
 			targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
 			checkCompositeLit(ctx, mod, e, targetType)
+		} else if expectedArrayType == nil && expectedStructType == nil {
+			// No explicit type and no expected type - infer and validate array consistency
+			inferredType := inferExprType(ctx, mod, e)
+			if arrayType, ok := inferredType.(*types.ArrayType); ok {
+				// Validate all elements match inferred element type
+				for _, elem := range e.Elts {
+					if _, isKV := elem.(*ast.KeyValueExpr); !isKV {
+						// Contextualize element with expected array element type
+						elemType := checkExpr(ctx, mod, elem, arrayType.Element)
+						compat := checkTypeCompatibility(elemType, arrayType.Element)
+						if compat == Incompatible {
+							// Format type description for better error messages
+							elemTypeStr := formatTypeDescription(elemType)
+							ctx.Diagnostics.Add(
+								diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
+									WithCode(diagnostics.ErrTypeMismatch).
+									WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
+									WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String())),
+							)
+						}
+					}
+				}
+			}
 		}
 	}
 
