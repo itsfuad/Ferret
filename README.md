@@ -101,6 +101,85 @@ let color := Color::Red;
 
 The `::` operator is used to access static members of types like enums and modules (symbols on other files).
 
+### Exports and Visibility (Go-style Capitalization)
+
+Ferret uses **capitalization** to control visibility (like Go):
+- **Uppercase** names are **exported** (public)
+- **Lowercase** names are **private**
+
+```ferret
+// Module-level symbols
+const MAX := 100;             // Exported (uppercase)
+const internal := 42;          // Private (lowercase)
+
+fn Add(a: i32, b: i32) -> i32 { ... }  // Exported function
+fn helper() { ... }                      // Private function
+
+type Point struct {            // Exported type
+    .X: i32,                   // Exported field (uppercase)
+    .y: i32                    // Private field (lowercase)
+};
+
+type internal struct { ... };  // Private type
+```
+
+**Struct field visibility:**
+- Uppercase fields (`.X`, `.Name`) are **public** - accessible everywhere
+- Lowercase fields (`.x`, `.name`) are **private** - only accessible:
+  - Within methods of the same type (via receiver)
+  - In struct literal construction (to provide values)
+- Direct field access `obj.field` on private fields is **not allowed** outside methods
+
+```ferret
+// In any module
+type Point struct {
+    .X: i32,  // public - accessible everywhere
+    .y: i32   // private - restricted access
+};
+
+fn (p: Point) GetY() -> i32 {
+    return p.y;  // ✅ OK - method can access private field
+}
+
+fn (p: &Point) SetY(val: i32) {
+    p.y = val;   // ✅ OK - method can modify private field
+}
+
+fn test() {
+    // ✅ OK - struct literal can set all fields
+    let p := { .X = 10, .y = 20 } as Point;
+    
+    let x := p.X;     // ✅ OK - public field
+    let y := p.y;     // ❌ Error - private field access
+    let y2 := p.GetY();  // ✅ OK - use method for controlled access
+}
+```
+
+**Cross-module access:**
+```ferret
+// In module A
+type Point struct {
+    .X: i32,  // public
+    .y: i32   // private
+};
+
+// In module B
+import "moduleA";
+
+let p := { .X = 10, .y = 20 } as moduleA::Point;  // ✅ Can construct
+let x := p.X;     // ✅ OK - public field
+let y := p.y;     // ❌ Error - private field
+```
+
+**Enum variants inherit visibility:**
+```ferret
+type Color enum { Red, Green, Blue };  // Exported enum
+// Color::Red, Color::Green, Color::Blue are all exported
+
+type internal enum { A, B };  // Private enum
+// internal::A and internal::B are also private
+```
+
 ### Module System & Import Restrictions
 
 ```ferret

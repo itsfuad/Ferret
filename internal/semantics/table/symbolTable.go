@@ -50,3 +50,13 @@ func (st *SymbolTable) GetSymbol(name string) (*symbols.Symbol, bool) {
 
 	return nil, false
 }
+
+// Parent returns the parent scope of this symbol table
+func (st *SymbolTable) Parent() *SymbolTable {
+	return st.parent
+}
+
+// GetAllSymbols returns all symbols in this scope (not including parent scopes)
+func (st *SymbolTable) GetAllSymbols() map[string]*symbols.Symbol {
+	return st.symbols
+}

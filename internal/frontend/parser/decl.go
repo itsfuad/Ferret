@@ -262,7 +262,7 @@ func (p *Parser) parseFuncLit(start source.Position, params []ast.Field) *ast.Fu
 
 	return &ast.FuncLit{
 		ID: ast.IdentifierExpr{
-			Name: utils.GenerateFuncLitID(),
+			Name:     utils.GenerateFuncLitID(),
 			Location: *source.NewLocation(&p.filepath, &start, &start),
 		},
 		Type:     funcType,

@@ -18,6 +18,16 @@ import (
 	"sync"
 )
 
+// isExported checks if a name is exported based on capitalization (Go-style)
+// Exported names start with uppercase letters
+func isExported(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	firstChar := rune(name[0])
+	return firstChar >= 'A' && firstChar <= 'Z'
+}
+
 // TypeCheckMethodSignatures only processes method signatures to attach methods to types
 // This must run before CheckModule so all methods are available
 func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
@@ -765,7 +775,36 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	if structType != nil {
 		for _, field := range structType.Fields {
 			if field.Name == fieldName {
-				return // Field exists
+				// Check field visibility - private fields (lowercase) have restrictions
+				if !isExported(fieldName) {
+					// Private field - only accessible if base is a receiver parameter
+					// Check if expr.X is an identifier referring to a receiver
+					allowAccess := false
+					if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+						if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+							// Allow if it's a receiver parameter (check symbol's Decl)
+							if _, isReceiver := sym.Decl.(*ast.Field); isReceiver && sym.Kind == symbols.SymbolParameter {
+								// Additional check: receiver type must match the field's type
+								if typeName != "" {
+									receiverType := sym.Type
+									if namedRecvType, ok := types.UnwrapType(receiverType).(*types.NamedType); ok {
+										allowAccess = namedRecvType.Name == typeName
+									}
+								}
+							}
+						}
+					}
+
+					if !allowAccess {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError(fmt.Sprintf("field '%s' is private", fieldName)).
+								WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("cannot access private field '%s'", fieldName)).
+								WithNote("private fields (lowercase) can only be accessed through the receiver in methods"),
+						)
+						return
+					}
+				}
+				return // Field exists and is accessible
 			}
 		}
 	}
@@ -861,6 +900,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		typeSym.Methods[decl.Name.Name] = &symbols.MethodInfo{
 			Name:     decl.Name.Name,
 			FuncType: funcType,
+			Exported: isExported(decl.Name.Name),
 		}
 	}
 }

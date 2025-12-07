@@ -62,14 +62,89 @@ import "std/math" as m;  // Use 'm' as the alias instead
 let math := 42;
 ```
 
-## Exporting from Modules
-Exporting means, which symbols (functions, variables, types) are accessible from outside the module. The public symbols are usually written in UpperCase, while private symbols are in lowercase. We follow this convention to differentiate between public and private symbol.
+## Exporting from Modules (Capitalization-Based)
+
+Ferret uses **capitalization** to control symbol visibility, similar to Go:
+- **Uppercase** names are **exported** (public) - accessible from other modules
+- **Lowercase** names are **private** - only accessible within the defining module
+
 ```ferret
 // In your_project/utils/math.fer
-fn PublicFunction() {
-    // This function is public and can be accessed from outside the module
+
+// Exported (public) - starts with uppercase
+const PI := 3.14159;
+fn Add(a: i32, b: i32) -> i32 { return a + b; }
+type Point struct { .X: i32, .Y: i32 };
+
+// Private - starts with lowercase
+const internal_buffer := 256;
+fn helper() { /* ... */ }
+type internal struct { .data: i32 };
+```
+
+### Struct Field Visibility
+
+Field names in structs follow the capitalization rule:
+
+```ferret
+type Person struct {
+    .Name: str,    // Public field (uppercase)
+    .Age: i32,     // Public field (uppercase)
+    .ssn: str      // Private field (lowercase)
+};
+```
+
+**Private field access rules:**
+- **Public fields** (uppercase) → accessible everywhere
+- **Private fields** (lowercase) → only accessible in:
+  1. **Methods of that type** (via receiver)
+  2. **Struct literals** (to provide initial values)
+- Direct field access `.field` on private fields is **not allowed** outside methods
+
+```ferret
+type Account struct {
+    .Owner: str,     // Public
+    .balance: i32    // Private
+};
+
+fn (a: Account) GetBalance() -> i32 {
+    return a.balance;  // ✅ OK - method can access private field
 }
-fn privateFunction() {
-    // This function is private and cannot be accessed from outside the module
+
+fn (a: &Account) Deposit(amount: i32) {
+    a.balance = a.balance + amount;  // ✅ OK - method can modify
 }
+
+fn test() {
+    // ✅ OK - struct literal provides all fields
+    let acc := { .Owner = "Alice", .balance = 1000 } as Account;
+    
+    let owner := acc.Owner;      // ✅ OK - public field
+    let bal := acc.balance;      // ❌ Error - private field
+    let bal2 := acc.GetBalance(); // ✅ OK - use method instead
+}
+```
+
+**Cross-module field access:**
+```ferret
+// In another module
+import "your_project/types";
+
+let p := { .Name = "Alice", .Age = 30, .ssn = "123" } as types::Person;
+
+let name := p.Name;  // ✅ OK - public field
+let age := p.Age;    // ✅ OK - public field  
+let ssn := p.ssn;    // ❌ Error - private field
+```
+
+### Enum Variants Inherit Visibility
+
+Enum variants automatically inherit the visibility of their parent enum:
+
+```ferret
+type Status enum { Pending, Active, Closed };  // Exported enum
+// Status::Pending, Status::Active, Status::Closed are all exported
+
+type internal enum { A, B, C };  // Private enum  
+// internal::A, internal::B, internal::C are all private
 ```

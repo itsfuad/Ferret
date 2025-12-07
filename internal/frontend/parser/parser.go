@@ -55,6 +55,7 @@ func (p *Parser) parseModule() *ast.Module {
 // parseTopLevel parses a single top-level declaration
 func (p *Parser) parseTopLevel() ast.Node {
 	tok := p.peek()
+
 	switch tok.Kind {
 	case tokens.IMPORT_TOKEN:
 		imp := p.parseImport()
@@ -165,6 +166,7 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 // parseStmt parses a statement
 func (p *Parser) parseStmt() ast.Node {
 	tok := p.peek()
+
 	switch tok.Kind {
 	case tokens.LET_TOKEN:
 		return p.parseVarDecl()

@@ -605,11 +605,12 @@ func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 
 			// Register variant as a placeholder symbol
 			// Type will be filled in during type checking
+			// Variants inherit the exported status from their enum type
 			variantSym := &symbols.Symbol{
 				Name:     qualifiedName,
 				Kind:     symbols.SymbolConstant,
 				Type:     types.TypeUnknown, // Will be set to the enum type during type checking
-				Exported: isExported(variantName),
+				Exported: isExported(name),
 				Decl:     variant.Name,
 			}
 			mod.ModuleScope.Declare(qualifiedName, variantSym)
@@ -657,12 +658,12 @@ func collectImport(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt
 	imp.Location = stmt.Loc()
 }
 
-// isExported checks if a name is exported (starts with uppercase letter in Ferret)
+// isExported checks if a name is exported based on capitalization (Go-style)
+// Exported names start with uppercase letters
 func isExported(name string) bool {
 	if len(name) == 0 {
 		return false
 	}
-	// In Ferret, exported names start with uppercase letters
 	firstChar := rune(name[0])
 	return firstChar >= 'A' && firstChar <= 'Z'
 }

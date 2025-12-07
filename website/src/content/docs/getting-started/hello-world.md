@@ -15,7 +15,7 @@ import "std/io";
 
 fn main() {
     let greeting: str = "Hello, World!";
-    io::print(greeting);
+    io::Println(greeting);
 }
 ```
 

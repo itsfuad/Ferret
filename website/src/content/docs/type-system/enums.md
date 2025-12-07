@@ -22,10 +22,10 @@ type Status enum {
 let status := Status::Active;
 
 when status {
-    Status::Pending => io::print("Waiting"),
-    Status::Active => io::print("Running"),
-    Status::Completed => io::print("Done"),
-    Status::Cancelled => io::print("Aborted"),
+    Status::Pending => io::Println("Waiting"),
+    Status::Active => io::Println("Running"),
+    Status::Completed => io::Println("Done"),
+    Status::Cancelled => io::Println("Aborted"),
 }
 ```
 
