@@ -1,0 +1,21 @@
+fn main() {
+    let arr: [30]i32 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+    
+    // Test 1: Initial value works
+    let a := 10;
+    let x := arr[a];  // Should work - a is 10
+    
+    // Test 2: After assignment (currently doesn't work)
+    a = a + 10;       // a is now 20
+    let y := arr[a];  // Should work - a is 20
+    
+    // Test 3: Out of bounds after assignment
+    a = a + 15;       // a is now 35
+    let z := arr[a];  // Should error - a is 35, out of bounds
+    
+    // Test 4: Multiple assignments
+    let b := 5;
+    b = b + 5;        // b is 10
+    b = b * 2;        // b is 20
+    let w := arr[b];  // Should work - b is 20
+}

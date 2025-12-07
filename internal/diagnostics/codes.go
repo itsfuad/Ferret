@@ -60,5 +60,8 @@ const (
 	InfoUnnecessarySemicolon = "S0002"
 
 	// Warnings (W prefix)
-	WarnUnreachableCode = "W0001"
+	WarnUnreachableCode        = "W0001"
+	WarnConstantConditionTrue  = "W0002"
+	WarnConstantConditionFalse = "W0003"
+	WarnDeadCode               = "W0004"
 )

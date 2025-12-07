@@ -1,0 +1,22 @@
+fn modifyRef(x: &i32) {
+    x = 100;  // Modifies through reference
+}
+
+fn main() {
+    let arr: [10]i32 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    
+    // Test 1: Direct constant - works
+    let i := 5;
+    let a := arr[i];  // Should work
+    
+    // Test 2: After reference passing - what happens?
+    let j := 3;
+    modifyRef(&j);  // j might be modified
+    let b := arr[j];  // Is j still 3, or is it 100?
+    
+    // Test 3: Aliasing problem
+    let k := 2;
+    let ref := &k;
+    ref = 50;  // Modifies k through reference
+    let c := arr[k];  // k is no longer 2!
+}

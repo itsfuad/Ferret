@@ -1,0 +1,29 @@
+fn main() {
+    // Test: Constant condition after assignment
+    let flag := false;
+    flag = true;  // flag is now true
+    
+    if flag {
+        let x := 1;
+    } else {
+        let y := 2;  // Should warn - dead code
+    }
+    
+    // Test: Condition becomes false after assignment
+    let condition := true;
+    condition = false;  // condition is now false
+    
+    if condition {
+        let a := 3;  // Should warn - dead code
+    } else {
+        let b := 4;
+    }
+    
+    // Test: Arithmetic assignment in condition
+    let n := 5;
+    n = n * 2;  // n is 10
+    
+    if n > 100 {
+        let c := 5;  // Should warn - 10 > 100 is false
+    }
+}

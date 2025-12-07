@@ -4,6 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/consteval"
 	"compiler/internal/semantics/controlflow"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
@@ -126,6 +127,33 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Check condition
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 
+		// Check for constant condition (dead code detection)
+		if constVal := consteval.EvaluateExpr(ctx, mod, n.Cond); constVal != nil {
+			if boolVal, ok := constVal.AsBool(); ok {
+				if boolVal {
+					// Condition is always true - else branch is dead code
+					if n.Else != nil {
+						ctx.Diagnostics.Add(
+							diagnostics.NewWarning("condition is always true").
+								WithCode(diagnostics.WarnConstantConditionTrue).
+								WithPrimaryLabel(n.Cond.Loc(), "this condition is always true").
+								WithSecondaryLabel(n.Else.Loc(), "this branch will never execute").
+								WithHelp("remove the if statement or the unreachable else branch"),
+						)
+					}
+				} else {
+					// Condition is always false - then branch is dead code
+					ctx.Diagnostics.Add(
+						diagnostics.NewWarning("condition is always false").
+							WithCode(diagnostics.WarnConstantConditionFalse).
+							WithPrimaryLabel(n.Cond.Loc(), "this condition is always false").
+							WithSecondaryLabel(n.Body.Loc(), "this branch will never execute").
+							WithHelp("remove the if statement or fix the condition"),
+					)
+				}
+			}
+		}
+
 		// Analyze condition for type narrowing
 		thenNarrowing, elseNarrowing := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
 
@@ -199,6 +227,23 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 
+		// Check for constant condition
+		if constVal := consteval.EvaluateExpr(ctx, mod, n.Cond); constVal != nil {
+			if boolVal, ok := constVal.AsBool(); ok {
+				// Only warn if condition is always false - loop never executes
+				// Always-true conditions are often intentional (infinite loops with break)
+				if !boolVal {
+					ctx.Diagnostics.Add(
+						diagnostics.NewWarning("condition is always false").
+							WithCode(diagnostics.WarnConstantConditionFalse).
+							WithPrimaryLabel(n.Cond.Loc(), "this condition is always false").
+							WithSecondaryLabel(n.Body.Loc(), "this loop will never execute").
+							WithHelp("remove the while loop or fix the condition"),
+					)
+				}
+			}
+		}
+
 		// Analyze condition for narrowing in loop body
 		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
 		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
@@ -259,6 +304,11 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			if item.Value != nil {
 				// Pass item.Type for type location in error messages
 				checkAssignLike(ctx, mod, declType, item.Type, item.Value)
+
+				// Try to evaluate the initializer as a compile-time constant
+				if constVal := consteval.EvaluateExpr(ctx, mod, item.Value); constVal != nil && constVal.IsConstant() {
+					sym.ConstValue = constVal
+				}
 			} else if isConst {
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
@@ -276,6 +326,12 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			}
 
 			sym.Type = rhsType
+
+			// Try to evaluate the initializer as a compile-time constant
+			// This enables constant propagation for code like: let i := 10; arr[i]
+			if constVal := consteval.EvaluateExpr(ctx, mod, item.Value); constVal != nil && constVal.IsConstant() {
+				sym.ConstValue = constVal
+			}
 		} else {
 			// No type and no value - error
 			if isConst {
@@ -1019,6 +1075,27 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// Check the RHS with the LHS type as context
 	// Pass stmt.Lhs for LHS location in error messages
 	checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
+
+	// Track constant value propagation through assignments
+	// If LHS is a simple identifier and RHS has a constant value, update the symbol
+	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
+		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+			// Try to evaluate the RHS as a constant
+			if constVal := consteval.EvaluateExpr(ctx, mod, stmt.Rhs); constVal != nil {
+				sym.ConstValue = constVal
+			} else {
+				// RHS is not constant - clear the constant value
+				sym.ConstValue = nil
+			}
+		}
+	}
+
+	// TODO: Invalidate constant values for aliasing
+	// When reference expressions (&x) are implemented, we should:
+	// 1. Clear constant value when address is taken (addressOf expression)
+	// 2. Clear all potentially aliased variables on reference assignment
+	// 3. Consider inter-procedural effects (function calls with &params)
+	// For now, method calls with reference receivers handle invalidation separately
 }
 
 // checkBlock type checks a block of statements
@@ -1889,22 +1966,26 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 		return
 	}
 
-	// Try to extract compile-time constant index
-	indexValue, isConstant := extractConstantIndex(indexExpr.Index)
+	// Try to evaluate the index expression as a compile-time constant
+	// This handles not just literals like `arr[10]`, but also variables with known values like `let i := 10; arr[i]`
+	indexValue, isConstant := consteval.EvaluateAsInt(ctx, mod, indexExpr.Index)
 	if !isConstant {
 		// Runtime value - cannot check at compile time
 		return
 	}
 
+	// Store original index for better error message
+	originalIndex := indexValue
+
 	// Handle negative indices (access from end)
 	if indexValue < 0 {
-		indexValue = arrType.Length + indexValue
+		indexValue = int64(arrType.Length) + indexValue
 	}
 
 	// Check bounds
-	if indexValue < 0 || indexValue >= arrType.Length {
+	if indexValue < 0 || indexValue >= int64(arrType.Length) {
 		ctx.Diagnostics.Add(
-			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", indexValue, arrType.Length)).
+			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", originalIndex, arrType.Length)).
 				WithCode(diagnostics.ErrArrayOutOfBounds).
 				WithPrimaryLabel(indexExpr.Index.Loc(), "index out of range").
 				WithNote(fmt.Sprintf("valid indices are 0 to %d, or -%d to -1 for reverse access", arrType.Length-1, arrType.Length)).

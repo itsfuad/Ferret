@@ -1,0 +1,26 @@
+type Counter struct {
+    .value: i32,
+};
+
+fn (c: &Counter) increment() {
+    c.value = c.value + 1;
+}
+
+fn main() {
+    let arr: [10]i32 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    
+    // Test 1: Struct field as constant
+    let counter := { .value = 5 } as Counter;
+    let x := arr[counter.value];  // Does this work with constant propagation?
+    
+    // Test 2: After method modifies it
+    counter.increment();
+    let y := arr[counter.value];  // counter.value is now 6
+    
+    // Test 3: Out of bounds after multiple increments
+    counter.increment();
+    counter.increment();
+    counter.increment();
+    counter.increment();  // counter.value is now 10
+    let z := arr[counter.value];  // Out of bounds! (index 10, length 10)
+}

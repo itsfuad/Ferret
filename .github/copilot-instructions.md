@@ -184,6 +184,9 @@ internal/
       inference.go   # Type inference from expressions
       compatibility.go # Type compatibility checking
       typechecker.go # Main type checking logic
+    consteval/       # Constant expression evaluation
+      value.go       # ConstValue type with big.Int/big.Float support
+      evaluator.go   # Expression evaluator for compile-time constants
     controlflow/     # CFG analysis, return path validation
     symbols/         # Symbol kinds and attributes
     table/           # Symbol table (lexical scopes)
@@ -237,11 +240,26 @@ internal/
 - **Type inference** (`inference.go`): Infers types from expressions, includes array type adoption from context
 - **Type compatibility** (`compatibility.go`): Checks assignability, conversions
 - **Type checking** (`typechecker.go`): Validates declarations, statements, expressions
+- **Constant propagation** (`internal/semantics/consteval/`): Compile-time constant evaluation system
+  - Tracks constant values through local variables: `let i := 5; i = i + 10; arr[i]`
+  - Evaluates arithmetic, comparison, and logical operations on constants
+  - Updates constant values on assignment, clears on non-constant assignment
+  - Handles `true`/`false` identifiers (parsed as identifiers, not literals)
+  - Uses `big.Int` and `big.Float` for arbitrary precision
+  - **Scope:** Only tracks primitive local variables, not struct fields or complex expressions
+  - **Sound & conservative:** May miss some optimizations but never gives wrong results
 - **Array bounds checking:** Compile-time validation for fixed-size arrays with constant indices
   - Fixed-size arrays (`[N]T`): Parse array size from type annotation, validate constant indices
   - Supports negative indices: `-1` to `-N` map to last element to first element
   - Dynamic arrays (`[]T`): No bounds checking - auto-grow on access/assignment instead
+  - Uses constant propagation: catches `let i := 10; arr[i]` and `i = i + 5; arr[i]`
   - Error code: `ErrArrayOutOfBounds` (T0009)
+- **Dead code detection:** Warns about unreachable code from constant conditions
+  - `if true { ... } else { ... }` → warns about dead else branch (W0002)
+  - `if false { ... } else { ... }` → warns about dead then branch (W0003)
+  - `while false { ... }` → warns loop never executes (W0003)
+  - `while true { ... }` → no warning (intentional infinite loops are common)
+  - Works with constant expressions: `if 1 + 1 == 2`, `if FLAG` where FLAG is const
 - **Control flow** (`controlflow/`): CFG construction, return path analysis, unreachable code detection
   - Only reports obvious infinite loops (no break/return statements)
   - Conservative approach avoids false positives
@@ -259,9 +277,16 @@ internal/
 ## Error Codes Reference
 
 All error codes are defined in `internal/diagnostics/codes.go`:
+
+**Type Errors (T-prefix):**
 - **T0003** (`ErrRedeclaredSymbol`): Symbol/import alias redeclaration
 - **T0009** (`ErrArrayOutOfBounds`): Array index out of bounds (compile-time)
 - **T0010+**: Other type system errors (renumbered to accommodate T0009)
+
+**Warnings (W-prefix):**
+- **W0002** (`WarnConstantConditionTrue`): Condition is always true, else branch unreachable
+- **W0003** (`WarnConstantConditionFalse`): Condition is always false, then branch/loop unreachable
+- **W0004** (`WarnDeadCode`): Dead code detected (currently unused, reserved for future)
 
 Always use error code constants from the `diagnostics` package, never hardcoded strings.
 
@@ -271,11 +296,106 @@ Always use error code constants from the `diagnostics` package, never hardcoded 
 - `internal/pipeline/pipeline.go`: Multi-phase pipeline, concurrency patterns
 - `internal/semantics/collector/collector.go`: Symbol table construction, import alias validation
 - `internal/semantics/resolver/resolver.go`: Name binding and resolution
-- `internal/semantics/typechecker/typechecker.go`: Type checking logic, array bounds checking
+- `internal/semantics/typechecker/typechecker.go`: Type checking logic, array bounds checking, assignment tracking
 - `internal/semantics/typechecker/inference.go`: Type inference, array type adoption
+- `internal/semantics/consteval/value.go`: Constant value representation with arbitrary precision
+- `internal/semantics/consteval/evaluator.go`: Expression evaluator for compile-time constants
 - `internal/semantics/controlflow/cfg.go`: Control flow graph and analysis
-- `internal/diagnostics/codes.go`: Central error code definitions
+- `internal/diagnostics/codes.go`: Central error code definitions (T-prefix errors, W-prefix warnings)
 - `internal/diagnostics/emitter.go`: Error rendering with colors
 - `internal/frontend/parser/parser.go`: Recursive descent patterns
 - `internal/frontend/parser/typ.go`: Type annotation parsing (array types)
 - `test_project/`: Example `.fer` files for testing imports/features
+
+## Constant Propagation System
+
+The compiler includes a **sound and conservative** constant propagation system that tracks compile-time known values.
+
+### What is Tracked ✅
+- **Primitive local variables**: `let i := 5`, `const MAX := 100`
+- **Arithmetic expressions**: `i + 10`, `a * 2`, `x - 5`
+- **Comparison operations**: `a < b`, `x == y`, `n > 0`
+- **Logical operations**: `true && false`, `!condition`, `a || b`
+- **Assignment updates**: `i = i + 10` (tracks new value)
+- **Boolean literals**: `true` and `false` (parsed as identifiers)
+
+### What is NOT Tracked ❌
+- **Struct fields**: `counter.value` - can be modified via methods with `&` receivers
+- **Array/map elements**: Complex aliasing makes tracking unsound
+- **Function call results**: May have side effects or non-deterministic results
+- **Non-constant assignments**: `i = n` where `n` is a parameter - clears constant value
+
+### Implementation Details
+
+**ConstValue Type** (`consteval/value.go`):
+- Uses `*big.Int` and `*big.Float` for arbitrary precision
+- Supports Int, Float, Bool, String kinds
+- Stored in `Symbol.ConstValue` field (interface{} to avoid import cycles)
+
+**Expression Evaluator** (`consteval/evaluator.go`):
+- `EvaluateExpr()`: Main entry point, returns `*ConstValue` or `nil`
+- Handles: BasicLit, IdentifierExpr, UnaryExpr, BinaryExpr, ParenExpr
+- Special case: `true`/`false` identifiers treated as boolean literals
+- Conservative: returns `nil` for anything it can't safely evaluate
+
+**Assignment Tracking** (typechecker.go):
+- `checkAssignStmt()` evaluates RHS and updates `Symbol.ConstValue`
+- If RHS is constant → store new value
+- If RHS is non-constant → clear value (set to `nil`)
+
+### Use Cases
+
+**Array Bounds Checking:**
+```ferret
+let arr: [10]i32 = [...];
+let i := 5;
+i = i + 10;       // i is now 15
+arr[i];           // Error: index 15 out of bounds
+```
+
+**Dead Code Detection:**
+```ferret
+if true {         // Warning: condition always true
+    let x := 1;
+} else {
+    let y := 2;   // Warning: unreachable
+}
+
+while false {     // Warning: condition always false
+    let z := 3;   // Warning: loop never executes
+}
+```
+
+**Constant Propagation:**
+```ferret
+const FLAG := true;
+let condition := FLAG;  // condition is constant true
+if condition {          // Detected as always true
+    // ...
+}
+```
+
+### Reference Semantics & Aliasing
+
+Ferret uses `&T` for reference types (C++ reference semantics):
+- `&` is used **only in type signatures**: `fn (p: &Point) scale(factor: i32)`
+- No `&` operator in expressions (no explicit address-taking)
+- Method calls with `&Receiver` modify the original value
+
+**Conservative approach for soundness:**
+- Struct fields are **not tracked** as constants
+- Methods with `&` receivers can modify fields unpredictably
+- Users can copy to local variable if constant tracking needed:
+  ```ferret
+  let i := counter.value;  // Copy to local - now tracked
+  arr[i];                   // Can use constant propagation
+  ```
+
+### Testing
+
+Test files demonstrate the system's capabilities:
+- `constant_propagation_test.go`: 11 tests for array bounds with constants
+- `assignment_propagation_test.go`: 10 tests for tracking through assignments
+- `dead_code_test.go`: 16 tests for if/while constant conditions (11 + 5)
+
+Total: **37 tests** covering all aspects of constant propagation.

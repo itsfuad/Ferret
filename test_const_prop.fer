@@ -1,0 +1,7 @@
+fn test_constant_propagation() {
+    let arr: [5]i32 = [1, 2, 3, 4, 5];
+    
+    // This should error: compile-time known out of bounds
+    let i := 10;
+    let x := arr[i];
+}
