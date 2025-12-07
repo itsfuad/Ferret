@@ -2,8 +2,7 @@ package diagnostics
 
 // Error codes for Ferret compiler
 const (
-
-	ErrMax				  = "E0010"
+	ErrMax = "E0010"
 
 	// Lexer errors (L prefix)
 	ErrUnexpectedCharacter = "L0001"
@@ -23,7 +22,7 @@ const (
 	ErrMissingIdentifier  = "P0006"
 	ErrMissingType        = "P0007"
 	ErrMissingInitializer = "P0008"
-	ErrMissingSemiCol	  = "P0009"
+	ErrMissingSemiCol     = "P0009"
 
 	// Type checker errors (T prefix)
 	ErrTypeMismatch            = "T0001"
@@ -46,7 +45,7 @@ const (
 	ErrConstantReassignment    = "T0018"
 	ErrInvalidBreak            = "T0019"
 	ErrInvalidContinue         = "T0020"
-	ErrInvalidType 			   = "T0021"
+	ErrInvalidType             = "T0021"
 	ErrInvalidMethodReceiver   = "T0022"
 
 	// Module/Import errors (M prefix)

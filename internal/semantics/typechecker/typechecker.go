@@ -1074,7 +1074,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Check both array and index expressions
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
-		
+
 		// Perform bounds checking for fixed-size arrays with constant indices
 		checkArrayBounds(ctx, mod, e)
 
@@ -1880,7 +1880,7 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 	// Get the type of the array being indexed
 	arrayType := inferExprType(ctx, mod, indexExpr.X)
 	arrayType = types.UnwrapType(arrayType)
-	
+
 	// Only check fixed-size arrays
 	arrType, ok := arrayType.(*types.ArrayType)
 	if !ok || arrType.Length < 0 {
@@ -1888,19 +1888,19 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 		// Dynamic arrays grow automatically, negative indices access from end
 		return
 	}
-	
+
 	// Try to extract compile-time constant index
 	indexValue, isConstant := extractConstantIndex(indexExpr.Index)
 	if !isConstant {
 		// Runtime value - cannot check at compile time
 		return
 	}
-	
+
 	// Handle negative indices (access from end)
 	if indexValue < 0 {
 		indexValue = arrType.Length + indexValue
 	}
-	
+
 	// Check bounds
 	if indexValue < 0 || indexValue >= arrType.Length {
 		ctx.Diagnostics.Add(
@@ -1925,7 +1925,7 @@ func extractConstantIndex(expr ast.Expression) (int, bool) {
 			fmt.Sscanf(e.Value, "%d", &val)
 			return int(val), true
 		}
-	
+
 	case *ast.UnaryExpr:
 		// Handle negative literals: -5
 		if e.Op.Kind == tokens.MINUS_TOKEN {
@@ -1933,10 +1933,10 @@ func extractConstantIndex(expr ast.Expression) (int, bool) {
 				return -val, true
 			}
 		}
-	
-	// Could extend to handle constant folding of expressions like 2+3
-	// For now, only handle direct literals
+
+		// Could extend to handle constant folding of expressions like 2+3
+		// For now, only handle direct literals
 	}
-	
+
 	return 0, false
 }

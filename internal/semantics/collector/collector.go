@@ -184,6 +184,24 @@ func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, dec
 			continue
 		}
 
+		// Check for conflict with import alias
+		if importPath, isImport := mod.ImportAliasMap[name]; isImport {
+			imp := mod.Imports[importPath]
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("'%s' is already used as an import alias", name)).
+					WithCode(diagnostics.ErrRedeclaredSymbol).
+					WithPrimaryLabel(&item.Name.Location, fmt.Sprintf("cannot declare '%s' here", name)).
+					WithSecondaryLabel(imp.Location, fmt.Sprintf("'%s' is the alias for this import", name)).
+					WithHelp(fmt.Sprintf("rename this %s or use a different import alias", func() string {
+						if kind == symbols.SymbolConstant {
+							return "constant"
+						}
+						return "variable"
+					}())),
+			)
+			continue
+		}
+
 		// Check for duplicate declaration
 		if existing, ok := mod.CurrentScope.GetSymbol(name); ok {
 			ctx.Diagnostics.Add(
@@ -221,6 +239,19 @@ func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	}
 
 	name := decl.Name.Name
+
+	// Check for conflict with import alias
+	if importPath, isImport := mod.ImportAliasMap[name]; isImport {
+		imp := mod.Imports[importPath]
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("'%s' is already used as an import alias", name)).
+				WithCode(diagnostics.ErrRedeclaredSymbol).
+				WithPrimaryLabel(decl.Loc(), fmt.Sprintf("cannot declare function '%s' here", name)).
+				WithSecondaryLabel(imp.Location, fmt.Sprintf("'%s' is the alias for this import", name)).
+				WithHelp("rename this function or use a different import alias"),
+		)
+		return
+	}
 
 	// Check for duplicate declaration
 	if existing, ok := mod.CurrentScope.GetSymbol(name); ok {
@@ -516,6 +547,19 @@ func validateParams(ctx *context_v2.CompilerContext, _ *context_v2.Module, param
 // collectTypeDecl handles type declarations
 func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.TypeDecl) {
 	name := decl.Name.Name
+
+	// Check for conflict with import alias
+	if importPath, isImport := mod.ImportAliasMap[name]; isImport {
+		imp := mod.Imports[importPath]
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("'%s' is already used as an import alias", name)).
+				WithCode(diagnostics.ErrRedeclaredSymbol).
+				WithPrimaryLabel(decl.Loc(), fmt.Sprintf("cannot declare type '%s' here", name)).
+				WithSecondaryLabel(imp.Location, fmt.Sprintf("'%s' is the alias for this import", name)).
+				WithHelp("rename this type or use a different import alias"),
+		)
+		return
+	}
 
 	// Check for duplicate declaration
 	if existing, ok := mod.CurrentScope.GetSymbol(name); ok {
