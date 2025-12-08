@@ -61,16 +61,16 @@ func TestResolveUntypedInt(t *testing.T) {
 				Kind:  ast.INT,
 				Value: tt.value,
 			}
-			result := resolveLiteral(lit, types.TypeUnknown)
+			result := inferLiteralType(lit, types.TypeUnknown)
 
 			// Extract primitive type name
 			name, ok := types.GetPrimitiveName(result)
 			if !ok {
-				t.Fatalf("resolveUntyped(%q) did not return a primitive type", tt.value)
+				t.Fatalf("inferLiteralType(%q) did not return a primitive type", tt.value)
 			}
 
 			if name != tt.wantType {
-				t.Errorf("resolveUntyped(%q) = %s, want %s", tt.value, name, tt.wantType)
+				t.Errorf("inferLiteralType(%q) = %s, want %s", tt.value, name, tt.wantType)
 			}
 		})
 	}
@@ -87,7 +87,7 @@ func TestResolveUntypedIntDefaultsToI32(t *testing.T) {
 		Kind:  ast.INT,
 		Value: "42",
 	}
-	result := resolveLiteral(lit, types.TypeUnknown)
+	result := inferLiteralType(lit, types.TypeUnknown)
 	name, ok := types.GetPrimitiveName(result)
 	if !ok {
 		t.Fatal("resolveUntyped did not return a primitive type")

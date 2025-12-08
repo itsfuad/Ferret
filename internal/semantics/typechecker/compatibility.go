@@ -1,11 +1,12 @@
 package typechecker
 
 import (
-	"compiler/internal/frontend/ast"
 	"compiler/internal/types"
 	"compiler/internal/utils/numeric"
+
 	"fmt"
 )
+
 
 // TypeCompatibility represents the relationship between two types
 type TypeCompatibility int
@@ -48,12 +49,8 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 
 	// Automatic dereferencing: &T is compatible with T
 	// This allows reference types to be used transparently
-	if refType, ok := source.(*types.ReferenceType); ok {
-		source = refType.Inner
-	}
-	if refType, ok := target.(*types.ReferenceType); ok {
-		target = refType.Inner
-	}
+	source = dereferenceType(source)
+	target = dereferenceType(target)
 
 	// Special handling for none
 	// none can be assigned to any optional type (T?)
@@ -408,117 +405,4 @@ func getMinimumFloatTypeForDigits(digits int) types.TYPE_NAME {
 		return types.TYPE_F256
 	}
 	return types.TYPE_UNKNOWN
-}
-
-// resolveLiteral resolves an untyped literal to a concrete type.
-// Strategy: Use expected type if it fits, otherwise use minimum required type.
-// This is the SINGLE source of truth for all untyped literal resolution.
-func resolveLiteral(lit *ast.BasicLit, expected types.SemType) types.SemType {
-	switch lit.Kind {
-	case ast.INT:
-		// 1. Try expected type first (if it's an integer type and value fits)
-		if types.IsInteger(expected) && !expected.Equals(types.TypeUnknown) {
-			if _, ok := types.GetPrimitiveName(expected); ok {
-				if fitsInType(lit.Value, expected) {
-					return expected
-				}
-			}
-		}
-
-		// 2. Use DEFAULT_INT_TYPE (i32) as baseline
-		defaultType := types.FromTypeName(types.DEFAULT_INT_TYPE)
-		if fitsInType(lit.Value, defaultType) {
-			return defaultType
-		}
-
-		// 3. Gradually promote: i32 -> i64 -> i128 -> i256
-		promotionSequence := []types.TYPE_NAME{
-			types.TYPE_I64,
-			types.TYPE_I128,
-			types.TYPE_I256,
-		}
-
-		for _, typeName := range promotionSequence {
-			promotedType := types.FromTypeName(typeName)
-			if fitsInType(lit.Value, promotedType) {
-				return promotedType
-			}
-		}
-
-		// 4. Doesn't fit even in maximum - return i256 (error will be reported elsewhere)
-		return types.FromTypeName(types.TYPE_I256)
-
-	case ast.FLOAT:
-		// 1. Try expected type first
-		if types.IsFloat(expected) && !expected.Equals(types.TypeUnknown) {
-			if _, ok := types.GetPrimitiveName(expected); ok {
-				if fitsInType(lit.Value, expected) {
-					return expected
-				}
-			}
-		}
-
-		// 2. Use DEFAULT_FLOAT_TYPE (f64) as baseline
-		defaultType := types.FromTypeName(types.DEFAULT_FLOAT_TYPE)
-		if fitsInType(lit.Value, defaultType) {
-			return defaultType
-		}
-
-		// 3. Gradually promote: f64 -> f128 -> f256
-		promotionSequence := []types.TYPE_NAME{
-			types.TYPE_F128,
-			types.TYPE_F256,
-		}
-
-		for _, typeName := range promotionSequence {
-			promotedType := types.FromTypeName(typeName)
-			if fitsInType(lit.Value, promotedType) {
-				return promotedType
-			}
-		}
-
-		// 4. Doesn't fit even in maximum - return f256 (error will be reported elsewhere)
-		return types.FromTypeName(types.TYPE_F256)
-
-	default:
-		return types.TypeUnknown
-	}
-}
-
-// getTypeRange returns a human-readable range for integer types
-func getTypeRange(t types.SemType) string {
-	// Extract primitive type name
-	name, ok := types.GetPrimitiveName(t)
-	if !ok {
-		return "unknown range"
-	}
-
-	switch name {
-	case types.TYPE_I8:
-		return "-128 to 127"
-	case types.TYPE_I16:
-		return "-32,768 to 32,767"
-	case types.TYPE_I32:
-		return "-2,147,483,648 to 2,147,483,647"
-	case types.TYPE_I64:
-		return "-9,223,372,036,854,775,808 to 9,223,372,036,854,775,807"
-	case types.TYPE_I128:
-		return "-170,141,183,460,469,231,731,687,303,715,884,105,728 to 170,141,183,460,469,231,731,687,303,715,884,105,727"
-	case types.TYPE_I256:
-		return "-2^255 to 2^255 - 1 (256-bit signed)"
-	case types.TYPE_U8:
-		return "0 to 255"
-	case types.TYPE_U16:
-		return "0 to 65,535"
-	case types.TYPE_U32:
-		return "0 to 4,294,967,295"
-	case types.TYPE_U64:
-		return "0 to 18,446,744,073,709,551,615"
-	case types.TYPE_U128:
-		return "0 to 340,282,366,920,938,463,463,374,607,431,768,211,455"
-	case types.TYPE_U256:
-		return "0 to 2^256 - 1 (256-bit unsigned)"
-	default:
-		return "unknown range"
-	}
 }

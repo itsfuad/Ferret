@@ -8,9 +8,138 @@ import (
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
+
 	"fmt"
 	"strings"
 )
+
+
+
+// inferLiteralType is the SINGLE source of truth for all literal type inference.
+// It handles all rules: default size, promotion, contextualization, and fitness checking.
+//
+// Rules:
+//   - If expected type is provided and value fits: use expected type
+//   - If expected type is provided and value doesn't fit: return expected type (error reported separately)
+//   - If no expected type: use DEFAULT_INT_TYPE/DEFAULT_FLOAT_TYPE, promote if needed
+//   - Non-numeric literals (string, bool, byte) return concrete types immediately
+func inferLiteralType(lit *ast.BasicLit, expected types.SemType) types.SemType {
+	switch lit.Kind {
+	case ast.INT:
+		// If expected type is provided, try to use it (contextualization)
+		if !expected.Equals(types.TypeUnknown) && types.IsInteger(expected) {
+			if _, ok := types.GetPrimitiveName(expected); ok {
+				// Value must fit in expected type (fitness check happens in checkFitness)
+				return expected
+			}
+		}
+
+		// No expected type or incompatible: use default and promote if needed
+		// 1. Try DEFAULT_INT_TYPE (i32) as baseline
+		defaultType := types.FromTypeName(types.DEFAULT_INT_TYPE)
+		if fitsInType(lit.Value, defaultType) {
+			return defaultType
+		}
+
+		// 2. Gradually promote: i32 -> i64 -> i128 -> i256
+		promotionSequence := []types.TYPE_NAME{
+			types.TYPE_I64,
+			types.TYPE_I128,
+			types.TYPE_I256,
+		}
+
+		for _, typeName := range promotionSequence {
+			promotedType := types.FromTypeName(typeName)
+			if fitsInType(lit.Value, promotedType) {
+				return promotedType
+			}
+		}
+
+		// 3. Doesn't fit even in maximum - return TypeUnknown to signal error
+		// Error will be reported in checkExpr when this is detected
+		return types.TypeUnknown
+
+	case ast.FLOAT:
+		// If expected type is provided, try to use it (contextualization)
+		if !expected.Equals(types.TypeUnknown) && types.IsFloat(expected) {
+			if _, ok := types.GetPrimitiveName(expected); ok {
+				// Value must fit in expected type (fitness check happens in checkFitness)
+				return expected
+			}
+		}
+
+		// No expected type or incompatible: use default and promote if needed
+		// 1. Try DEFAULT_FLOAT_TYPE (f64) as baseline
+		defaultType := types.FromTypeName(types.DEFAULT_FLOAT_TYPE)
+		if fitsInType(lit.Value, defaultType) {
+			return defaultType
+		}
+
+		// 2. Gradually promote: f64 -> f128 -> f256
+		promotionSequence := []types.TYPE_NAME{
+			types.TYPE_F128,
+			types.TYPE_F256,
+		}
+
+		for _, typeName := range promotionSequence {
+			promotedType := types.FromTypeName(typeName)
+			if fitsInType(lit.Value, promotedType) {
+				return promotedType
+			}
+		}
+
+		// 3. Doesn't fit even in maximum - return TypeUnknown to signal error
+		// Error will be reported in checkExpr when this is detected
+		return types.TypeUnknown
+
+	case ast.STRING:
+		return types.TypeString
+	case ast.BYTE:
+		return types.TypeByte
+	case ast.BOOL:
+		return types.TypeBool
+	default:
+		return types.TypeUnknown
+	}
+}
+
+// getTypeRange returns a human-readable range for integer types
+func getTypeRange(t types.SemType) string {
+	// Extract primitive type name
+	name, ok := types.GetPrimitiveName(t)
+	if !ok {
+		return "unknown range"
+	}
+
+	switch name {
+	case types.TYPE_I8:
+		return "-128 to 127"
+	case types.TYPE_I16:
+		return "-32,768 to 32,767"
+	case types.TYPE_I32:
+		return "-2,147,483,648 to 2,147,483,647"
+	case types.TYPE_I64:
+		return "-9,223,372,036,854,775,808 to 9,223,372,036,854,775,807"
+	case types.TYPE_I128:
+		return "-170,141,183,460,469,231,731,687,303,715,884,105,728 to 170,141,183,460,469,231,731,687,303,715,884,105,727"
+	case types.TYPE_I256:
+		return "-2^255 to 2^255 - 1 (256-bit signed)"
+	case types.TYPE_U8:
+		return "0 to 255"
+	case types.TYPE_U16:
+		return "0 to 65,535"
+	case types.TYPE_U32:
+		return "0 to 4,294,967,295"
+	case types.TYPE_U64:
+		return "0 to 18,446,744,073,709,551,615"
+	case types.TYPE_U128:
+		return "0 to 340,282,366,920,938,463,463,374,607,431,768,211,455"
+	case types.TYPE_U256:
+		return "0 to 2^256 - 1 (256-bit unsigned)"
+	default:
+		return "unknown range"
+	}
+}
 
 // inferExprType determines the type of an expression based on its structure and value.
 // This is pure type inference without any compatibility checking.
@@ -22,7 +151,9 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 
 	switch e := expr.(type) {
 	case *ast.BasicLit:
-		return inferLiteralType(e)
+		// For pure inference (no context), return untyped types
+		// This allows contextualization in checkExpr when expected type is provided
+		return inferLiteralType(e, types.TypeUnknown)
 
 	case *ast.IdentifierExpr:
 		return inferIdentifierType(ctx, mod, e)
@@ -63,27 +194,6 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	case *ast.ElvisExpr:
 		return inferElvisExprType(ctx, mod, e)
 
-	default:
-		return types.TypeUnknown
-	}
-}
-
-// inferLiteralType determines the type of a literal
-func inferLiteralType(lit *ast.BasicLit) types.SemType {
-	switch lit.Kind {
-	case ast.INT:
-		// Integer literals are UNTYPED until contextualized
-		return types.TypeUntypedInt
-	case ast.FLOAT:
-		// Float literals are UNTYPED until contextualized
-		return types.TypeUntypedFloat
-	case ast.STRING:
-		return types.TypeString
-	case ast.BYTE:
-		// Byte literals have concrete type 'byte'
-		return types.TypeByte
-	case ast.BOOL:
-		return types.TypeBool
 	default:
 		return types.TypeUnknown
 	}
@@ -142,10 +252,24 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		// Otherwise numeric addition: result is the wider of the two types
 		return widerType(lhsType, rhsType)
 
-	case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
+	case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.MOD_TOKEN:
 		// Arithmetic: result is the wider of the two types
 		return widerType(lhsType, rhsType)
-
+	case tokens.DIV_TOKEN:
+		{
+			// division always produces float but preserves wider type. like i32 / i32 -> f32, f32 / f64 -> f64, f64 / f64 -> f64
+			// get the bit width of the wider type
+			wider := widerType(lhsType, rhsType)
+			bitWidth := 0
+			if primType, ok := wider.(*types.PrimitiveType); ok {
+				bitWidth = primType.Size()
+			}
+			if bitWidth <= 32 {
+				return types.TypeF32
+			} else {
+				return types.TypeF64
+			}
+		}
 	default:
 		return types.TypeUnknown
 	}
@@ -249,9 +373,7 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	}
 
 	// Automatic dereferencing: &T -> T
-	if refType, ok := baseType.(*types.ReferenceType); ok {
-		baseType = refType.Inner
-	}
+	baseType = dereferenceType(baseType)
 
 	fieldName := expr.Sel.Name
 
@@ -263,20 +385,8 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	if namedType, ok := baseType.(*types.NamedType); ok {
 		// It's a named type - look up the type symbol for method resolution
 		typeName := namedType.Name
-
-		// First check current module's scope
-		if sym, found := mod.ModuleScope.Lookup(typeName); found {
+		if sym, found := lookupTypeSymbol(ctx, mod, typeName); found {
 			typeSym = sym
-		} else {
-			// Not in current module, search imported modules
-			for _, importPath := range mod.ImportAliasMap {
-				if importedMod, exists := ctx.GetModule(importPath); exists {
-					if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
-						typeSym = sym
-						break
-					}
-				}
-			}
 		}
 
 		// Get the underlying struct for field access
@@ -369,6 +479,7 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 		}
 
 		if !found {
+			// todo: code smell
 			// Build enum string representation with truncation (like struct)
 			var enumStr string
 			if len(enumType.Variants) == 0 {
@@ -459,9 +570,13 @@ func inferCompositeLitType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 			// Infer type from first element
 			firstElemType := inferExprType(ctx, mod, lit.Elts[0])
 
-			// If first element is untyped, finalize it to default type (i32/f64)
+			// If first element is untyped literal, infer its type
 			if types.IsUntyped(firstElemType) {
-				firstElemType = resolveType(firstElemType, types.TypeUnknown)
+				if lit, ok := lit.Elts[0].(*ast.BasicLit); ok {
+					firstElemType = inferLiteralType(lit, types.TypeUnknown)
+				} else {
+					firstElemType = resolveType(firstElemType, types.TypeUnknown)
+				}
 			}
 
 			// All subsequent elements must match the first element's type
@@ -578,7 +693,7 @@ func resolveType(untypedType types.SemType, expected types.SemType) types.SemTyp
 		return untypedType
 	}
 
-	// Try to use expected type if compatible
+	// Try to use expected type is valid recognized type
 	if !expected.Equals(types.TypeUnknown) {
 		if types.IsUntypedInt(untypedType) && types.IsNumeric(expected) {
 			return expected
@@ -588,7 +703,7 @@ func resolveType(untypedType types.SemType, expected types.SemType) types.SemTyp
 		}
 	}
 
-	// Default to standard default types
+	// Default to standard default types if no expected type provided
 	if primType, ok := untypedType.(*types.PrimitiveType); ok {
 		if primType.IsUntypedInt() {
 			return types.FromTypeName(types.DEFAULT_INT_TYPE)
@@ -596,6 +711,8 @@ func resolveType(untypedType types.SemType, expected types.SemType) types.SemTyp
 			return types.FromTypeName(types.DEFAULT_FLOAT_TYPE)
 		}
 	}
+
+	// todo: check if we need to unwrap the optional type here later
 
 	return untypedType
 }
@@ -614,19 +731,20 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 	// Build parameter types
 	params := make([]types.ParamType, len(lit.Type.Params))
 	for i, param := range lit.Type.Params {
+		paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
 		params[i] = types.ParamType{
 			Name: param.Name.Name,
-			Type: typeFromTypeNode(param.Type),
+			Type: paramType,
 		}
 
 		// Update symbol table with the parameter's type
 		if sym, ok := mod.CurrentScope.GetSymbol(param.Name.Name); ok {
-			sym.Type = params[i].Type
+			sym.Type = paramType
 		}
 	}
 
 	// Get return type
-	returnType := typeFromTypeNode(lit.Type.Result)
+	returnType := typeFromTypeNodeWithContext(ctx, mod, lit.Type.Result)
 
 	// Set the current function return type for validating return statements
 	// Save the parent function's return type and restore it after
@@ -649,50 +767,22 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	startType := inferExprType(ctx, mod, expr.Start)
 	endType := inferExprType(ctx, mod, expr.End)
 
-	// If both are untyped int literals, resolve to minimum required type
-	// by checking both values and taking the larger type
-	if types.IsUntypedInt(startType) && types.IsUntypedInt(endType) {
-		var resolvedType types.SemType = types.NewPrimitive(types.DEFAULT_INT_TYPE) // default to i32
-		maxBitSize := types.GetNumberBitSize(types.DEFAULT_INT_TYPE)
-
-		// Check if start literal needs a larger type
-		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
-			startResolved := resolveLiteral(startLit, types.TypeUnknown)
-			if name, ok := types.GetPrimitiveName(startResolved); ok {
-				bitSize := types.GetNumberBitSize(name)
-				if bitSize > maxBitSize {
-					maxBitSize = bitSize
-					resolvedType = startResolved
-				}
-			}
-		}
-
-		// Check if end literal needs a larger type
-		if endLit, ok := expr.End.(*ast.BasicLit); ok && endLit.Kind == ast.INT {
-			endResolved := resolveLiteral(endLit, types.TypeUnknown)
-			if name, ok := types.GetPrimitiveName(endResolved); ok {
-				bitSize := types.GetNumberBitSize(name)
-				if bitSize > maxBitSize {
-					resolvedType = endResolved
-				}
-			}
-		}
-
-		// Return array type with resolved element type
-		return &types.ArrayType{Element: resolvedType}
+	// Contextualize untyped types
+	if startLit, ok := expr.Start.(*ast.BasicLit); ok && types.IsUntyped(startType) {
+		startType = inferLiteralType(startLit, types.TypeUnknown)
+	} else {
+		startType = resolveType(startType, types.TypeUnknown)
 	}
-
-	// If start is untyped, use centralized resolution
-	if types.IsUntypedInt(startType) {
-		if startLit, ok := expr.Start.(*ast.BasicLit); ok && startLit.Kind == ast.INT {
-			startType = resolveLiteral(startLit, types.TypeUnknown)
-		} else {
-			startType = types.NewPrimitive(types.DEFAULT_INT_TYPE)
-		}
+	if endLit, ok := expr.End.(*ast.BasicLit); ok && types.IsUntyped(endType) {
+		endType = inferLiteralType(endLit, types.TypeUnknown)
+	} else {
+		endType = resolveType(endType, types.TypeUnknown)
 	}
 
 	// Return array type with element type from range
-	return &types.ArrayType{Element: startType}
+	// Use the wider type to accommodate both start and end values
+	elementType := widerType(startType, endType)
+	return &types.ArrayType{Element: elementType}
 }
 
 // inferElvisExprType determines the result type of an elvis expression (a ?: b)

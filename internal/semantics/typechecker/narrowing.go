@@ -3,9 +3,13 @@ package typechecker
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/semantics/controlflow"
+	"compiler/internal/semantics/symbols"
+	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
 )
+
 
 // NarrowingContext tracks type narrowing information for variables within a scope.
 // Used for optional type narrowing (T? → T) based on null checks.
@@ -129,4 +133,89 @@ func getOptionalVarType(mod *context_v2.Module, varName string) *types.OptionalT
 	}
 
 	return nil
+}
+
+// Helper functions to eliminate code duplication
+
+// addParamsToScope adds function/method parameters to the given scope with their types
+func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, params []ast.Field) {
+	if params == nil {
+		return
+	}
+	for _, param := range params {
+		if param.Name != nil {
+			paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
+			psym, ok := scope.GetSymbol(param.Name.Name)
+			if !ok {
+				continue // should not happen but safe side
+			}
+			psym.Type = paramType
+		}
+	}
+}
+
+// setupFunctionContext sets up function scope and return type tracking.
+// Returns a cleanup function that should be deferred.
+func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, funcType *ast.FuncType) func() {
+	// Enter function scope
+	defer mod.EnterScope(scope)()
+
+	// Set expected return type for validation
+	var expectedReturnType types.SemType = types.TypeVoid
+	if funcType != nil && funcType.Result != nil {
+		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, funcType.Result)
+	}
+	oldReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = expectedReturnType
+	return func() {
+		mod.CurrentFunctionReturnType = oldReturnType
+	}
+}
+
+// analyzeFunctionReturns builds CFG and analyzes return paths for a function
+func analyzeFunctionReturns(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcDecl *ast.FuncDecl) {
+	if funcDecl.Body == nil {
+		return
+	}
+	cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
+	cfg := cfgBuilder.BuildFunctionCFG(funcDecl)
+	controlflow.AnalyzeReturns(ctx, mod, funcDecl, cfg)
+}
+
+// lookupTypeSymbol finds a type symbol by name, checking current module first, then imported modules.
+// Returns the symbol and true if found, nil and false otherwise.
+func lookupTypeSymbol(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeName string) (*symbols.Symbol, bool) {
+	// First check current module's scope
+	if sym, found := mod.ModuleScope.Lookup(typeName); found {
+		return sym, true
+	}
+
+	// Not in current module, search imported modules
+	for _, importPath := range mod.ImportAliasMap {
+		if importedMod, exists := ctx.GetModule(importPath); exists {
+			if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+				return sym, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+// unwrapOptionalType unwraps optional types: T? -> T
+// Returns the inner type if it's optional, otherwise returns the original type.
+func unwrapOptionalType(typ types.SemType) types.SemType {
+	if optType, ok := typ.(*types.OptionalType); ok {
+		return optType.Inner
+	}
+	return typ
+}
+
+// dereferenceType unwraps reference types: &T -> T
+// Returns the inner type if it's a reference, otherwise returns the original type.
+func dereferenceType(typ types.SemType) types.SemType {
+	if refType, ok := typ.(*types.ReferenceType); ok {
+		return refType.Inner
+	}
+	return typ
 }

@@ -15,8 +15,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 )
+
 
 // isExported checks if a name is exported based on capitalization (Go-style)
 // Exported names start with uppercase letters
@@ -123,7 +123,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Resolve untyped literals
 					if types.IsUntyped(returnedType) {
 						if lit, ok := n.Result.(*ast.BasicLit); ok {
-							returnedType = resolveLiteral(lit, resultType.Err)
+							returnedType = inferLiteralType(lit, resultType.Err)
 						} else {
 							returnedType = resolveType(returnedType, resultType.Err)
 						}
@@ -148,7 +148,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Resolve untyped literals
 					if types.IsUntyped(returnedType) {
 						if lit, ok := n.Result.(*ast.BasicLit); ok {
-							returnedType = resolveLiteral(lit, resultType.Ok)
+							returnedType = inferLiteralType(lit, resultType.Ok)
 						} else {
 							returnedType = resolveType(returnedType, resultType.Ok)
 						}
@@ -395,7 +395,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			// If the RHS is UNTYPED, finalize it to a default type
 			if types.IsUntyped(rhsType) {
 				if lit, ok := item.Value.(*ast.BasicLit); ok {
-					rhsType = resolveLiteral(lit, types.TypeUnknown)
+					rhsType = inferLiteralType(lit, types.TypeUnknown)
 				}
 			}
 
@@ -438,52 +438,24 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	// Update the function symbol's type with actual function signature
 	if decl.Name != nil && decl.Type != nil {
-		funcType := typeFromTypeNode(decl.Type).(*types.FunctionType)
+		funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
 		if sym, ok := mod.CurrentScope.Lookup(decl.Name.Name); ok {
 			sym.Type = funcType
 		}
 	}
 
-	// Enter function scope for the entire function processing
-	defer mod.EnterScope(funcScope)()
-
-	// Set expected return type for validation
-	var expectedReturnType types.SemType = types.TypeVoid
-	if decl.Type != nil && decl.Type.Result != nil {
-		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, decl.Type.Result)
-	}
-	oldReturnType := mod.CurrentFunctionReturnType
-	mod.CurrentFunctionReturnType = expectedReturnType
-	defer func() {
-		mod.CurrentFunctionReturnType = oldReturnType
-	}()
+	// Set up function context (scope and return type)
+	defer setupFunctionContext(ctx, mod, funcScope, decl.Type)()
 
 	// Add parameters to the function scope with type information
-	if decl.Type != nil && decl.Type.Params != nil {
-		for _, param := range decl.Type.Params {
-			if param.Name != nil {
-				paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
-				// update the param type
-				psym, ok := funcScope.GetSymbol(param.Name.Name)
-				if !ok {
-					continue // should not happen but safe side
-				}
-
-				psym.Type = paramType // Done
-			}
-		}
+	if decl.Type != nil {
+		addParamsToScope(ctx, mod, funcScope, decl.Type.Params)
 	}
 
 	// Check the body with the function scope
 	if decl.Body != nil {
 		checkBlock(ctx, mod, decl.Body)
-
-		// Build control flow graph for the function
-		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
-		cfg := cfgBuilder.BuildFunctionCFG(decl)
-
-		// Analyze return paths
-		controlflow.AnalyzeReturns(ctx, mod, decl, cfg)
+		analyzeFunctionReturns(ctx, mod, decl)
 	}
 }
 
@@ -851,20 +823,8 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	if namedType, ok := baseType.(*types.NamedType); ok {
 		// It's a named type - look up the type symbol for method resolution
 		typeName = namedType.Name
-
-		// First check current module's scope
-		if sym, found := mod.ModuleScope.Lookup(typeName); found {
+		if sym, found := lookupTypeSymbol(ctx, mod, typeName); found {
 			typeSym = sym
-		} else {
-			// Not in current module, search imported modules
-			for _, importPath := range mod.ImportAliasMap {
-				if importedMod, exists := ctx.GetModule(importPath); exists {
-					if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
-						typeSym = sym
-						break
-					}
-				}
-			}
 		}
 
 		// Get the underlying struct for field access
@@ -962,9 +922,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 	}
 
 	// Unwrap reference types: &T -> T
-	if refType, ok := receiverType.(*types.ReferenceType); ok {
-		receiverType = refType.Inner
-	}
+	receiverType = dereferenceType(receiverType)
 
 	// Extract type name - only NamedType can have methods
 	var typeName string
@@ -980,19 +938,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 	}
 
 	// Find the type symbol - could be in current module or imported module
-	typeSym, found := mod.ModuleScope.Lookup(typeName)
-	if !found {
-		// Not in current module, search imported modules
-		for _, importPath := range mod.ImportAliasMap {
-			if importedMod, exists := ctx.GetModule(importPath); exists {
-				if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
-					typeSym = sym
-					found = true
-					break
-				}
-			}
-		}
-	}
+	typeSym, found := lookupTypeSymbol(ctx, mod, typeName)
 
 	// Type check the method signature and attach to type symbol
 	if found && typeSym.Kind == symbols.SymbolType && decl.Type != nil {
@@ -1022,19 +968,8 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 
 	methodScope := decl.Scope.(*table.SymbolTable)
 
-	// Enter method scope
-	defer mod.EnterScope(methodScope)()
-
-	// Set expected return type for validation
-	var expectedReturnType types.SemType = types.TypeVoid
-	if decl.Type != nil && decl.Type.Result != nil {
-		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, decl.Type.Result)
-	}
-	oldReturnType := mod.CurrentFunctionReturnType
-	mod.CurrentFunctionReturnType = expectedReturnType
-	defer func() {
-		mod.CurrentFunctionReturnType = oldReturnType
-	}()
+	// Set up method context (scope and return type)
+	defer setupFunctionContext(ctx, mod, methodScope, decl.Type)()
 
 	// Add receiver to method scope
 	if decl.Receiver != nil && decl.Receiver.Name != nil {
@@ -1046,17 +981,8 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	}
 
 	// Add parameters to the method scope with type information
-	if decl.Type != nil && decl.Type.Params != nil {
-		for _, param := range decl.Type.Params {
-			if param.Name != nil {
-				paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
-				psym, ok := methodScope.GetSymbol(param.Name.Name)
-				if !ok {
-					continue
-				}
-				psym.Type = paramType
-			}
-		}
+	if decl.Type != nil {
+		addParamsToScope(ctx, mod, methodScope, decl.Type.Params)
 	}
 
 	// Check the body with the method scope
@@ -1064,8 +990,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		checkBlock(ctx, mod, decl.Body)
 
 		// Build control flow graph for the method
-		// We'll wrap the method in a FuncDecl for CFG analysis
-		// Create a temporary FuncDecl for CFG construction
+		// Wrap the method in a FuncDecl for CFG analysis
 		tempFuncDecl := &ast.FuncDecl{
 			Name:     decl.Name,
 			Type:     decl.Type,
@@ -1073,12 +998,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 			Scope:    decl.Scope,
 			Location: decl.Location,
 		}
-
-		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
-		cfg := cfgBuilder.BuildFunctionCFG(tempFuncDecl)
-
-		// Analyze return paths
-		controlflow.AnalyzeReturns(ctx, mod, tempFuncDecl, cfg)
+		analyzeFunctionReturns(ctx, mod, tempFuncDecl)
 	}
 }
 
@@ -1392,23 +1312,45 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	// First, infer the type based on the expression structure
 	inferredType := inferExprType(ctx, mod, expr)
 
-	// Apply contextual typing for UNTYPED numeric literals only
+	// Check if literal is too large for any supported type
+	if lit, ok := expr.(*ast.BasicLit); ok {
+		if inferredType.Equals(types.TypeUnknown) {
+			// Literal doesn't fit in maximum type - report error
+			switch lit.Kind {
+			case ast.INT:
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("integer literal %s exceeds maximum supported integer size (256-bit)", lit.Value)).
+						WithPrimaryLabel(lit.Loc(), "too large value").
+						WithNote("maximum supported integer type is i256 (256-bit signed integer)").
+						WithHelp("consider using a string representation or splitting the value"),
+				)
+			case ast.FLOAT:
+				digits := countSignificantDigits(lit.Value)
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("float literal has %d significant digits, exceeds maximum supported precision (f256, ~71 digits)", digits)).
+						WithPrimaryLabel(lit.Loc(), "too large value").
+						WithNote("maximum supported float type is f256 with ~71 significant digits").
+						WithHelp("consider reducing precision or using a different representation"),
+				)
+			}
+			return types.TypeUnknown
+		}
+	}
+
+	// Apply contextual typing for literals when expected type is provided
 	// Note: Struct literals, string literals, bool literals have concrete types immediately
 	resultType := inferredType
 
-	if types.IsUntyped(inferredType) && !expected.Equals(types.TypeUnknown) {
-		// Only numeric literals (int/float) are untyped and need contextualization
+	// If we have an expected type and the expression is a literal, contextualize it directly
+	// This ensures literals are contextualized to the expected type when provided
+	if !expected.Equals(types.TypeUnknown) {
 		if lit, ok := expr.(*ast.BasicLit); ok {
 			// If expected is optional, contextualize to inner type
-			expectedForLit := expected
-			if optType, ok := expected.(*types.OptionalType); ok {
-				expectedForLit = optType.Inner
-			}
-			untypedCompatibility := checkTypeCompatibility(inferredType, expectedForLit)
-			if untypedCompatibility == Incompatible {
-				resultType = inferredType
-			} else {
-				resultType = resolveLiteral(lit, expectedForLit)
+			expectedForLit := unwrapOptionalType(expected)
+			// For numeric literals, always try to contextualize to expected type
+			// inferLiteralType will return expected type if compatible, or default if not
+			if lit.Kind == ast.INT || lit.Kind == ast.FLOAT {
+				resultType = inferLiteralType(lit, expectedForLit)
 			}
 		}
 	}
@@ -1532,7 +1474,7 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 	if types.IsUntyped(typ) {
 		if basicLit, ok := expr.(*ast.BasicLit); ok {
 			// Resolve to see what type it needs
-			resolvedType := resolveLiteral(basicLit, types.TypeUnknown)
+			resolvedType := inferLiteralType(basicLit, types.TypeUnknown)
 			if types.IsUntypedInt(typ) {
 				return fmt.Sprintf("integer literal (needs %s)", resolvedType.String())
 			} else if types.IsUntypedFloat(typ) {
@@ -1551,74 +1493,72 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 
 func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
 	// Check integer literal overflow
-	if types.IsUntypedInt(rhsType) || rhsType.Equals(types.TypeI64) {
-		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
-			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
-				// Use big.Int for all range checking (simpler, consistent)
-				if !fitsInType(lit.Value, targetType) {
-					// Get minimum type that can hold this value
-					minType := getMinimumTypeForValue(lit.Value)
+	// Check literal directly (works for both untyped and already-resolved literals)
+	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
+		if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
+			// Use big.Int for all range checking (simpler, consistent)
+			if !fitsInType(lit.Value, targetType) {
+				// Get minimum type that can hold this value
+				minType := getMinimumTypeForValue(lit.Value)
 
-					// Build error message
-					diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", lit.Value, targetType.String()))
+				// Build error message
+				diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", lit.Value, targetType.String()))
 
-					if typeNode != nil {
-						// Show value location (primary) and type location (secondary)
-						if minType != "unknown" && minType != "too large for any supported type" {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required to store this value", minType)).
-								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
-						} else if minType == "too large for any supported type" {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), "exceeds maximum supported integer size (256-bit)").
-								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
-						} else {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), "value too large for this type").
-								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
-						}
+				if typeNode != nil {
+					// Show value location (primary) and type location (secondary)
+					if minType != "unknown" && minType != "too large for any supported type" {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required to store this value", minType)).
+							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+					} else if minType == "too large for any supported type" {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "exceeds maximum supported integer size (256-bit)").
+							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 					} else {
-						if minType != "unknown" && minType != "too large for any supported type" {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required, got %s", minType, targetType.String()))
-						} else {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value doesn't fit in %s", targetType.String()))
-						}
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "value too large for this type").
+							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 					}
-
-					diag = diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType)))
-
-					ctx.Diagnostics.Add(diag)
-					return false
+				} else {
+					if minType != "unknown" && minType != "too large for any supported type" {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required, got %s", minType, targetType.String()))
+					} else {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value doesn't fit in %s", targetType.String()))
+					}
 				}
+
+				diag = diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType)))
+
+				ctx.Diagnostics.Add(diag)
+				return false
 			}
 		}
 	}
 
 	// Check float literal precision
-	if types.IsUntypedFloat(rhsType) {
-		if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.FLOAT {
-			if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsFloatTypeName(targetName) {
-				if !fitsInType(lit.Value, targetType) {
-					// Get minimum type that can hold this precision
-					digits := countSignificantDigits(lit.Value)
-					minType := getMinimumFloatTypeForDigits(digits)
+	// Check literal directly (works for both untyped and already-resolved literals)
+	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.FLOAT {
+		if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsFloatTypeName(targetName) {
+			if !fitsInType(lit.Value, targetType) {
+				// Get minimum type that can hold this precision
+				digits := countSignificantDigits(lit.Value)
+				minType := getMinimumFloatTypeForDigits(digits)
 
-					// Build error message
-					diag := diagnostics.NewError(fmt.Sprintf("float literal has too many significant digits for %s", targetType.String()))
+				// Build error message
+				diag := diagnostics.NewError(fmt.Sprintf("float literal has too many significant digits for %s", targetType.String()))
 
-					if typeNode != nil {
-						if minType != "exceeds f256 precision" {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits (needs %s)", digits, minType)).
-								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s' supports ~%d digits", targetType.String(), getFloatPrecision(targetName)))
-						} else {
-							diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits", digits)).
-								WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String())).
-								WithNote("This literal exceeds max f256 precision limit (~71 digits)")
-						}
+				if typeNode != nil {
+					if minType != "exceeds f256 precision" {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits (needs %s)", digits, minType)).
+							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s' supports ~%d digits", targetType.String(), getFloatPrecision(targetName)))
 					} else {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits, need %s but got %s", digits, minType, targetType.String()))
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits", digits)).
+							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String())).
+							WithNote("This literal exceeds max f256 precision limit (~71 digits)")
 					}
-
-					ctx.Diagnostics.Add(diag)
-					return false
+				} else {
+					diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("%d significant digits, need %s but got %s", digits, minType, targetType.String()))
 				}
+
+				ctx.Diagnostics.Add(diag)
+				return false
 			}
 		}
 	}
@@ -1634,7 +1574,10 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 
 	switch t := typeNode.(type) {
 	case *ast.ScopeResolutionExpr:
-		// Handle module::Type references
+		// Handle module::Type references (requires context)
+		if ctx == nil || mod == nil {
+			return types.TypeUnknown
+		}
 		if moduleIdent, ok := t.X.(*ast.IdentifierExpr); ok {
 			moduleAlias := moduleIdent.Name
 			typeName := t.Selector.Name
@@ -1666,14 +1609,16 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		return types.TypeUnknown
 
 	case *ast.IdentifierExpr:
-		// Try to look up user-defined type in symbol table first
-		sym, ok := mod.CurrentScope.Lookup(t.Name)
-		if ok && sym.Kind == symbols.SymbolType {
-			// Return the resolved user-defined type
-			return sym.Type
+		// If we have context, try to look up user-defined type in symbol table first
+		if ctx != nil && mod != nil {
+			sym, ok := mod.CurrentScope.Lookup(t.Name)
+			if ok && sym.Kind == symbols.SymbolType {
+				// Return the resolved user-defined type
+				return sym.Type
+			}
 		}
 
-		// Not a user-defined type, check if it's a primitive type
+		// Not a user-defined type (or no context), check if it's a primitive type
 		primitiveType := types.FromTypeName(types.TYPE_NAME(t.Name))
 		if !primitiveType.Equals(types.TypeUnknown) {
 			return primitiveType
@@ -1685,11 +1630,13 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 	case *ast.ArrayType:
 		// Array type: [N]T or []T
 		elementType := typeFromTypeNodeWithContext(ctx, mod, t.ElType)
-		length := -1
+		length := -1 // Dynamic array by default
 		if t.Len != nil {
-			// Extract constant length from array size expression
-			if constLength, ok := extractConstantIndex(t.Len); ok && constLength >= 0 {
-				length = constLength
+			// Extract constant length from array size expression (only if we have context for const eval)
+			if ctx != nil && mod != nil {
+				if constLength, ok := extractConstantIndex(t.Len); ok && constLength >= 0 {
+					length = constLength
+				}
 			}
 		}
 		return types.NewArray(elementType, length)
@@ -1746,107 +1693,21 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		return types.NewMap(keyType, valueType)
 
 	default:
-		// Fallback to simple version
-		return typeFromTypeNode(typeNode)
+		// For unknown types, try primitive lookup
+		if ident, ok := typeNode.(*ast.IdentifierExpr); ok {
+			return types.FromTypeName(types.TYPE_NAME(ident.Name))
+		}
+		return types.TypeUnknown
 	}
 }
 
-// typeFromTypeNode converts AST type nodes to semantic types
+// typeFromTypeNode converts AST type nodes to semantic types (without context)
+// This is a convenience wrapper that calls typeFromTypeNodeWithContext with nil context.
+// For user-defined types, this will only work for primitives.
 func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
-	if typeNode == nil {
-		return types.TypeUnknown
-	}
-
-	switch t := typeNode.(type) {
-	case *ast.IdentifierExpr:
-		// Simple type name (primitive or builtin)
-		return types.FromTypeName(types.TYPE_NAME(t.Name))
-
-	case *ast.UserDefinedType:
-		// User-defined type (struct, enum, interface)
-		// For now, treat as primitive - will be expanded with type registry
-		return types.FromTypeName(types.TYPE_NAME(t.Name))
-
-	case *ast.ArrayType:
-		// Array type: [N]T or []T
-		elementType := typeFromTypeNode(t.ElType)
-		length := -1 // Dynamic array by default
-		if t.Len != nil {
-			// TODO: keep all array dynamic now
-		}
-		return types.NewArray(elementType, length)
-
-	case *ast.OptionalType:
-		// Optional type: T?
-		innerType := typeFromTypeNode(t.Base)
-		return types.NewOptional(innerType)
-
-	case *ast.ResultType:
-		// Result type: T ! E
-		okType := typeFromTypeNode(t.Value)
-		errType := typeFromTypeNode(t.Error)
-		return types.NewResult(okType, errType)
-
-	case *ast.StructType:
-		// Struct type: struct { .x: i32, .y: i32 }
-		fields := make([]types.StructField, len(t.Fields))
-
-		// Process struct fields in parallel with bounded concurrency
-		var wg sync.WaitGroup
-
-		for i, f := range t.Fields {
-			wg.Add(1)
-			go func(idx int, field ast.Field) {
-				defer wg.Done()
-
-				fieldName := ""
-				if field.Name != nil {
-					fieldName = field.Name.Name
-				}
-				fields[idx] = types.StructField{
-					Name: fieldName,
-					Type: typeFromTypeNode(field.Type),
-				}
-			}(i, f)
-		}
-
-		wg.Wait()
-
-		return types.NewStruct("", fields) // Anonymous struct
-
-	case *ast.FuncType:
-		// Function type: fn(T1, T2) -> R
-		params := make([]types.ParamType, len(t.Params))
-
-		// Process parameters in parallel with bounded concurrency
-		var wg sync.WaitGroup
-
-		for i, param := range t.Params {
-			wg.Add(1)
-			go func(idx int, par ast.Field) {
-				defer wg.Done()
-				param := &params[idx]
-				param.Name = par.Name.Name
-				param.Type = typeFromTypeNode(par.Type)
-				param.IsVariadic = par.IsVariadic // Preserve variadic info
-			}(i, param)
-		}
-
-		wg.Wait()
-
-		returns := typeFromTypeNode(t.Result)
-
-		return types.NewFunction(params, returns)
-
-	case *ast.MapType:
-		// Map type: map[K]V
-		keyType := typeFromTypeNode(t.Key)
-		valueType := typeFromTypeNode(t.Value)
-		return types.NewMap(keyType, valueType)
-
-	default:
-		return types.TypeUnknown
-	}
+	// Use context version with nil - it will handle primitives correctly
+	// but won't resolve user-defined types (which is fine for this use case)
+	return typeFromTypeNodeWithContext(nil, nil, typeNode)
 }
 
 // checkCallExpr validates function call expressions
