@@ -17,7 +17,6 @@ import (
 	"strings"
 )
 
-
 // isExported checks if a name is exported based on capitalization (Go-style)
 // Exported names start with uppercase letters
 func isExported(name string) bool {
@@ -675,32 +674,67 @@ func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *
 }
 
 // checkCompositeLit validates that a composite literal matches its target type
+// It handles both explicit types (from lit.Type) and inferred types (when targetType is provided)
+// This function checks elements with context AND validates consistency
 func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
 	// Unwrap NamedType to get the underlying type
 	underlyingType := types.UnwrapType(targetType)
 
+	// Handle arrays
+	if arrayType, ok := underlyingType.(*types.ArrayType); ok {
+		validateArrayLiteral(ctx, mod, lit, arrayType)
+		return
+	}
+
 	// Handle struct literals
 	if structType, ok := underlyingType.(*types.StructType); ok {
-		checkStructLiteral(ctx, lit, structType, targetType)
+		checkStructLiteral(ctx, mod, lit, structType, targetType)
 		return
 	}
 
 	// Handle map literals
 	if mapType, ok := underlyingType.(*types.MapType); ok {
-		checkMapLiteral(ctx, mod, lit, mapType)
+		// Only validate as map if not all keys are identifiers (structs have all IdentifierExpr keys)
+		allKeysAreIdentifiers := true
+		hasKeyValueExpr := false
+		for _, elem := range lit.Elts {
+			if kv, ok := elem.(*ast.KeyValueExpr); ok {
+				hasKeyValueExpr = true
+				if _, isIdent := kv.Key.(*ast.IdentifierExpr); !isIdent {
+					allKeysAreIdentifiers = false
+					break
+				}
+			}
+		}
+		if hasKeyValueExpr && !allKeysAreIdentifiers {
+			checkMapLiteral(ctx, mod, lit, mapType)
+		}
 		return
 	}
 }
 
 // checkStructLiteral validates struct literal elements
-func checkStructLiteral(ctx *context_v2.CompilerContext, lit *ast.CompositeLit, structType *types.StructType, targetType types.SemType) {
-	// Build a map of provided fields
+// It checks elements with field type context AND validates consistency
+func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType, targetType types.SemType) {
+	// Build a map of provided fields and check elements with context
 	providedFields := make(map[string]bool)
 	for _, elem := range lit.Elts {
 		if kv, ok := elem.(*ast.KeyValueExpr); ok {
 			if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
 				fieldName := key.Name
 				providedFields[fieldName] = true
+
+				// Check value with field type as context
+				if kv.Value != nil {
+					fieldExpected := types.TypeUnknown
+					for _, field := range structType.Fields {
+						if field.Name == fieldName {
+							fieldExpected = field.Type
+							break
+						}
+					}
+					checkExpr(ctx, mod, kv.Value, fieldExpected)
+				}
 			}
 		}
 	}
@@ -730,6 +764,24 @@ func checkStructLiteral(ctx *context_v2.CompilerContext, lit *ast.CompositeLit, 
 	}
 }
 
+// validateArrayLiteral validates that all array elements match the element type
+func validateArrayLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, arrayType *types.ArrayType) {
+	for _, elem := range lit.Elts {
+		if _, isKV := elem.(*ast.KeyValueExpr); !isKV {
+			elemType := checkExpr(ctx, mod, elem, arrayType.Element)
+			if compat := checkTypeCompatibility(elemType, arrayType.Element); compat == Incompatible {
+				elemTypeStr := resolveType(elemType, types.TypeUnknown)
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
+						WithCode(diagnostics.ErrTypeMismatch).
+						WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
+						WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String())),
+				)
+			}
+		}
+	}
+}
+
 // checkMapLiteral validates map literal key/value types
 func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, mapType *types.MapType) {
 	// Validate that all keys have compatible types with the map's key type
@@ -743,23 +795,25 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 
 		// Check key type compatibility - with contextualization
 		keyType := checkExpr(ctx, mod, kv.Key, mapType.Key)
-		keyCompat := checkTypeCompatibility(keyType, mapType.Key)
-		if keyCompat == Incompatible {
+		if compat := checkTypeCompatibility(keyType, mapType.Key); compat == Incompatible {
+			keyTypeStr := resolveType(keyType, types.TypeUnknown)
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("map key type mismatch: expected %s, found %s", mapType.Key.String(), keyType.String())).
-					WithPrimaryLabel(kv.Key.Loc(), "incompatible key type").
-					WithHelp(fmt.Sprintf("expected type %s", mapType.Key.String())),
+				diagnostics.NewError(fmt.Sprintf("map keys must all be same type, expected %s but found %s", mapType.Key.String(), keyTypeStr)).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(kv.Key.Loc(), fmt.Sprintf("type %s", keyTypeStr)).
+					WithHelp(fmt.Sprintf("all map keys must be %s", mapType.Key.String())),
 			)
 		}
 
 		// Check value type compatibility - with contextualization
 		valueType := checkExpr(ctx, mod, kv.Value, mapType.Value)
-		valueCompat := checkTypeCompatibility(valueType, mapType.Value)
-		if valueCompat == Incompatible {
+		if compat := checkTypeCompatibility(valueType, mapType.Value); compat == Incompatible {
+			valueTypeStr := resolveType(valueType, types.TypeUnknown)
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("map value type mismatch: expected %s, found %s", mapType.Value.String(), valueType.String())).
-					WithPrimaryLabel(kv.Value.Loc(), "incompatible value type").
-					WithHelp(fmt.Sprintf("expected type %s", mapType.Value.String())),
+				diagnostics.NewError(fmt.Sprintf("map values must all be same type, expected %s but found %s", mapType.Value.String(), valueTypeStr)).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(kv.Value.Loc(), fmt.Sprintf("type %s", valueTypeStr)).
+					WithHelp(fmt.Sprintf("all map values must be %s", mapType.Value.String())),
 			)
 		}
 	}
@@ -1238,74 +1292,22 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		checkCastExpr(ctx, mod, e, sourceType, targetType)
 
 	case *ast.CompositeLit:
-		// Determine expected struct type for field contextualization
-		var expectedStructType *types.StructType
-		var expectedArrayType *types.ArrayType
-		if !expected.Equals(types.TypeUnknown) {
-			// Unwrap NamedType to get underlying struct or array
-			unwrapped := types.UnwrapType(expected)
-			expectedStructType, _ = unwrapped.(*types.StructType)
-			if expectedStructType == nil {
-				expectedArrayType, _ = unwrapped.(*types.ArrayType)
-			}
+		// Determine target type for validation
+		var targetType types.SemType
+		if e.Type != nil {
+			// Explicit type: use it as target
+			targetType = typeFromTypeNodeWithContext(ctx, mod, e.Type)
+		} else if !expected.Equals(types.TypeUnknown) {
+			// Expected type provided: use it as target
+			targetType = expected
+		} else {
+			// No explicit type and no expected type: infer type
+			targetType = inferExprType(ctx, mod, e)
 		}
 
-		// Check all element expressions in the composite literal
-		for _, elem := range e.Elts {
-			if kv, ok := elem.(*ast.KeyValueExpr); ok {
-				// Struct field: check the value with field type as context
-				if kv.Value != nil {
-					fieldExpected := types.TypeUnknown
-					// If we know the expected struct type, provide field type as context
-					if expectedStructType != nil {
-						if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
-							fieldName := key.Name
-							for _, field := range expectedStructType.Fields {
-								if field.Name == fieldName {
-									fieldExpected = field.Type
-									break
-								}
-							}
-						}
-					}
-					checkExpr(ctx, mod, kv.Value, fieldExpected)
-				}
-			} else {
-				// Array element: check with element type if known
-				elemExpected := types.TypeUnknown
-				if expectedArrayType != nil {
-					elemExpected = expectedArrayType.Element
-				}
-				checkExpr(ctx, mod, elem, elemExpected)
-			}
-		}
-		// Validate composite literal matches target type if specified
-		if e.Type != nil {
-			targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+		// checkCompositeLit handles everything: element checking with context AND validation
+		if !targetType.Equals(types.TypeUnknown) {
 			checkCompositeLit(ctx, mod, e, targetType)
-		} else if expectedArrayType == nil && expectedStructType == nil {
-			// No explicit type and no expected type - infer and validate array consistency
-			inferredType := inferExprType(ctx, mod, e)
-			if arrayType, ok := inferredType.(*types.ArrayType); ok {
-				// Validate all elements match inferred element type
-				for _, elem := range e.Elts {
-					if _, isKV := elem.(*ast.KeyValueExpr); !isKV {
-						// Contextualize element with expected array element type
-						elemType := checkExpr(ctx, mod, elem, arrayType.Element)
-						compat := checkTypeCompatibility(elemType, arrayType.Element)
-						if compat == Incompatible {
-							// Format type description for better error messages
-							elemTypeStr := resolveType(elemType, types.TypeUnknown)
-							ctx.Diagnostics.Add(
-								diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
-									WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String())),
-							)
-						}
-					}
-				}
-			}
 		}
 	}
 
