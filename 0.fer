@@ -63,15 +63,20 @@ let pp : i32 = p.x;
 let valueFromLiteral : i8 = { .x = 5.0, .y = 10.0 }.z;
 
 // should work
-fn (p: Point) move(dx: f64, dy: f64) -> Point {
+fn (p: Point) move(dx: f64, dy: f64, p: i32) -> Point {
     let new_point := { .x = p.x + dx, .y = p.y + dy } as Point;
     return new_point;
 }
 
+fn movePoint(p: Point, dx: f64, dy: f64) {
+    // try to access private field (should error)
+    let val := p.s;
+}
+
 // Method on anonymous struct (should error)
-fn (p: struct{.x: f64, .y: f64}) magnitude() -> f64 {
+fn (p: Point) magnitude() -> f64 {
     return p.x * p.x + p.y * p.s;
 }
 
-let newPoint : i32 = p.move(1, 2);
+let newPoint : i32 = p.move(1, 2, 3);
 

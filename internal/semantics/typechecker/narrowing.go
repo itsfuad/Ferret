@@ -10,7 +10,6 @@ import (
 	"compiler/internal/types"
 )
 
-
 // NarrowingContext tracks type narrowing information for variables within a scope.
 // Used for optional type narrowing (T? → T) based on null checks.
 type NarrowingContext struct {
@@ -157,8 +156,8 @@ func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 // setupFunctionContext sets up function scope and return type tracking.
 // Returns a cleanup function that should be deferred.
 func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, funcType *ast.FuncType) func() {
-	// Enter function scope
-	defer mod.EnterScope(scope)()
+	// Enter function scope and get restore function
+	restoreScope := mod.EnterScope(scope)
 
 	// Set expected return type for validation
 	var expectedReturnType types.SemType = types.TypeVoid
@@ -167,7 +166,10 @@ func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	}
 	oldReturnType := mod.CurrentFunctionReturnType
 	mod.CurrentFunctionReturnType = expectedReturnType
+
+	// Return cleanup function that restores both scope and return type
 	return func() {
+		restoreScope()
 		mod.CurrentFunctionReturnType = oldReturnType
 	}
 }

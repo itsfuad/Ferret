@@ -613,7 +613,7 @@ func (p *Parser) parseSelectorExpr(x ast.Expression) *ast.SelectorExpr {
 	sel := p.parseIdentifier()
 	return &ast.SelectorExpr{
 		X:        x,
-		Sel:      sel,
+		Field:    sel,
 		Location: *source.NewLocation(&p.filepath, x.Loc().Start, sel.Loc().End),
 	}
 }

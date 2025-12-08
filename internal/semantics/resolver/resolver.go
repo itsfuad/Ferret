@@ -184,7 +184,6 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 
 	case *ast.SelectorExpr:
 		resolveExpr(ctx, mod, e.X)
-		// Sel is the field name, not checked here
 
 	case *ast.ScopeResolutionExpr:
 		resolveStaticAccess(ctx, mod, e)
@@ -226,6 +225,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	}
 }
 
+// resolveStaticAccess handles scope resolution expressions like module::symbol or EnumType::Variant
 func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module, e *ast.ScopeResolutionExpr) {
 	// Handle X::Y resolution where X can be:
 	// 1. Module alias (module::symbol)
@@ -290,6 +290,7 @@ func resolveStaticAccess(ctx *context_v2.CompilerContext, mod *context_v2.Module
 
 		// Check if symbol is exported
 		if !sym.Exported {
+
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' is not exported from module '%s'", rightName, importPath)).
 					WithPrimaryLabel(e.Selector.Loc(), fmt.Sprintf("'%s' is private", rightName)).

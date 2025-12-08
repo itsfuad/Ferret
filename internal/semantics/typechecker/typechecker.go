@@ -10,22 +10,13 @@ import (
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
+	"compiler/internal/utils"
 	str "compiler/internal/utils/strings"
 
 	"fmt"
 	"strconv"
 	"strings"
 )
-
-// isExported checks if a name is exported based on capitalization (Go-style)
-// Exported names start with uppercase letters
-func isExported(name string) bool {
-	if len(name) == 0 {
-		return false
-	}
-	firstChar := rune(name[0])
-	return firstChar >= 'A' && firstChar <= 'Z'
-}
 
 // TypeCheckMethodSignatures only processes method signatures to attach methods to types
 // This must run before CheckModule so all methods are available
@@ -867,7 +858,7 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		return
 	}
 
-	fieldName := expr.Sel.Name
+	fieldName := expr.Field.Name
 
 	// Handle NamedType and anonymous StructType
 	var typeSym *symbols.Symbol
@@ -897,29 +888,34 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		for _, field := range structType.Fields {
 			if field.Name == fieldName {
 				// Check field visibility - private fields (lowercase) have restrictions
-				if !isExported(fieldName) {
-					// Private field - only accessible if base is a receiver parameter
-					// Check if expr.X is an identifier referring to a receiver
-					allowAccess := false
+				if !utils.IsExported(fieldName) {
+					// Private field - only accessible through receiver parameter
+					// Simple check: if expr.X is an identifier that refers to a receiver symbol
+					isReceiver := false
 					if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
-						if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-							// Allow if it's a receiver parameter (check symbol's Decl)
-							if _, isReceiver := sym.Decl.(*ast.Field); isReceiver && sym.Kind == symbols.SymbolParameter {
-								// Additional check: receiver type must match the field's type
-								if typeName != "" {
-									receiverType := sym.Type
-									if namedRecvType, ok := types.UnwrapType(receiverType).(*types.NamedType); ok {
-										allowAccess = namedRecvType.Name == typeName
-									}
+						// Look up the identifier - search scope chain to find receiver
+						// Walk up the parent chain starting from current scope
+						currentScope := mod.CurrentScope
+						for currentScope != nil {
+							if sym, found := currentScope.GetSymbol(ident.Name); found {
+								// Found in this scope - check if it's a receiver
+								if sym.Kind == symbols.SymbolReceiver {
+									isReceiver = true
+									break
 								}
+								// Found but not a receiver - this shadows any receiver in parent scopes
+								// So we stop searching
+								break
 							}
+							// Not found in this scope, check parent
+							currentScope = currentScope.Parent()
 						}
 					}
 
-					if !allowAccess {
+					if !isReceiver {
 						ctx.Diagnostics.Add(
 							diagnostics.NewError(fmt.Sprintf("field '%s' is private", fieldName)).
-								WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("cannot access private field '%s'", fieldName)).
+								WithPrimaryLabel(expr.Field.Loc(), fmt.Sprintf("cannot access private field '%s'", fieldName)).
 								WithNote("private fields (lowercase) can only be accessed through the receiver in methods"),
 						)
 						return
@@ -942,13 +938,13 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		ctx.Diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("field or method '%s' not found on type '%s'", fieldName, typeName)).
 				WithCode(diagnostics.ErrFieldNotFound).
-				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
+				WithPrimaryLabel(expr.Field.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
 		)
 	} else {
 		ctx.Diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("field '%s' not found on anonymous struct", fieldName)).
 				WithCode(diagnostics.ErrFieldNotFound).
-				WithPrimaryLabel(expr.Sel.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
+				WithPrimaryLabel(expr.Field.Loc(), fmt.Sprintf("'%s' does not exist", fieldName)),
 		)
 	}
 }
@@ -1007,7 +1003,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		typeSym.Methods[decl.Name.Name] = &symbols.MethodInfo{
 			Name:     decl.Name.Name,
 			FuncType: funcType,
-			Exported: isExported(decl.Name.Name),
+			Exported: utils.IsExported(decl.Name.Name),
 		}
 	}
 }

@@ -91,8 +91,8 @@ func (c *CallExpr) Loc() *source.Location { return &c.Location }
 
 // SelectorExpr represents a field access expression (x.field)
 type SelectorExpr struct {
-	X   Expression      // expression
-	Sel *IdentifierExpr // field selector
+	X     Expression      // expression
+	Field *IdentifierExpr // field selector
 	source.Location
 }
 

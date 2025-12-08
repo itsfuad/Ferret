@@ -48,4 +48,23 @@ const (
 	SymbolFunction
 	SymbolType
 	SymbolParameter
+	SymbolReceiver
 )
+
+func (s SymbolKind) String() string {
+	switch s {
+	case SymbolVariable:
+		return "variable"
+	case SymbolConstant:
+		return "constant"
+	case SymbolFunction:
+		return "function"
+	case SymbolType:
+		return "type"
+	case SymbolParameter:
+		return "parameter"
+	case SymbolReceiver:
+		return "receiver"
+	}
+	return "unknown"
+}

@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-
-
 // inferLiteralType is the SINGLE source of truth for all literal type inference.
 // It handles all rules: default size, promotion, contextualization, and fitness checking.
 //
@@ -375,7 +373,7 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	// Automatic dereferencing: &T -> T
 	baseType = dereferenceType(baseType)
 
-	fieldName := expr.Sel.Name
+	fieldName := expr.Field.Name
 
 	// If baseType is a NamedType, we might have methods attached to the type symbol
 	// We need to check both fields (on the underlying struct) and methods (on the named type)

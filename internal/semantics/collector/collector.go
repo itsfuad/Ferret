@@ -218,7 +218,7 @@ func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, dec
 			Name:     name,
 			Kind:     kind,
 			Type:     types.TypeUnknown,
-			Exported: isExported(name),
+			Exported: utils.IsExported(name),
 			Decl:     item.Name,
 		}
 
@@ -269,14 +269,14 @@ func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		Name:     name,
 		Kind:     symbols.SymbolFunction,
 		Type:     types.NewFunction([]types.ParamType{}, types.TypeVoid), // Placeholder, will be filled during type checking
-		Exported: isExported(name),
+		Exported: utils.IsExported(name),
 		Decl:     decl,
 	}
 
 	mod.CurrentScope.Declare(name, sym)
 
 	// Collect function scope and body using shared helper
-	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope)
+	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope, nil)
 }
 
 // extractReceiverTypeName extracts the type name and optional module from a receiver's TypeNode.
@@ -447,27 +447,15 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	// Create method scope and collect parameters + body
 	// This happens regardless of receiver validity to enable analysis of method body
 	// Reuse function scope logic since methods are just functions with receivers
-	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope)
-
-	// Add receiver as the first parameter in the scope
-	// This is done after collectFunctionScope so receiver appears before regular params
-	if decl.Receiver != nil && decl.Receiver.Name != nil && decl.Scope != nil {
-		methodScope := decl.Scope.(*table.SymbolTable)
-		receiverSym := &symbols.Symbol{
-			Name: decl.Receiver.Name.Name,
-			Kind: symbols.SymbolParameter,
-			Decl: decl.Receiver,
-			Type: types.TypeUnknown, // Filled during type checking
-		}
-		// Declare receiver (may fail if param name conflicts, but that's a user error)
-		if err := methodScope.Declare(decl.Receiver.Name.Name, receiverSym); err != nil {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("receiver name '%s' conflicts with parameter name", decl.Receiver.Name.Name)).
-					WithCode(diagnostics.ErrRedeclaredSymbol).
-					WithPrimaryLabel(decl.Receiver.Loc(), "receiver declared here"),
-			)
-		}
+	receiverSym := &symbols.Symbol{
+		Name: decl.Receiver.Name.Name,
+		Kind: symbols.SymbolReceiver,
+		Type: types.TypeUnknown, // Filled during type checking
+		Exported: utils.IsExported(decl.Receiver.Name.Name),
+		Decl: decl.Receiver,
 	}
+
+	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope, receiverSym)
 }
 
 // validateParams validates function parameters including variadic rules, duplicates, and type annotations
@@ -579,7 +567,7 @@ func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 		Name:     name,
 		Kind:     symbols.SymbolType,
 		Type:     types.TypeUnknown, // The actual type will be resolved later
-		Exported: isExported(name),
+		Exported: utils.IsExported(name),
 		Decl:     decl,
 	}
 
@@ -610,7 +598,7 @@ func collectTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 				Name:     qualifiedName,
 				Kind:     symbols.SymbolConstant,
 				Type:     types.TypeUnknown, // Will be set to the enum type during type checking
-				Exported: isExported(name),
+				Exported: utils.IsExported(name),
 				Decl:     variant.Name,
 			}
 			mod.ModuleScope.Declare(qualifiedName, variantSym)
@@ -656,16 +644,6 @@ func collectImport(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt
 	// Append alias and location
 	imp.Alias = alias
 	imp.Location = stmt.Loc()
-}
-
-// isExported checks if a name is exported based on capitalization (Go-style)
-// Exported names start with uppercase letters
-func isExported(name string) bool {
-	if len(name) == 0 {
-		return false
-	}
-	firstChar := rune(name[0])
-	return firstChar >= 'A' && firstChar <= 'Z'
 }
 
 // collectIfStmt handles if statements and their scopes
@@ -792,7 +770,7 @@ func collectFuncLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit
 	}
 
 	// Collect function scope and body using shared helper
-	collectFunctionScope(ctx, mod, lit.Type, lit.Body, &lit.Scope)
+	collectFunctionScope(ctx, mod, lit.Type, lit.Body, &lit.Scope, nil)
 
 	if ctx.Debug {
 		colors.BROWN.Println("Exiting function literal scope")
@@ -802,7 +780,7 @@ func collectFuncLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit
 // collectFunctionScope creates a new scope for a function (named or literal),
 // validates and declares parameters, and collects the function body.
 // This is shared by both collectFuncDecl and collectFuncLit.
-func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcType *ast.FuncType, body *ast.Block, scopePtr *ast.SymbolTable) {
+func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcType *ast.FuncType, body *ast.Block, scopePtr *ast.SymbolTable, receiverSym *symbols.Symbol) {
 	// Create new scope with current scope as parent
 	// For function literals, this enables closure (capturing parent variables)
 	newScope := table.NewSymbolTable(mod.CurrentScope)
@@ -813,25 +791,39 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	// Enter function scope and ensure it's restored on exit
 	defer mod.EnterScope(newScope)()
 
+	if receiverSym != nil {
+		// just like parameters, declare the receiver in the scope
+		mod.CurrentScope.Declare(receiverSym.Name, receiverSym)
+	}
+
 	// Validate and declare parameters
 	if funcType != nil && funcType.Params != nil {
 		validateParams(ctx, mod, funcType.Params)
-
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
 			psym := &symbols.Symbol{
 				Name: param.Name.Name,
 				Kind: symbols.SymbolParameter,
 				Decl: &param,
+				Exported: utils.IsExported(param.Name.Name),
 				Type: types.TypeUnknown, // Will be filled during type checking
 			}
 
 			err := mod.CurrentScope.Declare(param.Name.Name, psym)
 			if err != nil {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("duplicate parameter '%s'", param.Name.Name)).
-						WithPrimaryLabel(param.Loc(), "parameter already declared"),
-				)
+				// if parameter name conflicts with receiver name, return an error
+				if param.Name.Name == receiverSym.Name {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("receiver name '%s' conflicts with parameter name", receiverSym.Name)).
+							WithPrimaryLabel(receiverSym.Decl.Loc(), "receiver declared here"),
+					)
+					continue
+				} else {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("duplicate parameter '%s'", param.Name.Name)).
+							WithPrimaryLabel(param.Loc(), "parameter already declared"),
+					)
+				}
 			}
 		}
 	}
