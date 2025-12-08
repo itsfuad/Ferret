@@ -667,20 +667,20 @@ func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *
 // checkCompositeLit validates that a composite literal matches its target type
 // It handles both explicit types (from lit.Type) and inferred types (when targetType is provided)
 // This function checks elements with context AND validates consistency
-func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) {
+// Returns missing fields for struct literals, nil otherwise
+func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, targetType types.SemType) []string {
 	// Unwrap NamedType to get the underlying type
 	underlyingType := types.UnwrapType(targetType)
 
 	// Handle arrays
 	if arrayType, ok := underlyingType.(*types.ArrayType); ok {
 		validateArrayLiteral(ctx, mod, lit, arrayType)
-		return
+		return nil
 	}
 
 	// Handle struct literals
 	if structType, ok := underlyingType.(*types.StructType); ok {
-		checkStructLiteral(ctx, mod, lit, structType, targetType)
-		return
+		return checkStructLiteral(ctx, mod, lit, structType, targetType)
 	}
 
 	// Handle map literals
@@ -700,13 +700,16 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		if hasKeyValueExpr && !allKeysAreIdentifiers {
 			checkMapLiteral(ctx, mod, lit, mapType)
 		}
-		return
+		return nil
 	}
+	
+	return nil
 }
 
 // checkStructLiteral validates struct literal elements
 // It checks elements with field type context AND validates consistency
-func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType, targetType types.SemType) {
+// Returns missing fields if any, nil otherwise
+func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType, targetType types.SemType) []string {
 	// Build a map of provided fields and check elements with context
 	providedFields := make(map[string]bool)
 	for _, elem := range lit.Elts {
@@ -738,21 +741,8 @@ func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 		}
 	}
 
-	// Only report error if there are missing fields (extra fields are allowed and will be stripped)
-	if len(missingFields) > 0 {
-		// Use the original type's name if available (for better error messages)
-		typeName := targetType.String()
-		errorMsg := fmt.Sprintf("cannot convert composite literal to type '%s'", typeName)
-		diag := diagnostics.NewError(errorMsg).
-			WithCode(diagnostics.ErrTypeMismatch).
-			WithPrimaryLabel(lit.Loc(), "incompatible struct literal")
-
-		// Build note with missing fields list
-		noteMsg := fmt.Sprintf("missing %s (%s)", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", "))
-		diag = diag.WithNote(noteMsg)
-
-		ctx.Diagnostics.Add(diag)
-	}
+	// Return missing fields - error will be reported in checkAssignLike with better context
+	return missingFields
 }
 
 // validateArrayLiteral validates that all array elements match the element type
@@ -1302,6 +1292,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		}
 
 		// checkCompositeLit handles everything: element checking with context AND validation
+		// Missing fields info will be handled in checkAssignLike for better error messages
 		if !targetType.Equals(types.TypeUnknown) {
 			checkCompositeLit(ctx, mod, e, targetType)
 		}
@@ -1435,6 +1426,22 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 
 	case Incompatible:
 		// Cannot convert - create user-friendly error message
+		// Check if this is a struct compatibility issue that we can enhance
+		rhsUnwrapped := types.UnwrapType(rhsType)
+		leftUnwrapped := types.UnwrapType(leftType)
+		
+		var missingFields []string
+		var mismatchedFields []string
+		isStructCompatibility := false
+		
+		if rhsStruct, ok := rhsUnwrapped.(*types.StructType); ok {
+			if leftStruct, ok := leftUnwrapped.(*types.StructType); ok {
+				// Both are structs - get detailed compatibility info
+				missingFields, mismatchedFields = analyzeStructCompatibility(rhsStruct, leftStruct)
+				isStructCompatibility = true
+			}
+		}
+		
 		var errorMsg string
 		if types.IsUntyped(rhsType) {
 			// For untyped literals, use more intuitive message
@@ -1459,6 +1466,20 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		} else {
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("expected '%s', got '%s'", leftType.String(), rhsType.String()))
+		}
+
+		// Add helpful note for struct compatibility issues
+		if isStructCompatibility && (len(missingFields) > 0 || len(mismatchedFields) > 0) {
+			var noteParts []string
+			if len(missingFields) > 0 {
+				noteParts = append(noteParts, fmt.Sprintf("missing %s (%s)", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", ")))
+			}
+			if len(mismatchedFields) > 0 {
+				noteParts = append(noteParts, fmt.Sprintf("type mismatch in %s: %s", str.Pluralize("field", "fields", len(mismatchedFields)), strings.Join(mismatchedFields, ", ")))
+			}
+			if len(noteParts) > 0 {
+				diag = diag.WithNote(strings.Join(noteParts, "; "))
+			}
 		}
 
 		ctx.Diagnostics.Add(diag)

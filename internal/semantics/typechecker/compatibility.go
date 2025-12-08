@@ -178,7 +178,6 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 	switch compatibility {
 	case Incompatible:
 		return fmt.Sprintf("cannot use type '%s' as type '%s'", source, target)
-
 	case LossyConvertible:
 		// Check if target has smaller bit size than source
 		srcName, srcOk := types.GetPrimitiveName(source)
