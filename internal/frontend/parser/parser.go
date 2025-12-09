@@ -1029,7 +1029,7 @@ func (p *Parser) checkTrailing(target, closingToken tokens.TOKEN, contextName st
 		p.diagnostics.Add(
 			diagnostics.NewInfo(fmt.Sprintf("trailing %s in %s", target, contextName)).
 				WithCode(diagnostics.InfoTrailingComma).
-				WithPrimaryLabel(loc, "remove this trailing comma").
+				WithPrimaryLabel(loc, fmt.Sprintf("remove this trailing `%s`", target)).
 				WithNote(fmt.Sprintf("Trailing %s are allowed but excluding it keeps code clean ans consistent", target)),
 		)
 		return true

@@ -866,8 +866,7 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 			collectExpr(ctx, mod, arg)
 		}
 		// Handle catch clause: create handler block scope, declare error identifier, then collect block
-		// Both errVal and defaultVal are in the catch block scope
-		if e.Catch != nil {
+		if e.Catch != nil && e.Catch.Handler != nil {
 			// Create handler block scope (same as collectBlock does)
 			handlerScope := table.NewSymbolTable(mod.CurrentScope)
 			e.Catch.Handler.Scope = handlerScope
@@ -887,16 +886,13 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 			}
 
 			// Collect handler block nodes
-			if e.Catch.Handler != nil {
-				for _, n := range e.Catch.Handler.Nodes {
-					collectNode(ctx, mod, n)
-				}
+			for _, n := range e.Catch.Handler.Nodes {
+				collectNode(ctx, mod, n)
 			}
-
-			// Collect fallback expression in handler scope (defaultVal is also in catch block scope)
-			if e.Catch.Fallback != nil {
-				collectExpr(ctx, mod, e.Catch.Fallback)
-			}
+		}
+		// Collect fallback expression if present (in original scope, not handler scope)
+		if e.Catch != nil && e.Catch.Fallback != nil {
+			collectExpr(ctx, mod, e.Catch.Fallback)
 		}
 
 	case *ast.IndexExpr:
