@@ -448,11 +448,11 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	// This happens regardless of receiver validity to enable analysis of method body
 	// Reuse function scope logic since methods are just functions with receivers
 	receiverSym := &symbols.Symbol{
-		Name: decl.Receiver.Name.Name,
-		Kind: symbols.SymbolReceiver,
-		Type: types.TypeUnknown, // Filled during type checking
+		Name:     decl.Receiver.Name.Name,
+		Kind:     symbols.SymbolReceiver,
+		Type:     types.TypeUnknown, // Filled during type checking
 		Exported: utils.IsExported(decl.Receiver.Name.Name),
-		Decl: decl.Receiver,
+		Decl:     decl.Receiver,
 	}
 
 	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope, receiverSym)
@@ -732,7 +732,7 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 			// Create handler block scope (same as collectBlock does)
 			handlerScope := table.NewSymbolTable(mod.CurrentScope)
 			e.Catch.Handler.Scope = handlerScope
-			
+
 			// If error identifier is provided, declare it in the handler scope BEFORE collecting block nodes
 			if e.Catch.ErrIdent != nil {
 				// Check for duplicate declaration
@@ -755,14 +755,17 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 					handlerScope.Declare(e.Catch.ErrIdent.Name, errSymbol)
 				}
 			}
-			
+
 			// Enter handler scope and collect block nodes (error identifier is now available)
-			defer mod.EnterScope(handlerScope)()
-			for _, n := range e.Catch.Handler.Nodes {
-				collectNode(ctx, mod, n)
+			// Wrap in explicit braces so defer executes when block ends, not when collectExpr returns
+			{
+				defer mod.EnterScope(handlerScope)()
+				for _, n := range e.Catch.Handler.Nodes {
+					collectNode(ctx, mod, n)
+				}
 			}
 		}
-		// Collect fallback expression if present
+		// Collect fallback expression if present (in original scope, not handler scope)
 		if e.Catch != nil && e.Catch.Fallback != nil {
 			collectExpr(ctx, mod, e.Catch.Fallback)
 		}
@@ -841,11 +844,11 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
 			psym := &symbols.Symbol{
-				Name: param.Name.Name,
-				Kind: symbols.SymbolParameter,
-				Decl: &param,
+				Name:     param.Name.Name,
+				Kind:     symbols.SymbolParameter,
+				Decl:     &param,
 				Exported: utils.IsExported(param.Name.Name),
-				Type: types.TypeUnknown, // Will be filled during type checking
+				Type:     types.TypeUnknown, // Will be filled during type checking
 			}
 
 			err := mod.CurrentScope.Declare(param.Name.Name, psym)
