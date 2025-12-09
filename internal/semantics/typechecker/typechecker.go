@@ -680,7 +680,7 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 
 	// Handle struct literals
 	if structType, ok := underlyingType.(*types.StructType); ok {
-		return checkStructLiteral(ctx, mod, lit, structType, targetType)
+		return checkStructLiteral(ctx, mod, lit, structType)
 	}
 
 	// Handle map literals
@@ -702,14 +702,14 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		}
 		return nil
 	}
-	
+
 	return nil
 }
 
 // checkStructLiteral validates struct literal elements
 // It checks elements with field type context AND validates consistency
 // Returns missing fields if any, nil otherwise
-func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType, targetType types.SemType) []string {
+func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType) []string {
 	// Build a map of provided fields and check elements with context
 	providedFields := make(map[string]bool)
 	for _, elem := range lit.Elts {
@@ -1393,7 +1393,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 	rhsType := checkExpr(ctx, mod, rightNode, leftType)
 
 	// Special check for integer literals: ensure they fit in the target type
-	if ok := checkFitness(ctx, rhsType, leftType, rightNode, leftNode); !ok {
+	if ok := checkFitness(ctx, leftType, rightNode, leftNode); !ok {
 		return
 	}
 
@@ -1429,11 +1429,11 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 		// Check if this is a struct compatibility issue that we can enhance
 		rhsUnwrapped := types.UnwrapType(rhsType)
 		leftUnwrapped := types.UnwrapType(leftType)
-		
+
 		var missingFields []string
 		var mismatchedFields []string
 		isStructCompatibility := false
-		
+
 		if rhsStruct, ok := rhsUnwrapped.(*types.StructType); ok {
 			if leftStruct, ok := leftUnwrapped.(*types.StructType); ok {
 				// Both are structs - get detailed compatibility info
@@ -1441,7 +1441,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 				isStructCompatibility = true
 			}
 		}
-		
+
 		var errorMsg string
 		if types.IsUntyped(rhsType) {
 			// For untyped literals, use more intuitive message
@@ -1510,7 +1510,7 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 	return fmt.Sprintf("type '%s'", typ.String())
 }
 
-func checkFitness(ctx *context_v2.CompilerContext, rhsType, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
+func checkFitness(ctx *context_v2.CompilerContext, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
 	// Check integer literal overflow
 	// Check literal directly (works for both untyped and already-resolved literals)
 	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
@@ -1939,19 +1939,14 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 		return // Error already reported in validateResultTypeHandling
 	}
 
-	// If error identifier is provided, create a symbol for it in the handler block
+	// If error identifier is provided, update its type (symbol was already declared in collector)
 	if catch.ErrIdent != nil && catch.Handler != nil {
-		// Create error variable symbol in handler scope
 		if catch.Handler.Scope != nil {
 			handlerScope := catch.Handler.Scope.(*table.SymbolTable)
-			errSymbol := &symbols.Symbol{
-				Name: catch.ErrIdent.Name,
-				Kind: symbols.SymbolVariable,
-				Type: resultType.Err,
-				Decl: catch.ErrIdent, // Store the identifier as declaration
+			if errSymbol, ok := handlerScope.GetSymbol(catch.ErrIdent.Name); ok {
+				// Update the type (symbol was declared in collector with TypeUnknown)
+				errSymbol.Type = resultType.Err
 			}
-			// Add to handler scope
-			handlerScope.Declare(catch.ErrIdent.Name, errSymbol)
 		}
 	}
 

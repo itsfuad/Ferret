@@ -727,6 +727,45 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		for _, arg := range e.Args {
 			collectExpr(ctx, mod, arg)
 		}
+		// Handle catch clause: create handler block scope, declare error identifier, then collect block
+		if e.Catch != nil && e.Catch.Handler != nil {
+			// Create handler block scope (same as collectBlock does)
+			handlerScope := table.NewSymbolTable(mod.CurrentScope)
+			e.Catch.Handler.Scope = handlerScope
+			
+			// If error identifier is provided, declare it in the handler scope BEFORE collecting block nodes
+			if e.Catch.ErrIdent != nil {
+				// Check for duplicate declaration
+				if existing, ok := handlerScope.GetSymbol(e.Catch.ErrIdent.Name); ok {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", e.Catch.ErrIdent.Name)).
+							WithCode(diagnostics.ErrRedeclaredSymbol).
+							WithPrimaryLabel(e.Catch.ErrIdent.Loc(), fmt.Sprintf("'%s' already declared", e.Catch.ErrIdent.Name)).
+							WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here"),
+					)
+				} else {
+					// Create symbol with TYPE_UNKNOWN (will be filled during type checking)
+					errSymbol := &symbols.Symbol{
+						Name:     e.Catch.ErrIdent.Name,
+						Kind:     symbols.SymbolVariable,
+						Type:     types.TypeUnknown,
+						Decl:     e.Catch.ErrIdent,
+						Exported: utils.IsExported(e.Catch.ErrIdent.Name),
+					}
+					handlerScope.Declare(e.Catch.ErrIdent.Name, errSymbol)
+				}
+			}
+			
+			// Enter handler scope and collect block nodes (error identifier is now available)
+			defer mod.EnterScope(handlerScope)()
+			for _, n := range e.Catch.Handler.Nodes {
+				collectNode(ctx, mod, n)
+			}
+		}
+		// Collect fallback expression if present
+		if e.Catch != nil && e.Catch.Fallback != nil {
+			collectExpr(ctx, mod, e.Catch.Fallback)
+		}
 
 	case *ast.IndexExpr:
 		collectExpr(ctx, mod, e.X)
