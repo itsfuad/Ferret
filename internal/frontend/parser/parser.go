@@ -174,6 +174,10 @@ func (p *Parser) parseStmt() ast.Node {
 		return p.parseConstDecl()
 	case tokens.RETURN_TOKEN:
 		return p.parseReturnStmt()
+	case tokens.BREAK_TOKEN:
+		return p.parseBreakStmt()
+	case tokens.CONTINUE_TOKEN:
+		return p.parseContinueStmt()
 	case tokens.IF_TOKEN:
 		return p.parseIfStmt()
 	case tokens.FOR_TOKEN:
@@ -217,6 +221,24 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 		Result:   result,
 		IsError:  isError,
 		Location: *source.NewLocation(&p.filepath, &start, endPos),
+	}
+}
+
+// parseBreakStmt: break;
+func (p *Parser) parseBreakStmt() *ast.BreakStmt {
+	start := p.expect(tokens.BREAK_TOKEN).Start
+	endToken := p.expect(tokens.SEMICOLON_TOKEN)
+	return &ast.BreakStmt{
+		Location: *source.NewLocation(&p.filepath, &start, &endToken.End),
+	}
+}
+
+// parseContinueStmt: continue;
+func (p *Parser) parseContinueStmt() *ast.ContinueStmt {
+	start := p.expect(tokens.CONTINUE_TOKEN).Start
+	endToken := p.expect(tokens.SEMICOLON_TOKEN)
+	return &ast.ContinueStmt{
+		Location: *source.NewLocation(&p.filepath, &start, &endToken.End),
 	}
 }
 

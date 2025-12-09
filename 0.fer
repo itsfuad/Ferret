@@ -21,7 +21,7 @@ fn div(a: i32, b: i32) -> str ! f32 {
     }
 
     while true {
-        //
+        //break;
     }
 
     return a / b;
@@ -31,3 +31,7 @@ let res := div(1, 4) catch err {
     let errval : str = err;
     let fallback := "di";
 } fallback;
+
+type Shape interface {
+    
+}

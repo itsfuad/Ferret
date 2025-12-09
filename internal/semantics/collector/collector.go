@@ -187,9 +187,35 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		}
 		collectWhileStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
+		// Check if at module scope (top level)
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("return statement not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("return statements must be inside functions"),
+			)
+		}
 		// Collect function literals in return expressions
 		if n.Result != nil {
 			collectExpr(ctx, mod, n.Result)
+		}
+	case *ast.BreakStmt:
+		// Break statements don't declare anything, but check if at module scope
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("break statement not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("break statements must be inside loops"),
+			)
+		}
+	case *ast.ContinueStmt:
+		// Continue statements don't declare anything, but check if at module scope
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("continue statement not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("continue statements must be inside loops"),
+			)
 		}
 	case *ast.AssignStmt:
 		// Collect function literals in assignment expressions

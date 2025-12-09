@@ -83,6 +83,14 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 			resolveExpr(ctx, mod, n.Result)
 		}
 
+	case *ast.BreakStmt:
+		// Break statements don't need resolution (no identifiers to resolve)
+		// Validation (checking if inside loop) is done in control flow analysis
+
+	case *ast.ContinueStmt:
+		// Continue statements don't need resolution (no identifiers to resolve)
+		// Validation (checking if inside loop) is done in control flow analysis
+
 	case *ast.IfStmt:
 		// Enter if scope if it exists
 		if n.Scope != nil {

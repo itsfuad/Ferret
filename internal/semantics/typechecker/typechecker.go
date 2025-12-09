@@ -97,6 +97,12 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		checkTypeDecl(ctx, mod, n)
 	case *ast.AssignStmt:
 		checkAssignStmt(ctx, mod, n)
+	case *ast.BreakStmt:
+		// Break statements don't need type checking
+		// Validation (checking if inside loop) is done in control flow analysis phase
+	case *ast.ContinueStmt:
+		// Continue statements don't need type checking
+		// Validation (checking if inside loop) is done in control flow analysis phase
 	case *ast.ReturnStmt:
 		// Check return value type against function's declared return type
 		if n.Result != nil {
