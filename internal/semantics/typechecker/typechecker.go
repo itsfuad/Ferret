@@ -5,7 +5,8 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/consteval"
-	"compiler/internal/semantics/controlflow"
+
+	//"compiler/internal/semantics/controlflow"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
@@ -189,32 +190,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Check condition
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 
-		// Check for constant condition (dead code detection)
-		if constVal := consteval.EvaluateExpr(ctx, mod, n.Cond); constVal != nil {
-			if boolVal, ok := constVal.AsBool(); ok {
-				if boolVal {
-					// Condition is always true - else branch is dead code
-					if n.Else != nil {
-						ctx.Diagnostics.Add(
-							diagnostics.NewWarning("condition is always true").
-								WithCode(diagnostics.WarnConstantConditionTrue).
-								WithPrimaryLabel(n.Cond.Loc(), "this condition is always true").
-								WithSecondaryLabel(n.Else.Loc(), "this branch will never execute").
-								WithHelp("remove the if statement or the unreachable else branch"),
-						)
-					}
-				} else {
-					// Condition is always false - then branch is dead code
-					ctx.Diagnostics.Add(
-						diagnostics.NewWarning("condition is always false").
-							WithCode(diagnostics.WarnConstantConditionFalse).
-							WithPrimaryLabel(n.Cond.Loc(), "this condition is always false").
-							WithSecondaryLabel(n.Body.Loc(), "this branch will never execute").
-							WithHelp("remove the if statement or fix the condition"),
-					)
-				}
-			}
-		}
+		// Dead code detection (constant conditions) is done in control flow analysis phase
 
 		// Analyze condition for type narrowing
 		thenNarrowing, elseNarrowing := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
@@ -289,22 +265,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 
-		// Check for constant condition
-		if constVal := consteval.EvaluateExpr(ctx, mod, n.Cond); constVal != nil {
-			if boolVal, ok := constVal.AsBool(); ok {
-				// Only warn if condition is always false - loop never executes
-				// Always-true conditions are often intentional (infinite loops with break)
-				if !boolVal {
-					ctx.Diagnostics.Add(
-						diagnostics.NewWarning("condition is always false").
-							WithCode(diagnostics.WarnConstantConditionFalse).
-							WithPrimaryLabel(n.Cond.Loc(), "this condition is always false").
-							WithSecondaryLabel(n.Body.Loc(), "this loop will never execute").
-							WithHelp("remove the while loop or fix the condition"),
-					)
-				}
-			}
-		}
+		// Dead code detection (constant conditions) is done in control flow analysis phase
 
 		// Analyze condition for narrowing in loop body
 		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
@@ -445,7 +406,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	// Check the body with the function scope
 	if decl.Body != nil {
 		checkBlock(ctx, mod, decl.Body)
-		analyzeFunctionReturns(ctx, mod, decl)
+		// Return path analysis is done in control flow analysis phase, not here
 	}
 }
 
@@ -1028,17 +989,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	// Check the body with the method scope
 	if decl.Body != nil {
 		checkBlock(ctx, mod, decl.Body)
-
-		// Build control flow graph for the method
-		// Wrap the method in a FuncDecl for CFG analysis
-		tempFuncDecl := &ast.FuncDecl{
-			Name:     decl.Name,
-			Type:     decl.Type,
-			Body:     decl.Body,
-			Scope:    decl.Scope,
-			Location: decl.Location,
-		}
-		analyzeFunctionReturns(ctx, mod, tempFuncDecl)
+		// Return path analysis is done in control flow analysis phase, not here
 	}
 }
 
@@ -1212,12 +1163,10 @@ func checkBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *
 	}
 
 	// Enter block scope if it exists
+	// Some blocks (like function body) use their parent scope
 	if block.Scope != nil {
-		oldScope := mod.CurrentScope
-		mod.CurrentScope = block.Scope.(*table.SymbolTable)
-		defer func() {
-			mod.CurrentScope = oldScope
-		}()
+		scope := block.Scope.(*table.SymbolTable)
+		defer mod.EnterScope(scope)()
 	}
 
 	for _, node := range block.Nodes {
@@ -1939,60 +1888,22 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 		return // Error already reported in validateResultTypeHandling
 	}
 
-	// If error identifier is provided, update its type (symbol was already declared in collector)
-	if catch.ErrIdent != nil && catch.Handler != nil {
-		if catch.Handler.Scope != nil {
-			handlerScope := catch.Handler.Scope.(*table.SymbolTable)
-			if errSymbol, ok := handlerScope.GetSymbol(catch.ErrIdent.Name); ok {
-				// Update the type (symbol was declared in collector with TypeUnknown)
-				errSymbol.Type = resultType.Err
-			}
+	// get the scope of the catch block
+	scope := catch.Handler.Scope.(*table.SymbolTable)
+	defer mod.EnterScope(scope)()
+	// check catch block
+	// set the catch error identifier type to the error type
+	if catch.ErrIdent != nil {
+		if sym, ok := mod.CurrentScope.Lookup(catch.ErrIdent.Name); ok {
+			sym.Type = resultType.Err
 		}
 	}
-
-	// Check handler block if present
-	if catch.Handler != nil {
-		oldScope := mod.CurrentScope
-		if catch.Handler.Scope != nil {
-			mod.CurrentScope = catch.Handler.Scope.(*table.SymbolTable)
-		}
-		checkBlock(ctx, mod, catch.Handler)
-		mod.CurrentScope = oldScope
-	}
-
-	// Check fallback value type if present
+	// check the catch block
+	checkBlock(ctx, mod, catch.Handler)
+	// check the fallback expression - must match the OK type of the result
 	if catch.Fallback != nil {
-		fallbackType := checkExpr(ctx, mod, catch.Fallback, resultType.Ok)
-
-		if !fallbackType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
-			compatibility := checkTypeCompatibility(fallbackType, resultType.Ok)
-			if compatibility == Incompatible {
-				ctx.Diagnostics.Add(
-					diagnostics.CatchTypeMismatch(mod.FilePath, catch.Fallback.Loc(),
-						resultType.Ok.String(), fallbackType.String()),
-				)
-			}
-		}
-	} else if catch.Handler != nil {
-		// Handler exists but no fallback - use CFG analysis to check if all paths return
-		// Build CFG for the handler block (wrap in a temporary function for analysis)
-		tempFuncDecl := &ast.FuncDecl{
-			Name: &ast.IdentifierExpr{Name: "__catch_handler__"},
-			Body: catch.Handler,
-			Type: &ast.FuncType{
-				Result: &ast.IdentifierExpr{Name: "void"},
-			},
-		}
-
-		cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
-		cfg := cfgBuilder.BuildFunctionCFG(tempFuncDecl)
-
-		// Check if all paths return (using existing CFG analysis)
-		if !controlflow.AllPathsReturn(cfg) {
-			ctx.Diagnostics.Add(
-				diagnostics.MissingCatchFallback(mod.FilePath, catch.Loc()),
-			)
-		}
+		// Use checkAssignLike to validate type compatibility and report errors
+		checkAssignLike(ctx, mod, resultType.Ok, nil, catch.Fallback)
 	}
 }
 

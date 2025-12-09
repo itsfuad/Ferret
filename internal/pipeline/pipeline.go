@@ -63,19 +63,15 @@ func (p *Pipeline) Run() error {
 	// Continue to later phases even if there are parse errors
 	// This allows us to collect more diagnostics from successfully parsed modules
 
-	// Phase 2: Symbol Collection (split into 2 sub-phases)
+	// Phase 2: Symbol Collection
+	// The collector handles all sub-phases internally:
+	//   - Collect declarations (types, functions, methods, variables, constants)
+	//   - Collect function bodies
+	//   - Collect method bodies
 	if p.ctx.Debug {
-		colors.CYAN.Printf("\n[Phase 2a] Collect Types & Functions\n")
+		colors.CYAN.Printf("\n[Phase 2] Symbol Collection\n")
 	}
 	if err := p.runCollectorPhase(); err != nil {
-		return err
-	}
-
-	// Phase 2b: Collect Methods (after all types are known)
-	if p.ctx.Debug {
-		colors.CYAN.Printf("\n[Phase 2b] Collect Methods\n")
-	}
-	if err := p.runMethodCollectorPhase(); err != nil {
 		return err
 	}
 
@@ -328,7 +324,8 @@ func (p *Pipeline) PrintModuleDetails(importPath string) {
 	fmt.Println()
 }
 
-// runCollectorPhase runs symbol collection on all parsed modules
+// runCollectorPhase runs symbol collection on all parsed modules.
+// The collector handles all sub-phases internally (declarations, function bodies, method bodies).
 func (p *Pipeline) runCollectorPhase() error {
 	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
@@ -341,34 +338,12 @@ func (p *Pipeline) runCollectorPhase() error {
 			continue
 		}
 
+		// CollectModule handles all collection phases internally
 		collector.CollectModule(p.ctx, module)
 
 		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCollected) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCollected", importPath), nil)
 		}
-
-		if p.ctx.Debug {
-			colors.PURPLE.Printf("  ✓ %s\n", importPath)
-		}
-	}
-
-	return nil
-}
-
-// runMethodCollectorPhase collects method declarations after all types are known
-func (p *Pipeline) runMethodCollectorPhase() error {
-	for _, importPath := range p.ctx.GetModuleNames() {
-		module, exists := p.ctx.GetModule(importPath)
-		if !exists {
-			continue
-		}
-
-		// Check if module is at least collected
-		if p.ctx.GetModulePhase(importPath) < phase.PhaseCollected {
-			continue
-		}
-
-		collector.CollectMethodsOnly(p.ctx, module)
 
 		if p.ctx.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)

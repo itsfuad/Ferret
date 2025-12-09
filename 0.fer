@@ -14,3 +14,20 @@ let p : Point = { .X = 10, .Y = 29};
 fn (r: &Point?) move() {
     let val := r.internal;
 }
+
+fn div(a: i32, b: i32) -> str ! f32 {
+    if b == 0 {
+        return "cannot divide by 0"!;
+    }
+
+    while true {
+        //
+    }
+
+    return a / b;
+}
+
+let res := div(1, 4) catch err {
+    let errval : str = err;
+    let fallback := "di";
+} fallback;

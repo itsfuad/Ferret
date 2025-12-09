@@ -15,10 +15,27 @@ import (
 )
 
 // CollectModule builds the symbol table for a module by traversing its AST.
-// It declares names for let/const/fn/type declarations and fills Module.table.
+// It orchestrates all collection phases internally:
+//   - Phase 1: Collect declarations (types, functions, methods, variables, constants) - just names/signatures
+//   - Phase 2: Collect function bodies (after all declarations are known)
+//   - Phase 3: Collect method bodies (after all types are known)
+//
 // No type checking is performed - all symbols get TYPE_UNKNOWN initially.
 func CollectModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	// Phase 1: Collect declarations (signatures only)
+	collectDeclarations(ctx, mod)
 
+	// Phase 2: Collect function bodies (after all declarations are known)
+	collectFunctionBodies(ctx, mod)
+
+	// Phase 3: Collect method bodies (after all types are known)
+	collectMethodBodies(ctx, mod)
+}
+
+// collectDeclarations collects only module-level declarations (types, top-level functions, methods, variables, constants)
+// without their bodies to eliminate ordering issues.
+// Methods are bound to types so their order doesn't matter - we just collect their names/signatures.
+func collectDeclarations(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	// Initialize imports list if not exist
 	if mod.Imports == nil {
 		mod.Imports = make(map[string]*context_v2.Import)
@@ -32,38 +49,38 @@ func CollectModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	// Ensure CurrentScope starts at ModuleScope
 	mod.CurrentScope = mod.ModuleScope
 
-	// First pass: collect everything EXCEPT methods
-	// Methods are collected in a separate phase after all types are known
+	// Collect only module-level declarations (types, top-level functions, methods, variables, constants)
+	// Methods are bound to types so their order doesn't matter - we just collect their names/signatures
+	// Function and method bodies are collected in later phases
 	if mod.AST != nil {
 		for _, node := range mod.AST.Nodes {
-			// Skip method declarations in this phase
-			if _, isMethod := node.(*ast.MethodDecl); !isMethod {
-				collectNode(ctx, mod, node)
-			}
+			// Collect only the declaration, not the body
+			collectDeclarationOnly(ctx, mod, node)
 		}
 	}
 
 	// Reset CurrentScope to ModuleScope after collection
-	// (it may have been changed during nested scope traversal)
 	mod.CurrentScope = mod.ModuleScope
 }
 
-// CollectMethodsOnly collects only method declarations from a module
-// This is run in a second pass after all types are known across all modules
-func CollectMethodsOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+// collectFunctionBodies collects function bodies in a second pass after all declarations are known.
+// This ensures all symbols are available before processing function bodies.
+func collectFunctionBodies(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	if mod.AST == nil {
 		return
 	}
 
-	// Ensure CurrentScope is at ModuleScope
+	// Ensure CurrentScope starts at ModuleScope
 	mod.CurrentScope = mod.ModuleScope
 
-	// Collect only method declarations
-	methodCount := 0
+	// Collect function bodies
 	for _, node := range mod.AST.Nodes {
-		if methodDecl, ok := node.(*ast.MethodDecl); ok {
-			collectMethodDecl(ctx, mod, methodDecl)
-			methodCount++
+		switch n := node.(type) {
+		case *ast.FuncDecl:
+			collectFunctionBody(ctx, mod, n)
+		case *ast.MethodDecl:
+			// Methods are collected separately in collectMethodBodies
+			continue
 		}
 	}
 
@@ -71,17 +88,66 @@ func CollectMethodsOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module)
 	mod.CurrentScope = mod.ModuleScope
 }
 
-// collectNode processes a single AST node and declares symbols
-func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
+// collectMethodBodies collects method bodies in a third pass after all types are known.
+// Method signatures are already collected in the first pass.
+func collectMethodBodies(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	if mod.AST == nil {
+		return
+	}
+
+	// Ensure CurrentScope is at ModuleScope
+	mod.CurrentScope = mod.ModuleScope
+
+	// Collect method bodies (signatures already collected in first pass)
+	for _, node := range mod.AST.Nodes {
+		if methodDecl, ok := node.(*ast.MethodDecl); ok {
+			collectMethodBody(ctx, mod, methodDecl)
+		}
+	}
+
+	// Reset CurrentScope
+	mod.CurrentScope = mod.ModuleScope
+}
+
+// collectDeclarationOnly collects only the declaration symbol, not the body.
+// This is used in the first pass to eliminate ordering issues.
+func collectDeclarationOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
 	switch n := node.(type) {
 	case *ast.VarDecl:
 		collectVarDecl(ctx, mod, n, symbols.SymbolVariable)
 	case *ast.ConstDecl:
 		collectVarDecl(ctx, mod, n, symbols.SymbolConstant)
 	case *ast.FuncDecl:
-		collectFuncDecl(ctx, mod, n)
-	// case *ast.MethodDecl:
-	// 	collectMethodDecl(ctx, mod, n)
+		collectFuncDeclSignature(ctx, mod, n)
+	case *ast.MethodDecl:
+		collectMethodDeclSignature(ctx, mod, n)
+	case *ast.TypeDecl:
+		collectTypeDecl(ctx, mod, n)
+	case *ast.ImportStmt:
+		collectImport(ctx, mod, n)
+	case *ast.DeclStmt:
+		collectDeclarationOnly(ctx, mod, n.Decl)
+	// Skip statements and expressions in first pass
+	default:
+		// Skip non-declaration nodes
+	}
+}
+
+// collectNode processes a single AST node and declares symbols
+// This is used when collecting function bodies (second pass).
+// Function declarations are only at module level and are handled by collectDeclarationOnly.
+func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
+	switch n := node.(type) {
+	case *ast.VarDecl:
+		collectVarDecl(ctx, mod, n, symbols.SymbolVariable)
+	case *ast.ConstDecl:
+		collectVarDecl(ctx, mod, n, symbols.SymbolConstant)
+	// Function and method declarations can appear in nested scopes (e.g., function literals, nested functions)
+	// Collect them here if they appear in nested scopes
+	case *ast.FuncDecl:
+		collectFuncDeclSignature(ctx, mod, n)
+	case *ast.MethodDecl:
+		collectMethodDeclSignature(ctx, mod, n)
 	case *ast.TypeDecl:
 		collectTypeDecl(ctx, mod, n)
 	case *ast.ImportStmt:
@@ -231,9 +297,10 @@ func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, dec
 	}
 }
 
-// collectFuncDecl handles function declarations
-func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
-
+// collectFuncDeclSignature handles function declaration signature only (first pass).
+// It declares the function symbol and creates the function scope with parameters,
+// but does NOT collect the function body.
+func collectFuncDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
 	if decl.Name == nil {
 		return
 	}
@@ -275,8 +342,31 @@ func collectFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 
 	mod.CurrentScope.Declare(name, sym)
 
-	// Collect function scope and body using shared helper
-	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope, nil)
+	// Create function scope and declare parameters, but do NOT collect body
+	collectFunctionSignatureOnly(ctx, mod, decl.Type, &decl.Scope, nil)
+}
+
+// collectFunctionBody collects the function body in the second pass.
+func collectFunctionBody(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
+	if decl.Scope == nil {
+		// Scope should have been created in first pass
+		return
+	}
+
+	funcScope := decl.Scope.(*table.SymbolTable)
+	defer mod.EnterScope(funcScope)()
+
+	// Collect function body
+	// The function body block should use the function scope (not create a new one)
+	if decl.Body != nil {
+		// Set the body block's scope to the function scope
+		decl.Body.Scope = funcScope
+
+		// Collect nodes in the body (this will create scopes for nested blocks)
+		for _, n := range decl.Body.Nodes {
+			collectNode(ctx, mod, n)
+		}
+	}
 }
 
 // extractReceiverTypeName extracts the type name and optional module from a receiver's TypeNode.
@@ -343,10 +433,11 @@ func extractReceiverTypeName(ctx *context_v2.CompilerContext, receiverType ast.T
 	return "<unsupported type>", "", false
 }
 
-// collectMethodDecl handles method declarations with receivers.
-// Methods are stored in module scope with qualified name "TypeName::methodName".
-// This treats methods as functions with receiver as first parameter, simplifying the architecture.
-func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+// collectMethodDeclSignature handles method declaration signature only (first pass).
+// It validates the receiver type and creates the method scope with parameters,
+// but does NOT collect the method body.
+// Methods are bound to types so their order doesn't matter - we just collect their names.
+func collectMethodDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
 	if decl.Name == nil || decl.Receiver == nil {
 		return
 	}
@@ -366,7 +457,7 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		// Check if it's a cross-module type
 		if moduleAlias != "" {
 			// DISALLOW cross-module method definitions
-			// Report error but continue processing the method body for better diagnostics
+			// Report error but continue processing for better diagnostics
 			ctx.Diagnostics.Add(
 				diagnostics.NewError("cannot define methods on types from other modules").
 					WithCode(diagnostics.ErrInvalidMethodReceiver).
@@ -444,9 +535,7 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		}
 	}
 
-	// Create method scope and collect parameters + body
-	// This happens regardless of receiver validity to enable analysis of method body
-	// Reuse function scope logic since methods are just functions with receivers
+	// Create method scope and declare parameters, but do NOT collect body
 	receiverSym := &symbols.Symbol{
 		Name:     decl.Receiver.Name.Name,
 		Kind:     symbols.SymbolReceiver,
@@ -455,7 +544,30 @@ func collectMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		Decl:     decl.Receiver,
 	}
 
-	collectFunctionScope(ctx, mod, decl.Type, decl.Body, &decl.Scope, receiverSym)
+	collectFunctionSignatureOnly(ctx, mod, decl.Type, &decl.Scope, receiverSym)
+}
+
+// collectMethodBody collects the method body in the second pass.
+func collectMethodBody(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
+	if decl.Scope == nil {
+		// Scope should have been created in first pass
+		return
+	}
+
+	methodScope := decl.Scope.(*table.SymbolTable)
+	defer mod.EnterScope(methodScope)()
+
+	// Collect method body
+	// The method body block should use the method scope (not create a new one)
+	if decl.Body != nil {
+		// Set the body block's scope to the method scope
+		decl.Body.Scope = methodScope
+
+		// Collect nodes in the body (this will create scopes for nested blocks)
+		for _, n := range decl.Body.Nodes {
+			collectNode(ctx, mod, n)
+		}
+	}
 }
 
 // validateParams validates function parameters including variadic rules, duplicates, and type annotations
@@ -728,46 +840,37 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 			collectExpr(ctx, mod, arg)
 		}
 		// Handle catch clause: create handler block scope, declare error identifier, then collect block
-		if e.Catch != nil && e.Catch.Handler != nil {
+		// Both errVal and defaultVal are in the catch block scope
+		if e.Catch != nil {
 			// Create handler block scope (same as collectBlock does)
 			handlerScope := table.NewSymbolTable(mod.CurrentScope)
 			e.Catch.Handler.Scope = handlerScope
 
+			defer mod.EnterScope(handlerScope)()
+
 			// If error identifier is provided, declare it in the handler scope BEFORE collecting block nodes
 			if e.Catch.ErrIdent != nil {
-				// Check for duplicate declaration
-				if existing, ok := handlerScope.GetSymbol(e.Catch.ErrIdent.Name); ok {
-					ctx.Diagnostics.Add(
-						diagnostics.NewError(fmt.Sprintf("redeclaration of '%s'", e.Catch.ErrIdent.Name)).
-							WithCode(diagnostics.ErrRedeclaredSymbol).
-							WithPrimaryLabel(e.Catch.ErrIdent.Loc(), fmt.Sprintf("'%s' already declared", e.Catch.ErrIdent.Name)).
-							WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here"),
-					)
-				} else {
-					// Create symbol with TYPE_UNKNOWN (will be filled during type checking)
-					errSymbol := &symbols.Symbol{
-						Name:     e.Catch.ErrIdent.Name,
-						Kind:     symbols.SymbolVariable,
-						Type:     types.TypeUnknown,
-						Decl:     e.Catch.ErrIdent,
-						Exported: utils.IsExported(e.Catch.ErrIdent.Name),
-					}
-					handlerScope.Declare(e.Catch.ErrIdent.Name, errSymbol)
-				}
+				// catch identifier is new on handler scope, so parent variable wont used if same name
+				mod.CurrentScope.Declare(e.Catch.ErrIdent.Name, &symbols.Symbol{
+					Name:     e.Catch.ErrIdent.Name,
+					Kind:     symbols.SymbolVariable,
+					Type:     types.TypeUnknown,
+					Decl:     e.Catch.ErrIdent,
+					Exported: false, // catch identifier is not exported
+				})
 			}
 
-			// Enter handler scope and collect block nodes (error identifier is now available)
-			// Wrap in explicit braces so defer executes when block ends, not when collectExpr returns
-			{
-				defer mod.EnterScope(handlerScope)()
+			// Collect handler block nodes
+			if e.Catch.Handler != nil {
 				for _, n := range e.Catch.Handler.Nodes {
 					collectNode(ctx, mod, n)
 				}
 			}
-		}
-		// Collect fallback expression if present (in original scope, not handler scope)
-		if e.Catch != nil && e.Catch.Fallback != nil {
-			collectExpr(ctx, mod, e.Catch.Fallback)
+
+			// Collect fallback expression in handler scope (defaultVal is also in catch block scope)
+			if e.Catch.Fallback != nil {
+				collectExpr(ctx, mod, e.Catch.Fallback)
+			}
 		}
 
 	case *ast.IndexExpr:
@@ -819,9 +922,59 @@ func collectFuncLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit
 	}
 }
 
+// collectFunctionSignatureOnly creates a new scope for a function and declares parameters,
+// but does NOT collect the function body. Used in first pass for top-level functions.
+func collectFunctionSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcType *ast.FuncType, scopePtr *ast.SymbolTable, receiverSym *symbols.Symbol) {
+	// Create new scope with current scope as parent
+	newScope := table.NewSymbolTable(mod.CurrentScope)
+
+	// Assign the scope to the pointer so the caller can access it
+	*scopePtr = newScope
+
+	// Enter function scope and ensure it's restored on exit
+	defer mod.EnterScope(newScope)()
+
+	if receiverSym != nil {
+		// just like parameters, declare the receiver in the scope
+		mod.CurrentScope.Declare(receiverSym.Name, receiverSym)
+	}
+
+	// Validate and declare parameters
+	if funcType != nil && funcType.Params != nil {
+		validateParams(ctx, mod, funcType.Params)
+		// Declare parameters in function scope
+		for _, param := range funcType.Params {
+			psym := &symbols.Symbol{
+				Name:     param.Name.Name,
+				Kind:     symbols.SymbolParameter,
+				Decl:     &param,
+				Exported: utils.IsExported(param.Name.Name),
+				Type:     types.TypeUnknown, // Will be filled during type checking
+			}
+
+			err := mod.CurrentScope.Declare(param.Name.Name, psym)
+			if err != nil {
+				// if parameter name conflicts with receiver name, return an error
+				if receiverSym != nil && param.Name.Name == receiverSym.Name {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("receiver name '%s' conflicts with parameter name", receiverSym.Name)).
+							WithPrimaryLabel(receiverSym.Decl.Loc(), "receiver declared here"),
+					)
+					continue
+				} else {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("duplicate parameter '%s'", param.Name.Name)).
+							WithPrimaryLabel(param.Loc(), "parameter already declared"),
+					)
+				}
+			}
+		}
+	}
+}
+
 // collectFunctionScope creates a new scope for a function (named or literal),
 // validates and declares parameters, and collects the function body.
-// This is shared by both collectFuncDecl and collectFuncLit.
+// This is used for function literals and method bodies (which are collected in their respective phases).
 func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcType *ast.FuncType, body *ast.Block, scopePtr *ast.SymbolTable, receiverSym *symbols.Symbol) {
 	// Create new scope with current scope as parent
 	// For function literals, this enables closure (capturing parent variables)
@@ -854,7 +1007,7 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 			err := mod.CurrentScope.Declare(param.Name.Name, psym)
 			if err != nil {
 				// if parameter name conflicts with receiver name, return an error
-				if param.Name.Name == receiverSym.Name {
+				if receiverSym != nil && param.Name.Name == receiverSym.Name {
 					ctx.Diagnostics.Add(
 						diagnostics.NewError(fmt.Sprintf("receiver name '%s' conflicts with parameter name", receiverSym.Name)).
 							WithPrimaryLabel(receiverSym.Decl.Loc(), "receiver declared here"),
@@ -871,8 +1024,15 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	}
 
 	// Collect local variables and nested declarations in function body
-	// Don't call collectBlock since we've already set up the scope
+	// The function body is a block, so we need to ensure it has a scope
+	// However, we don't create a new scope for it since we're already in the function scope
+	// We just need to set the body's scope to the function scope and collect its nodes
 	if body != nil {
+		// Set the body block's scope to the function scope (not a new scope)
+		// This ensures the block has a scope for later phases
+		body.Scope = newScope
+
+		// Collect nodes in the body
 		for _, n := range body.Nodes {
 			collectNode(ctx, mod, n)
 		}

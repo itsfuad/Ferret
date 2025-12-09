@@ -177,6 +177,21 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		for _, arg := range e.Args {
 			resolveExpr(ctx, mod, arg)
 		}
+		if e.Catch != nil {
+			// get the scope of the catch block
+			scope := e.Catch.Handler.Scope.(*table.SymbolTable)
+
+			defer mod.EnterScope(scope)()
+
+			// resolve the catch block
+			if e.Catch.Handler != nil {
+				resolveBlock(ctx, mod, e.Catch.Handler)
+			}
+			// resolve the fallback expression in catch handler scope (defaultVal is also in catch block scope)
+			if e.Catch.Fallback != nil {
+				resolveExpr(ctx, mod, e.Catch.Fallback)
+			}
+		}
 
 	case *ast.IndexExpr:
 		resolveExpr(ctx, mod, e.X)

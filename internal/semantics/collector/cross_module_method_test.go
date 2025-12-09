@@ -80,9 +80,6 @@ fn (p: module_a::Point) distance() -> f64 {
 	ctx.AddModule("test/module_b", modB)
 	CollectModule(ctx, modB)
 
-	// Collect methods in second pass (after types are known)
-	CollectMethodsOnly(ctx, modB)
-
 	// Check for errors
 	diags := ctx.Diagnostics.Diagnostics()
 
