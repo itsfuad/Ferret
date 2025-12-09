@@ -1,12 +1,12 @@
 package typechecker
 
 import (
+	"compiler/internal/context_v2"
 	"compiler/internal/types"
 	"compiler/internal/utils/numeric"
 
 	"fmt"
 )
-
 
 // TypeCompatibility represents the relationship between two types
 type TypeCompatibility int
@@ -38,6 +38,68 @@ func (tc TypeCompatibility) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+// methodSignaturesMatch checks if two function types match
+// This is used to compare method signatures with interface method signatures
+// Note: Methods don't include the receiver in their FuncType - the receiver is separate
+// So we can directly compare the FuncTypes
+func methodSignaturesMatch(methodType, interfaceType *types.FunctionType) bool {
+	// Direct comparison - methods don't have receiver in FuncType
+	return methodType.Equals(interfaceType)
+}
+
+// implementsInterface checks if a type implements an interface
+// Returns true if the type has all required methods with matching signatures
+func implementsInterface(ctx *context_v2.CompilerContext, mod *context_v2.Module, implType types.SemType, ifaceType *types.InterfaceType) bool {
+	// Empty interface: all types implement it
+	if len(ifaceType.Methods) == 0 {
+		return true
+	}
+
+	// Unwrap NamedType to get underlying type, but keep name for method lookup
+	var typeName string
+	if named, ok := implType.(*types.NamedType); ok {
+		typeName = named.Name
+		implType = named.Underlying
+	}
+
+	// Only named types can implement interfaces (they have methods)
+	if typeName == "" {
+		return false
+	}
+
+	// Look up the type symbol to get its methods
+	typeSym, found := lookupTypeSymbol(ctx, mod, typeName)
+	if !found || typeSym.Methods == nil {
+		return false
+	}
+
+	// Check that all interface methods are implemented
+	for _, requiredMethod := range ifaceType.Methods {
+		methodInfo, hasMethod := typeSym.Methods[requiredMethod.Name]
+		if !hasMethod {
+			return false
+		}
+
+		// Check method signature matches
+		// Methods don't include receiver in FuncType, so direct comparison works
+		if !methodSignaturesMatch(methodInfo.FuncType, requiredMethod.FuncType) {
+			// Debug: check what's different
+			if ctx != nil && ctx.Debug {
+				fmt.Printf("      [Interface check: method %s signature mismatch]\n", requiredMethod.Name)
+				fmt.Printf("        Method: %s\n", methodInfo.FuncType.String())
+				fmt.Printf("        Interface: %s\n", requiredMethod.FuncType.String())
+				fmt.Printf("        Method return: %s, Interface return: %s\n",
+					methodInfo.FuncType.Return.String(), requiredMethod.FuncType.Return.String())
+				fmt.Printf("        Method params: %d, Interface params: %d\n",
+					len(methodInfo.FuncType.Params), len(requiredMethod.FuncType.Params))
+			}
+			return false
+		}
+	}
+
+	return true
 }
 
 // checkTypeCompatibility determines if source type can be used where target type is expected
@@ -108,6 +170,125 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 			return Assignable
 		}
 		return LossyConvertible
+	}
+
+	// Check interface compatibility
+	// If target is an interface, check if source implements it
+	if targetIface, ok := target.(*types.InterfaceType); ok {
+		// This requires context to look up methods, so we'll handle it in checkTypeCompatibilityWithContext
+		// For now, return a special value that indicates we need context
+		// Actually, we can't do this here without context. Let's handle it differently.
+		// We'll check this in the caller with context.
+		_ = targetIface
+	}
+
+	// Check struct compatibility (unwrap NamedType to get underlying structure)
+	srcUnwrapped := types.UnwrapType(source)
+	tgtUnwrapped := types.UnwrapType(target)
+
+	// If target is a NamedType and source matches the underlying structure,
+	// allow assignment (e.g., { .x = 1, .y = 2 } can be assigned to Point if Point wraps struct { .x: i32, .y: i32 })
+	if srcStruct, srcOk := srcUnwrapped.(*types.StructType); srcOk {
+		if tgtStruct, tgtOk := tgtUnwrapped.(*types.StructType); tgtOk {
+			// Check if structs are structurally compatible
+			if areStructsCompatible(srcStruct, tgtStruct) {
+				// If target is a NamedType, this is a structural -> nominal conversion (assignable)
+				// If both are anonymous or both are named and identical, it's identical
+				if source.Equals(target) {
+					return Identical
+				}
+				return Assignable
+			}
+		}
+	}
+
+	// No implicit conversion available
+	return Incompatible
+}
+
+// checkTypeCompatibilityWithContext determines if source type can be used where target type is expected
+// This version includes context for interface satisfaction checking
+func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, source, target types.SemType) TypeCompatibility {
+	// Handle unknown types
+	if source.Equals(types.TypeUnknown) || target.Equals(types.TypeUnknown) {
+		return Incompatible
+	}
+
+	// Automatic dereferencing: &T is compatible with T
+	// This allows reference types to be used transparently
+	source = dereferenceType(source)
+	target = dereferenceType(target)
+
+	// Special handling for none
+	// none can be assigned to any optional type (T?)
+	if source.Equals(types.TypeNone) {
+		if _, ok := target.(*types.OptionalType); ok {
+			return Assignable
+		}
+		return Incompatible
+	}
+
+	// Identical types
+	if source.Equals(target) {
+		return Identical
+	}
+
+	// UNTYPED literals can be assigned to compatible concrete types with restrictions
+	if types.IsUntyped(source) {
+		// Unwrap target if it's a NamedType to check the underlying type
+		targetUnwrapped := types.UnwrapType(target)
+
+		if types.IsUntypedInt(source) && types.IsInteger(targetUnwrapped) {
+			return Assignable
+		}
+		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
+			return Assignable
+		}
+		return Incompatible
+	}
+
+	// Check numeric conversions
+	if types.IsNumericType(source) && types.IsNumericType(target) {
+		// Special case: byte and u8 are internally the same size but require explicit cast
+		srcName, srcOk := types.GetPrimitiveName(source)
+		tgtName, tgtOk := types.GetPrimitiveName(target)
+		if srcOk && tgtOk {
+			// byte -> u8 or u8 -> byte requires explicit cast
+			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
+				return LossyConvertible
+			}
+			if types.IsIntegerTypeName(srcName) && types.IsFloatTypeName(tgtName) {
+				if isLosslessNumericConversion(source, target) {
+					return Assignable
+				}
+				return LossyConvertible
+			}
+			if types.IsFloatTypeName(srcName) && types.IsIntegerTypeName(tgtName) {
+				return LossyConvertible
+			}
+		}
+
+		if isLosslessNumericConversion(source, target) {
+			return Assignable
+		}
+		return LossyConvertible
+	}
+
+	// Check interface compatibility
+	// If target is an interface, check if source implements it
+	// Handle both direct InterfaceType and NamedType wrapping an InterfaceType
+	var targetIface *types.InterfaceType
+	if iface, ok := target.(*types.InterfaceType); ok {
+		targetIface = iface
+	} else if named, ok := target.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
+			targetIface = iface
+		}
+	}
+	if targetIface != nil {
+		if implementsInterface(ctx, mod, source, targetIface) {
+			return Assignable
+		}
 	}
 
 	// Check struct compatibility (unwrap NamedType to get underlying structure)

@@ -485,6 +485,66 @@ func (e *EnumType) Equals(other SemType) bool {
 	return false
 }
 
+// InterfaceMethod represents a method signature in an interface
+type InterfaceMethod struct {
+	Name     string        // Method name
+	FuncType *FunctionType // Method signature
+}
+
+// InterfaceType represents interface types: interface { method1(...), method2(...) }
+// Named interfaces like "type Shape interface{}" use NamedType wrapper
+type InterfaceType struct {
+	ID      string            // Unique ID for type identity (from AST or generated)
+	Methods []InterfaceMethod // Required methods
+}
+
+func NewInterface(methods []InterfaceMethod) *InterfaceType {
+	return &InterfaceType{Methods: methods}
+}
+
+func (i *InterfaceType) String() string {
+	if len(i.Methods) == 0 {
+		return "interface{}" // Empty interface (any type)
+	}
+	methodStrs := make([]string, len(i.Methods))
+	for j, m := range i.Methods {
+		methodStrs[j] = fmt.Sprintf("%s%s", m.Name, m.FuncType.String()[2:]) // Remove "fn" prefix
+	}
+	return fmt.Sprintf("interface { %s }", strings.Join(methodStrs, ", "))
+}
+
+func (i *InterfaceType) Size() int {
+	return 16 // Interface value: pointer + type info
+}
+
+func (i *InterfaceType) isType() {}
+
+func (i *InterfaceType) Equals(other SemType) bool {
+	if it, ok := other.(*InterfaceType); ok {
+		// Interfaces use structural equality (compare methods)
+		if len(i.Methods) != len(it.Methods) {
+			return false
+		}
+		// Build method maps for comparison
+		thisMethods := make(map[string]*FunctionType)
+		thatMethods := make(map[string]*FunctionType)
+		for _, m := range i.Methods {
+			thisMethods[m.Name] = m.FuncType
+		}
+		for _, m := range it.Methods {
+			thatMethods[m.Name] = m.FuncType
+		}
+		// Check all methods match
+		for name, funcType := range thisMethods {
+			if otherFuncType, ok := thatMethods[name]; !ok || !funcType.Equals(otherFuncType) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // NamedType represents a named type declaration: type Name UnderlyingType
 // This wraps any SemType with a name, enabling:
 // - Nominal typing for user-defined types

@@ -542,7 +542,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 }
 
 // checkCastExpr validates that a cast expression is valid
-func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *ast.CastExpr, sourceType, targetType types.SemType) {
+func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CastExpr, sourceType, targetType types.SemType) {
 	// Skip if target type is unknown
 	if targetType.Equals(types.TypeUnknown) {
 		return
@@ -558,8 +558,55 @@ func checkCastExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr *
 		return
 	}
 
+	// Check interface casts: allow casting to interface if type implements it
+	// Handle both direct InterfaceType and NamedType wrapping an InterfaceType
+	var targetIface *types.InterfaceType
+	if iface, ok := targetType.(*types.InterfaceType); ok {
+		targetIface = iface
+	} else if named, ok := targetType.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
+			targetIface = iface
+		}
+	}
+	if targetIface != nil {
+		if implementsInterface(ctx, mod, sourceType, targetIface) {
+			return // Valid interface cast
+		}
+		// Build error message with missing methods
+		var missingMethods []string
+		var typeName string
+		if named, ok := sourceType.(*types.NamedType); ok {
+			typeName = named.Name
+		}
+		typeSym, _ := lookupTypeSymbol(ctx, mod, typeName)
+		for _, requiredMethod := range targetIface.Methods {
+			if typeSym == nil || typeSym.Methods == nil {
+				missingMethods = append(missingMethods, requiredMethod.Name)
+				continue
+			}
+			methodInfo, hasMethod := typeSym.Methods[requiredMethod.Name]
+			if !hasMethod {
+				missingMethods = append(missingMethods, requiredMethod.Name)
+			} else if !methodSignaturesMatch(methodInfo.FuncType, requiredMethod.FuncType) {
+				if ctx.Debug {
+					fmt.Printf("      [Cast check: method %s signature mismatch]\n", requiredMethod.Name)
+					fmt.Printf("        Method: %s\n", methodInfo.FuncType.String())
+					fmt.Printf("        Interface: %s\n", requiredMethod.FuncType.String())
+				}
+				missingMethods = append(missingMethods, fmt.Sprintf("%s (signature mismatch)", requiredMethod.Name))
+			}
+		}
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+				WithCode(diagnostics.ErrInvalidCast).
+				WithPrimaryLabel(expr.Loc(), "type does not implement interface").
+				WithHelp(fmt.Sprintf("missing methods: %s", strings.Join(missingMethods, ", "))),
+		)
+		return
+	}
+
 	// Check if cast is valid
-	compatibility := checkTypeCompatibility(sourceType, targetType)
+	compatibility := checkTypeCompatibilityWithContext(ctx, mod, sourceType, targetType)
 
 	// For struct types, check structural compatibility (unwrap NamedType on both sides)
 	srcUnwrapped := types.UnwrapType(sourceType)
@@ -816,6 +863,32 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	}
 
 	fieldName := expr.Field.Name
+
+	// Check if baseType is an interface type (or NamedType wrapping an interface)
+	var interfaceType *types.InterfaceType
+	if iface, ok := baseType.(*types.InterfaceType); ok {
+		interfaceType = iface
+	} else if named, ok := baseType.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
+			interfaceType = iface
+		}
+	}
+
+	// If it's an interface, check if the method exists in the interface
+	if interfaceType != nil {
+		for _, method := range interfaceType.Methods {
+			if method.Name == fieldName {
+				return // Method exists in interface
+			}
+		}
+		// Method not found in interface
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("method '%s' not found in interface '%s'", fieldName, baseType.String())).
+				WithCode(diagnostics.ErrFieldNotFound).
+				WithPrimaryLabel(expr.Field.Loc(), fmt.Sprintf("'%s' does not exist in interface", fieldName)),
+		)
+		return
+	}
 
 	// Handle NamedType and anonymous StructType
 	var typeSym *symbols.Symbol
@@ -1352,8 +1425,8 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 		return
 	}
 
-	// Check type compatibility
-	compatibility := checkTypeCompatibility(rhsType, leftType)
+	// Check type compatibility (use context-aware version for interface checking)
+	compatibility := checkTypeCompatibilityWithContext(ctx, mod, rhsType, leftType)
 
 	switch compatibility {
 	case Identical, Assignable:
@@ -1657,7 +1730,10 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 			params[i].Type = typeFromTypeNodeWithContext(ctx, mod, param.Type)
 			params[i].IsVariadic = param.IsVariadic
 		}
-		returnType := typeFromTypeNodeWithContext(ctx, mod, t.Result)
+		returnType := types.TypeVoid
+		if t.Result != nil {
+			returnType = typeFromTypeNodeWithContext(ctx, mod, t.Result)
+		}
 		return types.NewFunction(params, returnType)
 
 	case *ast.MapType:
@@ -1665,6 +1741,36 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		keyType := typeFromTypeNodeWithContext(ctx, mod, t.Key)
 		valueType := typeFromTypeNodeWithContext(ctx, mod, t.Value)
 		return types.NewMap(keyType, valueType)
+
+	case *ast.InterfaceType:
+		// Interface type: interface { method1(...), method2(...) }
+		methods := make([]types.InterfaceMethod, 0, len(t.Methods))
+		for _, m := range t.Methods {
+			if m.Type == nil {
+				continue
+			}
+			// m.Type should be a FuncType
+			if funcType, ok := m.Type.(*ast.FuncType); ok {
+				params := make([]types.ParamType, len(funcType.Params))
+				for j, param := range funcType.Params {
+					params[j].Name = param.Name.Name
+					params[j].Type = typeFromTypeNodeWithContext(ctx, mod, param.Type)
+					params[j].IsVariadic = param.IsVariadic
+				}
+				returnType := types.TypeVoid
+				if funcType.Result != nil {
+					returnType = typeFromTypeNodeWithContext(ctx, mod, funcType.Result)
+				}
+				methods = append(methods, types.InterfaceMethod{
+					Name:     m.Name.Name,
+					FuncType: types.NewFunction(params, returnType),
+				})
+			}
+		}
+		interfaceType := types.NewInterface(methods)
+		// Propagate the ID from AST to semantic type for identity tracking
+		interfaceType.ID = t.ID
+		return interfaceType
 
 	default:
 		// For unknown types, try primitive lookup

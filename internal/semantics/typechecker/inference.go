@@ -375,6 +375,27 @@ func inferSelectorExprType(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 
 	fieldName := expr.Field.Name
 
+	// Check if baseType is an interface type (or NamedType wrapping an interface)
+	var interfaceType *types.InterfaceType
+	if iface, ok := baseType.(*types.InterfaceType); ok {
+		interfaceType = iface
+	} else if named, ok := baseType.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
+			interfaceType = iface
+		}
+	}
+
+	// If it's an interface, return the method's function type from the interface
+	if interfaceType != nil {
+		for _, method := range interfaceType.Methods {
+			if method.Name == fieldName {
+				return method.FuncType
+			}
+		}
+		// Method not found in interface - error will be reported by type checker
+		return types.TypeUnknown
+	}
+
 	// If baseType is a NamedType, we might have methods attached to the type symbol
 	// We need to check both fields (on the underlying struct) and methods (on the named type)
 	var typeSym *symbols.Symbol

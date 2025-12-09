@@ -32,6 +32,3 @@ let res := div(1, 4) catch err {
     let fallback := "di";
 } fallback;
 
-type Shape interface {
-    
-}
