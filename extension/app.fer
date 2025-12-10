@@ -70,11 +70,6 @@ fn print(msg: str) {
     // do something
 }
 
-fn print2(msg?: str) { //optional parameter
-    // do something
-    return;
-}
-
 fn main() {
     println("Hello, world!");
 }

@@ -18,7 +18,7 @@ Clean, expressive syntax that's easy to learn and pleasant to write. Inspired by
 First-class error handling with result types (`E ! T`) that make dealing with failures explicit and safe.
 
 ### Optional Types
-No more null pointer exceptions! Optional types (`T?`) and the elvis operator (`?:`) make handling missing values a breeze.
+No more null pointer exceptions! Optional types (`T?`) and the coalescing operator (`??`) make handling missing values a breeze.
 
 ## Quick Example
 
@@ -41,8 +41,8 @@ fn main() {
         let doubled: i32 = maybeValue * 2;
     }
 
-    // Elvis operator for default values
-    let value: i32 = maybeValue ?: 0;
+    // Coalescing operator for default values
+    let value: i32 = maybeValue ?? 0;
 
     greet(name);
 }

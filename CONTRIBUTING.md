@@ -78,7 +78,7 @@ Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: Code
 - Functions (regular and anonymous)
 - Control flow (`if`, `else`, `for`, `while`, `when`)
 - Error handling (`E ! T`, `catch` expressions)
-- Optional types (`T?`, elvis operator `?:`)
+- Optional types (`T?`, coalescing operator `??`)
 - Scope resolution (`::` for enums and modules)
 - Composite literals (structs, arrays, maps)
 - Variadic parameters (`...T`)
@@ -352,7 +352,7 @@ let multiply := fn (a: i32, b: i32) -> i32 {
 #### Optional Types
 ```ferret
 let maybe: i32? = none;
-let value := maybe ?: 42;  // Elvis operator - defaults to 42 if none
+let value := maybe ?? 42;  // Coalescing operator - defaults to 42 if none
 
 // Optional chaining
 let result: str? = getValue()?;

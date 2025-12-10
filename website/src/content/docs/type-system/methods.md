@@ -222,7 +222,7 @@ let result := { .content: "" } as StringBuilder
 
 ## Methods and Optional Types
 
-Methods work seamlessly with optional types. When you have an optional value, you can use the elvis operator to provide a default:
+Methods work seamlessly with optional types. When you have an optional value, you can use the coalescing operator to provide a default:
 
 ```ferret
 type User struct {
@@ -235,7 +235,7 @@ fn (u: User) get_display_name() -> str {
 }
 
 let maybe_user: User? = get_user();
-let display := maybe_user?.get_display_name() ?: "Guest";
+let display := maybe_user?.get_display_name() ?? "Guest";
 ```
 
 ## Methods with Maps
@@ -258,7 +258,7 @@ let configs := {
 } as map[str]Config;
 
 // Get config and call method with default
-let prod_config := configs["production"] ?: { .timeout: 3000, .retries: 2 } as Config;
+let prod_config := configs["production"] ?? { .timeout: 3000, .retries: 2 } as Config;
 let aggressive := prod_config.is_aggressive();  // false
 ```
 

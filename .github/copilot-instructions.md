@@ -202,7 +202,7 @@ internal/
 - **Fixed-size arrays:** `[5]i32` with compile-time bounds checking for constant indices
 - **Dynamic arrays:** `[]i32` with auto-growth (no bounds checking) - `arr[5] = x` grows array to size 6
 - **Negative indexing:** Both array types support `arr[-1]` for reverse access
-- **Optional types:** `i32?` with elvis operator `value ?: default`
+- **Optional types:** `i32?` with coalescing operator `value ?? default`
 - **Result types:** `Error ! Result` with `catch` blocks
 - **Structs:** `type Point struct { .x: f64, .y: f64 };`
 - **Enums:** `type Color enum { Red, Green, Blue };`

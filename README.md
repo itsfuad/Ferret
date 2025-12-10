@@ -203,11 +203,11 @@ fn add(a: i32, b: i32) -> i32 {
 }
 ```
 
-### Optional Types & Elvis Operator
+### Optional Types & Coalescing Operator
 
 ```ferret
 let maybe: i32? = None;
-let value := maybe ?: 42;  // Defaults to 42 if None. Kind of like `??` in other languages. Or we may switch to `??` later. making ?: a ternary operator.
+let value := maybe ?? 42;  // Defaults to 42 if None. Kind of like `??` in other languages. Or we may switch to `??` later. making ?? a ternary operator.
 ```
 
 ### Error Handling

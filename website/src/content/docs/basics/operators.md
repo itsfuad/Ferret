@@ -206,34 +206,34 @@ let price := 19.99;       // Type inferred as f64
 
 It's called the "walrus" operator because `:=` looks like a walrus if you tilt your head! 🦭
 
-### Elvis Operator (`?:`)
+### Coalescing Operator (`??`)
 
-The elvis operator gives you a way to provide a default value when dealing with optional types. If the left side is `none`, it uses the right side instead.
+The coalescing operator gives you a way to provide a default value when dealing with optional types. If the left side is `none`, it uses the right side instead.
 
 ```ferret
 let maybe_value: i32? = none;
-let value := maybe_value ?: 0;  // value is 0 (because maybe_value is none)
+let value := maybe_value ?? 0;  // value is 0 (because maybe_value is none)
 
 let some_value: i32? = 42;
-let result := some_value ?: 0;  // result is 42 (because some_value has a value)
+let result := some_value ?? 0;  // result is 42 (because some_value has a value)
 ```
 
 It's super useful for providing defaults:
 
 ```ferret
 let username: str? = get_input();
-let display_name := username ?: "Guest";  // Show "Guest" if no username
+let display_name := username ?? "Guest";  // Show "Guest" if no username
 
 let max_items: i32? = get_config("max");
-let limit := max_items ?: 100;  // Default to 100 if not configured
+let limit := max_items ?? 100;  // Default to 100 if not configured
 ```
 
 This is especially useful with maps, since indexing returns optional values:
 
 ```ferret
 let scores := { "Alice" => 95, "Bob" => 87 } as map[str]i32;
-let alice_score := scores["Alice"] ?: 0;   // 95
-let charlie_score := scores["Charlie"] ?: 0;  // 0 (key not found)
+let alice_score := scores["Alice"] ?? 0;   // 95
+let charlie_score := scores["Charlie"] ?? 0;  // 0 (key not found)
 ```
 
 Learn more about [Optional Types](/optionals) and [Maps](/type-system/maps).
@@ -354,7 +354,7 @@ Here's the order from highest priority (done first) to lowest (done last):
 11. **Bitwise OR** - `|`
 12. **Logical AND** - `and`
 13. **Logical OR** - `or`
-14. **Elvis operator** - `?:`
+14. **Coalescing operator** - `??`
 15. **Assignment** - `=`, `+=`, `-=`, etc.
 
 Let's see this in action:
@@ -389,7 +389,7 @@ You've learned about all the operators in Ferret! Here's what we covered:
 * **Comparison operators** for checking relationships: `==`, `!=`, `<`, `>`, `<=`, `>=`
 * **Logical operators** for combining conditions: `and`, `or`, `not`
 * **Assignment operators** for modifying variables: `=`, `+=`, `-=`, etc.
-* **Special operators** like `:=` for type inference and `?:` for defaults
+* **Special operators** like `:=` for type inference and `??` for defaults
 * **Bitwise operators** for low-level bit manipulation
 * **Operator precedence** and when to use parentheses
 

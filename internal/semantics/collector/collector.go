@@ -919,7 +919,7 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	case *ast.CastExpr:
 		collectExpr(ctx, mod, e.X)
 
-	case *ast.ElvisExpr:
+	case *ast.CoalescingExpr:
 		collectExpr(ctx, mod, e.Cond)
 		collectExpr(ctx, mod, e.Default)
 
@@ -970,7 +970,7 @@ func collectFunctionSignatureOnly(ctx *context_v2.CompilerContext, mod *context_
 				Name:     param.Name.Name,
 				Kind:     symbols.SymbolParameter,
 				Decl:     &param,
-				Exported: utils.IsExported(param.Name.Name),
+				Exported: false,
 				Type:     types.TypeUnknown, // Will be filled during type checking
 			}
 
@@ -1022,7 +1022,7 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 				Name:     param.Name.Name,
 				Kind:     symbols.SymbolParameter,
 				Decl:     &param,
-				Exported: utils.IsExported(param.Name.Name),
+				Exported: false,
 				Type:     types.TypeUnknown, // Will be filled during type checking
 			}
 

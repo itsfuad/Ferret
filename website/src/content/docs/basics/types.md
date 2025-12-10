@@ -248,15 +248,15 @@ let missing: i32? = ages["unknown"];  // none
 
 This is a safety feature! It forces you to think about what happens when a key doesn't exist, preventing crashes.
 
-#### The Elvis Operator with Maps
+#### The Coalescing Operator with Maps
 
-The elvis operator `?:` is perfect for providing default values:
+The coalescing operator `??` is perfect for providing default values:
 
 ```ferret
 let scores := {"alice" => 95} as map[str]i32;
 
-let alice_score := scores["alice"] ?: 0;    // 95
-let bob_score := scores["bob"] ?: 0;        // 0 (key doesn't exist)
+let alice_score := scores["alice"] ?? 0;    // 95
+let bob_score := scores["bob"] ?? 0;        // 0 (key doesn't exist)
 ```
 
 This pattern is so common you'll use it all the time when working with maps!

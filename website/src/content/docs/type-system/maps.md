@@ -84,9 +84,9 @@ let unknown_age: i32? = ages["nobody"]; // none
 
 This design prevents common bugs! You can't forget to check if a key exists because the type system reminds you.
 
-### The Elvis Operator Pattern
+### The Coalescing Operator Pattern
 
-The most common way to work with map values is using the elvis operator `?:` to provide a default:
+The most common way to work with map values is using the coalescing operator `??` to provide a default:
 
 ```ferret
 let scores := {
@@ -95,8 +95,8 @@ let scores := {
 };
 
 // Get value or use default
-let alice_score := scores["alice"] ?: 0;   // 95
-let carol_score := scores["carol"] ?: 0;   // 0 (key doesn't exist)
+let alice_score := scores["alice"] ?? 0;   // 95
+let carol_score := scores["carol"] ?? 0;   // 0 (key doesn't exist)
 ```
 
 This pattern is so useful because:
@@ -139,7 +139,7 @@ let config := {
     "retry_count" => "3"
 };
 
-let api_url := config["api_url"] ?: "https://default.com";
+let api_url := config["api_url"] ?? "https://default.com";
 ```
 
 ### Numeric Keys
@@ -153,7 +153,7 @@ let id_to_name := {
     3 => "Charlie"
 };
 
-let name := id_to_name[1] ?: "Unknown";
+let name := id_to_name[1] ?? "Unknown";
 ```
 
 ### Mixed Type Values
@@ -186,8 +186,8 @@ fn main() {
     };
 
     // Safe access with defaults
-    let alice_age := user_ages["alice"] ?: 0;
-    let unknown_age := user_ages["nobody"] ?: 18; // Default to 18
+    let alice_age := user_ages["alice"] ?? 0;
+    let unknown_age := user_ages["nobody"] ?? 18; // Default to 18
 
     print("Alice is " + alice_age + " years old");
 }
@@ -204,8 +204,8 @@ fn main() {
     };
 
     // Check stock levels
-    let apple_count := inventory["apples"] ?: 0;
-    let grape_count := inventory["grapes"] ?: 0;  // Not in stock
+    let apple_count := inventory["apples"] ?? 0;
+    let grape_count := inventory["grapes"] ?? 0;  // Not in stock
 
     if apple_count > 0 {
         print("We have apples!");
@@ -223,8 +223,8 @@ fn main() {
         "auto_save" => "true"
     };
 
-    let theme := settings["theme"] ?: "light";
-    let font := settings["font_size"] ?: "12";
+    let theme := settings["theme"] ?? "light";
+    let font := settings["font_size"] ?? "12";
 
     print("Theme: " + theme);
 }
@@ -242,8 +242,8 @@ let scores := {"alice" => 95};
 // ✅ Correct: returns i32?
 let score: i32? = scores["alice"];
 
-// ✅ Correct: unwrap with elvis
-let value: i32 = scores["alice"] ?: 0;
+// ✅ Correct: unwrap with coalescing
+let value: i32 = scores["alice"] ?? 0;
 
 // ❌ Error: can't assign i32? to i32
 let bad: i32 = scores["alice"];
@@ -258,7 +258,7 @@ let data := {"key1" => 100};
 
 // In other languages, this might crash!
 // In Ferret, you get 'none' safely
-let missing := data["key_does_not_exist"] ?: -1;  // Returns -1
+let missing := data["key_does_not_exist"] ?? -1;  // Returns -1
 ```
 
 This design eliminates an entire class of runtime errors!
@@ -267,16 +267,16 @@ This design eliminates an entire class of runtime errors!
 
 ### Always Provide Defaults
 
-When using elvis operator, always think about what default makes sense:
+When using coalescing operator, always think about what default makes sense:
 
 ```ferret
 let scores := {"alice" => 95};
 
 // ✅ Good: meaningful default
-let score := scores["bob"] ?: 0;
+let score := scores["bob"] ?? 0;
 
 // ✅ Good: indicates "not found"
-let score := scores["bob"] ?: -1;
+let score := scores["bob"] ?? -1;
 ```
 
 ### Use Descriptive Key Types
@@ -299,7 +299,7 @@ Always consider what happens when a key doesn't exist:
 let cache := {"page1" => "content"};
 
 // Option 1: Provide default
-let content := cache["page1"] ?: "Loading...";
+let content := cache["page1"] ?? "Loading...";
 
 // Option 2: Check explicitly
 let maybe_content: str? = cache["page2"];
@@ -329,10 +329,10 @@ Ferret's approach is similar to Rust and Swift - it makes missing values **impos
 
 ### Default Value Pattern
 
-Most common - use elvis for instant defaults:
+Most common - use coalescing for instant defaults:
 
 ```ferret
-let value := mymap[key] ?: default_value;
+let value := mymap[key] ?? default_value;
 ```
 
 ### Chaining Lookups
@@ -342,8 +342,8 @@ Try multiple keys until one works:
 ```ferret
 let config := {"env" => "prod"};
 
-let env := config["environment"] ?: 
-           config["env"] ?: 
+let env := config["environment"] ?? 
+           config["env"] ?? 
            "development";  // Ultimate fallback
 ```
 
@@ -368,13 +368,13 @@ Maps in Ferret are:
 - **Safe**: Optional returns prevent crashes
 - **Explicit**: You must handle missing keys
 - **Type-safe**: Keys and values have specific types
-- **Ergonomic**: Elvis operator makes defaults easy
+- **Ergonomic**: Coalescing operator makes defaults easy
 
 Key takeaways:
 - Map syntax: `map[KeyType]ValueType`
 - Map literals: `{ key => value } as map[K]V`
 - Accessing values returns optionals: `map[key]` → `V?`
-- Use elvis for defaults: `map[key] ?: default`
+- Use coalescing for defaults: `map[key] ?? default`
 - No crashes - missing keys return `none`
 
 ## What's Next?

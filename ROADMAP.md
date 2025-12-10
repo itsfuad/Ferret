@@ -48,7 +48,7 @@ This document tracks planned improvements and enhancements to the Ferret compile
   - [x] Changed "may lose precision" → "possible data loss"
   - [x] Only show data loss warning when target bit size < source bit size
 - [x] Optional type narrowing
-  - [x] Narrow T? to T in if/elvis/comparison contexts
+  - [x] Narrow T? to T in if/coalescing/comparison contexts
   - [x] Defer-based scope restoration for type narrowing
 - [x] Byte type improvements
   - [x] Fixed byte literal type inference
@@ -301,7 +301,7 @@ This document tracks planned improvements and enhancements to the Ferret compile
 ### Recent Improvements (December 2025)
 - ✅ **Optional Type Narrowing**
   - Implemented T? → T narrowing in conditional contexts
-  - Elvis operator type narrowing (x ?: default)
+  - Coalescing operator type narrowing (x ?? default)
   - None literal comparison narrowing
   - Defer-based scope restoration for clean implementation
 - ✅ **Byte Type Enhancements**

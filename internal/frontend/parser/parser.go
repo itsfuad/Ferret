@@ -298,18 +298,18 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 
 // parseExpr parses an expression
 func (p *Parser) parseExpr() ast.Expression {
-	return p.parseElvis()
+	return p.parseCoalescing()
 }
 
-// parseElvis parses elvis operator (a ?: b)
-// Elvis has lower precedence than logical operators and is right-associative
-func (p *Parser) parseElvis() ast.Expression {
+// parseCoalescing parses coalescing operator (a ?? b)
+// Coalescing has lower precedence than logical operators and is right-associative
+func (p *Parser) parseCoalescing() ast.Expression {
 	left := p.parseLogicalOr()
 
-	if p.match(tokens.ELVIS_TOKEN) {
-		p.advance()             // consume ?:
-		right := p.parseElvis() // Right-associative: recursively parse elvis on the right
-		return &ast.ElvisExpr{
+	if p.match(tokens.COALESCING_TOKEN) {
+		p.advance()                  // consume ??
+		right := p.parseCoalescing() // Right-associative: recursively parse coalescing on the right
+		return &ast.CoalescingExpr{
 			Cond:     left,
 			Default:  right,
 			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),

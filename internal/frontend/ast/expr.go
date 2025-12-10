@@ -137,17 +137,17 @@ func (c *CastExpr) INode()                {} // Implements Node interface
 func (c *CastExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (c *CastExpr) Loc() *source.Location { return &c.Location }
 
-// ElvisExpr represents the elvis operator (a ?: b)
+// CoalescingExpr represents the coalescing operator (a ?? b)
 // If a is none/falsy, returns b
-type ElvisExpr struct {
+type CoalescingExpr struct {
 	Cond    Expression // condition (left side)
 	Default Expression // default value (right side)
 	source.Location
 }
 
-func (e *ElvisExpr) INode()                {} // Implements Node interface
-func (e *ElvisExpr) Expr()                 {} // Expr is a marker interface for all expressions
-func (e *ElvisExpr) Loc() *source.Location { return &e.Location }
+func (e *CoalescingExpr) INode()                {} // Implements Node interface
+func (e *CoalescingExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (e *CoalescingExpr) Loc() *source.Location { return &e.Location }
 
 // ForkExpr represents a fork expression for coroutines
 type ForkExpr struct {

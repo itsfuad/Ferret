@@ -189,8 +189,8 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	case *ast.RangeExpr:
 		return inferRangeExprType(ctx, mod, e)
 
-	case *ast.ElvisExpr:
-		return inferElvisExprType(ctx, mod, e)
+	case *ast.CoalescingExpr:
+		return inferCoalescingExprType(ctx, mod, e)
 
 	default:
 		return types.TypeUnknown
@@ -804,21 +804,21 @@ func inferRangeExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	return &types.ArrayType{Element: elementType}
 }
 
-// inferElvisExprType determines the result type of an elvis expression (a ?: b)
-// The elvis operator unwraps optional types:
+// inferCoalescingExprType determines the result type of an coalescing expression (a ?? b)
+// The coalescing operator unwraps optional types:
 // - If 'a' has type T?, the result is T (non-optional)
 // - The fallback 'b' should have type T to match
 // - Result type is always the non-optional inner type
-func inferElvisExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.ElvisExpr) types.SemType {
+func inferCoalescingExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CoalescingExpr) types.SemType {
 	condType := inferExprType(ctx, mod, expr.Cond)
 
 	// Check if condition is an optional type
 	if optType, ok := condType.(*types.OptionalType); ok {
-		// Elvis operator unwraps the optional: T? ?: T → T
+		// Coalescing operator unwraps the optional: T? ?? T → T
 		return optType.Inner
 	}
 
-	// If condition is not optional, elvis is redundant but still valid
+	// If condition is not optional, coalescing is redundant but still valid
 	// Result type is the condition type itself
 	return condType
 }

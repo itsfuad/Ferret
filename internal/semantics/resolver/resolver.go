@@ -227,7 +227,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		// Resolve the target type as well
 		resolveTypeNode(ctx, mod, e.Type)
 
-	case *ast.ElvisExpr:
+	case *ast.CoalescingExpr:
 		resolveExpr(ctx, mod, e.Cond)
 		resolveExpr(ctx, mod, e.Default)
 

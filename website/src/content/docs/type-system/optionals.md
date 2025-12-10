@@ -47,26 +47,26 @@ if opt == none {
 }
 ```
 
-## Elvis Operator
+## Coalescing Operator
 
-The elvis operator `?:` provides a default value when an optional is `none`:
+The coalescing operator `??` provides a default value when an optional is `none`:
 
 ```ferret
 let maybeValue: i32? = none;
-let value: i32 = maybeValue ?: 0;  // value is 0
+let value: i32 = maybeValue ?? 0;  // value is 0
 
 let someValue: i32? = 42;
-let result: i32 = someValue ?: 0;  // result is 42
+let result: i32 = someValue ?? 0;  // result is 42
 ```
 
-### Chaining Elvis Operators
+### Chaining Coalescing Operators
 
 ```ferret
 let a: i32? = none;
 let b: i32? = none;
 let c: i32? = 42;
 
-let result: i32 = a ?: b ?: c ?: 0;  // result is 42
+let result: i32 = a ?? b ?? c ?? 0;  // result is 42
 ```
 
 ## Assignment Rules
@@ -87,7 +87,7 @@ let optNum: i32? = 42;
 let num: i32 = optNum;  // ERROR - must unwrap first
 ```
 
-Instead, use type narrowing or the elvis operator:
+Instead, use type narrowing or the coalescing operator:
 
 ```ferret
 // Option 1: Type narrowing
@@ -95,8 +95,8 @@ if optNum != none {
     let num: i32 = optNum;  // OK
 }
 
-// Option 2: Elvis operator
-let num: i32 = optNum ?: 0;  // OK
+// Option 2: Coalescing operator
+let num: i32 = optNum ?? 0;  // OK
 ```
 
 ### None Assignment
@@ -132,12 +132,12 @@ if maybeUser != none {
 ### Do
 - Use optional types for values that might be absent
 - Use type narrowing to safely access optional values
-- Use elvis operator for simple default values
+- Use coalescing operator for simple default values
 
 ### Don't
 - Don't use optional types unnecessarily
 - Don't try to use optional values without checking for none first
-- Don't chain too many elvis operators (readability)
+- Don't chain too many coalescing operators (readability)
 
 ## Examples
 
@@ -152,7 +152,7 @@ fn safeDivide(a: i32, b: i32) -> i32? {
 }
 
 let result: i32? = safeDivide(10, 2);
-let value: i32 = result ?: 0;  // value is 5
+let value: i32 = result ?? 0;  // value is 5
 ```
 
 ### Working with Maps
@@ -169,12 +169,12 @@ let scores := {
 let alice_score: i32? = scores["alice"];  // Some(95)
 let carol_score: i32? = scores["carol"];  // none
 
-// Use elvis for defaults
-let score1 := scores["alice"] ?: 0;  // 95
-let score2 := scores["carol"] ?: 0;  // 0
+// Use coalescing for defaults
+let score1 := scores["alice"] ?? 0;  // 95
+let score2 := scores["carol"] ?? 0;  // 0
 
 // Chain lookups with multiple fallbacks
-let primary := scores["primary"] ?: scores["backup"] ?: 0;
+let primary := scores["primary"] ?? scores["backup"] ?? 0;
 ```
 
 See the [Maps](/type-system/maps) section for more details on how maps use optionals for safety.
@@ -192,8 +192,8 @@ let config := {
     .host: "localhost"
 } as Config;
 
-let actualPort: i32 = config.port ?: 8080;
-let actualHost: str = config.host ?: "0.0.0.0";
+let actualPort: i32 = config.port ?? 8080;
+let actualHost: str = config.host ?? "0.0.0.0";
 ```
 
 ## Next Steps

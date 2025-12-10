@@ -111,7 +111,7 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 			{regexp.MustCompile(`\}`), defaultHandler(tokens.CLOSE_CURLY)},
 			{regexp.MustCompile(","), defaultHandler(tokens.COMMA_TOKEN)},
 			{regexp.MustCompile(`\.`), defaultHandler(tokens.DOT_TOKEN)},
-			{regexp.MustCompile(`\?:`), defaultHandler(tokens.ELVIS_TOKEN)},
+			{regexp.MustCompile(`\?\?`), defaultHandler(tokens.COALESCING_TOKEN)},
 			{regexp.MustCompile(`\?`), defaultHandler(tokens.QUESTION_TOKEN)},
 		},
 	}
