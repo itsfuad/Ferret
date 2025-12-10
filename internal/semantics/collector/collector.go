@@ -65,6 +65,7 @@ func collectDeclarations(ctx *context_v2.CompilerContext, mod *context_v2.Module
 
 // collectFunctionBodies collects function bodies in a second pass after all declarations are known.
 // This ensures all symbols are available before processing function bodies.
+// It also processes top-level statements to check for invalid control flow at module level.
 func collectFunctionBodies(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	if mod.AST == nil {
 		return
@@ -73,7 +74,7 @@ func collectFunctionBodies(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	// Ensure CurrentScope starts at ModuleScope
 	mod.CurrentScope = mod.ModuleScope
 
-	// Collect function bodies
+	// Collect function bodies and process top-level statements
 	for _, node := range mod.AST.Nodes {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
@@ -81,6 +82,13 @@ func collectFunctionBodies(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 		case *ast.MethodDecl:
 			// Methods are collected separately in collectMethodBodies
 			continue
+		case *ast.VarDecl, *ast.ConstDecl, *ast.TypeDecl, *ast.ImportStmt:
+			// These are declarations, already processed in collectDeclarations
+			// Skip them here
+		default:
+			// Process top-level statements (if, for, while, return, break, continue, etc.)
+			// This will trigger the guards that check for module-level control flow
+			collectNode(ctx, mod, node)
 		}
 	}
 
