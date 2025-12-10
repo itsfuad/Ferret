@@ -3,7 +3,6 @@ package typechecker
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/semantics/controlflow"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
@@ -206,16 +205,6 @@ func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 		restoreScope()
 		mod.CurrentFunctionReturnType = oldReturnType
 	}
-}
-
-// analyzeFunctionReturns builds CFG and analyzes return paths for a function
-func analyzeFunctionReturns(ctx *context_v2.CompilerContext, mod *context_v2.Module, funcDecl *ast.FuncDecl) {
-	if funcDecl.Body == nil {
-		return
-	}
-	cfgBuilder := controlflow.NewCFGBuilder(ctx, mod)
-	cfg := cfgBuilder.BuildFunctionCFG(funcDecl)
-	controlflow.AnalyzeReturns(ctx, mod, funcDecl, cfg)
 }
 
 // lookupTypeSymbol finds a type symbol by name, checking current module first, then imported modules.

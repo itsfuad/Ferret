@@ -11,4 +11,3 @@ if maybeInt != none {
     // This shouldn't be reachable, but if it is, maybeInt is i32? here
     let v4: i32? = maybeInt;
 }
-
