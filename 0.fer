@@ -1,34 +1,14 @@
+let maybeInt: i32? = 10;
 
-type Point struct {
-    .X : i32,
-    .Y : i32,
-
-
-    .internal: str,
-};
-
-
-let p : Point = { .X = 10, .Y = 29};
-
-
-fn (r: &Point?) move() {
-    let val := r.internal;
+if maybeInt != none {
+    // maybeInt is i32 here
+    let v1: i32 = maybeInt;
+} else if maybeInt == none {
+    // maybeInt should be none here
+    let v2: i32? = maybeInt; // Should work - none can be assigned to i32?
+    let v3: i32 = maybeInt;  // Should error - cannot assign none to i32
+} else {
+    // This shouldn't be reachable, but if it is, maybeInt is i32? here
+    let v4: i32? = maybeInt;
 }
-
-fn div(a: i32, b: i32) -> str ! f32 {
-    if b == 0 {
-        return "cannot divide by 0"!;
-    }
-
-    while true {
-        //break;
-    }
-
-    return a / b;
-}
-
-let res := div(1, 4) catch err {
-    let errval : str = err;
-    let fallback := "di";
-} fallback;
 

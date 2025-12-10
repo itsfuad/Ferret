@@ -71,9 +71,26 @@ func analyzeConditionForNarrowing(_ *context_v2.CompilerContext, mod *context_v2
 			// a != none → a is non-optional in then branch, none in else branch
 			varName, isNoneCheck := isNoneComparison(binExpr)
 			if isNoneCheck && varName != "" {
-				if optType := getOptionalVarType(mod, varName); optType != nil {
-					thenNarrowing.Narrow(varName, optType.Inner) // Unwrap to T
-					// In else branch, a is definitely none (stays T?)
+				// Check if variable has been narrowed in parent context
+				parentNarrowedType, hasParentNarrowing := parentNarrowing.GetNarrowedType(varName)
+				
+				if hasParentNarrowing {
+					// If already narrowed to none, we can't further narrow
+					if parentNarrowedType.Equals(types.TypeNone) {
+						// Variable is already none, so a != none is always false
+						// then branch is unreachable, else branch stays none
+						elseNarrowing.Narrow(varName, types.TypeNone) // Explicitly set to ensure it's applied
+					} else {
+						// Variable was narrowed to T (non-optional), so a != none is always true
+						// then branch gets T (already from parent), else branch is unreachable
+						thenNarrowing.Narrow(varName, parentNarrowedType) // Explicitly set to ensure it's applied
+					}
+				} else {
+					// Not narrowed in parent, check if it's optional in symbol table
+					if optType := getOptionalVarType(mod, varName); optType != nil {
+						thenNarrowing.Narrow(varName, optType.Inner) // Unwrap to T
+						elseNarrowing.Narrow(varName, types.TypeNone) // Narrow to none in else branch
+					}
 				}
 			}
 
@@ -81,9 +98,26 @@ func analyzeConditionForNarrowing(_ *context_v2.CompilerContext, mod *context_v2
 			// a == none → a is none in then branch, non-optional in else branch
 			varName, isNoneCheck := isNoneComparison(binExpr)
 			if isNoneCheck && varName != "" {
-				if optType := getOptionalVarType(mod, varName); optType != nil {
-					// In then branch, a is definitely none (stays T?)
-					elseNarrowing.Narrow(varName, optType.Inner) // Unwrap to T in else
+				// Check if variable has been narrowed in parent context
+				parentNarrowedType, hasParentNarrowing := parentNarrowing.GetNarrowedType(varName)
+				
+				if hasParentNarrowing {
+					// If already narrowed to none, we can't further narrow
+					if parentNarrowedType.Equals(types.TypeNone) {
+						// Variable is already none, so a == none is always true
+						// then branch gets none (already from parent), else branch is unreachable
+						thenNarrowing.Narrow(varName, types.TypeNone) // Explicitly set to ensure it's applied
+					} else {
+						// Variable was narrowed to T (non-optional), so a == none is always false
+						// then branch is unreachable, else branch gets T (already from parent)
+						elseNarrowing.Narrow(varName, parentNarrowedType) // Explicitly set to ensure it's applied
+					}
+				} else {
+					// Not narrowed in parent, check if it's optional in symbol table
+					if optType := getOptionalVarType(mod, varName); optType != nil {
+						thenNarrowing.Narrow(varName, types.TypeNone) // Narrow to none in then branch
+						elseNarrowing.Narrow(varName, optType.Inner)  // Unwrap to T in else
+					}
 				}
 			}
 		}

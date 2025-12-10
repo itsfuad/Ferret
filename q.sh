@@ -1,0 +1,1 @@
+go build -o ./bin/ferret && ./bin/ferret -d 0.fer
