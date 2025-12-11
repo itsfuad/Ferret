@@ -28,6 +28,8 @@ type Options struct {
 	SaveAST bool
 	// Output format: "ansi" or "html"
 	LogFormat FORMAT
+	// Output executable path (if empty, uses default: <projectRoot>/bin/<projectName>)
+	OutputExecutable string
 }
 
 // Result of compilation
@@ -52,19 +54,50 @@ func Compile(opts *Options) Result {
 			return Result{Success: false, Output: fmt.Sprintf("File not found: %s", opts.EntryFile)}
 		}
 
-		projectRoot = filepath.Dir(absPath)
-		projectName = filepath.Base(projectRoot)
+		// Find the actual project root (where runtime/ directory is)
+		// Start from the entry file's directory and walk up until we find runtime/
+		entryDir := filepath.Dir(absPath)
+		currentDir := entryDir
+		for {
+			runtimePath := filepath.Join(currentDir, "runtime")
+			if _, err := os.Stat(runtimePath); err == nil {
+				// Found runtime directory, this is the project root
+				projectRoot = currentDir
+				break
+			}
+			parent := filepath.Dir(currentDir)
+			if parent == currentDir {
+				// Reached filesystem root, use entry file's directory as fallback
+				projectRoot = entryDir
+				break
+			}
+			currentDir = parent
+		}
+		projectName = filepath.Base(entryDir)
 	}
 
 	execPath, _ := os.Executable()
 	builtinPath := filepath.Join(filepath.Dir(execPath), "../ferret_libs")
+
+	// Determine output path
+	outputPath := filepath.Join(projectRoot, "bin", projectName)
+	if opts.OutputExecutable != "" {
+		// Use user-specified path
+		outputPath = opts.OutputExecutable
+		// Make it absolute if it's not already
+		if !filepath.IsAbs(outputPath) {
+			if absPath, err := filepath.Abs(outputPath); err == nil {
+				outputPath = absPath
+			}
+		}
+	}
 
 	config := &context_v2.Config{
 		ProjectName:        projectName,
 		ProjectRoot:        projectRoot,
 		Extension:          ".fer",
 		BuiltinModulesPath: builtinPath,
-		OutputPath:         filepath.Join(projectRoot, "bin", projectName),
+		OutputPath:         outputPath,
 	}
 
 	ctx := context_v2.New(config, opts.Debug)

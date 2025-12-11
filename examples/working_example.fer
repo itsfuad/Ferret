@@ -1,0 +1,31 @@
+// Working example - demonstrates all supported features
+import "std/io";
+
+fn main() {
+    // Variables with type inference
+    let x := 10;
+    let y := 20;
+    
+    // Arithmetic operations
+    let sum := x + y;
+    
+    // If-else statements
+    if sum > 25 {
+        io::Println("Sum is greater than 25");
+    } else {
+        io::Println("Sum is 25 or less");
+    }
+    
+    // Function calls
+    greet();
+    calculate(5, 3);
+}
+
+fn greet() {
+    io::Println("Hello from Ferret!");
+}
+
+fn calculate(a: i32, b: i32) -> i32 {
+    let result := a * b;
+    return result;
+}

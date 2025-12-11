@@ -2,12 +2,12 @@ let maybeInt: i32? = 100033333333339999;
 
 let max32int := 2147483648;
 
-let sring: str = max32int; // error
+//let sring: str = max32int; // error
 
-while true {
-    maybeInt = maybeInt + 1;
-}
+// while true {
+//     //maybeInt = maybeInt + 1;
+// }
 
-for let i in 0..10 {
-    sring = sring + "a";
-}
+// for let i in 0..10 {
+//     sring = sring + "a";
+// }

@@ -1,0 +1,27 @@
+// Basic Ferret program demonstrating supported features
+import "std/io";
+
+fn main() {
+    // Variables
+    let x: i32 = 10;
+    let y: i32 = 20;
+    
+    // Arithmetic
+    let sum := x + y;
+    let diff := x - y;
+    let prod := x * y;
+    
+    // If-else
+    if sum > 25 {
+        io::Println("Sum is greater than 25");
+    } else {
+        io::Println("Sum is 25 or less");
+    }
+    
+    // Function call
+    print_result(sum);
+}
+
+fn print_result(value: i32) {
+    io::Println("Result calculated");
+}

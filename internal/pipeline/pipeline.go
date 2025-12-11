@@ -3,11 +3,15 @@ package pipeline
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 
 	"compiler/colors"
+	"compiler/internal/codegen"
+	"compiler/internal/codegen/cgen"
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
@@ -107,7 +111,13 @@ func (p *Pipeline) Run() error {
 		return err
 	}
 
-	// Phase 6: Code Generation (future)
+	// Phase 6: Code Generation
+	if p.ctx.Debug {
+		colors.CYAN.Printf("\n[Phase 6] Code Generation\n")
+	}
+	if err := p.runCodegenPhase(); err != nil {
+		return err
+	}
 
 	// Final error check
 	if p.ctx.HasErrors() {
@@ -173,10 +183,43 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 
 		filePath, modType, err = p.ctx.ImportPathToFilePath(importPath)
 		if err != nil {
+			// Check if it's a native module (already registered)
+			if p.ctx.HasModule(importPath) {
+				mod, _ := p.ctx.GetModule(importPath)
+				if mod.Type == context_v2.ModuleBuiltin && mod.AST == nil {
+					// Native module - skip file reading, it's already registered
+					// Mark it as parsed (native modules don't need parsing)
+					if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseParsed) {
+						p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
+					}
+					return
+				}
+			}
 			p.ctx.Diagnostics.Add(
 				diagnostics.NewError(err.Error()).
 					WithPrimaryLabel(requestedLocation, ""),
 			)
+			return
+		}
+
+		// Skip file reading for native modules
+		if strings.HasPrefix(filePath, "native://") {
+			// Native module - already registered, create empty AST and mark as parsed
+			module.Mu.Lock()
+			if module.AST == nil {
+				// Create minimal AST for native module
+				module.AST = &ast.Module{
+					Nodes: []ast.Node{},
+				}
+			}
+			module.Mu.Unlock()
+
+			// Mark as lexed and parsed
+			p.ctx.SetModulePhase(importPath, phase.PhaseLexed)
+			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseParsed) {
+				// If advance fails, try direct set (native modules may not follow normal flow)
+				p.ctx.SetModulePhase(importPath, phase.PhaseParsed)
+			}
 			return
 		}
 
@@ -338,6 +381,18 @@ func (p *Pipeline) runCollectorPhase() error {
 			continue
 		}
 
+		// Skip collection for native modules (symbols already registered)
+		if module.Type == context_v2.ModuleBuiltin && module.AST != nil && len(module.AST.Nodes) == 0 {
+			// Native module - symbols already in ModuleScope, just advance phase
+			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCollected) {
+				p.ctx.SetModulePhase(importPath, phase.PhaseCollected)
+			}
+			if p.ctx.Debug {
+				colors.PURPLE.Printf("  ✓ %s (native)\n", importPath)
+			}
+			continue
+		}
+
 		// CollectModule handles all collection phases internally
 		collector.CollectModule(p.ctx, module)
 
@@ -363,6 +418,17 @@ func (p *Pipeline) runResolverPhase() error {
 
 		// Check if module is at least collected
 		if p.ctx.GetModulePhase(importPath) < phase.PhaseCollected {
+			continue
+		}
+
+		// Skip resolution for native modules (symbols already resolved)
+		if module.Type == context_v2.ModuleBuiltin && module.AST != nil && len(module.AST.Nodes) == 0 {
+			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseResolved) {
+				p.ctx.SetModulePhase(importPath, phase.PhaseResolved)
+			}
+			if p.ctx.Debug {
+				colors.PURPLE.Printf("  ✓ %s (native)\n", importPath)
+			}
 			continue
 		}
 
@@ -416,6 +482,17 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 			continue
 		}
 
+		// Skip type checking for native modules (types already validated during registration)
+		if module.Type == context_v2.ModuleBuiltin && module.AST != nil && len(module.AST.Nodes) == 0 {
+			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseTypeChecked) {
+				p.ctx.SetModulePhase(importPath, phase.PhaseTypeChecked)
+			}
+			if p.ctx.Debug {
+				colors.PURPLE.Printf("  ✓ %s (native)\n", importPath)
+			}
+			continue
+		}
+
 		typechecker.CheckModule(p.ctx, module)
 
 		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseTypeChecked) {
@@ -423,7 +500,7 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 		}
 
 		if p.ctx.Debug {
-			colors.PURPLE.Printf("  ✓ %s\\n", importPath)
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
 
@@ -459,4 +536,86 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 	// Don't return error here - let Run() handle final error check
 	// This allows all modules to be analyzed even if some have errors
 	return nil
+}
+
+// runCodegenPhase runs code generation on all type-checked modules
+func (p *Pipeline) runCodegenPhase() error {
+	for _, importPath := range p.ctx.GetModuleNames() {
+		module, exists := p.ctx.GetModule(importPath)
+		if !exists {
+			continue
+		}
+
+		// Only generate code for entry module (main module)
+		// Skip builtin modules and other imported modules
+		if importPath != p.ctx.EntryModule {
+			continue
+		}
+
+		// Check if module is at least type-checked
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseTypeChecked {
+			continue
+		}
+
+		// Generate C code
+		cFilePath := p.ctx.Config.OutputPath + ".c"
+		if err := p.generateCode(module, cFilePath); err != nil {
+			p.ctx.ReportError(fmt.Sprintf("code generation failed: %v", err), nil)
+			continue
+		}
+
+		// Build executable
+		execPath := p.ctx.Config.OutputPath
+		// Only add .exe if user didn't specify custom output path and we're on Windows
+		// (If user specified -o, they control the exact filename)
+		if runtime.GOOS == "windows" && !strings.HasSuffix(execPath, ".exe") {
+			// Check if this looks like a user-specified path (not the default pattern)
+			// Default pattern is: <projectRoot>/bin/<projectName>
+			defaultPattern := filepath.Join(p.ctx.Config.ProjectRoot, "bin", p.ctx.Config.ProjectName)
+			if execPath == defaultPattern {
+				execPath += ".exe"
+			}
+		}
+
+		if err := p.buildExecutable(cFilePath, execPath); err != nil {
+			p.ctx.ReportError(fmt.Sprintf("build failed: %v", err), nil)
+			continue
+		}
+
+		if p.ctx.Debug {
+			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+		}
+	}
+
+	return nil
+}
+
+// generateCode generates C code for a module
+func (p *Pipeline) generateCode(mod *context_v2.Module, outputPath string) error {
+	return cgen.GenerateModule(p.ctx, mod, outputPath)
+}
+
+// buildExecutable compiles the C code into an executable
+func (p *Pipeline) buildExecutable(cFilePath, execPath string) error {
+	// Determine runtime path - use project root (most reliable)
+	runtimePath := filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
+
+	// If not found, try relative to C file as fallback
+	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
+		cFileDir := filepath.Dir(cFilePath)
+		runtimePath = filepath.Join(cFileDir, "..", "..", "runtime")
+	}
+
+	// Make it absolute
+	if absRuntime, err := filepath.Abs(runtimePath); err == nil {
+		runtimePath = absRuntime
+	}
+
+	opts := codegen.DefaultBuildOptions()
+	// Use project root for runtime path (most reliable)
+	opts.RuntimePath = filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
+	opts.OutputPath = execPath
+	opts.Debug = p.ctx.Debug
+
+	return codegen.BuildExecutable(p.ctx, cFilePath, opts)
 }

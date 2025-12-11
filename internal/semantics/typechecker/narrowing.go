@@ -72,7 +72,7 @@ func analyzeConditionForNarrowing(_ *context_v2.CompilerContext, mod *context_v2
 			if isNoneCheck && varName != "" {
 				// Check if variable has been narrowed in parent context
 				parentNarrowedType, hasParentNarrowing := parentNarrowing.GetNarrowedType(varName)
-				
+
 				if hasParentNarrowing {
 					// If already narrowed to none, we can't further narrow
 					if parentNarrowedType.Equals(types.TypeNone) {
@@ -87,7 +87,7 @@ func analyzeConditionForNarrowing(_ *context_v2.CompilerContext, mod *context_v2
 				} else {
 					// Not narrowed in parent, check if it's optional in symbol table
 					if optType := getOptionalVarType(mod, varName); optType != nil {
-						thenNarrowing.Narrow(varName, optType.Inner) // Unwrap to T
+						thenNarrowing.Narrow(varName, optType.Inner)  // Unwrap to T
 						elseNarrowing.Narrow(varName, types.TypeNone) // Narrow to none in else branch
 					}
 				}
@@ -99,7 +99,7 @@ func analyzeConditionForNarrowing(_ *context_v2.CompilerContext, mod *context_v2
 			if isNoneCheck && varName != "" {
 				// Check if variable has been narrowed in parent context
 				parentNarrowedType, hasParentNarrowing := parentNarrowing.GetNarrowedType(varName)
-				
+
 				if hasParentNarrowing {
 					// If already narrowed to none, we can't further narrow
 					if parentNarrowedType.Equals(types.TypeNone) {
@@ -176,7 +176,7 @@ func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 	}
 	for _, param := range params {
 		if param.Name != nil {
-			paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
+			paramType := TypeFromTypeNodeWithContext(ctx, mod, param.Type)
 			psym, ok := scope.GetSymbol(param.Name.Name)
 			if !ok {
 				continue // should not happen but safe side
@@ -195,7 +195,7 @@ func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	// Set expected return type for validation
 	var expectedReturnType types.SemType = types.TypeVoid
 	if funcType != nil && funcType.Result != nil {
-		expectedReturnType = typeFromTypeNodeWithContext(ctx, mod, funcType.Result)
+		expectedReturnType = TypeFromTypeNodeWithContext(ctx, mod, funcType.Result)
 	}
 	oldReturnType := mod.CurrentFunctionReturnType
 	mod.CurrentFunctionReturnType = expectedReturnType

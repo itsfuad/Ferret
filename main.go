@@ -18,6 +18,7 @@ func main() {
 	showVersion := flag.Bool("v", false, "Show version")
 	saveAST := flag.Bool("ast", false, "Save AST")
 	help := flag.Bool("h", false, "Show help")
+	outputPath := flag.String("o", "", "Output executable path")
 	flag.BoolVar(debug, "debug", false, "Enable debug output")
 	flag.BoolVar(showVersion, "version", false, "Show version")
 	flag.BoolVar(help, "help", false, "Show help")
@@ -51,10 +52,11 @@ func main() {
 
 	// Compile
 	result := compiler.Compile(&compiler.Options{
-		EntryFile: entryFile,
-		Debug:     *debug,
-		SaveAST:   *saveAST,
-		LogFormat: compiler.ANSI,
+		EntryFile:        entryFile,
+		Debug:            *debug,
+		SaveAST:          *saveAST,
+		LogFormat:        compiler.ANSI,
+		OutputExecutable: *outputPath,
 	})
 
 	// Exit code

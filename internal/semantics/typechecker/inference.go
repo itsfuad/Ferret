@@ -319,7 +319,7 @@ func inferCallExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		// Get the function declaration
 		if funcDecl, ok := sym.Decl.(*ast.FuncDecl); ok {
 			if funcDecl.Type != nil && funcDecl.Type.Result != nil {
-				returnType := typeFromTypeNodeWithContext(ctx, mod, funcDecl.Type.Result)
+				returnType := TypeFromTypeNodeWithContext(ctx, mod, funcDecl.Type.Result)
 
 				// Unwrap Result type if catch clause present
 				if resultType, isResult := returnType.(*types.ResultType); isResult && expr.Catch != nil {
@@ -543,13 +543,13 @@ func inferScopeResolutionExprType(ctx *context_v2.CompilerContext, mod *context_
 
 // inferCastExprType determines the target type of a cast
 func inferCastExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CastExpr) types.SemType {
-	return typeFromTypeNodeWithContext(ctx, mod, expr.Type)
+	return TypeFromTypeNodeWithContext(ctx, mod, expr.Type)
 }
 
 // inferCompositeLitType determines the type of a composite literal
 func inferCompositeLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit) types.SemType {
 	if lit.Type != nil {
-		return typeFromTypeNodeWithContext(ctx, mod, lit.Type)
+		return TypeFromTypeNodeWithContext(ctx, mod, lit.Type)
 	}
 
 	// Infer type from elements
@@ -750,7 +750,7 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 	// Build parameter types
 	params := make([]types.ParamType, len(lit.Type.Params))
 	for i, param := range lit.Type.Params {
-		paramType := typeFromTypeNodeWithContext(ctx, mod, param.Type)
+		paramType := TypeFromTypeNodeWithContext(ctx, mod, param.Type)
 		params[i] = types.ParamType{
 			Name: param.Name.Name,
 			Type: paramType,
@@ -763,7 +763,7 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 	}
 
 	// Get return type
-	returnType := typeFromTypeNodeWithContext(ctx, mod, lit.Type.Result)
+	returnType := TypeFromTypeNodeWithContext(ctx, mod, lit.Type.Result)
 
 	// Set the current function return type for validating return statements
 	// Save the parent function's return type and restore it after

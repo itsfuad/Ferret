@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"compiler/internal/builtins"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/phase"
@@ -190,6 +191,9 @@ func New(config *Config, debug bool) *CompilerContext {
 		ctx.loadBuiltinModules()
 	}
 
+	// Register native builtin functions
+	ctx.registerNativeBuiltins()
+
 	return ctx
 }
 
@@ -264,6 +268,16 @@ func registerBuiltins(universe *table.SymbolTable) {
 		Type:     types.TypeNone, // Special none type for optional unwrapping
 		Exported: true,
 	})
+}
+
+// registerNativeBuiltins registers native builtin modules (implemented in Go/C)
+func (ctx *CompilerContext) registerNativeBuiltins() {
+	builtins.RegisterAllBuiltins(ctx)
+}
+
+// GetUniverse returns the universe scope (implements builtins.ModuleCreator)
+func (ctx *CompilerContext) GetUniverse() *table.SymbolTable {
+	return ctx.Universe
 }
 
 // SetEntryPoint sets the entry point for compilation
@@ -360,10 +374,24 @@ func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, Mod
 	}
 
 	// Check if it's a builtin module
+	// First check if it's a native module (registered in Go)
+	if ctx.HasModule(importPath) {
+		mod, _ := ctx.GetModule(importPath)
+		if mod.Type == ModuleBuiltin {
+			// Native module - return a virtual path
+			return "native://" + importPath, ModuleBuiltin, nil
+		}
+	}
+
+	// Then check for file-based builtin modules
 	if builtinPath, ok := ctx.Config.BuiltinModules[packageName]; ok {
 		filePath := filepath.Join(builtinPath, cleanPath+ctx.Config.Extension)
 		if fs.IsValidFile(filePath) {
 			return filepath.ToSlash(filePath), ModuleBuiltin, nil
+		}
+		// If file doesn't exist but we have a native module, that's OK
+		if ctx.HasModule(importPath) {
+			return "native://" + importPath, ModuleBuiltin, nil
 		}
 		return "", ModuleUnknown, fmt.Errorf("builtin module not found: %s", importPath)
 	}
@@ -385,7 +413,8 @@ func (ctx *CompilerContext) isRemoteImport(importPath string) bool {
 }
 
 // AddModule registers a module in the context
-func (ctx *CompilerContext) AddModule(importPath string, module *Module) {
+// Accepts interface{} to support both *Module and *builtins.NativeModule
+func (ctx *CompilerContext) AddModule(importPath string, module interface{}) {
 	if module == nil {
 		panic(fmt.Sprintf("cannot add nil module for %q", importPath))
 	}
@@ -398,8 +427,27 @@ func (ctx *CompilerContext) AddModule(importPath string, module *Module) {
 		return
 	}
 
-	module.ImportPath = importPath
-	ctx.Modules[importPath] = module
+	// Convert interface{} to *Module
+	var mod *Module
+	switch m := module.(type) {
+	case *Module:
+		mod = m
+	case *builtins.NativeModule:
+		// Convert NativeModule to Module
+		mod = &Module{
+			ImportPath:     importPath,
+			Type:           ModuleBuiltin,
+			ModuleScope:    m.ModuleScope,
+			CurrentScope:   m.CurrentScope,
+			Imports:        make(map[string]*Import),
+			ImportAliasMap: make(map[string]string),
+		}
+	default:
+		panic(fmt.Sprintf("unsupported module type: %T", module))
+	}
+
+	mod.ImportPath = importPath
+	ctx.Modules[importPath] = mod
 }
 
 // GetModule retrieves a module by import path

@@ -1,0 +1,7 @@
+// Native IO module - implementations are in Go/C
+// This file provides type declarations for type checking
+
+fn Println(msg: str) -> void;
+fn Print(msg: str) -> void;
+fn ReadInt() -> i32 ! str;
+fn ReadFloat() -> f64 ! str;

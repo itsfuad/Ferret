@@ -30,6 +30,10 @@ type Symbol struct {
 	DeclaredScope SymbolTable            // Scope where this symbol was declared
 	Methods       map[string]*MethodInfo // Methods attached to this named type (only for SymbolType)
 	ConstValue    ConstValue             // Compile-time known value (for constants and const variables)
+
+	// Native function support (for builtin functions implemented in Go/C)
+	IsNative   bool   // true if this function is implemented in native code (Go/C)
+	NativeName string // C function name for code generation (e.g., "ferret_io_Println")
 }
 
 // MethodInfo stores information about a method attached to a named type

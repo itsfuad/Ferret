@@ -6,3 +6,20 @@ dist
 
 # Ignore ferret files from being tracked by git from the root directory
 /*.fer
+*.c
+*.h
+*.o
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.def
+*.exp
+*.manifest
+*.rc
+*.res
+*.manifest
+*.exe
+*.dll

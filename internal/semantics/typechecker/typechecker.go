@@ -245,7 +245,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 					if item.Type != nil {
 						// Explicit type annotation - use it
-						declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
+						declType := TypeFromTypeNodeWithContext(ctx, mod, item.Type)
 						if sym, ok := mod.CurrentScope.GetSymbol(item.Name.Name); ok {
 							sym.Type = declType
 						}
@@ -310,7 +310,7 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		// Determine the type
 		if item.Type != nil {
 			// Explicit type annotation
-			declType := typeFromTypeNodeWithContext(ctx, mod, item.Type)
+			declType := TypeFromTypeNodeWithContext(ctx, mod, item.Type)
 
 			// Disallow 'none' as a variable/const type
 			if declType.Equals(types.TypeNone) {
@@ -395,7 +395,7 @@ func checkFuncDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 	// Update the function symbol's type with actual function signature
 	if decl.Name != nil && decl.Type != nil {
-		funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
+		funcType := TypeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
 		if sym, ok := mod.CurrentScope.Lookup(decl.Name.Name); ok {
 			sym.Type = funcType
 		}
@@ -994,7 +994,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		return
 	}
 
-	receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+	receiverType := TypeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
 
 	// Only process valid named types
 	if receiverType.Equals(types.TypeUnknown) {
@@ -1022,7 +1022,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 
 	// Type check the method signature and attach to type symbol
 	if found && typeSym.Kind == symbols.SymbolType && decl.Type != nil {
-		funcType := typeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
+		funcType := TypeFromTypeNodeWithContext(ctx, mod, decl.Type).(*types.FunctionType)
 
 		// Attach method to the type symbol's Methods map
 		if typeSym.Methods == nil {
@@ -1055,7 +1055,7 @@ func checkMethodDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, de
 	if decl.Receiver != nil && decl.Receiver.Name != nil {
 		receiverSym, ok := methodScope.GetSymbol(decl.Receiver.Name.Name)
 		if ok && decl.Receiver.Type != nil {
-			receiverType := typeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+			receiverType := TypeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
 			receiverSym.Type = receiverType
 		}
 	}
@@ -1089,7 +1089,7 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 	}
 
 	// Convert the AST type node to a semantic type
-	semType := typeFromTypeNodeWithContext(ctx, mod, decl.Type)
+	semType := TypeFromTypeNodeWithContext(ctx, mod, decl.Type)
 
 	// Wrap the type with a NamedType to preserve the name
 	// This enables nominal typing and method attachment
@@ -1300,7 +1300,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	case *ast.CastExpr:
 		// Check expression being cast and validate cast compatibility
-		targetType := typeFromTypeNodeWithContext(ctx, mod, e.Type)
+		targetType := TypeFromTypeNodeWithContext(ctx, mod, e.Type)
 		// For composite literals, provide target type as context to allow untyped literal contextualization
 		sourceType := checkExpr(ctx, mod, e.X, targetType)
 		checkCastExpr(ctx, mod, e, sourceType, targetType)
@@ -1310,7 +1310,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		var targetType types.SemType
 		if e.Type != nil {
 			// Explicit type: use it as target
-			targetType = typeFromTypeNodeWithContext(ctx, mod, e.Type)
+			targetType = TypeFromTypeNodeWithContext(ctx, mod, e.Type)
 		} else if !expected.Equals(types.TypeUnknown) {
 			// Expected type provided: use it as target
 			targetType = expected
@@ -1613,8 +1613,11 @@ func checkFitness(ctx *context_v2.CompilerContext, targetType types.SemType, val
 	return true
 }
 
-// typeFromTypeNodeWithContext resolves type nodes including user-defined types by looking them up in the symbol table
-func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeNode ast.TypeNode) types.SemType {
+// TypeFromTypeNodeWithContext resolves type nodes including user-defined types by looking them up in the symbol table
+// TypeFromTypeNodeWithContext converts AST type nodes to semantic types with full context.
+// This allows resolving user-defined types, module-qualified types, etc.
+// Exported for use by codegen and other packages that need type resolution.
+func TypeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeNode ast.TypeNode) types.SemType {
 	if typeNode == nil {
 		return types.TypeUnknown
 	}
@@ -1676,7 +1679,7 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 
 	case *ast.ArrayType:
 		// Array type: [N]T or []T
-		elementType := typeFromTypeNodeWithContext(ctx, mod, t.ElType)
+		elementType := TypeFromTypeNodeWithContext(ctx, mod, t.ElType)
 		length := -1 // Dynamic array by default
 		if t.Len != nil {
 			// Extract constant length from array size expression (only if we have context for const eval)
@@ -1690,18 +1693,18 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 
 	case *ast.OptionalType:
 		// Optional type: T?
-		innerType := typeFromTypeNodeWithContext(ctx, mod, t.Base)
+		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
 		return types.NewOptional(innerType)
 
 	case *ast.ReferenceType:
 		// Reference type: &T
-		innerType := typeFromTypeNodeWithContext(ctx, mod, t.Base)
+		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
 		return types.NewReference(innerType)
 
 	case *ast.ResultType:
 		// Result type: T ! E
-		okType := typeFromTypeNodeWithContext(ctx, mod, t.Value)
-		errType := typeFromTypeNodeWithContext(ctx, mod, t.Error)
+		okType := TypeFromTypeNodeWithContext(ctx, mod, t.Value)
+		errType := TypeFromTypeNodeWithContext(ctx, mod, t.Error)
 		return types.NewResult(okType, errType)
 
 	case *ast.StructType:
@@ -1714,7 +1717,7 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 			}
 			fields[i] = types.StructField{
 				Name: fieldName,
-				Type: typeFromTypeNodeWithContext(ctx, mod, f.Type),
+				Type: TypeFromTypeNodeWithContext(ctx, mod, f.Type),
 			}
 		}
 		structType := types.NewStruct("", fields)
@@ -1727,19 +1730,19 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		params := make([]types.ParamType, len(t.Params))
 		for i, param := range t.Params {
 			params[i].Name = param.Name.Name
-			params[i].Type = typeFromTypeNodeWithContext(ctx, mod, param.Type)
+			params[i].Type = TypeFromTypeNodeWithContext(ctx, mod, param.Type)
 			params[i].IsVariadic = param.IsVariadic
 		}
 		returnType := types.TypeVoid
 		if t.Result != nil {
-			returnType = typeFromTypeNodeWithContext(ctx, mod, t.Result)
+			returnType = TypeFromTypeNodeWithContext(ctx, mod, t.Result)
 		}
 		return types.NewFunction(params, returnType)
 
 	case *ast.MapType:
 		// Map type: map[K]V
-		keyType := typeFromTypeNodeWithContext(ctx, mod, t.Key)
-		valueType := typeFromTypeNodeWithContext(ctx, mod, t.Value)
+		keyType := TypeFromTypeNodeWithContext(ctx, mod, t.Key)
+		valueType := TypeFromTypeNodeWithContext(ctx, mod, t.Value)
 		return types.NewMap(keyType, valueType)
 
 	case *ast.InterfaceType:
@@ -1754,12 +1757,12 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 				params := make([]types.ParamType, len(funcType.Params))
 				for j, param := range funcType.Params {
 					params[j].Name = param.Name.Name
-					params[j].Type = typeFromTypeNodeWithContext(ctx, mod, param.Type)
+					params[j].Type = TypeFromTypeNodeWithContext(ctx, mod, param.Type)
 					params[j].IsVariadic = param.IsVariadic
 				}
 				returnType := types.TypeVoid
 				if funcType.Result != nil {
-					returnType = typeFromTypeNodeWithContext(ctx, mod, funcType.Result)
+					returnType = TypeFromTypeNodeWithContext(ctx, mod, funcType.Result)
 				}
 				methods = append(methods, types.InterfaceMethod{
 					Name:     m.Name.Name,
@@ -1782,12 +1785,12 @@ func typeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 }
 
 // typeFromTypeNode converts AST type nodes to semantic types (without context)
-// This is a convenience wrapper that calls typeFromTypeNodeWithContext with nil context.
+// This is a convenience wrapper that calls TypeFromTypeNodeWithContext with nil context.
 // For user-defined types, this will only work for primitives.
 func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 	// Use context version with nil - it will handle primitives correctly
 	// but won't resolve user-defined types (which is fine for this use case)
-	return typeFromTypeNodeWithContext(nil, nil, typeNode)
+	return TypeFromTypeNodeWithContext(nil, nil, typeNode)
 }
 
 // checkCallExpr validates function call expressions
