@@ -13,21 +13,23 @@ type NativeFunction struct {
 
 // IOBuiltins defines all native IO functions
 var IOBuiltins = []NativeFunction{
+	// Println accepts variadic arguments of any type (empty interface)
 	{
 		Name: "Println",
 		Signature: types.NewFunction(
-			[]types.ParamType{{Name: "msg", Type: types.TypeString}},
+			[]types.ParamType{{Name: "values", Type: &types.InterfaceType{ID: "", Methods: nil}, IsVariadic: true}}, // ...interface{} - accepts any number of any type
 			types.TypeVoid,
 		),
-		NativeName: "ferret_io_Println",
+		NativeName: "ferret_io_Println", // Codegen will format and concatenate all arguments
 	},
+	// Print accepts variadic arguments of any type (empty interface)
 	{
 		Name: "Print",
 		Signature: types.NewFunction(
-			[]types.ParamType{{Name: "msg", Type: types.TypeString}},
+			[]types.ParamType{{Name: "values", Type: &types.InterfaceType{ID: "", Methods: nil}, IsVariadic: true}}, // ...interface{} - accepts any number of any type
 			types.TypeVoid,
 		),
-		NativeName: "ferret_io_Print",
+		NativeName: "ferret_io_Print", // Codegen will format and concatenate all arguments
 	},
 	{
 		Name: "ReadInt",

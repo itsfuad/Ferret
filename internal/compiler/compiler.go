@@ -30,6 +30,8 @@ type Options struct {
 	LogFormat FORMAT
 	// Output executable path (if empty, uses default: <projectRoot>/bin/<projectName>)
 	OutputExecutable string
+	// Keep generated C file after compilation
+	KeepCFile bool
 }
 
 // Result of compilation
@@ -98,6 +100,7 @@ func Compile(opts *Options) Result {
 		Extension:          ".fer",
 		BuiltinModulesPath: builtinPath,
 		OutputPath:         outputPath,
+		KeepCFile:          opts.KeepCFile,
 	}
 
 	ctx := context_v2.New(config, opts.Debug)

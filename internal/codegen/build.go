@@ -115,9 +115,78 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFilePath string, opts *Bu
 	// Build command
 	args := []string{}
 	args = append(args, opts.CFlags...)
+	// Add include directory for runtime headers
+	args = append(args, "-I", runtimePath)
 	args = append(args, "-o", outputPath)
 	args = append(args, cFilePath)
 	args = append(args, runtimeC)
+	args = append(args, "-lm") // Link math library for pow() function
+
+	if ctx.Debug || opts.Debug {
+		colors.CYAN.Printf("Building executable: %s %v\n", opts.CC, args)
+	}
+
+	// Run compiler
+	cmd := exec.Command(opts.CC, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("compilation failed: %w", err)
+	}
+
+	if ctx.Debug || opts.Debug {
+		colors.GREEN.Printf("  ✓ Built: %s\n", outputPath)
+	}
+
+	return nil
+}
+
+// BuildExecutableMultiple compiles multiple C files into an executable
+func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, includeDir string, opts *BuildOptions) error {
+	if opts == nil {
+		opts = DefaultBuildOptions()
+	}
+
+	// Determine runtime path
+	runtimePath := opts.RuntimePath
+	if ctx.Config.ProjectRoot != "" {
+		possibleRuntime := filepath.Join(ctx.Config.ProjectRoot, "runtime")
+		if absRuntime, err := filepath.Abs(possibleRuntime); err == nil {
+			if _, err := os.Stat(absRuntime); err == nil {
+				runtimePath = absRuntime
+			}
+		}
+	}
+
+	// Check if runtime directory exists
+	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
+		return fmt.Errorf("runtime directory not found: %s", runtimePath)
+	}
+
+	// Build runtime library
+	runtimeC := filepath.Join(runtimePath, "io.c")
+	if _, err := os.Stat(runtimeC); os.IsNotExist(err) {
+		return fmt.Errorf("runtime file not found: %s", runtimeC)
+	}
+
+	// Determine output path
+	outputPath := opts.OutputPath
+	if outputPath == "" {
+		return fmt.Errorf("output path must be specified")
+	}
+
+	// Build command
+	args := []string{}
+	args = append(args, opts.CFlags...)
+	// Add include directories
+	args = append(args, "-I", runtimePath)
+	args = append(args, "-I", includeDir)
+	args = append(args, "-o", outputPath)
+	// Add all C files
+	args = append(args, cFiles...)
+	args = append(args, runtimeC)
+	args = append(args, "-lm") // Link math library for pow() function
 
 	if ctx.Debug || opts.Debug {
 		colors.CYAN.Printf("Building executable: %s %v\n", opts.CC, args)

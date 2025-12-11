@@ -268,6 +268,10 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 				return types.TypeF64
 			}
 		}
+	case tokens.EXP_TOKEN:
+		// Power operator **: returns double (f64)
+		// Always returns f64 for accuracy (can be cast to int if needed)
+		return types.TypeF64
 	default:
 		return types.TypeUnknown
 	}

@@ -540,54 +540,193 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 
 // runCodegenPhase runs code generation on all type-checked modules
 func (p *Pipeline) runCodegenPhase() error {
+	outputDir := filepath.Dir(p.ctx.Config.OutputPath)
+	baseName := filepath.Base(p.ctx.Config.OutputPath)
+
+	// Create a temporary directory for generated C files
+	tempDir := filepath.Join(outputDir, baseName+"_gen")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	// Note: tempDir cleanup is handled after build - only remove if KeepCFile is false
+
+	// Collect all modules to generate (entry module + dependencies)
+	modulesToGenerate := []string{p.ctx.EntryModule}
+	// Also collect all imported modules (except builtins)
 	for _, importPath := range p.ctx.GetModuleNames() {
+		if importPath != p.ctx.EntryModule {
+			module, exists := p.ctx.GetModule(importPath)
+			if exists && module.Type != context_v2.ModuleBuiltin {
+				// Only include modules that are type-checked and are local Ferret files
+				modulePhase := p.ctx.GetModulePhase(importPath)
+				if modulePhase >= phase.PhaseTypeChecked && module.Type == context_v2.ModuleLocal {
+					modulesToGenerate = append(modulesToGenerate, importPath)
+					if p.ctx.Debug {
+						colors.CYAN.Printf("  Including module: %s (phase: %s, type: %s)\n", importPath, modulePhase, module.Type)
+					}
+				} else if p.ctx.Debug {
+					colors.YELLOW.Printf("  Skipping module: %s (phase: %s, type: %s)\n", importPath, modulePhase, module.Type)
+				}
+			}
+		}
+	}
+
+	if p.ctx.Debug {
+		colors.CYAN.Printf("  Generating code for %d modules: %v\n", len(modulesToGenerate), modulesToGenerate)
+	}
+
+	// Separate entry module from imported modules (imports come first)
+	var entryModule string
+	var importedModules []string
+	for _, importPath := range modulesToGenerate {
+		if importPath == p.ctx.EntryModule {
+			entryModule = importPath
+		} else {
+			importedModules = append(importedModules, importPath)
+		}
+	}
+
+	var cFiles []string // Track all .c files for compilation
+
+	// Step 1: Generate .h and .c files for imported modules first
+	for _, importPath := range importedModules {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
 			continue
 		}
 
-		// Only generate code for entry module (main module)
-		// Skip builtin modules and other imported modules
-		if importPath != p.ctx.EntryModule {
+		// Generate header file
+		gen := cgen.New(p.ctx, module)
+		headerContent := gen.GenerateHeader()
+		headerName := p.sanitizeModuleName(importPath) + ".h"
+		headerPath := filepath.Join(tempDir, headerName)
+		if err := os.WriteFile(headerPath, []byte(headerContent), 0644); err != nil {
+			p.ctx.ReportError(fmt.Sprintf("failed to write header for %s: %v", importPath, err), nil)
 			continue
 		}
 
-		// Check if module is at least type-checked
-		if p.ctx.GetModulePhase(importPath) < phase.PhaseTypeChecked {
+		// Generate implementation file
+		implContent := gen.GenerateImplementation()
+		var implBuilder strings.Builder
+		implBuilder.WriteString("// Generated C code from Ferret\n")
+		implBuilder.WriteString("// Module: " + importPath + "\n\n")
+		implBuilder.WriteString("#include <stdio.h>\n")
+		implBuilder.WriteString("#include <stdlib.h>\n")
+		implBuilder.WriteString("#include <string.h>\n")
+		implBuilder.WriteString("#include <stdint.h>\n\n")
+		implBuilder.WriteString("#include \"" + headerName + "\"\n\n")
+		implBuilder.WriteString(implContent)
+
+		implName := p.sanitizeModuleName(importPath) + ".c"
+		implPath := filepath.Join(tempDir, implName)
+		if err := os.WriteFile(implPath, []byte(implBuilder.String()), 0644); err != nil {
+			p.ctx.ReportError(fmt.Sprintf("failed to write implementation for %s: %v", importPath, err), nil)
 			continue
 		}
 
-		// Generate C code
-		cFilePath := p.ctx.Config.OutputPath + ".c"
-		if err := p.generateCode(module, cFilePath); err != nil {
-			p.ctx.ReportError(fmt.Sprintf("code generation failed: %v", err), nil)
-			continue
-		}
-
-		// Build executable
-		execPath := p.ctx.Config.OutputPath
-		// Only add .exe if user didn't specify custom output path and we're on Windows
-		// (If user specified -o, they control the exact filename)
-		if runtime.GOOS == "windows" && !strings.HasSuffix(execPath, ".exe") {
-			// Check if this looks like a user-specified path (not the default pattern)
-			// Default pattern is: <projectRoot>/bin/<projectName>
-			defaultPattern := filepath.Join(p.ctx.Config.ProjectRoot, "bin", p.ctx.Config.ProjectName)
-			if execPath == defaultPattern {
-				execPath += ".exe"
-			}
-		}
-
-		if err := p.buildExecutable(cFilePath, execPath); err != nil {
-			p.ctx.ReportError(fmt.Sprintf("build failed: %v", err), nil)
-			continue
-		}
-
+		cFiles = append(cFiles, implPath)
 		if p.ctx.Debug {
-			colors.PURPLE.Printf("  ✓ %s\n", importPath)
+			colors.GREEN.Printf("  ✓ Generated: %s, %s\n", headerName, implName)
 		}
 	}
 
+	// Step 2: Generate main file that includes all headers
+	mainCFile := filepath.Join(tempDir, "main.c")
+	var mainBuilder strings.Builder
+	mainBuilder.WriteString("// Generated C code from Ferret\n")
+	mainBuilder.WriteString("// Entry module: " + p.ctx.EntryModule + "\n\n")
+	mainBuilder.WriteString("#include <stdio.h>\n")
+	mainBuilder.WriteString("#include <stdlib.h>\n")
+	mainBuilder.WriteString("#include <string.h>\n")
+	mainBuilder.WriteString("#include <stdint.h>\n")
+	mainBuilder.WriteString("#include <math.h>\n") // For pow() function
+	mainBuilder.WriteString("\n")
+	mainBuilder.WriteString("#include \"io.h\"\n\n")
+
+	// Include all module headers
+	for _, importPath := range importedModules {
+		headerName := p.sanitizeModuleName(importPath) + ".h"
+		mainBuilder.WriteString("#include \"" + headerName + "\"\n")
+	}
+	mainBuilder.WriteString("\n")
+
+	// Generate entry module code
+	if entryModule != "" {
+		module, exists := p.ctx.GetModule(entryModule)
+		if exists {
+			gen := cgen.New(p.ctx, module)
+			moduleCode, err := gen.Generate()
+			if err != nil {
+				p.ctx.ReportError(fmt.Sprintf("code generation failed for %s: %v", entryModule, err), nil)
+			} else {
+				// Extract just the function definitions (skip header/includes)
+				lines := strings.Split(moduleCode, "\n")
+				var funcLines []string
+				skipHeader := true
+				for _, line := range lines {
+					// Skip header comments and includes
+					if skipHeader && (strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#include") || strings.TrimSpace(line) == "" || strings.Contains(line, "Runtime function declarations")) {
+						continue
+					}
+					skipHeader = false
+					funcLines = append(funcLines, line)
+				}
+
+				if len(funcLines) > 0 {
+					mainBuilder.WriteString("// Functions from " + entryModule + "\n")
+					mainBuilder.WriteString(strings.Join(funcLines, "\n"))
+					mainBuilder.WriteString("\n")
+				}
+			}
+		}
+	}
+
+	if err := os.WriteFile(mainCFile, []byte(mainBuilder.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write main C file: %w", err)
+	}
+	cFiles = append(cFiles, mainCFile)
+
+	// Build executable - compile all .c files together
+	execPath := p.ctx.Config.OutputPath
+	// Only add .exe if user didn't specify custom output path and we're on Windows
+	if runtime.GOOS == "windows" && !strings.HasSuffix(execPath, ".exe") {
+		defaultPattern := filepath.Join(p.ctx.Config.ProjectRoot, "bin", p.ctx.Config.ProjectName)
+		if execPath == defaultPattern {
+			execPath += ".exe"
+		}
+	}
+
+	if err := p.buildExecutableMultiple(cFiles, execPath, tempDir); err != nil {
+		p.ctx.ReportError(fmt.Sprintf("build failed: %v", err), nil)
+		return err
+	}
+
+	// Clean up temp directory after successful build (unless KeepCFile is set)
+	if !p.ctx.Config.KeepCFile {
+		if err := os.RemoveAll(tempDir); err != nil {
+			if p.ctx.Debug {
+				colors.YELLOW.Printf("  ⚠ Could not remove temp directory: %v\n", err)
+			}
+		} else if p.ctx.Debug {
+			colors.GREEN.Printf("  ✓ Removed temp directory: %s\n", tempDir)
+		}
+	} else if p.ctx.Debug {
+		colors.CYAN.Printf("  ℹ Keeping generated files in: %s\n", tempDir)
+	}
+
+	if p.ctx.Debug {
+		colors.PURPLE.Printf("  ✓ Code generation complete\n")
+	}
+
 	return nil
+}
+
+// sanitizeModuleName converts a module import path to a valid C identifier
+func (p *Pipeline) sanitizeModuleName(importPath string) string {
+	name := strings.ReplaceAll(strings.ReplaceAll(importPath, "/", "_"), "-", "_")
+	// Remove any invalid characters
+	name = strings.ReplaceAll(name, ".", "_")
+	return name
 }
 
 // generateCode generates C code for a module
@@ -618,4 +757,27 @@ func (p *Pipeline) buildExecutable(cFilePath, execPath string) error {
 	opts.Debug = p.ctx.Debug
 
 	return codegen.BuildExecutable(p.ctx, cFilePath, opts)
+}
+
+// buildExecutableMultiple compiles multiple C files into an executable
+func (p *Pipeline) buildExecutableMultiple(cFiles []string, execPath, includeDir string) error {
+	// Determine runtime path - use project root (most reliable)
+	runtimePath := filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
+
+	// If not found, try relative to include dir as fallback
+	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
+		runtimePath = filepath.Join(includeDir, "..", "..", "runtime")
+	}
+
+	// Make it absolute
+	if absRuntime, err := filepath.Abs(runtimePath); err == nil {
+		runtimePath = absRuntime
+	}
+
+	opts := codegen.DefaultBuildOptions()
+	opts.RuntimePath = filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
+	opts.OutputPath = execPath
+	opts.Debug = p.ctx.Debug
+
+	return codegen.BuildExecutableMultiple(p.ctx, cFiles, includeDir, opts)
 }

@@ -1,0 +1,43 @@
+import "std/io";
+import "test_local/utils";
+
+fn main() {
+    // Test numeric operations
+    let a : i32 = 10;
+    let b : i32 = 20;
+    let sum := a + b;
+    let diff := a - b;
+    let prod := a * b;
+    let quot := b / a;
+    let rem := b % a;
+    let power := 2 ** 3; // 2^3 = 8
+    
+    io::Println("Sum:", sum);
+    io::Println("Diff:", diff);
+    io::Println("Product:", prod);
+    io::Println("Quotient:", quot);
+    io::Println("Remainder:", rem);
+    io::Println("Power (2**3):", power);
+    
+    // Test comparison operators
+    let gt := a > b;
+    let lt := a < b;
+    let ge := a >= b;
+    let le := a <= b;
+    let eq := a == b;
+    let ne := a != b;
+    
+    io::Println("a > b:", gt);
+    io::Println("a < b:", lt);
+    io::Println("a >= b:", ge);
+    io::Println("a <= b:", le);
+    io::Println("a == b:", eq);
+    io::Println("a != b:", ne);
+    
+    // Test string concatenation
+    let msg := "Hello" + " " + "World";
+    io::Println(msg);
+    
+    // Test multiple args
+    io::Println("Multiple args:", 42, true, "test");
+}

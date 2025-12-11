@@ -1895,8 +1895,8 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 		// Infer argument type with parameter type as context
 		argType := checkExpr(ctx, mod, arg, param.Type)
 
-		// Check compatibility
-		compatibility := checkTypeCompatibility(argType, param.Type)
+		// Check compatibility (use WithContext to handle interfaces properly)
+		compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, param.Type)
 
 		if compatibility == Incompatible {
 			// Format the argument type in a user-friendly way
@@ -1914,18 +1914,27 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 	}
 
 	// Validate variadic arguments
-	if isVariadic && argCount > regularParamCount {
+	// If function is variadic, all arguments (including those that match regular params if any)
+	// beyond regularParamCount are checked against the variadic element type
+	if isVariadic {
 		variadicParam := funcType.Params[paramCount-1]
 		variadicElemType := variadicParam.Type // The element type (not array type)
 
-		for i := regularParamCount; i < argCount; i++ {
+		// For variadic functions, check all arguments starting from regularParamCount
+		// If there are no regular params (regularParamCount == 0), check all arguments
+		startIdx := regularParamCount
+		if regularParamCount == 0 {
+			startIdx = 0 // Check all arguments against variadic type
+		}
+
+		for i := startIdx; i < argCount; i++ {
 			arg := expr.Args[i]
 
 			// Infer argument type with variadic element type as context
 			argType := checkExpr(ctx, mod, arg, variadicElemType)
 
-			// Check compatibility with variadic element type
-			compatibility := checkTypeCompatibility(argType, variadicElemType)
+			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)
+			compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, variadicElemType)
 
 			if compatibility == Incompatible {
 				// Format the argument type in a user-friendly way

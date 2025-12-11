@@ -149,6 +149,7 @@ type Config struct {
 	// Build configuration
 	OutputPath string // Where to write compiled output
 	Extension  string // Source file extension (default: ".fer")
+	KeepCFile  bool   // Keep generated C file after compilation
 
 	// Module resolution
 	BuiltinModulesPath string            // Path to standard library
@@ -366,9 +367,21 @@ func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, Mod
 
 	// Check if it's a local module
 	if packageName == ctx.Config.ProjectName {
+		// For local modules, cleanPath is the relative path from project root
+		// But if ProjectName is set, we need to handle the case where the entry file
+		// is in a subdirectory (e.g., test_local/main.fer) and imports are relative to that
 		filePath := filepath.Join(ctx.Config.ProjectRoot, cleanPath+ctx.Config.Extension)
 		if fs.IsValidFile(filePath) {
 			return filepath.ToSlash(filePath), ModuleLocal, nil
+		}
+		// If not found, try relative to entry file's directory (for cases where ProjectName
+		// is the directory name but files are in that subdirectory)
+		if ctx.EntryPoint != "" {
+			entryDir := filepath.Dir(ctx.EntryPoint)
+			filePath = filepath.Join(entryDir, cleanPath+ctx.Config.Extension)
+			if fs.IsValidFile(filePath) {
+				return filepath.ToSlash(filePath), ModuleLocal, nil
+			}
 		}
 		return "", ModuleUnknown, fmt.Errorf("module not found: %s", importPath)
 	}
