@@ -29,7 +29,7 @@ func DefaultBuildOptions() *BuildOptions {
 
 	return &BuildOptions{
 		CC:          cc,
-		CFlags:      []string{"-std=c11", "-w"}, // -w suppresses all warnings
+		CFlags:      []string{"-std=c11", "-w", "-Os", "-flto", "-s"}, // -Os: optimize for size, -flto: link-time optimization, -s: strip symbols
 		RuntimePath: "runtime",
 		Debug:       false,
 	}
@@ -122,7 +122,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFilePath string, opts *Bu
 	args = append(args, runtimeC)
 	args = append(args, "-lm") // Link math library for pow() function
 
-	if ctx.Debug || opts.Debug {
+	if ctx.Config.Debug || opts.Debug {
 		colors.CYAN.Printf("Building executable: %s %v\n", opts.CC, args)
 	}
 
@@ -135,7 +135,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFilePath string, opts *Bu
 		return fmt.Errorf("compilation failed: %w", err)
 	}
 
-	if ctx.Debug || opts.Debug {
+	if ctx.Config.Debug || opts.Debug {
 		colors.GREEN.Printf("  ✓ Built: %s\n", outputPath)
 	}
 
@@ -148,14 +148,16 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 		opts = DefaultBuildOptions()
 	}
 
-	// Determine runtime path
+	// Determine runtime path - use from config if available, otherwise from opts
 	runtimePath := opts.RuntimePath
-	if ctx.Config.ProjectRoot != "" {
-		possibleRuntime := filepath.Join(ctx.Config.ProjectRoot, "runtime")
-		if absRuntime, err := filepath.Abs(possibleRuntime); err == nil {
-			if _, err := os.Stat(absRuntime); err == nil {
-				runtimePath = absRuntime
-			}
+	if runtimePath == "" && ctx.Config.RuntimePath != "" {
+		runtimePath = ctx.Config.RuntimePath
+	}
+
+	// Make it absolute
+	if !filepath.IsAbs(runtimePath) {
+		if absRuntime, err := filepath.Abs(runtimePath); err == nil {
+			runtimePath = absRuntime
 		}
 	}
 
@@ -188,7 +190,7 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 	args = append(args, runtimeC)
 	args = append(args, "-lm") // Link math library for pow() function
 
-	if ctx.Debug || opts.Debug {
+	if ctx.Config.Debug || opts.Debug {
 		colors.CYAN.Printf("Building executable: %s %v\n", opts.CC, args)
 	}
 
@@ -201,7 +203,7 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 		return fmt.Errorf("compilation failed: %w", err)
 	}
 
-	if ctx.Debug || opts.Debug {
+	if ctx.Config.Debug || opts.Debug {
 		colors.GREEN.Printf("  ✓ Built: %s\n", outputPath)
 	}
 

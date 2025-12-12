@@ -239,7 +239,7 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 }
 
 func collectBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block) {
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		colors.BROWN.Println("Entering new scope")
 	}
 
@@ -250,7 +250,7 @@ func collectBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 	// Enter new block scope and ensure it's restored on exit
 	defer mod.EnterScope(blockScope)()
 
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		defer colors.BROWN.Println("Exiting new scope...")
 	}
 
@@ -940,14 +940,14 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 // collectFuncLit handles function literal collection
 // Function literals are expressions that create closures with their own scope
 func collectFuncLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.FuncLit) {
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		colors.BROWN.Println("Entering function literal scope")
 	}
 
 	// Collect function scope and body using shared helper
 	collectFunctionScope(ctx, mod, lit.Type, lit.Body, &lit.Scope, nil)
 
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		colors.BROWN.Println("Exiting function literal scope")
 	}
 }

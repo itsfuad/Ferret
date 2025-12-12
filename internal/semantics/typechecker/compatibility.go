@@ -86,7 +86,7 @@ func implementsInterface(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		// Methods don't include receiver in FuncType, so direct comparison works
 		if !methodSignaturesMatch(methodInfo.FuncType, requiredMethod.FuncType) {
 			// Debug: check what's different
-			if ctx != nil && ctx.Debug {
+			if ctx != nil && ctx.Config.Debug {
 				fmt.Printf("      [Interface check: method %s signature mismatch]\n", requiredMethod.Name)
 				fmt.Printf("        Method: %s\n", methodInfo.FuncType.String())
 				fmt.Printf("        Interface: %s\n", requiredMethod.FuncType.String())

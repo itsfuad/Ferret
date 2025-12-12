@@ -135,9 +135,6 @@ type CompilerContext struct {
 
 	// Configuration
 	Config *Config
-
-	// Debug mode
-	Debug bool
 }
 
 // Config holds compiler configuration
@@ -150,10 +147,13 @@ type Config struct {
 	OutputPath string // Where to write compiled output
 	Extension  string // Source file extension (default: ".fer")
 	KeepCFile  bool   // Keep generated C file after compilation
+	Debug      bool   // Debug mode
+	SaveAST    bool   // Save AST to file
 
 	// Module resolution
 	BuiltinModulesPath string            // Path to standard library
 	BuiltinModules     map[string]string // name -> path mapping
+	RuntimePath        string            // Path to runtime directory (relative to executable)
 
 	// Remote modules (future)
 	RemoteCachePath string // Cache directory for remote dependencies (.ferret)
@@ -184,7 +184,6 @@ func New(config *Config, debug bool) *CompilerContext {
 		Diagnostics:   diagnostics.NewDiagnosticBag(""),
 		DepGraph:      make(map[string][]string),
 		Config:        config,
-		Debug:         debug,
 	}
 
 	// Auto-load builtin modules if path is provided
@@ -357,6 +356,7 @@ func (ctx *CompilerContext) FilePathToImportPath(filePath string) string {
 }
 
 // ImportPathToFilePath converts an import path to a file path
+// fromModulePath is optional - if provided, relative imports will be resolved relative to that module's directory
 func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, ModuleType, error) {
 	// Normalize import path to ensure consistent lookup
 	importPath = fs.NormalizeImportPath(importPath)

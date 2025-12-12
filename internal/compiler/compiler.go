@@ -79,7 +79,9 @@ func Compile(opts *Options) Result {
 	}
 
 	execPath, _ := os.Executable()
-	builtinPath := filepath.Join(filepath.Dir(execPath), "../ferret_libs")
+	execDir := filepath.Dir(execPath)
+	builtinPath := filepath.Join(execDir, "../ferret_libs")
+	runtimePath := filepath.Join(execDir, "../runtime")
 
 	// Determine output path
 	outputPath := filepath.Join(projectRoot, "bin", projectName)
@@ -99,6 +101,7 @@ func Compile(opts *Options) Result {
 		ProjectRoot:        projectRoot,
 		Extension:          ".fer",
 		BuiltinModulesPath: builtinPath,
+		RuntimePath:        runtimePath, // Runtime path relative to executable
 		OutputPath:         outputPath,
 		KeepCFile:          opts.KeepCFile,
 	}

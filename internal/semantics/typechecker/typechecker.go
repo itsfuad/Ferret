@@ -26,7 +26,7 @@ func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.
 		return
 	}
 
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		fmt.Printf("    [TypeCheckMethodSignatures for %s]\n", mod.ImportPath)
 	}
 
@@ -44,7 +44,7 @@ func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.
 	methodCount := 0
 	for _, node := range mod.AST.Nodes {
 		if methodDecl, ok := node.(*ast.MethodDecl); ok {
-			if ctx.Debug {
+			if ctx.Config.Debug {
 				fmt.Printf("      [Found method %s]\n", methodDecl.Name.Name)
 			}
 			checkMethodSignatureOnly(ctx, mod, methodDecl)
@@ -52,7 +52,7 @@ func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.
 		}
 	}
 
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		fmt.Printf("    [Processed %d methods]\n", methodCount)
 	}
 }
@@ -588,7 +588,7 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 			if !hasMethod {
 				missingMethods = append(missingMethods, requiredMethod.Name)
 			} else if !methodSignaturesMatch(methodInfo.FuncType, requiredMethod.FuncType) {
-				if ctx.Debug {
+				if ctx.Config.Debug {
 					fmt.Printf("      [Cast check: method %s signature mismatch]\n", requiredMethod.Name)
 					fmt.Printf("        Method: %s\n", methodInfo.FuncType.String())
 					fmt.Printf("        Interface: %s\n", requiredMethod.FuncType.String())
@@ -982,13 +982,13 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 // checkMethodSignatureOnly processes only the method signature (receiver + parameters + return type)
 // and attaches the method to its type. Does NOT check the body.
 func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.MethodDecl) {
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		fmt.Printf("        [checkMethodSignatureOnly: %s]\n", decl.Name.Name)
 	}
 
 	// Get receiver type
 	if decl.Receiver == nil || decl.Receiver.Type == nil {
-		if ctx.Debug {
+		if ctx.Config.Debug {
 			fmt.Printf("          [No receiver]\n")
 		}
 		return

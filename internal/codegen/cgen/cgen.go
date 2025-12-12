@@ -72,8 +72,9 @@ func (g *Generator) writeIncludes() {
 }
 
 func (g *Generator) writeRuntimeDeclarations() {
-	// Just include the runtime header - don't redeclare functions
-	g.write("// Runtime functions - included from runtime/io.h\n")
+	// Include the runtime header for IO functions
+	g.write("#include \"io.h\"\n")
+	g.write("\n")
 }
 
 func (g *Generator) generateFunction(decl *ast.FuncDecl) {
@@ -285,11 +286,15 @@ func (g *Generator) GenerateHeader() string {
 	return result
 }
 
-// GenerateImplementation generates C implementation code (without headers/includes)
+// GenerateImplementation generates C implementation code (with includes)
 func (g *Generator) GenerateImplementation() string {
 	var buf strings.Builder
 	oldBuf := g.buf
 	g.buf = buf
+
+	// Write includes and runtime header
+	g.writeIncludes()
+	g.writeRuntimeDeclarations()
 
 	// Generate code for each top-level declaration
 	if g.mod.AST != nil {
@@ -1150,7 +1155,7 @@ func GenerateModule(ctx *context_v2.CompilerContext, mod *context_v2.Module, out
 		return err
 	}
 
-	if ctx.Debug {
+	if ctx.Config.Debug {
 		colors.GREEN.Printf("  ✓ Generated: %s\n", outputPath)
 	}
 

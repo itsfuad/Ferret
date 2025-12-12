@@ -47,7 +47,7 @@ func New(ctx *context_v2.CompilerContext) *Pipeline {
 
 // Run executes the full compilation pipeline
 func (p *Pipeline) Run() error {
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 
 		colors.PrintAllColors()
 
@@ -72,7 +72,7 @@ func (p *Pipeline) Run() error {
 	//   - Collect declarations (types, functions, methods, variables, constants)
 	//   - Collect function bodies
 	//   - Collect method bodies
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 2] Symbol Collection\n")
 	}
 	if err := p.runCollectorPhase(); err != nil {
@@ -80,7 +80,7 @@ func (p *Pipeline) Run() error {
 	}
 
 	// Phase 3: Resolution
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 3] Resolution\n")
 	}
 	if err := p.runResolverPhase(); err != nil {
@@ -88,7 +88,7 @@ func (p *Pipeline) Run() error {
 	}
 
 	// Phase 4a: Type Check Method Signatures (attach methods to types)
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 4a] Type Check Method Signatures\n")
 	}
 	if err := p.runMethodSignatureTypeCheckPhase(); err != nil {
@@ -96,7 +96,7 @@ func (p *Pipeline) Run() error {
 	}
 
 	// Phase 4b: Type Check Everything Else
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 4b] Type Check Bodies\n")
 	}
 	if err := p.runTypeCheckerPhase(); err != nil {
@@ -104,15 +104,23 @@ func (p *Pipeline) Run() error {
 	}
 
 	// Phase 5: Control Flow Analysis
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 5] Control Flow Analysis\n")
 	}
 	if err := p.runCFGAnalysisPhase(); err != nil {
 		return err
 	}
 
-	// Phase 6: Code Generation
-	if p.ctx.Debug {
+	// Phase 6: Code Generation - ONLY run if no errors
+	// All semantic phases above run even with errors to collect all diagnostics
+	if p.ctx.HasErrors() {
+		if p.ctx.Config.Debug {
+			colors.YELLOW.Printf("\n[Skipping Code Generation] Errors detected in previous phases\n")
+		}
+		return fmt.Errorf("compilation failed with errors")
+	}
+
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 6] Code Generation\n")
 	}
 	if err := p.runCodegenPhase(); err != nil {
@@ -124,7 +132,7 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("compilation failed with errors")
 	}
 
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
 	}
 
@@ -262,7 +270,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 	module.AST = astModule
 	module.Mu.Unlock()
 
-	if astModule != nil {
+	if astModule != nil && p.ctx.Config.SaveAST {
 		astModule.SaveAST()
 	}
 
@@ -271,7 +279,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 		return
 	}
 
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.PURPLE.Printf("  ✓ %s\n", importPath)
 	}
 
@@ -387,7 +395,7 @@ func (p *Pipeline) runCollectorPhase() error {
 			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCollected) {
 				p.ctx.SetModulePhase(importPath, phase.PhaseCollected)
 			}
-			if p.ctx.Debug {
+			if p.ctx.Config.Debug {
 				colors.PURPLE.Printf("  ✓ %s (native)\n", importPath)
 			}
 			continue
@@ -400,7 +408,7 @@ func (p *Pipeline) runCollectorPhase() error {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCollected", importPath), nil)
 		}
 
-		if p.ctx.Debug {
+		if p.ctx.Config.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
@@ -426,7 +434,7 @@ func (p *Pipeline) runResolverPhase() error {
 			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseResolved) {
 				p.ctx.SetModulePhase(importPath, phase.PhaseResolved)
 			}
-			if p.ctx.Debug {
+			if p.ctx.Config.Debug {
 				colors.PURPLE.Printf("  ✓ %s (native)\n", importPath)
 			}
 			continue
@@ -438,7 +446,7 @@ func (p *Pipeline) runResolverPhase() error {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseResolved", importPath), nil)
 		}
 
-		if p.ctx.Debug {
+		if p.ctx.Config.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
@@ -461,7 +469,7 @@ func (p *Pipeline) runMethodSignatureTypeCheckPhase() error {
 
 		typechecker.TypeCheckMethodSignatures(p.ctx, module)
 
-		if p.ctx.Debug {
+		if p.ctx.Config.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
@@ -487,7 +495,7 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseTypeChecked) {
 				p.ctx.SetModulePhase(importPath, phase.PhaseTypeChecked)
 			}
-			if p.ctx.Debug {
+			if p.ctx.Config.Debug {
 				colors.PURPLE.Printf("  ✓ %s (native)\n", importPath)
 			}
 			continue
@@ -499,7 +507,7 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseTypeChecked", importPath), nil)
 		}
 
-		if p.ctx.Debug {
+		if p.ctx.Config.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
 		}
 	}
@@ -528,7 +536,7 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCFGAnalyzed", importPath), nil)
 		}
 
-		if p.ctx.Debug {
+		if p.ctx.Config.Debug {
 			colors.PURPLE.Printf("  ✓ %s\\n", importPath)
 		}
 	}
@@ -561,17 +569,17 @@ func (p *Pipeline) runCodegenPhase() error {
 				modulePhase := p.ctx.GetModulePhase(importPath)
 				if modulePhase >= phase.PhaseTypeChecked && module.Type == context_v2.ModuleLocal {
 					modulesToGenerate = append(modulesToGenerate, importPath)
-					if p.ctx.Debug {
+					if p.ctx.Config.Debug {
 						colors.CYAN.Printf("  Including module: %s (phase: %s, type: %s)\n", importPath, modulePhase, module.Type)
 					}
-				} else if p.ctx.Debug {
+				} else if p.ctx.Config.Debug {
 					colors.YELLOW.Printf("  Skipping module: %s (phase: %s, type: %s)\n", importPath, modulePhase, module.Type)
 				}
 			}
 		}
 	}
 
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("  Generating code for %d modules: %v\n", len(modulesToGenerate), modulesToGenerate)
 	}
 
@@ -613,7 +621,10 @@ func (p *Pipeline) runCodegenPhase() error {
 		implBuilder.WriteString("#include <stdio.h>\n")
 		implBuilder.WriteString("#include <stdlib.h>\n")
 		implBuilder.WriteString("#include <string.h>\n")
-		implBuilder.WriteString("#include <stdint.h>\n\n")
+		implBuilder.WriteString("#include <stdint.h>\n")
+		implBuilder.WriteString("#include <math.h>\n") // For pow() function
+		implBuilder.WriteString("\n")
+		implBuilder.WriteString("#include \"io.h\"\n") // Runtime header
 		implBuilder.WriteString("#include \"" + headerName + "\"\n\n")
 		implBuilder.WriteString(implContent)
 
@@ -625,7 +636,7 @@ func (p *Pipeline) runCodegenPhase() error {
 		}
 
 		cFiles = append(cFiles, implPath)
-		if p.ctx.Debug {
+		if p.ctx.Config.Debug {
 			colors.GREEN.Printf("  ✓ Generated: %s, %s\n", headerName, implName)
 		}
 	}
@@ -704,17 +715,17 @@ func (p *Pipeline) runCodegenPhase() error {
 	// Clean up temp directory after successful build (unless KeepCFile is set)
 	if !p.ctx.Config.KeepCFile {
 		if err := os.RemoveAll(tempDir); err != nil {
-			if p.ctx.Debug {
+			if p.ctx.Config.Debug {
 				colors.YELLOW.Printf("  ⚠ Could not remove temp directory: %v\n", err)
 			}
-		} else if p.ctx.Debug {
+		} else if p.ctx.Config.Debug {
 			colors.GREEN.Printf("  ✓ Removed temp directory: %s\n", tempDir)
 		}
-	} else if p.ctx.Debug {
+	} else if p.ctx.Config.Debug {
 		colors.CYAN.Printf("  ℹ Keeping generated files in: %s\n", tempDir)
 	}
 
-	if p.ctx.Debug {
+	if p.ctx.Config.Debug {
 		colors.PURPLE.Printf("  ✓ Code generation complete\n")
 	}
 
@@ -736,48 +747,26 @@ func (p *Pipeline) generateCode(mod *context_v2.Module, outputPath string) error
 
 // buildExecutable compiles the C code into an executable
 func (p *Pipeline) buildExecutable(cFilePath, execPath string) error {
-	// Determine runtime path - use project root (most reliable)
-	runtimePath := filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
-
-	// If not found, try relative to C file as fallback
-	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-		cFileDir := filepath.Dir(cFilePath)
-		runtimePath = filepath.Join(cFileDir, "..", "..", "runtime")
-	}
-
-	// Make it absolute
-	if absRuntime, err := filepath.Abs(runtimePath); err == nil {
-		runtimePath = absRuntime
-	}
-
 	opts := codegen.DefaultBuildOptions()
-	// Use project root for runtime path (most reliable)
-	opts.RuntimePath = filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
+	// Use runtime path from config (set relative to executable in compiler.go)
+	if p.ctx.Config.RuntimePath != "" {
+		opts.RuntimePath = p.ctx.Config.RuntimePath
+	}
 	opts.OutputPath = execPath
-	opts.Debug = p.ctx.Debug
+	opts.Debug = p.ctx.Config.Debug
 
 	return codegen.BuildExecutable(p.ctx, cFilePath, opts)
 }
 
 // buildExecutableMultiple compiles multiple C files into an executable
 func (p *Pipeline) buildExecutableMultiple(cFiles []string, execPath, includeDir string) error {
-	// Determine runtime path - use project root (most reliable)
-	runtimePath := filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
-
-	// If not found, try relative to include dir as fallback
-	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-		runtimePath = filepath.Join(includeDir, "..", "..", "runtime")
-	}
-
-	// Make it absolute
-	if absRuntime, err := filepath.Abs(runtimePath); err == nil {
-		runtimePath = absRuntime
-	}
-
 	opts := codegen.DefaultBuildOptions()
-	opts.RuntimePath = filepath.Join(p.ctx.Config.ProjectRoot, "runtime")
+	// Use runtime path from config (set relative to executable in compiler.go)
+	if p.ctx.Config.RuntimePath != "" {
+		opts.RuntimePath = p.ctx.Config.RuntimePath
+	}
 	opts.OutputPath = execPath
-	opts.Debug = p.ctx.Debug
+	opts.Debug = p.ctx.Config.Debug
 
 	return codegen.BuildExecutableMultiple(p.ctx, cFiles, includeDir, opts)
 }
