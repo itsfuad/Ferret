@@ -14,6 +14,24 @@ import (
 	"fmt"
 )
 
+// checkModuleLevelRestriction checks if a node is not allowed at module level and reports an error if so
+func checkModuleLevelRestriction(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
+	// Only check if we're at module scope
+	if mod.CurrentScope != mod.ModuleScope {
+		return
+	}
+
+	// Check if this node type is not allowed at module level
+	switch node.(type) {
+	case *ast.IfStmt, *ast.ForStmt, *ast.WhileStmt, *ast.MatchStmt,
+		*ast.ReturnStmt, *ast.BreakStmt, *ast.ContinueStmt:
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("this statement is not allowed at module level").
+				WithPrimaryLabel(node.Loc(), "remove this statement"),
+		)
+	}
+}
+
 // CollectModule builds the symbol table for a module by traversing its AST.
 // It orchestrates all collection phases internally:
 //   - Phase 1: Collect declarations (types, functions, methods, variables, constants) - just names/signatures
@@ -145,6 +163,9 @@ func collectDeclarationOnly(ctx *context_v2.CompilerContext, mod *context_v2.Mod
 // This is used when collecting function bodies (second pass).
 // Function declarations are only at module level and are handled by collectDeclarationOnly.
 func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast.Node) {
+	// Check if this statement is not allowed at module level
+	checkModuleLevelRestriction(ctx, mod, node)
+
 	switch n := node.(type) {
 	case *ast.VarDecl:
 		collectVarDecl(ctx, mod, n, symbols.SymbolVariable)
@@ -165,76 +186,22 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 	case *ast.Block:
 		collectBlock(ctx, mod, n)
 	case *ast.IfStmt:
-		// Check if at module scope (top level)
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("if statement not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("control flow statements must be inside functions"),
-			)
-		}
 		collectIfStmt(ctx, mod, n)
 	case *ast.ForStmt:
-		// Check if at module scope (top level)
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("for loop not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("control flow statements must be inside functions"),
-			)
-		}
 		collectForStmt(ctx, mod, n)
 	case *ast.WhileStmt:
-		// Check if at module scope (top level)
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("while loop not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("control flow statements must be inside functions"),
-			)
-		}
 		collectWhileStmt(ctx, mod, n)
 	case *ast.MatchStmt:
-		// Check if at module scope (top level)
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("match statement not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("control flow statements must be inside functions"),
-			)
-		}
 		collectMatchStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
-		// Check if at module scope (top level)
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("return statement not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("return statements must be inside functions"),
-			)
-		}
 		// Collect function literals in return expressions
 		if n.Result != nil {
 			collectExpr(ctx, mod, n.Result)
 		}
 	case *ast.BreakStmt:
-		// Break statements don't declare anything, but check if at module scope
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("break statement not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("break statements must be inside loops"),
-			)
-		}
+		// Break statements don't declare anything
 	case *ast.ContinueStmt:
-		// Continue statements don't declare anything, but check if at module scope
-		if mod.CurrentScope == mod.ModuleScope {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("continue statement not allowed at module level").
-					WithPrimaryLabel(n.Loc(), "remove this statement").
-					WithNote("continue statements must be inside loops"),
-			)
-		}
+		// Continue statements don't declare anything
 	case *ast.AssignStmt:
 		// Collect function literals in assignment expressions
 		collectExpr(ctx, mod, n.Lhs)

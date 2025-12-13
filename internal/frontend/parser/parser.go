@@ -101,9 +101,10 @@ func (p *Parser) parseTopLevel() ast.Node {
 		p.seenNonImport = true
 		return p.parseAnnonType()
 	default:
-		p.error(fmt.Sprintf("unexpected token at top level: %s", tok.Value))
-		p.advance()
-		return nil
+		// Parser's job is to parse - let parseStmt handle any statement
+		// Semantic validation (like "not allowed at module level") happens in collector
+		p.seenNonImport = true
+		return p.parseStmt()
 	}
 }
 

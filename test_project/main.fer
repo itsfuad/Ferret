@@ -1,5 +1,6 @@
 import "test_project/utils";
 
+import "std/io";
 import "std/math";
 
 // Unicode test: 你好世界 こんにちは 안녕하세요 🚀 ✅
@@ -89,3 +90,15 @@ let divisionResult2 := divide(10, 2) catch err {
 // shorthand error handling
 
 let divisionResult3 := divide(20, 4) catch 1; // if there was an error, 1 will be used as the default value
+
+    const mIden := 10;
+    match mIden {
+        1 => io::Println("one"),
+        2 => io::Println("two"),
+        _ => io::Println("other") // default case
+    }
+fn matchtest() {
+    // test match
+
+
+}
