@@ -139,6 +139,7 @@ type CompilerContext struct {
 
 // Config holds compiler configuration
 type Config struct {
+	SkipCodegen bool // If true, skip code generation phase
 	// Project information
 	ProjectName string // Name of the project
 	ProjectRoot string // Root directory of the project

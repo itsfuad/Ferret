@@ -128,6 +128,30 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		resolveExpr(ctx, mod, n.Cond)
 		resolveBlock(ctx, mod, n.Body)
 
+	case *ast.WhenStmt:
+		// Resolve the match expression
+		resolveExpr(ctx, mod, n.Expr)
+
+		// Resolve each case clause
+		for _, caseClause := range n.Cases {
+			// Resolve pattern expression (if not default case)
+			if caseClause.Pattern != nil {
+				resolveExpr(ctx, mod, caseClause.Pattern)
+			}
+
+			// Enter case body scope if it exists
+			var restoreScope func()
+			if caseClause.Body != nil && caseClause.Body.Scope != nil {
+				restoreScope = mod.EnterScope(caseClause.Body.Scope.(*table.SymbolTable))
+			}
+			// Resolve case body
+			resolveBlock(ctx, mod, caseClause.Body)
+			// Restore scope if we entered one
+			if restoreScope != nil {
+				restoreScope()
+			}
+		}
+
 	case *ast.Block:
 		resolveBlock(ctx, mod, n)
 

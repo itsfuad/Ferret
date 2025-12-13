@@ -184,6 +184,8 @@ func (p *Parser) parseStmt() ast.Node {
 		return p.parseForStmt()
 	case tokens.WHILE_TOKEN:
 		return p.parseWhileStmt()
+	case tokens.MATCH_TOKEN:
+		return p.parseMatchStmt()
 	case tokens.OPEN_CURLY:
 		return p.parseBlock()
 	default:
@@ -1153,5 +1155,117 @@ func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 		Cond:     cond,
 		Body:     body,
 		Location: *source.NewLocation(&p.filepath, &start, body.Location.End),
+	}
+}
+
+// parseMatchStmt: match expr { pattern => body, ... }
+func (p *Parser) parseMatchStmt() *ast.WhenStmt {
+	start := p.expect(tokens.MATCH_TOKEN).Start
+
+	// Parse the expression to match
+	expr := p.parseExpr()
+
+	// Expect opening curly brace
+	p.expect(tokens.OPEN_CURLY)
+
+	// Parse cases
+	cases := []*ast.CaseClause{}
+	for !p.match(tokens.CLOSE_CURLY) && !p.isAtEnd() {
+		caseStart := p.peek().Start
+
+		// Parse pattern (can be expression or underscore for default)
+		var pattern ast.Expression
+		if p.match(tokens.IDENTIFIER_TOKEN) && p.peek().Value == "_" {
+			// Default case: _
+			p.advance()
+			pattern = nil // nil pattern indicates default case
+		} else {
+			// Regular pattern expression
+			pattern = p.parseExpr()
+		}
+
+		// Expect fat arrow =>
+		p.expect(tokens.FAT_ARROW_TOKEN)
+
+		// Parse case body (can be a single expression/statement or a block)
+		var body *ast.Block
+		if p.match(tokens.OPEN_CURLY) {
+			// Block body
+			body = p.parseBlock()
+		} else {
+			// Single expression/statement body
+			// First check if it's an assignment (has = before comma/close brace)
+			// We need to peek ahead to see if there's an assignment
+			var stmt ast.Node
+
+			// Try to parse as assignment first
+			lhs := p.parseExpr()
+			if lhs == nil {
+				// Error parsing expression, skip this case
+				p.error("expected expression in match case body")
+				// Try to recover by skipping to next case or closing brace
+				for !p.match(tokens.COMMA_TOKEN, tokens.CLOSE_CURLY) && !p.isAtEnd() {
+					p.advance()
+				}
+				continue
+			}
+
+			if p.match(tokens.EQUALS_TOKEN) {
+				// It's an assignment statement
+				p.advance() // consume =
+				rhs := p.parseExpr()
+				if rhs == nil {
+					p.error("expected expression after '=' in assignment")
+					// Try to recover
+					for !p.match(tokens.COMMA_TOKEN, tokens.CLOSE_CURLY) && !p.isAtEnd() {
+						p.advance()
+					}
+					continue
+				}
+				stmt = &ast.AssignStmt{
+					Lhs:      lhs,
+					Rhs:      rhs,
+					Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, rhs.Loc().End),
+				}
+			} else {
+				// It's just an expression statement
+				stmt = &ast.ExprStmt{
+					X:        lhs,
+					Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, lhs.Loc().End),
+				}
+			}
+
+			// Check if there's a semicolon (optional for match cases)
+			if p.match(tokens.SEMICOLON_TOKEN) {
+				p.advance()
+			}
+
+			// Wrap in a Block
+			body = &ast.Block{
+				Nodes:    []ast.Node{stmt},
+				Location: *source.NewLocation(&p.filepath, stmt.Loc().Start, stmt.Loc().End),
+			}
+		}
+
+		// Create case clause
+		caseEnd := body.Location.End
+		cases = append(cases, &ast.CaseClause{
+			Pattern:  pattern,
+			Body:     body,
+			Location: *source.NewLocation(&p.filepath, &caseStart, caseEnd),
+		})
+
+		// Check for comma separator (optional, for readability)
+		if p.match(tokens.COMMA_TOKEN) {
+			p.advance()
+		}
+	}
+
+	end := p.expect(tokens.CLOSE_CURLY).End
+
+	return &ast.WhenStmt{
+		Expr:     expr,
+		Cases:    cases,
+		Location: *source.NewLocation(&p.filepath, &start, &end),
 	}
 }

@@ -194,6 +194,16 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 			)
 		}
 		collectWhileStmt(ctx, mod, n)
+	case *ast.WhenStmt:
+		// Check if at module scope (top level)
+		if mod.CurrentScope == mod.ModuleScope {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("match statement not allowed at module level").
+					WithPrimaryLabel(n.Loc(), "remove this statement").
+					WithNote("control flow statements must be inside functions"),
+			)
+		}
+		collectWhenStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
 		// Check if at module scope (top level)
 		if mod.CurrentScope == mod.ModuleScope {
@@ -848,6 +858,29 @@ func collectWhileStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 	// Collect symbols in the while body
 	if stmt.Body != nil {
 		collectNode(ctx, mod, stmt.Body)
+	}
+}
+
+// collectWhenStmt handles match statements and their case scopes
+func collectWhenStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.WhenStmt) {
+	// Collect the match expression (may contain function literals)
+	if stmt.Expr != nil {
+		collectExpr(ctx, mod, stmt.Expr)
+	}
+
+	// Collect each case clause
+	for _, caseClause := range stmt.Cases {
+		// Create scope for each case body
+		caseScope := table.NewSymbolTable(mod.CurrentScope)
+		caseClause.Body.Scope = caseScope
+
+		// Enter case scope and ensure it's restored on exit
+		defer mod.EnterScope(caseScope)()
+
+		// Collect symbols in the case body
+		if caseClause.Body != nil {
+			collectNode(ctx, mod, caseClause.Body)
+		}
 	}
 }
 

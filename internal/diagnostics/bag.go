@@ -99,6 +99,14 @@ func sortDiagnostics(diagnostics []*Diagnostic) {
 		iLoc := diagnostics[i].Labels[0].Location
 		jLoc := diagnostics[j].Labels[0].Location
 
+		// Handle nil locations
+		if iLoc == nil {
+			return false
+		}
+		if jLoc == nil {
+			return true
+		}
+
 		// Compare filenames
 		iFile := ""
 		jFile := ""

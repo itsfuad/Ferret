@@ -188,6 +188,9 @@ func (b *CFGBuilder) buildNode(node ast.Node, current *BasicBlock, exitBlock *Ba
 	case *ast.WhileStmt:
 		return b.buildWhile(n, current, exitBlock)
 
+	case *ast.WhenStmt:
+		return b.buildWhen(n, current, exitBlock)
+
 	case *ast.Block:
 		return b.buildBlock(n, current, exitBlock)
 
@@ -505,6 +508,44 @@ func (b *CFGBuilder) reportUnreachableCodeRange(start, end ast.Node) {
 			WithPrimaryLabel(rangeLocation, "this code will never execute").
 			WithHelp("remove this code or restructure control flow"),
 	)
+}
+
+// buildWhen handles match statements
+// Match statements are similar to if-else chains - each case is a branch
+func (b *CFGBuilder) buildWhen(stmt *ast.WhenStmt, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
+	// Add match statement to current block
+	current.Nodes = append(current.Nodes, stmt)
+	current.Terminator = FlowConditional
+
+	// Create merge block after all cases
+	mergeBlock := b.newBlock()
+	mergeBlock.Location = stmt.Loc()
+
+	// Process each case
+	for _, caseClause := range stmt.Cases {
+		// Create block for this case
+		caseBlock := b.newBlock()
+		caseBlock.Reachable = current.Reachable
+		caseBlock.Location = caseClause.Body.Loc()
+		caseBlock.BranchKind = "case"
+		caseBlock.OriginNode = stmt
+		addEdge(current, caseBlock)
+
+		// Process case body
+		afterCase := b.buildBlock(caseClause.Body, caseBlock, exitBlock)
+
+		// Connect case body to merge block if it can fall through
+		if afterCase != nil && afterCase.CanFallThru {
+			addEdge(afterCase, mergeBlock)
+			mergeBlock.Reachable = true
+		}
+	}
+
+	// Return merge block (or nil if no cases can fall through)
+	if mergeBlock.Reachable {
+		return mergeBlock
+	}
+	return nil
 }
 
 // AnalyzeReturns checks if a function returns in all paths

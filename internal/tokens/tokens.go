@@ -24,6 +24,7 @@ const (
 	FOREACH_TOKEN    TOKEN = "foreach"
 	WHILE_TOKEN      TOKEN = "while"
 	DO_TOKEN         TOKEN = "do"
+	MATCH_TOKEN      TOKEN = "match"
 	IDENTIFIER_TOKEN TOKEN = "identifier"
 	PRIVATE_TOKEN    TOKEN = "priv"
 	RETURN_TOKEN     TOKEN = "return"
@@ -111,6 +112,7 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	FOR_TOKEN:       true,
 	IN_TOKEN:        true,
 	WHILE_TOKEN:     true,
+	MATCH_TOKEN:     true,
 	TYPE_TOKEN:      true,
 	STRUCT_TOKEN:    true,
 	PRIVATE_TOKEN:   true,

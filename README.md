@@ -261,14 +261,38 @@ if x < y {
     println("x is greater or equal");
 }
 
-for i := 0; i < 10; i++ {
-    println(i);
+for let i, v in arrayLike {
+    println(i, v);
 }
 
-while condition {
-    // loop body
+for i, v in arrayLike { // i , v delcared as existing variables
+    println(i, v);
+}
+
+// skip index or value using _
+for let _, v in arrayLike {
+    println(v);
+}
+for let i, _ in arrayLike {
+    println(i);
+}
+for let _, _ in arrayLike {
+    // do something
+}
+
+while x < 5 {
+    print(x);
+    x = x + 1;
+}
+
+// match statement 
+match value {
+    1 => println("one"),
+    2 => println("two"),
+    _ => println("other") // default case
 }
 ```
+
 
 ## Error Reporting
 

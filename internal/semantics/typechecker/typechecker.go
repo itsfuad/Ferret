@@ -276,6 +276,65 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Analyze condition for narrowing in loop body
 		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
 		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
+	case *ast.WhenStmt:
+		// Check the match expression
+		matchType := checkExpr(ctx, mod, n.Expr, types.TypeUnknown)
+
+		// Track if we've seen a default case
+		hasDefault := false
+
+		// Check each case clause
+		for i, caseClause := range n.Cases {
+			// Check if this is a default case
+			if caseClause.Pattern == nil {
+				if hasDefault {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("multiple default cases in match statement").
+							WithPrimaryLabel(&caseClause.Location, "duplicate default case").
+							WithNote("only one default case (_) is allowed per match statement"),
+					)
+				}
+				hasDefault = true
+			} else {
+				// Check pattern type compatibility with match expression
+				patternType := checkExpr(ctx, mod, caseClause.Pattern, types.TypeUnknown)
+
+				// Check if pattern type is compatible with match expression type
+				if !matchType.Equals(types.TypeUnknown) && !patternType.Equals(types.TypeUnknown) {
+					// Check if types are compatible (exact match or compatible types)
+					compat := checkTypeCompatibility(patternType, matchType)
+					if compat == Incompatible {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError(fmt.Sprintf("pattern type '%s' does not match match expression type '%s'", patternType.String(), matchType.String())).
+								WithPrimaryLabel(caseClause.Pattern.Loc(), "incompatible pattern type").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithNote(fmt.Sprintf("match expression has type '%s'", matchType.String())),
+						)
+					}
+				}
+			}
+
+			// Enter case body scope if it exists
+			var restoreScope func()
+			if caseClause.Body != nil && caseClause.Body.Scope != nil {
+				restoreScope = mod.EnterScope(caseClause.Body.Scope.(*table.SymbolTable))
+			}
+			// Check case body
+			checkBlock(ctx, mod, caseClause.Body)
+			// Restore scope if we entered one
+			if restoreScope != nil {
+				restoreScope()
+			}
+
+			// Check for unreachable cases (cases after default)
+			if hasDefault && i < len(n.Cases)-1 {
+				ctx.Diagnostics.Add(
+					diagnostics.NewWarning("unreachable case after default case").
+						WithPrimaryLabel(&n.Cases[i+1].Location, "this case will never be reached").
+						WithNote("default case matches all remaining values"),
+				)
+			}
+		}
 	case *ast.Block:
 		checkBlock(ctx, mod, n)
 	case *ast.DeclStmt:
