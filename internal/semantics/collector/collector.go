@@ -194,7 +194,7 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 			)
 		}
 		collectWhileStmt(ctx, mod, n)
-	case *ast.WhenStmt:
+	case *ast.MatchStmt:
 		// Check if at module scope (top level)
 		if mod.CurrentScope == mod.ModuleScope {
 			ctx.Diagnostics.Add(
@@ -203,7 +203,7 @@ func collectNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 					WithNote("control flow statements must be inside functions"),
 			)
 		}
-		collectWhenStmt(ctx, mod, n)
+		collectMatchStmt(ctx, mod, n)
 	case *ast.ReturnStmt:
 		// Check if at module scope (top level)
 		if mod.CurrentScope == mod.ModuleScope {
@@ -861,8 +861,8 @@ func collectWhileStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 	}
 }
 
-// collectWhenStmt handles match statements and their case scopes
-func collectWhenStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.WhenStmt) {
+// collectMatchStmt handles match statements and their case scopes
+func collectMatchStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.MatchStmt) {
 	// Collect the match expression (may contain function literals)
 	if stmt.Expr != nil {
 		collectExpr(ctx, mod, stmt.Expr)

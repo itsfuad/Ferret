@@ -86,16 +86,16 @@ func (w *WhileStmt) INode()                {} // Implements Node interface
 func (w *WhileStmt) Block()                {} // Block is a marker interface for all statements
 func (w *WhileStmt) Loc() *source.Location { return &w.Location }
 
-// WhenStmt represents a when/match statement (Ferret's pattern matching)
-type WhenStmt struct {
+// MatchStmt represents a match statement (Ferret's pattern matching)
+type MatchStmt struct {
 	Expr  Expression    // expression to match
 	Cases []*CaseClause // match cases
 	source.Location
 }
 
-func (w *WhenStmt) INode()                {} // Implements Node interface
-func (w *WhenStmt) Block()                {} // Block is a marker interface for all statements
-func (w *WhenStmt) Loc() *source.Location { return &w.Location }
+func (w *MatchStmt) INode()                {} // Implements Node interface
+func (w *MatchStmt) Block()                {} // Block is a marker interface for all statements
+func (w *MatchStmt) Loc() *source.Location { return &w.Location }
 
 // CaseClause represents a case in a when statement
 type CaseClause struct {

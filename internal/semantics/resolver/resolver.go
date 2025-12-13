@@ -128,7 +128,7 @@ func resolveNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node a
 		resolveExpr(ctx, mod, n.Cond)
 		resolveBlock(ctx, mod, n.Body)
 
-	case *ast.WhenStmt:
+	case *ast.MatchStmt:
 		// Resolve the match expression
 		resolveExpr(ctx, mod, n.Expr)
 
@@ -209,7 +209,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		for _, arg := range e.Args {
 			resolveExpr(ctx, mod, arg)
 		}
-		if e.Catch != nil {
+		if e.Catch != nil && e.Catch.Handler != nil {
 			// get the scope of the catch block
 			scope := e.Catch.Handler.Scope.(*table.SymbolTable)
 

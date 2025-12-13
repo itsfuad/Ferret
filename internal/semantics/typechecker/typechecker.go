@@ -276,7 +276,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Analyze condition for narrowing in loop body
 		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
 		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
-	case *ast.WhenStmt:
+	case *ast.MatchStmt:
 		// Check the match expression
 		matchType := checkExpr(ctx, mod, n.Expr, types.TypeUnknown)
 
@@ -1325,7 +1325,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.CallExpr:
 		checkCallExpr(ctx, mod, e)
 		// Validate catch clause if present
-		if e.Catch != nil {
+		if e.Catch != nil && e.Catch.Handler != nil {
 			checkCatchClause(ctx, mod, e)
 		}
 

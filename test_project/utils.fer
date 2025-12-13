@@ -1,13 +1,13 @@
-export fn multiply(a: i32, b: i32) -> i32 {
+fn multiply(a: i32, b: i32) -> i32 {
     return a * b;
 }
 
-export fn add(x: i32, y: i32) -> i32 {
+fn add(x: i32, y: i32) -> i32 {
     return x + y;
 }
 
 // const
-export const MAX : i32 = 0;
+const MAX : i32 = 0;
     struct{
 
         .x: i32,
@@ -26,12 +26,12 @@ let a : i32 = 10;
 
 let NAME := "Fuad";
 
-export type Point struct {
+type Point struct {
     .x: i32,
     .y: i32,
 };
 
-export fn (p: Point) move(dx: i32, dy: i32) -> Point {
+fn (p: Point) move(dx: i32, dy: i32) -> Point {
     for let i, v in 0..5 {
         let index : str = i;
         let value : str = v;

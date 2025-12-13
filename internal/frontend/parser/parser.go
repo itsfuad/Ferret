@@ -1159,7 +1159,7 @@ func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 }
 
 // parseMatchStmt: match expr { pattern => body, ... }
-func (p *Parser) parseMatchStmt() *ast.WhenStmt {
+func (p *Parser) parseMatchStmt() *ast.MatchStmt {
 	start := p.expect(tokens.MATCH_TOKEN).Start
 
 	// Parse the expression to match
@@ -1263,7 +1263,7 @@ func (p *Parser) parseMatchStmt() *ast.WhenStmt {
 
 	end := p.expect(tokens.CLOSE_CURLY).End
 
-	return &ast.WhenStmt{
+	return &ast.MatchStmt{
 		Expr:     expr,
 		Cases:    cases,
 		Location: *source.NewLocation(&p.filepath, &start, &end),

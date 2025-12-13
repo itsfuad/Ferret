@@ -188,7 +188,7 @@ func (b *CFGBuilder) buildNode(node ast.Node, current *BasicBlock, exitBlock *Ba
 	case *ast.WhileStmt:
 		return b.buildWhile(n, current, exitBlock)
 
-	case *ast.WhenStmt:
+	case *ast.MatchStmt:
 		return b.buildWhen(n, current, exitBlock)
 
 	case *ast.Block:
@@ -512,7 +512,7 @@ func (b *CFGBuilder) reportUnreachableCodeRange(start, end ast.Node) {
 
 // buildWhen handles match statements
 // Match statements are similar to if-else chains - each case is a branch
-func (b *CFGBuilder) buildWhen(stmt *ast.WhenStmt, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
+func (b *CFGBuilder) buildWhen(stmt *ast.MatchStmt, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
 	// Add match statement to current block
 	current.Nodes = append(current.Nodes, stmt)
 	current.Terminator = FlowConditional
