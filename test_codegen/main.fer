@@ -1,7 +1,0 @@
-import "std/io";
-
-fn main() {
-    io::Println("Hello from Ferret!");
-    let x: i32 = 42;
-    io::Println("Test complete");
-}

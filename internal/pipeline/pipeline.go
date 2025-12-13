@@ -548,11 +548,15 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 
 // runCodegenPhase runs code generation on all type-checked modules
 func (p *Pipeline) runCodegenPhase() error {
-	outputDir := filepath.Dir(p.ctx.Config.OutputPath)
-	baseName := filepath.Base(p.ctx.Config.OutputPath)
-
+	// Determine output directory from output path
+	outputPath := p.ctx.Config.OutputPath
+	outputDir := filepath.Dir(outputPath)
+	
 	// Create a temporary directory for generated C files
-	tempDir := filepath.Join(outputDir, baseName+"_gen")
+	// Always place C code in a "gen" subdirectory relative to the output executable location
+	// Pattern: <outputDir>/gen/ (e.g., if output is "start", C code goes to "./gen/")
+	//          if output is "bin/myapp", C code goes to "bin/gen/"
+	tempDir := filepath.Join(outputDir, "gen")
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}

@@ -1,0 +1,23 @@
+import "std/io";
+
+type Point struct {
+    .x: i32;
+    .y: i32;
+}
+
+fn (p: Point) area() -> i32 {
+    return p.x * p.y;
+}
+
+fn main() {
+    // Test struct literal with cast
+    let p := {.x = 10, .y = 20} as Point;
+    io::Println("Point area:", p.area());
+    
+    // Test array literal
+    let arr := []i32{1, 2, 3, 4, 5};
+    for let i, v in arr {
+        io::Println(i, " : ", v);
+    }
+}
+

@@ -218,8 +218,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 		// Check range expression first to infer element type
 		var rangeElemType types.SemType = types.TypeUnknown
+		var rangeType types.SemType = types.TypeUnknown
 		if n.Range != nil {
-			rangeType := checkExpr(ctx, mod, n.Range, types.TypeUnknown)
+			rangeType = checkExpr(ctx, mod, n.Range, types.TypeUnknown)
 			// Extract element type from array - for integer ranges this will be i32
 			if arrayType, ok := rangeType.(*types.ArrayType); ok {
 				rangeElemType = arrayType.Element
@@ -230,8 +231,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		if n.Iterator != nil {
 			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok {
 				// For VarDecl iterator: apply types and validate structure
-				// Both single and dual variables get the same type (range element type)
-				for _, item := range varDecl.Decls {
+				// For array iteration with two variables: first is index (i32), second is value (element type)
+				// For single variable or range iteration: variable gets range element type
+				for idx, item := range varDecl.Decls {
 					// Validate iterator declaration structure
 					if item.Value != nil {
 						ctx.Diagnostics.Add(diagnostics.NewError("for loop iterator cannot have initializer").
@@ -250,10 +252,25 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 							sym.Type = declType
 						}
 					} else {
-						// Infer type: all variables get range element type
-						// For numeric ranges like 0..10, both index and value are i32
+						// Infer type based on position and range type
+						var inferredType types.SemType
+						if len(varDecl.Decls) == 2 && idx == 0 {
+							// First variable in dual-iterator: index is always i32 for array iteration
+							// Check if range is an array (not a numeric range)
+							if _, ok := rangeType.(*types.ArrayType); ok {
+								// Array iteration: first variable is index (i32)
+								inferredType = types.TypeI32
+							} else {
+								// Numeric range: both variables are i32
+								inferredType = rangeElemType
+							}
+						} else {
+							// Second variable or single variable: gets range element type
+							inferredType = rangeElemType
+						}
+
 						if sym, ok := mod.CurrentScope.GetSymbol(item.Name.Name); ok {
-							sym.Type = rangeElemType
+							sym.Type = inferredType
 						}
 					}
 				}

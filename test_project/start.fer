@@ -1,0 +1,24 @@
+
+
+import "std/io";
+
+
+
+
+
+fn main() {
+    io::Println("Hello");
+
+    let i : i32;
+    let v : i32;
+
+    for let i, v in 0..10 {
+        io::Println(i, " : ", v + 1);
+    }
+
+    let fruits : []str = ["apple", "banana", "cherry"];
+
+    for let i, fruit in fruits {
+        io::Println("Fruit: ", fruit, " in index: ", i);
+    }
+}

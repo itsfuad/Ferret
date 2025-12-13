@@ -1,0 +1,11 @@
+import "std/io";
+
+type Point struct {
+    .x: i32;
+    .y: i32;
+}
+
+fn main() {
+    io::Println("test");
+}
+

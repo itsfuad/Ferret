@@ -29,6 +29,13 @@ Or to build for both wasm and native:
 ./scripts/build-all.bat
 ```
 
+### Testing
+
+```batch
+go build -o ./bin/ferret main.go && ./bin/ferret code.fer
+```
+Note: flags must be before any non flag arguments in ferret command. like `./bin/ferret -o execname code.fer`, but `./bin/ferret code.fer -o execname` will not work.
+
 ## Language Features
 
 ### Variables and Constants
