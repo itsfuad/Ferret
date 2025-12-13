@@ -21,7 +21,7 @@ type Status enum {
 ```ferret
 let status := Status::Active;
 
-when status {
+match status {
     Status::Pending => io::Println("Waiting"),
     Status::Active => io::Println("Running"),
     Status::Completed => io::Println("Done"),

@@ -265,5 +265,5 @@ You've learned how to make decisions in your code:
 Now that you can make decisions, learn how to repeat actions:
 
 * [Learn about Loops](/loops)  -  Repeat code efficiently
-* [Explore When Expressions](/when)  -  Advanced pattern matching
+* [Explore Match Expressions](/match)  -  Advanced pattern matching
 * [Understand Optional Types](/optionals)  -  Master safe value handling

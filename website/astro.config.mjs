@@ -75,7 +75,7 @@ export default defineConfig({
                 items: [
                     { label: 'If Statements', slug: 'control-flow/if-statements' },
                     { label: 'Loops', slug: 'control-flow/loops' },
-                    { label: 'When Expressions', slug: 'control-flow/when' },
+                    { label: 'Match Expressions', slug: 'control-flow/match' },
                 ],
             },
             {

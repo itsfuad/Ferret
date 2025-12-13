@@ -76,7 +76,7 @@ Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: Code
 - Arrays (fixed and dynamic)
 - Maps
 - Functions (regular and anonymous)
-- Control flow (`if`, `else`, `for`, `while`, `when`)
+- Control flow (`if`, `else`, `for`, `while`, `match`)
 - Error handling (`E ! T`, `catch` expressions)
 - Optional types (`T?`, coalescing operator `??`)
 - Scope resolution (`::` for enums and modules)
@@ -296,8 +296,8 @@ type Color enum {
 // Enum usage with scope resolution operator
 let color := Color::Red;
 
-// Pattern matching with when
-when color {
+// Pattern matching with match
+match color {
     Color::Red => println("Red"),
     Color::Green => println("Green"),
     Color::Blue => println("Blue")
@@ -418,8 +418,8 @@ while condition {
     // loop body
 }
 
-// Pattern matching (when)
-when value {
+// Pattern matching (match)
+match value {
     1 => println("one"),
     2 => println("two"),
     _ => println("other")

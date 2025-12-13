@@ -76,7 +76,7 @@ type Status enum {
 };
 
 fn (s: Status) is_finished() -> bool {
-    when s {
+    match s {
         Status::Completed => return true,
         Status::Failed => return true,
         _ => return false,
@@ -84,7 +84,7 @@ fn (s: Status) is_finished() -> bool {
 }
 
 fn (s: Status) to_string() -> str {
-    when s {
+    match s {
         Status::Pending => return "Pending",
         Status::Active => return "Active",
         Status::Completed => return "Completed",
