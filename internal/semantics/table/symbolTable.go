@@ -24,9 +24,6 @@ func NewSymbolTable(parent *SymbolTable) *SymbolTable {
 
 // Declare adds a symbol to the table
 func (st *SymbolTable) Declare(name string, symbol *symbols.Symbol) error {
-	if symbol.Kind == symbols.SymbolReceiver {
-		fmt.Printf("receiver symbol %s of type %s declared\n", name, symbol.Kind.String())
-	}
 	if _, exists := st.symbols[name]; exists {
 		return fmt.Errorf("symbol '%s' already declared", name)
 	}

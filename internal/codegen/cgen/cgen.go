@@ -49,13 +49,9 @@ func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
 
 // Generate generates C code for the module
 func (g *Generator) Generate() (string, error) {
-	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: starting\n")
 	g.writeHeader()
-	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: after writeHeader, buf length=%d\n", g.buf.Len())
 	g.writeIncludes()
-	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: after writeIncludes, buf length=%d\n", g.buf.Len())
 	g.writeRuntimeDeclarations()
-	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: after writeRuntimeDeclarations, buf length=%d\n", g.buf.Len())
 
 	// Generate struct/type definitions first
 	if g.mod.AST != nil {
@@ -87,21 +83,7 @@ func (g *Generator) Generate() (string, error) {
 		}
 	}
 
-	result := g.buf.String()
-	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: final result length=%d\n", len(result))
-	if strings.Contains(result, "interface.h") {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Generate: ✓ interface.h found in final result\n")
-	} else {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Generate: ✗ interface.h NOT found in final result!\n")
-		// Show the includes section
-		lines := strings.Split(result, "\n")
-		for i, line := range lines {
-			if i < 15 && strings.Contains(line, "include") {
-				fmt.Fprintf(os.Stderr, "[DEBUG] Generate: line %d: %s\n", i+1, line)
-			}
-		}
-	}
-	return result, nil
+	return g.buf.String(), nil
 }
 
 func (g *Generator) writeHeader() {
@@ -120,23 +102,9 @@ func (g *Generator) writeIncludes() {
 
 func (g *Generator) writeRuntimeDeclarations() {
 	// Include the runtime headers
-	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: writing io.h, buf length=%d\n", g.buf.Len())
-	g.write("#include \"io.h\"\n")
-	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: after io.h, buf length=%d\n", g.buf.Len())
-	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: writing interface.h\n")
+	g.write("#include \"io.h\"\n")        // Runtime header for I/O functions
 	g.write("#include \"interface.h\"\n") // Required for ferret_interface_t type
-	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: after interface.h, buf length=%d\n", g.buf.Len())
-	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: writing newline\n")
 	g.write("\n")
-	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: done, buf length=%d\n", g.buf.Len())
-	// Debug: check if interface.h is actually in the buffer
-	bufContent := g.buf.String()
-	if strings.Contains(bufContent, "interface.h") {
-		fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: ✓ interface.h found in buffer\n")
-	} else {
-		fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: ✗ interface.h NOT found in buffer!\n")
-		fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: last 100 chars of buffer: %s\n", bufContent[max(0, len(bufContent)-100):])
-	}
 }
 
 func (g *Generator) generateFunction(decl *ast.FuncDecl) {
@@ -620,13 +588,6 @@ func (g *Generator) generateMethodWrapperForInterfaceAtFileScope(typeName, metho
 	g.write("}\n\n")
 }
 
-// generateMethodWrapperForInterface generates a wrapper function for interface method dispatch
-// Converts void* self to concrete type and calls the actual method
-// This is kept for backward compatibility but should use generateMethodWrapperForInterfaceAtFileScope
-func (g *Generator) generateMethodWrapperForInterface(typeName, methodName string, funcType *types.FunctionType, wrapperName string, ifaceMethod *types.InterfaceMethod) {
-	g.generateMethodWrapperForInterfaceAtFileScope(typeName, methodName, funcType, wrapperName, ifaceMethod)
-}
-
 // getInterfaceName gets the interface name from a type
 func (g *Generator) getInterfaceName(typ types.SemType) string {
 	if named, ok := typ.(*types.NamedType); ok {
@@ -634,46 +595,6 @@ func (g *Generator) getInterfaceName(typ types.SemType) string {
 	}
 	// For anonymous interfaces, generate a name
 	return "Interface"
-}
-
-// generateInterfaceVTableInstance generates a vtable instance for a type implementing an interface
-// This should be called when we need to generate the vtable instance
-func (g *Generator) generateInterfaceVTableInstance(concreteTypeName string, iface *types.InterfaceType, interfaceName string) {
-	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
-	vtableVarName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(interfaceName) + "_vtable_inst"
-
-	g.write("static %s %s = {\n", vtableTypeName, vtableVarName)
-	g.indent++
-
-	// Look up the concrete type's methods
-	typeSym, found := g.lookupTypeSymbol(concreteTypeName)
-	if !found || typeSym == nil || typeSym.Methods == nil {
-		g.ctx.ReportError(fmt.Sprintf("codegen: type %s not found or has no methods", concreteTypeName), nil)
-		return
-	}
-
-	for _, method := range iface.Methods {
-		methodInfo, hasMethod := typeSym.Methods[method.Name]
-		if !hasMethod {
-			g.ctx.ReportError(fmt.Sprintf("codegen: method %s not found on type %s", method.Name, concreteTypeName), nil)
-			continue
-		}
-
-		g.writeIndent()
-		// Generate wrapper function name
-		wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_wrapper"
-		g.write(".%s = %s", g.sanitizeName(method.Name), wrapperName)
-
-		// Generate wrapper function - use the interface method signature
-		// Find the interface method to get correct signature
-		methodCopy := method // Create a copy to pass pointer
-		g.generateMethodWrapperForInterface(concreteTypeName, method.Name, methodInfo.FuncType, wrapperName, &methodCopy)
-
-		g.write(",\n")
-	}
-
-	g.indent--
-	g.write("};\n\n")
 }
 
 // lookupTypeSymbol looks up a type symbol in the current module or imports
@@ -1014,7 +935,6 @@ func (g *Generator) GenerateHeader() string {
 
 // GenerateImplementation generates C implementation code (without includes - they're in the .c file)
 func (g *Generator) GenerateImplementation() string {
-	fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: starting\n")
 	var buf strings.Builder
 	oldBuf := g.buf
 	g.buf = buf
@@ -1044,7 +964,6 @@ func (g *Generator) GenerateImplementation() string {
 	}
 
 	result := g.buf.String()
-	fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: final result length=%d\n", len(result))
 	g.buf = oldBuf
 	return result
 }
@@ -2469,8 +2388,25 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 			return
 		}
 
-		// Regular function call
-		g.write("%s(", g.sanitizeName(ident.Name))
+		// Regular function call - check if function is from current module
+		funcName := ident.Name
+		cFuncName := g.sanitizeName(funcName)
+
+		// Check if function is in current module's scope
+		sym, found := g.mod.ModuleScope.GetSymbol(funcName)
+		if found && sym != nil && sym.Kind == symbols.SymbolFunction {
+			// Function is in current module - use same prefixing logic as function definition
+			if funcName != "main" && g.mod.ImportPath != g.ctx.EntryModule {
+				// Prefix with module path to avoid conflicts
+				modulePrefix := strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")
+				cFuncName = g.sanitizeName(modulePrefix) + "_" + cFuncName
+			}
+		}
+		// If not found in current module, it might be from imported module
+		// but that should be handled by scope resolution (module::function)
+		// For now, use the name as-is (will fail at compile time if wrong)
+
+		g.write("%s(", cFuncName)
 		for i, arg := range expr.Args {
 			if i > 0 {
 				g.write(", ")

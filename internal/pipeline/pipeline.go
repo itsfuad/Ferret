@@ -353,28 +353,6 @@ func (p *Pipeline) PrintSummary() {
 	colors.CYAN.Println("═══════════════════════════════════════")
 }
 
-// PrintModuleDetails prints detailed information about a specific module
-func (p *Pipeline) PrintModuleDetails(importPath string) {
-	module, exists := p.ctx.GetModule(importPath)
-	if !exists {
-		colors.RED.Printf("Module %q not found\n", importPath)
-		return
-	}
-
-	colors.CYAN.Printf("\n━━━ Module: %s ━━━\n", importPath)
-	fmt.Printf("File Path: %s\n", module.FilePath)
-	fmt.Printf("Type: %s\n", module.Type)
-	fmt.Printf("Phase: %s\n", module.Phase)
-
-	nodes := 0
-	if module.AST != nil {
-		nodes = len(module.AST.Nodes)
-	}
-	fmt.Printf("AST Nodes: %d\n", nodes)
-
-	fmt.Println()
-}
-
 // runCollectorPhase runs symbol collection on all parsed modules.
 // The collector handles all sub-phases internally (declarations, function bodies, method bodies).
 func (p *Pipeline) runCollectorPhase() error {
@@ -622,13 +600,8 @@ func (p *Pipeline) runCodegenPhase() error {
 		var implBuilder strings.Builder
 		implBuilder.WriteString("// Generated C code from Ferret\n")
 		implBuilder.WriteString("// Module: " + importPath + "\n\n")
-		implBuilder.WriteString("#include <stdio.h>\n")
-		implBuilder.WriteString("#include <stdlib.h>\n")
-		implBuilder.WriteString("#include <string.h>\n")
-		implBuilder.WriteString("#include <stdint.h>\n")
-		implBuilder.WriteString("#include <math.h>\n") // For pow() function
-		implBuilder.WriteString("\n")
-		implBuilder.WriteString("#include \"io.h\"\n") // Runtime header
+		p.writeStandardIncludes(&implBuilder)
+		p.writeRuntimeIncludes(&implBuilder)
 		implBuilder.WriteString("#include \"" + headerName + "\"\n\n")
 		implBuilder.WriteString(implContent)
 
@@ -666,14 +639,8 @@ func (p *Pipeline) runCodegenPhase() error {
 			var implBuilder strings.Builder
 			implBuilder.WriteString("// Generated C code from Ferret\n")
 			implBuilder.WriteString("// Module: " + entryModule + "\n\n")
-			implBuilder.WriteString("#include <stdio.h>\n")
-			implBuilder.WriteString("#include <stdlib.h>\n")
-			implBuilder.WriteString("#include <string.h>\n")
-			implBuilder.WriteString("#include <stdint.h>\n")
-			implBuilder.WriteString("#include <math.h>\n")
-			implBuilder.WriteString("\n")
-			implBuilder.WriteString("#include \"io.h\"\n")
-			implBuilder.WriteString("#include \"interface.h\"\n")
+			p.writeStandardIncludes(&implBuilder)
+			p.writeRuntimeIncludes(&implBuilder)
 			// Include imported module headers so constants and functions are available
 			for _, importPath := range importedModules {
 				headerName := p.sanitizeModuleName(importPath) + ".h"
@@ -692,37 +659,8 @@ func (p *Pipeline) runCodegenPhase() error {
 		}
 	}
 
-	// Step 3: Generate main.c that just includes all module headers
-	// The entry module's .c file contains main() and all implementations
-	// main.c is just a simple file that includes headers (for consistency, though it may not be needed)
-	mainCFile := filepath.Join(tempDir, "main.c")
-	var mainBuilder strings.Builder
-	mainBuilder.WriteString("// Generated C code from Ferret\n")
-	mainBuilder.WriteString("// Entry module: " + p.ctx.EntryModule + "\n\n")
-	mainBuilder.WriteString("#include <stdio.h>\n")
-	mainBuilder.WriteString("#include <stdlib.h>\n")
-	mainBuilder.WriteString("#include <string.h>\n")
-	mainBuilder.WriteString("#include <stdint.h>\n")
-	mainBuilder.WriteString("#include <math.h>\n")
-	mainBuilder.WriteString("\n")
-	mainBuilder.WriteString("#include \"io.h\"\n")
-	mainBuilder.WriteString("#include \"interface.h\"\n")
-	mainBuilder.WriteString("\n")
-
-	// Include all module headers (imported modules first, then entry module)
-	for _, importPath := range importedModules {
-		headerName := p.sanitizeModuleName(importPath) + ".h"
-		mainBuilder.WriteString("#include \"" + headerName + "\"\n")
-	}
-	if entryHeaderName != "" {
-		mainBuilder.WriteString("#include \"" + entryHeaderName + "\"\n")
-	}
-	mainBuilder.WriteString("\n")
-
-	if err := os.WriteFile(mainCFile, []byte(mainBuilder.String()), 0644); err != nil {
-		return fmt.Errorf("failed to write main C file: %w", err)
-	}
-	cFiles = append(cFiles, mainCFile)
+	// Note: main.c is not needed - the entry module's .c file contains main() and all code
+	// All module headers are already included in the entry module's .c file
 
 	// Build executable - compile all .c files together
 	execPath := p.ctx.Config.OutputPath
@@ -767,22 +705,20 @@ func (p *Pipeline) sanitizeModuleName(importPath string) string {
 	return name
 }
 
-// generateCode generates C code for a module
-func (p *Pipeline) generateCode(mod *context_v2.Module, outputPath string) error {
-	return cgen.GenerateModule(p.ctx, mod, outputPath)
+// writeStandardIncludes writes standard C library includes to a builder
+func (p *Pipeline) writeStandardIncludes(builder *strings.Builder) {
+	builder.WriteString("#include <stdio.h>\n")
+	builder.WriteString("#include <stdlib.h>\n")
+	builder.WriteString("#include <string.h>\n")
+	builder.WriteString("#include <stdint.h>\n")
+	builder.WriteString("#include <math.h>\n")
+	builder.WriteString("\n")
 }
 
-// buildExecutable compiles the C code into an executable
-func (p *Pipeline) buildExecutable(cFilePath, execPath string) error {
-	opts := codegen.DefaultBuildOptions()
-	// Use runtime path from config (set relative to executable in compiler.go)
-	if p.ctx.Config.RuntimePath != "" {
-		opts.RuntimePath = p.ctx.Config.RuntimePath
-	}
-	opts.OutputPath = execPath
-	opts.Debug = p.ctx.Config.Debug
-
-	return codegen.BuildExecutable(p.ctx, cFilePath, opts)
+// writeRuntimeIncludes writes runtime header includes to a builder
+func (p *Pipeline) writeRuntimeIncludes(builder *strings.Builder) {
+	builder.WriteString("#include \"io.h\"\n")
+	builder.WriteString("#include \"interface.h\"\n")
 }
 
 // buildExecutableMultiple compiles multiple C files into an executable
