@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"compiler/colors"
 	"compiler/internal/context_v2"
@@ -166,10 +167,23 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 		return fmt.Errorf("runtime directory not found: %s", runtimePath)
 	}
 
-	// Build runtime library
-	runtimeC := filepath.Join(runtimePath, "io.c")
-	if _, err := os.Stat(runtimeC); os.IsNotExist(err) {
-		return fmt.Errorf("runtime file not found: %s", runtimeC)
+	// Build runtime libraries
+	runtimeFiles := []string{
+		filepath.Join(runtimePath, "io.c"),
+		filepath.Join(runtimePath, "interface.c"),
+		filepath.Join(runtimePath, "array.c"),          // Dynamic array library
+		filepath.Join(runtimePath, "string_builder.c"), // String builder library
+	}
+
+	// Check that all runtime files exist
+	for _, runtimeFile := range runtimeFiles {
+		if _, err := os.Stat(runtimeFile); os.IsNotExist(err) {
+			// Some runtime files are optional (array.c, string_builder.c)
+			// Only io.c and interface.c are required
+			if strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") {
+				return fmt.Errorf("required runtime file not found: %s", runtimeFile)
+			}
+		}
 	}
 
 	// Determine output path
@@ -187,7 +201,12 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 	args = append(args, "-o", outputPath)
 	// Add all C files
 	args = append(args, cFiles...)
-	args = append(args, runtimeC)
+	// Add runtime files (only include if they exist)
+	for _, runtimeFile := range runtimeFiles {
+		if _, err := os.Stat(runtimeFile); err == nil {
+			args = append(args, runtimeFile)
+		}
+	}
 	args = append(args, "-lm") // Link math library for pow() function
 
 	if ctx.Config.Debug || opts.Debug {
