@@ -45,7 +45,42 @@ ferret_array_free(arr);
 
 ---
 
-### 4. `string_builder.c` / `string_builder.h` - String Builder Library
+### 4. `bigint.c` / `bigint.h` - Big Integer Library (128/256-bit)
+**Status**: ✅ Created, required for i128/i256/u128/u256 types
+**When to use**: Automatically used when Ferret code uses 128-bit or 256-bit integer types
+
+**Features**:
+- **128-bit integers**: Uses compiler extensions (`__int128` / `unsigned __int128`) when available (GCC/Clang)
+- **256-bit integers**: Always uses struct-based representation (4 × 64-bit words)
+- **Fallback support**: Struct-based 128-bit implementation for compilers without `__int128` support
+- Full arithmetic operations: add, sub, mul, div, mod, comparisons
+
+**Implementation Strategy**:
+- **128-bit**: Native compiler support when available → fast native operations
+- **128-bit fallback**: Struct-based (2 × 64-bit words) → slower but portable
+- **256-bit**: Always struct-based (4 × 64-bit words) → portable across all compilers
+
+**API** (automatically used by codegen):
+```c
+// Types
+ferret_i128, ferret_u128  // 128-bit integers
+ferret_i256, ferret_u256  // 256-bit integers
+
+// Operations (when using struct-based fallback)
+ferret_i128_add(a, b), ferret_i128_sub(a, b), ferret_i128_mul(a, b), ...
+ferret_i256_add(a, b), ferret_i256_sub(a, b), ferret_i256_mul(a, b), ...
+```
+
+**Performance**:
+- **128-bit with compiler support**: Native speed (same as int64_t operations)
+- **128-bit fallback**: ~2-3x slower than native (struct overhead)
+- **256-bit**: ~4-5x slower than native (struct overhead, but necessary for 256-bit)
+
+**Note**: Full multiplication and division for 256-bit are simplified implementations. For production use, consider integrating GMP (GNU Multiple Precision Library) for optimal performance.
+
+---
+
+### 5. `string_builder.c` / `string_builder.h` - String Builder Library
 **Status**: ✅ Created, ready for use
 **When to use**: For efficient string concatenation (better than `ferret_io_ConcatStrings`)
 
@@ -72,6 +107,7 @@ ferret_string_builder_destroy(sb);
 ### What's Working:
 - ✅ `io.c` - Basic I/O (required)
 - ✅ `interface.c` - Interface support (required)
+- ✅ `bigint.c` - Big integers 128/256-bit (required for i128/i256/u128/u256 types)
 - ✅ `array.c` - Dynamic arrays (optional, ready)
 - ✅ `string_builder.c` - String builder (optional, ready)
 

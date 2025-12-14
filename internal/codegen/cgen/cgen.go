@@ -104,6 +104,7 @@ func (g *Generator) writeRuntimeDeclarations() {
 	// Include the runtime headers
 	g.write("#include \"io.h\"\n")        // Runtime header for I/O functions
 	g.write("#include \"interface.h\"\n") // Required for ferret_interface_t type
+	g.write("#include \"bigint.h\"\n")    // Required for 128/256-bit integer types
 	g.write("\n")
 }
 
@@ -2429,6 +2430,10 @@ func (g *Generator) typeToC(typ types.SemType) string {
 			return "int32_t"
 		case types.TYPE_I64:
 			return "int64_t"
+		case types.TYPE_I128:
+			return "ferret_i128"
+		case types.TYPE_I256:
+			return "ferret_i256"
 		case types.TYPE_U8:
 			return "uint8_t"
 		case types.TYPE_U16:
@@ -2437,10 +2442,18 @@ func (g *Generator) typeToC(typ types.SemType) string {
 			return "uint32_t"
 		case types.TYPE_U64:
 			return "uint64_t"
+		case types.TYPE_U128:
+			return "ferret_u128"
+		case types.TYPE_U256:
+			return "ferret_u256"
 		case types.TYPE_F32:
 			return "float"
 		case types.TYPE_F64:
 			return "double"
+		case types.TYPE_F128:
+			return "ferret_f128"
+		case types.TYPE_F256:
+			return "ferret_f256"
 		case types.TYPE_STRING:
 			return "const char*"
 		case types.TYPE_BOOL:
