@@ -176,12 +176,23 @@ gcc -c -std=c11 -I runtime runtime/bigint.c -o bigint.o
 
 ## Integration Status
 
-- ✅ Integer types defined (`ferret_i128`, `ferret_i256`, `ferret_u128`, `ferret_u256`)
-- ✅ Float types defined (`ferret_f128`, `ferret_f256`)
-- ✅ Basic operations implemented for all types
-- ✅ Codegen updated to use all big types
-- ✅ Build system includes `bigint.c` in compilation
-- ⏳ Full 256-bit multiplication/division (simplified for now)
-- ⏳ Full IEEE 754 float operations (currently simplified via double conversion)
-- ⏳ Bitwise operations for integers (not yet implemented)
-- ⏳ String conversion helpers (not yet implemented)
+- [-] Integer types defined (`ferret_i128`, `ferret_i256`, `ferret_u128`, `ferret_u256`)
+- [-] Float types defined (`ferret_f128`, `ferret_f256`)
+- [-] Basic arithmetic operations implemented for all types
+- [-] Full 256-bit multiplication/division (using long multiplication and binary long division)
+- [-] Bitwise operations for all integer types (AND, OR, XOR, NOT, shifts)
+- [-] String conversion helpers (to/from decimal and hex strings)
+- [-] Codegen updated to use all big types
+- [-] Build system includes `bigint.c` in compilation
+- [-] **f128 with native support** (GCC on x86_64/PowerPC): Complete IEEE 754 via `__float128`
+- [-] **f128 fallback** (Clang, MSVC, etc.): Simplified via double conversion (loses precision, but functional)
+- [-] **f256**: Simplified via double conversion (loses precision, but functional)
+
+**Note on Float Operations:**
+- When `__float128` is available (GCC on x86_64/PowerPC), f128 operations use native IEEE 754 binary128 format - **fully complete**.
+- Fallback implementations convert to `double` (64-bit), perform operations, then convert back. This works but:
+  - Loses precision (only 53 bits of mantissa vs 112 for f128, 236 for f256)
+  - May not handle edge cases (NaN, Inf, subnormals) correctly
+  - A full implementation would require bit-level IEEE 754 manipulation (extracting sign/exponent/mantissa, normalizing, rounding, etc.)
+
+For most practical purposes, the double conversion approach is sufficient. For scientific computing requiring full precision, consider using a library like MPFR or implementing proper IEEE 754 operations.
