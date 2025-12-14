@@ -2,6 +2,7 @@ package ast
 
 import (
 	"compiler/internal/source"
+	"compiler/internal/types"
 )
 
 type LiteralKind int
@@ -18,7 +19,8 @@ const (
 // BasicLit represents a literal of basic type (int, float, string, bool, none)
 type BasicLit struct {
 	Kind  LiteralKind
-	Value string // the literal value as a string
+	Value string        // the literal value as a string
+	Type  types.SemType // type information (populated during semantic analysis)
 	source.Location
 }
 
@@ -35,8 +37,9 @@ func (b *BasicLit) Loc() *source.Location { return &b.Location }
 // For arrays, Elts contains plain Expression values.
 // For structs and maps, Elts contains KeyValueExpr nodes.
 type CompositeLit struct {
-	Type TypeNode     // type of the composite literal (can be nil for inferred types)
-	Elts []Expression // list of composite elements (can be plain values or KeyValueExpr)
+	Type     TypeNode      // type of the composite literal (AST node, can be nil for inferred types)
+	TypeInfo types.SemType // resolved type (populated during semantic analysis)
+	Elts     []Expression  // list of composite elements (can be plain values or KeyValueExpr)
 	source.Location
 }
 
@@ -60,10 +63,11 @@ func (k *KeyValueExpr) Loc() *source.Location { return &k.Location }
 
 // FuncLit represents a function literal (anonymous function/lambda)
 type FuncLit struct {
-	ID    IdentifierExpr // unique identifier for the function literal
-	Type  *FuncType      // function signature
-	Body  *Block         // function body
-	Scope SymbolTable    // Symbol table for function scope (filled during collection)
+	ID       IdentifierExpr // unique identifier for the function literal
+	Type     *FuncType      // function signature (AST node)
+	TypeInfo types.SemType  // resolved function type (populated during semantic analysis)
+	Body     *Block         // function body
+	Scope    SymbolTable    // Symbol table for function scope (filled during collection)
 	source.Location
 }
 

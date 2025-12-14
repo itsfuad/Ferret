@@ -87,8 +87,9 @@ func (g *Generator) writeIncludes() {
 }
 
 func (g *Generator) writeRuntimeDeclarations() {
-	// Include the runtime header for IO functions
+	// Include the runtime headers
 	g.write("#include \"io.h\"\n")
+	g.write("#include \"interface.h\"\n")
 	g.write("\n")
 }
 
@@ -125,7 +126,6 @@ func (g *Generator) generateFunction(decl *ast.FuncDecl) {
 	}
 
 	// For functions from non-entry modules, prefix with module name
-	// TODO: Properly handle 'export' keyword instead of prefixing all functions
 	cFuncName := g.sanitizeName(funcName)
 	if funcName != "main" && g.mod.ImportPath != g.ctx.EntryModule {
 		// Prefix with module path to avoid conflicts
@@ -186,33 +186,395 @@ func (g *Generator) generateTypeDecl(decl *ast.TypeDecl) {
 		return
 	}
 
-	// Check if it's a struct type
+	// Check if it's a struct type or interface type
 	namedType, ok := sym.Type.(*types.NamedType)
 	if !ok {
 		return
 	}
 
-	structType, ok := namedType.Underlying.(*types.StructType)
-	if !ok {
-		// Not a struct, skip (enums, interfaces, etc. handled differently)
+	// Handle struct types
+	if structType, ok := namedType.Underlying.(*types.StructType); ok {
+
+		// Generate struct definition
+		cTypeName := g.sanitizeName(typeName)
+		g.write("typedef struct {\n")
+		g.indent++
+
+		// Generate fields
+		for _, field := range structType.Fields {
+			g.writeIndent()
+			fieldType := g.typeToC(field.Type)
+			fieldName := g.sanitizeName(field.Name)
+			g.write("%s %s;\n", fieldType, fieldName)
+		}
+
+		g.indent--
+		g.write("} %s;\n\n", cTypeName)
 		return
 	}
 
-	// Generate struct definition
-	cTypeName := g.sanitizeName(typeName)
+	// Handle interface types - generate vtable type
+	if ifaceType, ok := namedType.Underlying.(*types.InterfaceType); ok {
+		g.generateInterfaceVTableType(typeName, ifaceType)
+		return
+	}
+
+	// Other types (enums, etc.) handled elsewhere
+}
+
+// generateInterfaceVTableType generates the vtable struct type for an interface
+func (g *Generator) generateInterfaceVTableType(interfaceName string, ifaceType *types.InterfaceType) {
+	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
 	g.write("typedef struct {\n")
 	g.indent++
 
-	// Generate fields
-	for _, field := range structType.Fields {
+	for _, method := range ifaceType.Methods {
 		g.writeIndent()
-		fieldType := g.typeToC(field.Type)
-		fieldName := g.sanitizeName(field.Name)
-		g.write("%s %s;\n", fieldType, fieldName)
+		// Generate function pointer signature
+		// Return type
+		returnType := g.typeToC(method.FuncType.Return)
+
+		// Generate parameter list: void* self, then method parameters
+		g.write("%s (*%s)(", returnType, g.sanitizeName(method.Name))
+		g.write("void*")
+		for _, param := range method.FuncType.Params {
+			g.write(", %s", g.typeToC(param.Type))
+		}
+		g.write(");\n")
 	}
 
 	g.indent--
-	g.write("} %s;\n\n", cTypeName)
+	g.write("} %s;\n\n", vtableTypeName)
+}
+
+// isInterfaceType checks if a type is an interface (non-empty)
+func (g *Generator) isInterfaceType(typ types.SemType) bool {
+	if iface, ok := typ.(*types.InterfaceType); ok && len(iface.Methods) > 0 {
+		return true
+	}
+	if named, ok := typ.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// getInterfaceType extracts the InterfaceType from a type (handles NamedType wrapping)
+func (g *Generator) getInterfaceType(typ types.SemType) *types.InterfaceType {
+	if iface, ok := typ.(*types.InterfaceType); ok {
+		return iface
+	}
+	if named, ok := typ.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
+			return iface
+		}
+	}
+	return nil
+}
+
+// generateInterfaceAssignment generates code to assign a concrete type to an interface
+// Creates interface value with data pointer and vtable
+func (g *Generator) generateInterfaceAssignment(varName string, ifaceType types.SemType, valueExpr ast.Expression) {
+	// Get the concrete type from the value expression
+	concreteType := g.inferExprType(valueExpr)
+	if concreteType == nil || concreteType.Equals(types.TypeUnknown) {
+		g.ctx.ReportError("codegen: cannot determine concrete type for interface assignment", nil)
+		g.write("/* error: unknown type */")
+		return
+	}
+
+	// Get interface type
+	iface := g.getInterfaceType(ifaceType)
+	if iface == nil {
+		g.ctx.ReportError("codegen: expected interface type", nil)
+		g.write("/* error: not an interface */")
+		return
+	}
+
+	// Get concrete type name (for vtable generation)
+	var concreteTypeName string
+	if named, ok := concreteType.(*types.NamedType); ok {
+		concreteTypeName = named.Name
+	} else {
+		g.ctx.ReportError("codegen: only named types can implement interfaces", nil)
+		g.write("/* error: not a named type */")
+		return
+	}
+
+	// Generate temporary variable for the concrete value
+	g.counter++
+	tempVarName := fmt.Sprintf("__temp_%d", g.counter)
+	concreteCType := g.typeToC(concreteType)
+
+	// Store the concrete value
+	g.write("{\n")
+	g.indent++
+	g.writeIndent()
+	g.write("%s %s = ", concreteCType, tempVarName)
+	g.generateExpr(valueExpr)
+	g.write(";\n")
+
+	// Generate vtable instance name
+	interfaceName := g.getInterfaceName(ifaceType)
+	vtableVarName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(interfaceName) + "_vtable_inst"
+	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
+
+	// Generate wrapper functions and vtable instance
+	// First, generate wrapper functions for each interface method
+	typeSym, found := g.lookupTypeSymbol(concreteTypeName)
+	if found && typeSym != nil && typeSym.Methods != nil {
+		for _, method := range iface.Methods {
+			methodInfo, hasMethod := typeSym.Methods[method.Name]
+			if hasMethod {
+				wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_" + g.sanitizeName(interfaceName) + "_wrapper"
+				methodCopy := method // Create a copy to pass pointer
+				g.generateMethodWrapperForInterface(concreteTypeName, method.Name, methodInfo.FuncType, wrapperName, &methodCopy)
+			}
+		}
+	}
+
+	// Now generate vtable instance with wrapper function pointers
+	g.writeIndent()
+	g.write("static %s %s = {", vtableTypeName, vtableVarName)
+
+	if found && typeSym != nil && typeSym.Methods != nil {
+		first := true
+		for _, method := range iface.Methods {
+			if !first {
+				g.write(", ")
+			}
+			first = false
+
+			_, hasMethod := typeSym.Methods[method.Name]
+			if hasMethod {
+				// Use wrapper function pointer
+				wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_" + g.sanitizeName(interfaceName) + "_wrapper"
+				g.write(".%s = %s", g.sanitizeName(method.Name), wrapperName)
+			}
+		}
+	}
+
+	g.write("};\n")
+
+	// Assign interface value with data and vtable pointers
+	g.write("%s = (ferret_interface_t) { .data = &%s, .vtable = (void**)&%s }",
+		g.sanitizeName(varName), tempVarName, vtableVarName)
+
+	g.indent--
+	g.writeIndent()
+	g.write("}")
+}
+
+// generateInterfaceMethodCall generates code to call a method on an interface using vtable dispatch
+func (g *Generator) generateInterfaceMethodCall(objExpr ast.Expression, methodName string, args []ast.Expression) {
+	// Get interface type from objExpr
+	objType := g.inferExprType(objExpr)
+	iface := g.getInterfaceType(objType)
+	if iface == nil {
+		g.ctx.ReportError("codegen: expected interface type for method call", nil)
+		g.write("/* error: not an interface */")
+		return
+	}
+
+	// Find the method in the interface
+	var ifaceMethod *types.InterfaceMethod
+	for i := range iface.Methods {
+		if iface.Methods[i].Name == methodName {
+			ifaceMethod = &iface.Methods[i]
+			break
+		}
+	}
+	if ifaceMethod == nil {
+		g.ctx.ReportError(fmt.Sprintf("codegen: method '%s' not found in interface", methodName), nil)
+		g.write("/* error: method not in interface */")
+		return
+	}
+
+	// Get interface name for vtable type
+	interfaceName := "Interface"
+	if named, ok := objType.(*types.NamedType); ok {
+		interfaceName = named.Name
+	}
+	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
+
+	// Generate vtable cast and method call
+	// Cast vtable and call method: ((Interface_vtable*)obj.vtable)->method(obj.data, args...)
+	g.write("((%s*)", vtableTypeName)
+	g.generateExpr(objExpr)
+	g.write(".vtable)->%s(", g.sanitizeName(methodName))
+	g.generateExpr(objExpr)
+	g.write(".data")
+
+	for _, arg := range args {
+		g.write(", ")
+		g.generateExpr(arg)
+	}
+	g.write(")")
+}
+
+// generateMethodWrapperForInterface generates a wrapper function for interface method dispatch
+// Converts void* self to concrete type and calls the actual method
+func (g *Generator) generateMethodWrapperForInterface(typeName, methodName string, funcType *types.FunctionType, wrapperName string, ifaceMethod *types.InterfaceMethod) {
+	// Generate wrapper function signature matching interface method
+	returnType := g.typeToC(ifaceMethod.FuncType.Return)
+	g.writeIndent()
+	g.write("static %s %s(void* self", returnType, wrapperName)
+
+	// Use interface method parameters (they define the vtable signature)
+	for _, param := range ifaceMethod.FuncType.Params {
+		g.write(", %s %s", g.typeToC(param.Type), g.sanitizeName(param.Name))
+	}
+	g.write(") {\n")
+	g.indent++
+
+	// Cast self to concrete type and call actual method
+	concreteCType := g.sanitizeName(typeName)
+	actualMethodName := g.sanitizeName(typeName) + "_" + g.sanitizeName(methodName)
+
+	g.writeIndent()
+	if !ifaceMethod.FuncType.Return.Equals(types.TypeVoid) {
+		g.write("return ")
+	}
+
+	// Call actual method: TypeName_method((TypeName*)self, params...)
+	// Check if method needs address-of for receiver
+	needsAddressOf := false
+	typeSym, found := g.lookupTypeSymbol(typeName)
+	if found && typeSym != nil && typeSym.Methods != nil {
+		if _, hasMethod := typeSym.Methods[methodName]; hasMethod {
+			// Check AST for receiver type
+			if g.mod.AST != nil {
+				for _, node := range g.mod.AST.Nodes {
+					if methodDecl, ok := node.(*ast.MethodDecl); ok {
+						if methodDecl.Name != nil && methodDecl.Name.Name == methodName {
+							if methodDecl.Receiver != nil && methodDecl.Receiver.Type != nil {
+								if _, ok := methodDecl.Receiver.Type.(*ast.ReferenceType); ok {
+									needsAddressOf = true
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	g.write("%s(", actualMethodName)
+	if needsAddressOf {
+		g.write("&")
+	}
+	g.write("((%s*)self)", concreteCType)
+
+	// Pass through parameters
+	for _, param := range ifaceMethod.FuncType.Params {
+		g.write(", %s", g.sanitizeName(param.Name))
+	}
+	g.write(");\n")
+
+	g.indent--
+	g.writeIndent()
+	g.write("}\n")
+}
+
+// getInterfaceName gets the interface name from a type
+func (g *Generator) getInterfaceName(typ types.SemType) string {
+	if named, ok := typ.(*types.NamedType); ok {
+		return named.Name
+	}
+	// For anonymous interfaces, generate a name
+	return "Interface"
+}
+
+// generateInterfaceVTableInstance generates a vtable instance for a type implementing an interface
+// This should be called when we need to generate the vtable instance
+func (g *Generator) generateInterfaceVTableInstance(concreteTypeName string, iface *types.InterfaceType, interfaceName string) {
+	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
+	vtableVarName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(interfaceName) + "_vtable_inst"
+
+	g.write("static %s %s = {\n", vtableTypeName, vtableVarName)
+	g.indent++
+
+	// Look up the concrete type's methods
+	typeSym, found := g.lookupTypeSymbol(concreteTypeName)
+	if !found || typeSym == nil || typeSym.Methods == nil {
+		g.ctx.ReportError(fmt.Sprintf("codegen: type %s not found or has no methods", concreteTypeName), nil)
+		return
+	}
+
+	for _, method := range iface.Methods {
+		methodInfo, hasMethod := typeSym.Methods[method.Name]
+		if !hasMethod {
+			g.ctx.ReportError(fmt.Sprintf("codegen: method %s not found on type %s", method.Name, concreteTypeName), nil)
+			continue
+		}
+
+		g.writeIndent()
+		// Generate wrapper function name
+		wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_wrapper"
+		g.write(".%s = %s", g.sanitizeName(method.Name), wrapperName)
+
+		// Generate wrapper function - use the interface method signature
+		// Find the interface method to get correct signature
+		methodCopy := method // Create a copy to pass pointer
+		g.generateMethodWrapperForInterface(concreteTypeName, method.Name, methodInfo.FuncType, wrapperName, &methodCopy)
+
+		g.write(",\n")
+	}
+
+	g.indent--
+	g.write("};\n\n")
+}
+
+// lookupTypeSymbol looks up a type symbol in the current module or imports
+func (g *Generator) lookupTypeSymbol(typeName string) (*symbols.Symbol, bool) {
+	// Check current module
+	if sym, found := g.mod.ModuleScope.Lookup(typeName); found {
+		return sym, true
+	}
+
+	// Check imported modules
+	for _, importPath := range g.mod.ImportAliasMap {
+		if importedMod, exists := g.ctx.GetModule(importPath); exists {
+			if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+				return sym, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
+// generateMethodWrapper generates a wrapper function that converts void* to concrete type
+func (g *Generator) generateMethodWrapper(typeName, methodName string, funcType *types.FunctionType, wrapperName string) {
+	// This is kept for backward compatibility but should use generateMethodWrapperForInterface
+	// Generate wrapper function signature
+	returnType := g.typeToC(funcType.Return)
+	g.write("\nstatic %s %s(void* self", returnType, wrapperName)
+
+	for _, param := range funcType.Params {
+		g.write(", %s", g.typeToC(param.Type))
+	}
+	g.write(") {\n")
+	g.indent++
+
+	// Cast self to concrete type and call method
+	concreteType := g.typeToC(types.NewNamed(typeName, nil)) // This will be the struct name
+	actualMethodName := g.sanitizeName(typeName) + "_" + g.sanitizeName(methodName)
+
+	g.writeIndent()
+	if !funcType.Return.Equals(types.TypeVoid) {
+		g.write("return ")
+	}
+	g.write("%s((%s*)self", actualMethodName, concreteType)
+	for i := range funcType.Params {
+		g.write(", param%d", i)
+	}
+	g.write(");\n")
+
+	g.indent--
+	g.write("}\n")
 }
 
 // generateMethod generates C code for a method declaration
@@ -536,47 +898,59 @@ func (g *Generator) generateVarDecl(decl *ast.VarDecl) {
 		g.write("%s %s", cType, g.sanitizeName(item.Name.Name))
 
 		if item.Value != nil {
-			g.write(" = ")
-			// For interface{} (void*), we need to cast the value appropriately
-			isEmptyInterface := false
-			if iface, ok := varType.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
-				isEmptyInterface = true
-			} else if named, ok := varType.(*types.NamedType); ok {
-				if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
-					isEmptyInterface = true
-				}
-			}
-
-			if isEmptyInterface {
-				// Empty interface - need to cast based on value type
-				// For now, use a simple cast (works for pointers, but integers need uintptr_t)
-				// In a full implementation, we'd need type information at runtime
-				g.write("(void*)(uintptr_t)(")
-				g.generateExpr(item.Value)
-				g.write(")")
+			// Check if this is an interface assignment
+			if g.isInterfaceType(varType) {
+				// Interface assignment - declare variable first, then assign in a block
+				g.write(";\n")
+				// Generate assignment in a block scope (for temporary variables)
+				g.writeIndent()
+				g.generateInterfaceAssignment(item.Name.Name, varType, item.Value)
+				g.write(";\n")
 			} else {
-				// If the value is a CompositeLit and we have a type from the variable declaration,
-				// use the variable's type directly for generation
-				// This handles cases like: let fruits : []str = ["apple", "banana", "cherry"];
-				if compLit, ok := item.Value.(*ast.CompositeLit); ok {
-					if compLit.Type == nil && varType != nil && !varType.Equals(types.TypeUnknown) {
-						// Generate composite literal with the variable's type
-						// For variable initialization, don't use cast for anonymous structs
-						g.generateCompositeLitWithType(compLit, varType, true)
-						// Store array length for dynamic arrays initialized with literals
-						if arrayType, ok := varType.(*types.ArrayType); ok && arrayType.Length < 0 {
-							g.arrayLengths[item.Name.Name] = len(compLit.Elts)
+				// Regular assignment
+				g.write(" = ")
+				// For interface{} (void*), we need to cast the value appropriately
+				isEmptyInterface := false
+				if iface, ok := varType.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+					isEmptyInterface = true
+				} else if named, ok := varType.(*types.NamedType); ok {
+					if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+						isEmptyInterface = true
+					}
+				}
+
+				if isEmptyInterface {
+					// Empty interface - need to cast based on value type
+					// For now, use a simple cast (works for pointers, but integers need uintptr_t)
+					// In a full implementation, we'd need type information at runtime
+					g.write("(void*)(uintptr_t)(")
+					g.generateExpr(item.Value)
+					g.write(")")
+				} else {
+					// If the value is a CompositeLit and we have a type from the variable declaration,
+					// use the variable's type directly for generation
+					// This handles cases like: let fruits : []str = ["apple", "banana", "cherry"];
+					if compLit, ok := item.Value.(*ast.CompositeLit); ok {
+						if compLit.Type == nil && varType != nil && !varType.Equals(types.TypeUnknown) {
+							// Generate composite literal with the variable's type
+							// For variable initialization, don't use cast for anonymous structs
+							g.generateCompositeLitWithType(compLit, varType, true)
+							// Store array length for dynamic arrays initialized with literals
+							if arrayType, ok := varType.(*types.ArrayType); ok && arrayType.Length < 0 {
+								g.arrayLengths[item.Name.Name] = len(compLit.Elts)
+							}
+						} else {
+							g.generateExpr(item.Value)
 						}
 					} else {
 						g.generateExpr(item.Value)
 					}
-				} else {
-					g.generateExpr(item.Value)
 				}
+				g.write(";\n")
 			}
+		} else {
+			g.write(";\n")
 		}
-
-		g.write(";\n")
 	}
 }
 
@@ -1286,141 +1660,90 @@ func (g *Generator) generateBinaryExpr(expr *ast.BinaryExpr) {
 	g.generateExpr(expr.Y)
 }
 
-// inferExprType infers the type of an expression (simplified version for codegen)
+// inferExprType gets the type of an expression.
+// First checks if type is stored in the AST node (populated during semantic analysis),
+// otherwise falls back to type inference from the typechecker.
 func (g *Generator) inferExprType(expr ast.Expression) types.SemType {
-	// Try to get type from identifier
-	if ident, ok := expr.(*ast.IdentifierExpr); ok {
-		// Use Lookup which searches parent scopes
-		if sym, found := g.mod.CurrentScope.Lookup(ident.Name); found && sym != nil && sym.Type != nil {
-			return sym.Type
-		}
-		// If not found, return unknown (don't try harder here to avoid infinite loops)
+	if expr == nil {
 		return types.TypeUnknown
 	}
 
-	// Try to get type from literal
-	if lit, ok := expr.(*ast.BasicLit); ok {
-		switch lit.Kind {
-		case ast.INT:
-			return types.TypeI32
-		case ast.FLOAT:
-			return types.TypeF64
-		case ast.BOOL:
-			return types.TypeBool
-		case ast.STRING:
-			return types.TypeString
+	// First, check if type information is stored in the AST node (populated by semantic analysis)
+	// This is the preferred path as it's faster and uses already-computed type information
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.IdentifierExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.BinaryExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.UnaryExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.PostfixExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.PrefixExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.CallExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.SelectorExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.IndexExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.CastExpr:
+		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
+			return e.TypeInfo
+		}
+	case *ast.ParenExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.ScopeResolutionExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.RangeExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.CoalescingExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.ForkExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.FuncLit:
+		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
+			return e.TypeInfo
+		}
+	case *ast.CompositeLit:
+		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
+			return e.TypeInfo
 		}
 	}
 
-	// Try scope resolution
-	if scopeRes, ok := expr.(*ast.ScopeResolutionExpr); ok {
-		if moduleIdent, ok := scopeRes.X.(*ast.IdentifierExpr); ok {
-			importPath, ok := g.mod.ImportAliasMap[moduleIdent.Name]
-			if ok {
-				importedMod, exists := g.ctx.GetModule(importPath)
-				if exists {
-					sym, found := importedMod.ModuleScope.GetSymbol(scopeRes.Selector.Name)
-					if found && sym != nil && sym.Type != nil {
-						return sym.Type
-					}
-				}
-			}
-		}
-	}
-
-	// Try binary expressions
-	if binExpr, ok := expr.(*ast.BinaryExpr); ok {
-		xType := g.inferExprType(binExpr.X)
-		yType := g.inferExprType(binExpr.Y)
-
-		// Power operation returns double (or int if both operands are int)
-		if binExpr.Op.Value == "**" {
-			if g.isIntegerType(xType) && g.isIntegerType(yType) {
-				return types.TypeI32 // Integer power returns integer
-			}
-			return types.TypeF64 // Otherwise returns double
-		}
-
-		// Comparison operators return bool
-		if binExpr.Op.Value == ">" || binExpr.Op.Value == "<" || binExpr.Op.Value == ">=" ||
-			binExpr.Op.Value == "<=" || binExpr.Op.Value == "==" || binExpr.Op.Value == "!=" {
-			return types.TypeBool
-		}
-
-		// Arithmetic operations: result type depends on operands
-		if binExpr.Op.Value == "+" || binExpr.Op.Value == "-" || binExpr.Op.Value == "*" ||
-			binExpr.Op.Value == "/" || binExpr.Op.Value == "%" {
-			// If either is float, result is float
-			if prim, ok := xType.(*types.PrimitiveType); ok {
-				if prim.GetName() == types.TYPE_F32 || prim.GetName() == types.TYPE_F64 {
-					return types.TypeF64
-				}
-			}
-			if prim, ok := yType.(*types.PrimitiveType); ok {
-				if prim.GetName() == types.TYPE_F32 || prim.GetName() == types.TYPE_F64 {
-					return types.TypeF64
-				}
-			}
-			// Both integers - result is integer (use larger type, or default to i32)
-			if g.isIntegerType(xType) && g.isIntegerType(yType) {
-				return types.TypeI32 // Default to i32 for now
-			}
-		}
-	}
-
-	// Try cast expressions
-	if castExpr, ok := expr.(*ast.CastExpr); ok {
-		// Cast expression returns the target type
-		return g.typeFromTypeNode(castExpr.Type)
-	}
-
-	// Try composite literals
-	if compLit, ok := expr.(*ast.CompositeLit); ok {
-		// If composite literal has explicit type, use it
-		if compLit.Type != nil {
-			return g.typeFromTypeNode(compLit.Type)
-		}
-		// Otherwise, try to infer from elements (for array literals)
-		if len(compLit.Elts) > 0 {
-			// Infer element type from first element
-			firstElemType := g.inferExprType(compLit.Elts[0])
-			if firstElemType != nil && !firstElemType.Equals(types.TypeUnknown) {
-				// Create array type with dynamic length (-1)
-				return &types.ArrayType{
-					Element: firstElemType,
-					Length:  -1, // Dynamic array
-				}
-			}
-		}
-		// If we can't infer, return unknown
-	}
-
-	// Try selector expressions (field access: obj.field)
-	if selectorExpr, ok := expr.(*ast.SelectorExpr); ok {
-		// Infer the base type (e.g., Point for p.X)
-		baseType := g.inferExprType(selectorExpr.X)
-		if baseType == nil || baseType.Equals(types.TypeUnknown) {
-			return types.TypeUnknown
-		}
-
-		// Unwrap NamedType to get underlying struct
-		if namedType, ok := baseType.(*types.NamedType); ok {
-			baseType = namedType.Underlying
-		}
-
-		// Check if it's a struct type
-		if structType, ok := baseType.(*types.StructType); ok {
-			// Look up the field name
-			fieldName := selectorExpr.Field.Name
-			for _, field := range structType.Fields {
-				if field.Name == fieldName {
-					return field.Type
-				}
-			}
-		}
-	}
-
-	return types.TypeUnknown
+	// Fallback: use type inference from typechecker if type not stored in AST
+	// This handles edge cases where type wasn't stored or wasn't computed yet
+	return typechecker.InferExprType(g.ctx, g.mod, expr)
 }
 
 // isStringType checks if a type is string
@@ -1829,6 +2152,12 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 		// Get the method name
 		methodName := selector.Field.Name
 
+		// Check if calling method on interface - use vtable dispatch
+		if g.isInterfaceType(objType) {
+			g.generateInterfaceMethodCall(selector.X, methodName, expr.Args)
+			return
+		}
+
 		// Find the type name and method
 		// Handle reference types: &Point -> Point
 		var typeName string
@@ -1991,19 +2320,25 @@ func (g *Generator) typeToC(typ types.SemType) string {
 		return g.typeToC(t.Ok)
 	case *types.InterfaceType:
 		// Empty interface (interface{}) - use void* as generic pointer type
-		// This allows storing any type (though we'd need type information at runtime for full support)
 		if len(t.Methods) == 0 {
 			return "void*"
 		}
-		// Non-empty interfaces would need more complex representation
-		// For now, use void* as fallback
-		return "void*"
+		// Non-empty interfaces use ferret_interface_t structure
+		// The vtable type will be generated separately
+		return "ferret_interface_t"
 	case *types.NamedType:
 		// For named types, generate a struct name or use underlying type
 		// If it's a struct, we'll generate a struct definition
 		if _, ok := t.Underlying.(*types.StructType); ok {
 			// Generate struct name from type name
 			return g.sanitizeName(t.Name)
+		}
+		// If it's an interface, use ferret_interface_t (vtable type generated separately)
+		if iface, ok := t.Underlying.(*types.InterfaceType); ok {
+			if len(iface.Methods) == 0 {
+				return "void*"
+			}
+			return "ferret_interface_t"
 		}
 		// For other named types, unwrap to underlying
 		return g.typeToC(t.Underlying)
@@ -2171,34 +2506,19 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 	formatParts := []string{}
 
 	for _, arg := range args {
+		// Use semantic analyzer's type inference which is comprehensive and handles
+		// all expression types including literals, identifiers, function calls, etc.
 		argType := g.inferExprType(arg)
-		// If type is unknown, try to infer from the expression itself
-		if argType == nil || argType.Equals(types.TypeUnknown) {
-			// For identifiers, try harder to find the type by doing a direct lookup
-			if ident, ok := arg.(*ast.IdentifierExpr); ok {
-				// Try looking up in current scope (Lookup searches parent scopes)
-				if sym, found := g.mod.CurrentScope.Lookup(ident.Name); found && sym != nil {
-					// Only use sym.Type if it's not nil and not TypeUnknown
-					if sym.Type != nil && !sym.Type.Equals(types.TypeUnknown) {
-						argType = sym.Type
-					} else {
-						// Symbol found but type is unknown - use fallback for common loop variables
-						if ident.Name == "i" || ident.Name == "j" || ident.Name == "k" || ident.Name == "index" {
-							argType = types.TypeI32
-						}
-					}
-				} else {
-					// Symbol not found - use fallback for common loop variables
-					if ident.Name == "i" || ident.Name == "j" || ident.Name == "k" || ident.Name == "index" {
-						argType = types.TypeI32
-					}
-				}
-			}
-		}
+
+		// If type is still unknown after inference, it's likely a real error.
+		// The semantic analyzer should have caught this, but we handle it gracefully.
+		// For identifiers, the type should always be available from the symbol table.
 
 		if argType == nil || argType.Equals(types.TypeUnknown) {
-			// Still unknown - default to string to avoid crashes
-			formatParts = append(formatParts, "%s")
+			// Type inference failed - report error instead of defaulting to string
+			// Defaulting to string causes segfaults when the value is not a string
+			g.ctx.ReportError(fmt.Sprintf("codegen: cannot determine type for print argument (expression type: %T)", arg), nil)
+			formatParts = append(formatParts, "%s") // Still add format to prevent syntax errors, but will likely crash
 		} else {
 			// Unwrap NamedType to get underlying type for format specifier determination
 			unwrappedType := types.UnwrapType(argType)
@@ -2207,23 +2527,33 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				formatParts = append(formatParts, "%s")
 			} else if prim, ok := unwrappedType.(*types.PrimitiveType); ok {
 				switch prim.GetName() {
-				case types.TYPE_I32:
+				case types.TYPE_I8, types.TYPE_I16, types.TYPE_I32:
 					formatParts = append(formatParts, "%d")
 				case types.TYPE_I64:
 					formatParts = append(formatParts, "%ld")
+				case types.TYPE_U8, types.TYPE_U16, types.TYPE_U32:
+					formatParts = append(formatParts, "%u")
+				case types.TYPE_U64:
+					formatParts = append(formatParts, "%lu")
 				case types.TYPE_F32:
 					formatParts = append(formatParts, "%.6g")
 				case types.TYPE_F64:
 					formatParts = append(formatParts, "%.15g")
 				case types.TYPE_BOOL:
 					formatParts = append(formatParts, "%s") // Will format as "true"/"false"
+				case types.TYPE_STRING:
+					formatParts = append(formatParts, "%s")
 				default:
+					// Unknown primitive type - report error but use safe fallback
+					g.ctx.ReportError(fmt.Sprintf("codegen: unsupported primitive type for printing: %s", prim.GetName()), nil)
 					formatParts = append(formatParts, "%s")
 				}
 			} else if g.isIntegerType(unwrappedType) {
-				// Fallback for integer types that aren't PrimitiveType
+				// Fallback for integer types that aren't PrimitiveType (e.g., NamedType wrapping integer)
 				formatParts = append(formatParts, "%d")
 			} else {
+				// Non-primitive type - report error
+				g.ctx.ReportError(fmt.Sprintf("codegen: cannot print non-primitive type: %s", unwrappedType.String()), nil)
 				formatParts = append(formatParts, "%s")
 			}
 		}

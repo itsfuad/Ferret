@@ -146,6 +146,15 @@ func getTypeRange(t types.SemType) string {
 }
 
 // inferExprType determines the type of an expression based on its structure and value.
+// InferExprType infers the type of an expression using semantic analysis.
+// This is pure type inference without any compatibility checking.
+// Returns TYPE_UNTYPED for literals that haven't been contextualized yet.
+// Exported for use by codegen and other packages that need type inference.
+func InferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) types.SemType {
+	return inferExprType(ctx, mod, expr)
+}
+
+// inferExprType is the internal implementation of InferExprType.
 // This is pure type inference without any compatibility checking.
 // Returns TYPE_UNTYPED for literals that haven't been contextualized yet.
 func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) types.SemType {
@@ -197,6 +206,10 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 
 	case *ast.CoalescingExpr:
 		return inferCoalescingExprType(ctx, mod, e)
+
+	case *ast.PostfixExpr:
+		// Postfix operators (++, --) return the type of the operand
+		return inferExprType(ctx, mod, e.X)
 
 	default:
 		return types.TypeUnknown

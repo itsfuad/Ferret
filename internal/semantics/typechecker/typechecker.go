@@ -1612,12 +1612,14 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 					if areStructsCompatible(inferredStruct, expectedStruct) {
 						// Use the expected type (preserves named type)
 						resultType = expected
+						compLit.TypeInfo = resultType // Update stored type
 					}
 				}
 			} else if _, ok := expectedUnwrapped.(*types.ArrayType); ok {
 				// For array literals without explicit type, adopt the expected array type
 				// This allows [1, 2, 3] to adopt type [3]i32 when that's expected
 				resultType = expected
+				compLit.TypeInfo = resultType // Update stored type
 				// Validate the composite literal against the expected array type
 				checkCompositeLit(ctx, mod, compLit, expected)
 			}
@@ -1637,6 +1639,44 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	// Keep untyped literals untyped for better error messages
 	// They will be resolved in specific contexts that need concrete types
+
+	// Store the final resultType in the AST node (update if it changed)
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		e.Type = resultType
+	case *ast.IdentifierExpr:
+		e.Type = resultType
+	case *ast.BinaryExpr:
+		e.Type = resultType
+	case *ast.UnaryExpr:
+		e.Type = resultType
+	case *ast.PostfixExpr:
+		e.Type = resultType
+	case *ast.PrefixExpr:
+		e.Type = resultType
+	case *ast.CallExpr:
+		e.Type = resultType
+	case *ast.SelectorExpr:
+		e.Type = resultType
+	case *ast.IndexExpr:
+		e.Type = resultType
+	case *ast.CastExpr:
+		e.TypeInfo = resultType
+	case *ast.ParenExpr:
+		e.Type = resultType
+	case *ast.ScopeResolutionExpr:
+		e.Type = resultType
+	case *ast.RangeExpr:
+		e.Type = resultType
+	case *ast.CoalescingExpr:
+		e.Type = resultType
+	case *ast.ForkExpr:
+		e.Type = resultType
+	case *ast.FuncLit:
+		e.TypeInfo = resultType
+	case *ast.CompositeLit:
+		e.TypeInfo = resultType
+	}
 
 	return resultType
 }
