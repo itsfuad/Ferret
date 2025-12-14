@@ -674,6 +674,11 @@ func (p *Pipeline) runCodegenPhase() error {
 			implBuilder.WriteString("\n")
 			implBuilder.WriteString("#include \"io.h\"\n")
 			implBuilder.WriteString("#include \"interface.h\"\n")
+			// Include imported module headers so constants and functions are available
+			for _, importPath := range importedModules {
+				headerName := p.sanitizeModuleName(importPath) + ".h"
+				implBuilder.WriteString("#include \"" + headerName + "\"\n")
+			}
 			implBuilder.WriteString("#include \"" + entryHeaderName + "\"\n\n")
 			implBuilder.WriteString(implContent)
 
