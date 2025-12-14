@@ -22,7 +22,7 @@ func TestUntypedIntCompatibilityWithLargeIntegers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			compat := checkTypeCompatibility(untypedInt, tt.target)
-			if compat != Assignable {
+			if compat != ImplicitCastable {
 				t.Errorf("Untyped int should be assignable to %s, got %v", tt.name, compat)
 			}
 		})

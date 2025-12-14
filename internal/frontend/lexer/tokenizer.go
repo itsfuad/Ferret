@@ -75,6 +75,7 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 			{regexp.MustCompile(`!=`), defaultHandler(tokens.NOT_EQUAL_TOKEN)},
 			{regexp.MustCompile(`\+=`), defaultHandler(tokens.PLUS_EQUALS_TOKEN)},
 			{regexp.MustCompile(`-=`), defaultHandler(tokens.MINUS_EQUALS_TOKEN)},
+			{regexp.MustCompile(`\*\*=`), defaultHandler(tokens.POW_EQUALS_TOKEN)}, // Must come before **
 			{regexp.MustCompile(`\*=`), defaultHandler(tokens.MUL_EQUALS_TOKEN)},
 			{regexp.MustCompile(`/=`), defaultHandler(tokens.DIV_EQUALS_TOKEN)},
 			{regexp.MustCompile(`%=`), defaultHandler(tokens.MOD_EQUALS_TOKEN)},

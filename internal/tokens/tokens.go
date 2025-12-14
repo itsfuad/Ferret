@@ -86,6 +86,7 @@ const (
 	DIV_EQUALS_TOKEN   TOKEN = "/="
 	MOD_EQUALS_TOKEN   TOKEN = "%="
 	EXP_EQUALS_TOKEN   TOKEN = "^="
+	POW_EQUALS_TOKEN   TOKEN = "**="
 	//delimiters
 	OPEN_PAREN       TOKEN = "("
 	CLOSE_PAREN      TOKEN = ")"

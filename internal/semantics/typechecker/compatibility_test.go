@@ -178,50 +178,50 @@ func TestCheckTypeCompatibility(t *testing.T) {
 		{types.TypeString, types.TypeString, Identical},
 
 		// Untyped int can only be assigned to integer types (not float)
-		{types.TypeUntypedInt, types.TypeI32, Assignable},
-		{types.TypeUntypedInt, types.TypeI64, Assignable},
+		{types.TypeUntypedInt, types.TypeI32, ImplicitCastable},
+		{types.TypeUntypedInt, types.TypeI64, ImplicitCastable},
 		{types.TypeUntypedInt, types.TypeF64, Incompatible}, // Requires explicit cast
 		{types.TypeUntypedInt, types.TypeString, Incompatible},
 
 		// Untyped float can only be assigned to float types (not int)
-		{types.TypeUntypedFloat, types.TypeF32, Assignable},
-		{types.TypeUntypedFloat, types.TypeF64, Assignable},
-		{types.TypeUntypedFloat, types.TypeF128, Assignable},
-		{types.TypeUntypedFloat, types.TypeF256, Assignable},
+		{types.TypeUntypedFloat, types.TypeF32, ImplicitCastable},
+		{types.TypeUntypedFloat, types.TypeF64, ImplicitCastable},
+		{types.TypeUntypedFloat, types.TypeF128, ImplicitCastable},
+		{types.TypeUntypedFloat, types.TypeF256, ImplicitCastable},
 		{types.TypeUntypedFloat, types.TypeI32, Incompatible}, // Requires explicit cast
 
-		// Assignable conversions - integers (widening)
-		{types.TypeI8, types.TypeI16, Assignable},
-		{types.TypeI8, types.TypeI32, Assignable},
-		{types.TypeI8, types.TypeI64, Assignable},
-		{types.TypeI16, types.TypeI32, Assignable},
-		{types.TypeU8, types.TypeU16, Assignable},
+		// ImplicitCastable conversions - integers (widening)
+		{types.TypeI8, types.TypeI16, ImplicitCastable},
+		{types.TypeI8, types.TypeI32, ImplicitCastable},
+		{types.TypeI8, types.TypeI64, ImplicitCastable},
+		{types.TypeI16, types.TypeI32, ImplicitCastable},
+		{types.TypeU8, types.TypeU16, ImplicitCastable},
 
-		// Assignable conversions - floats (widening)
-		{types.TypeF32, types.TypeF64, Assignable},
-		{types.TypeF32, types.TypeF128, Assignable},
-		{types.TypeF32, types.TypeF256, Assignable},
-		{types.TypeF64, types.TypeF128, Assignable},
-		{types.TypeF64, types.TypeF256, Assignable},
-		{types.TypeF128, types.TypeF256, Assignable},
+		// ImplicitCastable conversions - floats (widening)
+		{types.TypeF32, types.TypeF64, ImplicitCastable},
+		{types.TypeF32, types.TypeF128, ImplicitCastable},
+		{types.TypeF32, types.TypeF256, ImplicitCastable},
+		{types.TypeF64, types.TypeF128, ImplicitCastable},
+		{types.TypeF64, types.TypeF256, ImplicitCastable},
+		{types.TypeF128, types.TypeF256, ImplicitCastable},
 
-		// Assignable conversions - int to float (safe precision)
-		{types.TypeI8, types.TypeF32, Assignable},
-		{types.TypeI32, types.TypeF64, Assignable},
-		{types.TypeI32, types.TypeF128, Assignable},
-		{types.TypeI64, types.TypeF128, Assignable},
-		{types.TypeI128, types.TypeF256, Assignable},
+		// ImplicitCastable conversions - int to float (safe precision)
+		{types.TypeI8, types.TypeF32, ImplicitCastable},
+		{types.TypeI32, types.TypeF64, ImplicitCastable},
+		{types.TypeI32, types.TypeF128, ImplicitCastable},
+		{types.TypeI64, types.TypeF128, ImplicitCastable},
+		{types.TypeI128, types.TypeF256, ImplicitCastable},
 
 		// Lossy conversions - narrowing
-		{types.TypeI32, types.TypeI16, LossyConvertible},
-		{types.TypeI64, types.TypeI32, LossyConvertible},
-		{types.TypeF64, types.TypeF32, LossyConvertible},
-		{types.TypeF128, types.TypeF64, LossyConvertible},
-		{types.TypeI64, types.TypeF32, LossyConvertible}, // Loses precision
+		{types.TypeI32, types.TypeI16, ExplicitCastable},
+		{types.TypeI64, types.TypeI32, ExplicitCastable},
+		{types.TypeF64, types.TypeF32, ExplicitCastable},
+		{types.TypeF128, types.TypeF64, ExplicitCastable},
+		{types.TypeI64, types.TypeF32, ExplicitCastable}, // Loses precision
 
 		// Lossy conversions - float to int (always lossy)
-		{types.TypeF32, types.TypeI32, LossyConvertible},
-		{types.TypeF64, types.TypeI64, LossyConvertible},
+		{types.TypeF32, types.TypeI32, ExplicitCastable},
+		{types.TypeF64, types.TypeI64, ExplicitCastable},
 
 		// Incompatible
 		{types.TypeI32, types.TypeString, Incompatible},
@@ -306,10 +306,10 @@ func TestGetConversionError(t *testing.T) {
 		expectError   bool
 	}{
 		{types.TypeI32, types.TypeString, Incompatible, true},
-		{types.TypeI64, types.TypeI32, LossyConvertible, true},
+		{types.TypeI64, types.TypeI32, ExplicitCastable, true},
 		{types.TypeI32, types.TypeI32, Identical, false},
-		{types.TypeUntypedInt, types.TypeI32, Assignable, false},
-		{types.TypeI32, types.TypeI64, Assignable, false},
+		{types.TypeUntypedInt, types.TypeI32, ImplicitCastable, false},
+		{types.TypeI32, types.TypeI64, ImplicitCastable, false},
 	}
 
 	for _, tt := range tests {

@@ -220,10 +220,42 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		var rangeElemType types.SemType = types.TypeUnknown
 		var rangeType types.SemType = types.TypeUnknown
 		if n.Range != nil {
+			// Skip empty array checks for RangeExpr (e.g., 10..=15) - they're not arrays
+			_, isRangeExpr := n.Range.(*ast.RangeExpr)
+
 			rangeType = checkExpr(ctx, mod, n.Range, types.TypeUnknown)
 			// Extract element type from array - for integer ranges this will be i32
 			if arrayType, ok := rangeType.(*types.ArrayType); ok {
 				rangeElemType = arrayType.Element
+
+				// Check for empty arrays - error: loop will never execute
+				// Only check actual arrays, not range expressions (which are typed as dynamic arrays)
+				if !isRangeExpr && arrayType.Length == 0 {
+					ctx.Diagnostics.Add(diagnostics.NewError("for loop over empty array will never execute").
+						WithPrimaryLabel(n.Range.Loc(), "this array is empty").
+						WithNote("Remove this loop or use a non-empty array"))
+				}
+			}
+
+			// Check for empty array literals (not range expressions)
+			// Need to unwrap CastExpr to check underlying CompositeLit (e.g., [] as []i32)
+			// Note: We only check direct literals, not variables (variables can be updated elsewhere)
+			if !isRangeExpr {
+				var compLit *ast.CompositeLit
+				if castExpr, ok := n.Range.(*ast.CastExpr); ok {
+					// Unwrap cast: [] as []i32 -> the CompositeLit is inside the cast
+					if cl, ok := castExpr.X.(*ast.CompositeLit); ok {
+						compLit = cl
+					}
+				} else if cl, ok := n.Range.(*ast.CompositeLit); ok {
+					compLit = cl
+				}
+
+				if compLit != nil && len(compLit.Elts) == 0 {
+					ctx.Diagnostics.Add(diagnostics.NewError("for loop over empty array literal will never execute").
+						WithPrimaryLabel(n.Range.Loc(), "this array literal is empty").
+						WithNote("Remove this loop or add elements to the array"))
+				}
 			}
 		}
 
@@ -254,18 +286,18 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					} else {
 						// Infer type based on position and range type
 						var inferredType types.SemType
-						if len(varDecl.Decls) == 2 && idx == 0 {
-							// First variable in dual-iterator: index is always i32 for array iteration
-							// Check if range is an array (not a numeric range)
-							if _, ok := rangeType.(*types.ArrayType); ok {
-								// Array iteration: first variable is index (i32)
+						// Check if range is an array (not a numeric range)
+						if _, ok := rangeType.(*types.ArrayType); ok {
+							// Array iteration
+							if len(varDecl.Decls) == 2 && idx == 0 {
+								// First variable in dual-iterator: index is always i32
 								inferredType = types.TypeI32
 							} else {
-								// Numeric range: both variables are i32
+								// Second variable or single variable: gets array element type (value)
 								inferredType = rangeElemType
 							}
 						} else {
-							// Second variable or single variable: gets range element type
+							// Numeric range: all variables get range element type
 							inferredType = rangeElemType
 						}
 
@@ -433,6 +465,26 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			}
 
 			sym.Type = rhsType
+
+			// Check if initializer is an empty literal (array, map, or struct)
+			// If it has a type (via cast or type annotation), warn to use explicit type annotation
+			// If it has no type, error because type cannot be inferred
+			if isEmptyLiteral(item.Value) {
+				// Infer the type from the cast or composite literal to suggest the correct type
+				suggestedType := inferTypeFromEmptyLiteral(ctx, mod, item.Value)
+				if suggestedType != "" {
+					// Has type information (e.g., [] as []i32) - warn to use explicit type annotation
+					ctx.Diagnostics.Add(diagnostics.NewWarning("use explicit type annotation instead of assigning to empty value").
+						WithPrimaryLabel(item.Value.Loc(), "empty literal with type inference").
+						WithNote(fmt.Sprintf("use `let %s : %s;` instead", name, suggestedType)))
+				} else {
+					// No type information (e.g., []) - error because type cannot be inferred
+					ctx.Diagnostics.Add(diagnostics.NewError("cannot infer type from empty literal").
+						WithPrimaryLabel(item.Value.Loc(), "empty literal with no type information").
+						WithNote(fmt.Sprintf("use explicit type annotation: `let %s : <type>;` instead", name)))
+					sym.Type = types.TypeUnknown
+				}
+			}
 
 			// Try to evaluate the initializer as a compile-time constant
 			// This enables constant propagation for code like: let i := 10; arr[i]
@@ -741,6 +793,23 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 
 	// Allow explicit casts between numeric types
 	if types.IsNumericType(sourceType) && types.IsNumericType(targetType) {
+		return
+	}
+
+	// Allow explicit casts involving named types:
+	// 1. NamedType -> underlying type (e.g., Integer -> i32)
+	// 2. NamedType -> NamedType with same underlying type (e.g., Integer -> Count where both wrap i32)
+	// 3. Base type -> NamedType (already handled above if both are numeric)
+	// Note: srcUnwrapped and dstUnwrapped are already declared above
+
+	// Check if underlying types are compatible (allows named type casts)
+	if types.IsNumeric(srcUnwrapped) && types.IsNumeric(dstUnwrapped) {
+		// Allow cast if underlying types are compatible (all numeric types can cast to each other)
+		return
+	}
+
+	// Check if underlying types are the same (allows named -> named or named -> base)
+	if srcUnwrapped.Equals(dstUnwrapped) {
 		return
 	}
 
@@ -1285,20 +1354,103 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
 
-	// Check the RHS with the LHS type as context
-	// Pass stmt.Lhs for LHS location in error messages
-	checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
+	// Handle increment/decrement operators (x++, x--)
+	if stmt.Op != nil && (stmt.Op.Kind == tokens.PLUS_PLUS_TOKEN || stmt.Op.Kind == tokens.MINUS_MINUS_TOKEN) {
+		// For ++ and --, RHS is nil
+		// Check that LHS is a numeric type
+		if !types.IsNumeric(lhsType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("cannot use %s operator on non-numeric type '%s'", stmt.Op.Value, lhsType.String())).
+					WithPrimaryLabel(stmt.Lhs.Loc(), "expected numeric type").
+					WithHelp("increment/decrement operators only work on numeric types"),
+			)
+			return
+		}
+		// Clear constant value since variable is being modified
+		if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
+			if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+				sym.ConstValue = nil
+			}
+		}
+		return
+	}
+
+	// Handle compound assignment operators (x += y, x -= y, etc.)
+	if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
+		// For compound assignments, we need to check that the operation is valid
+		// The RHS should be compatible with the operation
+		rhsType := checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+
+		// Check if the operation is valid for these types
+		opKind := stmt.Op.Kind
+		var requiredOp tokens.TOKEN
+		switch opKind {
+		case tokens.PLUS_EQUALS_TOKEN:
+			requiredOp = tokens.PLUS_TOKEN
+		case tokens.MINUS_EQUALS_TOKEN:
+			requiredOp = tokens.MINUS_TOKEN
+		case tokens.MUL_EQUALS_TOKEN:
+			requiredOp = tokens.MUL_TOKEN
+		case tokens.DIV_EQUALS_TOKEN:
+			requiredOp = tokens.DIV_TOKEN
+		case tokens.MOD_EQUALS_TOKEN:
+			requiredOp = tokens.MOD_TOKEN
+		case tokens.EXP_EQUALS_TOKEN:
+			requiredOp = tokens.BIT_XOR_TOKEN // ^= is bitwise XOR
+		case tokens.POW_EQUALS_TOKEN:
+			requiredOp = tokens.EXP_TOKEN // **= is power
+		default:
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("unsupported compound assignment operator '%s'", stmt.Op.Value)).
+					WithPrimaryLabel(stmt.Lhs.Loc(), "unknown operator"),
+			)
+			return
+		}
+
+		// Create a temporary binary expression to check type compatibility
+		// Use the operator token from the assignment statement for proper location info
+		lhsEnd := stmt.Lhs.Loc().End
+		rhsStart := stmt.Rhs.Loc().Start
+		if lhsEnd == nil {
+			lhsEnd = stmt.Lhs.Loc().Start
+		}
+		if rhsStart == nil {
+			rhsStart = stmt.Rhs.Loc().End
+		}
+		opToken := tokens.Token{
+			Kind:  requiredOp,
+			Value: string(requiredOp),
+			Start: *lhsEnd,
+			End:   *rhsStart,
+		}
+		tempBinExpr := &ast.BinaryExpr{
+			X:        stmt.Lhs,
+			Op:       opToken,
+			Y:        stmt.Rhs,
+			Location: stmt.Location,
+		}
+		// Check the binary expression to validate types
+		checkBinaryExpr(ctx, mod, tempBinExpr, lhsType, rhsType)
+	} else {
+		// Regular assignment: Check the RHS with the LHS type as context
+		checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
+	}
 
 	// Track constant value propagation through assignments
 	// If LHS is a simple identifier and RHS has a constant value, update the symbol
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
 		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-			// Try to evaluate the RHS as a constant
-			if constVal := consteval.EvaluateExpr(ctx, mod, stmt.Rhs); constVal != nil {
-				sym.ConstValue = constVal
-			} else {
-				// RHS is not constant - clear the constant value
+			// For compound assignments and increment/decrement, clear constant value
+			if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
 				sym.ConstValue = nil
+			} else if stmt.Rhs != nil {
+				// Try to evaluate the RHS as a constant
+				if constVal := consteval.EvaluateExpr(ctx, mod, stmt.Rhs); constVal != nil {
+					sym.ConstValue = constVal
+				} else {
+					// RHS is not constant - clear the constant value
+					sym.ConstValue = nil
+				}
 			}
 		}
 	}
@@ -1505,11 +1657,12 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 	compatibility := checkTypeCompatibilityWithContext(ctx, mod, rhsType, leftType)
 
 	switch compatibility {
-	case Identical, Assignable:
+	case Identical, ImplicitCastable:
 		return
 
-	case LossyConvertible:
-		// Requires explicit cast
+	case ExplicitCastable:
+		// Requires explicit cast - use centralized hint system
+		exprText := rightNode.Loc().GetText(ctx.Diagnostics.GetSourceCache())
 		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility))
 
 		// Add dual labels if we have type node location
@@ -1517,20 +1670,17 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
 				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		} else {
-			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion may lose precision")
+			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion not allowed")
 		}
 
-		exprText := rightNode.Loc().GetText(ctx.Diagnostics.GetSourceCache())
-		if exprText == "" {
-			exprText = "expression"
+		hint := getConversionHint(rhsType, leftType, compatibility, exprText)
+		if hint != "" {
+			diag = diag.WithHelp(hint)
 		}
-		ctx.Diagnostics.Add(
-			diag.WithHelp(fmt.Sprintf("use an explicit cast: %s as %s", exprText, leftType.String())),
-		)
+		ctx.Diagnostics.Add(diag)
 
 	case Incompatible:
-		// Cannot convert - create user-friendly error message
-		// Check if this is a struct compatibility issue that we can enhance
+		// Cannot convert - create user-friendly error message (no hint, not castable)
 		rhsUnwrapped := types.UnwrapType(rhsType)
 		leftUnwrapped := types.UnwrapType(leftType)
 
@@ -2292,4 +2442,211 @@ func extractConstantIndex(expr ast.Expression) (int, bool) {
 	}
 
 	return 0, false
+}
+
+// isEmptyLiteral checks if an expression is an empty literal (array, map, or struct)
+func isEmptyLiteral(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	var compLit *ast.CompositeLit
+	if castExpr, ok := expr.(*ast.CastExpr); ok {
+		// Unwrap cast: [] as []i32, {} as Point, map[str]i32{} as MapType
+		if cl, ok := castExpr.X.(*ast.CompositeLit); ok {
+			compLit = cl
+		}
+	} else if cl, ok := expr.(*ast.CompositeLit); ok {
+		compLit = cl
+	}
+
+	if compLit != nil && len(compLit.Elts) == 0 {
+		return true
+	}
+
+	return false
+}
+
+// inferTypeFromEmptyLiteral attempts to infer the type from an empty literal to suggest the correct type annotation
+// Returns the type string if it can be inferred, empty string otherwise
+func inferTypeFromEmptyLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) string {
+	if expr == nil {
+		return ""
+	}
+
+	// Handle cast expressions: [] as []i32, {} as Point
+	if castExpr, ok := expr.(*ast.CastExpr); ok {
+		if castExpr.Type != nil {
+			return TypeFromTypeNodeWithContext(ctx, mod, castExpr.Type).String()
+		}
+	}
+
+	// Handle composite literals with explicit type: map[str]i32{}
+	if compLit, ok := expr.(*ast.CompositeLit); ok {
+		if compLit.Type != nil {
+			return TypeFromTypeNodeWithContext(ctx, mod, compLit.Type).String()
+		}
+	}
+
+	return ""
+}
+
+// findEmptyArrayInitializer searches for a variable declaration with the given name
+// and returns its initializer if it's an empty array literal (or cast to empty array)
+// Returns nil if the variable is not found or doesn't have an empty array initializer
+func findEmptyArrayInitializer(ctx *context_v2.CompilerContext, mod *context_v2.Module, varName string) *ast.CompositeLit {
+	if mod.AST == nil {
+		return nil
+	}
+
+	// First, try to find the symbol to verify it exists and get its scope
+	sym, found := mod.CurrentScope.Lookup(varName)
+	if !found || sym == nil {
+		return nil
+	}
+
+	// Helper function to check if a DeclItem has an empty array initializer
+	checkDeclItem := func(item ast.DeclItem) *ast.CompositeLit {
+		if item.Name.Name == varName && item.Value != nil {
+			// Check if initializer is an empty array literal
+			if compLit, ok := item.Value.(*ast.CompositeLit); ok {
+				if len(compLit.Elts) == 0 {
+					return compLit
+				}
+			} else if castExpr, ok := item.Value.(*ast.CastExpr); ok {
+				// Check if cast contains an empty array literal: [] as []i32
+				if compLit, ok := castExpr.X.(*ast.CompositeLit); ok {
+					if len(compLit.Elts) == 0 {
+						return compLit
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	// Search through the module's AST nodes to find VarDecl or ConstDecl
+	// We need to search all function bodies to find where the variable was declared
+	var searchNode func(ast.Node) *ast.CompositeLit
+	searchNode = func(node ast.Node) *ast.CompositeLit {
+		if node == nil {
+			return nil
+		}
+
+		switch n := node.(type) {
+		case *ast.VarDecl:
+			for _, decl := range n.Decls {
+				if result := checkDeclItem(decl); result != nil {
+					return result
+				}
+			}
+		case *ast.ConstDecl:
+			for _, decl := range n.Decls {
+				if result := checkDeclItem(decl); result != nil {
+					return result
+				}
+			}
+		case *ast.Block:
+			// Search in block statements
+			for _, stmt := range n.Nodes {
+				if result := searchNode(stmt); result != nil {
+					return result
+				}
+			}
+		case *ast.DeclStmt:
+			// Unwrap DeclStmt to get the actual declaration
+			return searchNode(n.Decl)
+		case *ast.FuncDecl:
+			// Search in function body
+			if n.Body != nil {
+				if result := searchNode(n.Body); result != nil {
+					return result
+				}
+			}
+		case *ast.MethodDecl:
+			// Search in method body
+			if n.Body != nil {
+				if result := searchNode(n.Body); result != nil {
+					return result
+				}
+			}
+		case *ast.IfStmt:
+			// Search in if/else branches
+			if n.Body != nil {
+				if result := searchNode(n.Body); result != nil {
+					return result
+				}
+			}
+			if n.Else != nil {
+				if result := searchNode(n.Else); result != nil {
+					return result
+				}
+			}
+		case *ast.WhileStmt:
+			// Search in while loop body
+			if n.Body != nil {
+				if result := searchNode(n.Body); result != nil {
+					return result
+				}
+			}
+		case *ast.ForStmt:
+			// Search in for loop body
+			if n.Body != nil {
+				if result := searchNode(n.Body); result != nil {
+					return result
+				}
+			}
+		}
+
+		return nil
+	}
+
+	// Search in module-level nodes (includes function declarations)
+	for _, node := range mod.AST.Nodes {
+		if result := searchNode(node); result != nil {
+			return result
+		}
+	}
+
+	// Also search in the current function body if we're inside a function
+	// This handles cases where the variable is declared in the same function as the for loop
+	// We need to search backwards from the current position, but since we don't have that context,
+	// we search all function bodies. The module-level search above should have caught it,
+	// but let's also try searching by walking up the scope chain to find the function.
+	if mod.CurrentScope != nil {
+		// Try to find the function that contains the current scope
+		// by searching for functions and checking if their scope matches
+		for _, node := range mod.AST.Nodes {
+			if funcDecl, ok := node.(*ast.FuncDecl); ok && funcDecl.Body != nil {
+				// Check if this function's scope contains our variable
+				if funcDecl.Scope != nil {
+					if st, ok := funcDecl.Scope.(*table.SymbolTable); ok {
+						// Check if the variable exists in this function's scope
+						if _, found := st.Lookup(varName); found {
+							// Search this function's body
+							if result := searchNode(funcDecl.Body); result != nil {
+								return result
+							}
+						}
+					}
+				}
+			}
+			if methodDecl, ok := node.(*ast.MethodDecl); ok && methodDecl.Body != nil {
+				// Check if this method's scope contains our variable
+				if methodDecl.Scope != nil {
+					if st, ok := methodDecl.Scope.(*table.SymbolTable); ok {
+						// Check if the variable exists in this method's scope
+						if _, found := st.Lookup(varName); found {
+							// Search this method's body
+							if result := searchNode(methodDecl.Body); result != nil {
+								return result
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }

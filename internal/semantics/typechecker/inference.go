@@ -25,9 +25,12 @@ func inferLiteralType(lit *ast.BasicLit, expected types.SemType) types.SemType {
 	switch lit.Kind {
 	case ast.INT:
 		// If expected type is provided, try to use it (contextualization)
-		if !expected.Equals(types.TypeUnknown) && types.IsInteger(expected) {
-			if _, ok := types.GetPrimitiveName(expected); ok {
+		// Unwrap NamedType to check underlying type (e.g., type Integer i32)
+		expectedUnwrapped := types.UnwrapType(expected)
+		if !expected.Equals(types.TypeUnknown) && types.IsInteger(expectedUnwrapped) {
+			if _, ok := types.GetPrimitiveName(expectedUnwrapped); ok {
 				// Value must fit in expected type (fitness check happens in checkFitness)
+				// Return the expected type (which may be a NamedType) to preserve the type name
 				return expected
 			}
 		}
@@ -59,9 +62,12 @@ func inferLiteralType(lit *ast.BasicLit, expected types.SemType) types.SemType {
 
 	case ast.FLOAT:
 		// If expected type is provided, try to use it (contextualization)
-		if !expected.Equals(types.TypeUnknown) && types.IsFloat(expected) {
-			if _, ok := types.GetPrimitiveName(expected); ok {
+		// Unwrap NamedType to check underlying type (e.g., type Float f64)
+		expectedUnwrapped := types.UnwrapType(expected)
+		if !expected.Equals(types.TypeUnknown) && types.IsFloat(expectedUnwrapped) {
+			if _, ok := types.GetPrimitiveName(expectedUnwrapped); ok {
 				// Value must fit in expected type (fitness check happens in checkFitness)
+				// Return the expected type (which may be a NamedType) to preserve the type name
 				return expected
 			}
 		}

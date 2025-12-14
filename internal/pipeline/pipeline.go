@@ -551,7 +551,7 @@ func (p *Pipeline) runCodegenPhase() error {
 	// Determine output directory from output path
 	outputPath := p.ctx.Config.OutputPath
 	outputDir := filepath.Dir(outputPath)
-	
+
 	// Create a temporary directory for generated C files
 	// Always place C code in a "gen" subdirectory relative to the output executable location
 	// Pattern: <outputDir>/gen/ (e.g., if output is "start", C code goes to "./gen/")

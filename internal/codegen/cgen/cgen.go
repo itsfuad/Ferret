@@ -12,6 +12,7 @@ import (
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/semantics/typechecker"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
 )
 
@@ -229,10 +230,22 @@ func (g *Generator) generateMethod(decl *ast.MethodDecl) {
 		return
 	}
 
+	// Handle reference types: unwrap &T to get T
+	var namedType *types.NamedType
+	var isReference bool
+	if refType, ok := receiverType.(*types.ReferenceType); ok {
+		isReference = true
+		if nt, ok := refType.Inner.(*types.NamedType); ok {
+			namedType = nt
+		}
+	} else if nt, ok := receiverType.(*types.NamedType); ok {
+		namedType = nt
+	}
+
 	// Get method signature from symbol (if available)
 	// Methods are stored in the type's Methods map
 	var funcType *types.FunctionType
-	if namedType, ok := receiverType.(*types.NamedType); ok {
+	if namedType != nil {
 		if typeSym, found := g.mod.ModuleScope.GetSymbol(namedType.Name); found && typeSym != nil {
 			if typeSym.Methods != nil {
 				if methodInfo, exists := typeSym.Methods[methodName]; exists && methodInfo != nil {
@@ -255,7 +268,7 @@ func (g *Generator) generateMethod(decl *ast.MethodDecl) {
 
 	// Generate function name: TypeName_methodName
 	receiverTypeName := "unknown"
-	if namedType, ok := receiverType.(*types.NamedType); ok {
+	if namedType != nil {
 		receiverTypeName = namedType.Name
 	}
 	cFuncName := g.sanitizeName(receiverTypeName) + "_" + g.sanitizeName(methodName)
@@ -266,7 +279,14 @@ func (g *Generator) generateMethod(decl *ast.MethodDecl) {
 	g.write("%s %s(", returnType, cFuncName)
 
 	// First parameter is the receiver
-	receiverCType := g.typeToC(receiverType)
+	// For reference types, the parameter type is T* (pointer), otherwise use receiverType as-is
+	var receiverCType string
+	if isReference && namedType != nil {
+		// For &T, generate T* in C
+		receiverCType = g.typeToC(namedType) + "*"
+	} else {
+		receiverCType = g.typeToC(receiverType)
+	}
 	receiverName := "self"
 	if decl.Receiver.Name != nil {
 		receiverName = g.sanitizeName(decl.Receiver.Name.Name)
@@ -506,7 +526,13 @@ func (g *Generator) generateVarDecl(decl *ast.VarDecl) {
 		}
 
 		g.writeIndent()
-		cType := g.typeToC(varType)
+		// For anonymous structs, generate the struct type inline instead of using void*
+		var cType string
+		if structType, ok := varType.(*types.StructType); ok {
+			cType = g.structTypeToC(structType)
+		} else {
+			cType = g.typeToC(varType)
+		}
 		g.write("%s %s", cType, g.sanitizeName(item.Name.Name))
 
 		if item.Value != nil {
@@ -535,7 +561,8 @@ func (g *Generator) generateVarDecl(decl *ast.VarDecl) {
 				if compLit, ok := item.Value.(*ast.CompositeLit); ok {
 					if compLit.Type == nil && varType != nil && !varType.Equals(types.TypeUnknown) {
 						// Generate composite literal with the variable's type
-						g.generateCompositeLitWithType(compLit, varType)
+						// For variable initialization, don't use cast for anonymous structs
+						g.generateCompositeLitWithType(compLit, varType, true)
 						// Store array length for dynamic arrays initialized with literals
 						if arrayType, ok := varType.(*types.ArrayType); ok && arrayType.Length < 0 {
 							g.arrayLengths[item.Name.Name] = len(compLit.Elts)
@@ -641,7 +668,7 @@ func (g *Generator) generateStmt(stmt ast.Node) {
 		}
 		g.writeIndent()
 		g.generateExpr(s.X)
-		//g.write(";\n")
+		g.write(";\n")
 	case *ast.Block:
 		g.writeIndent()
 		g.write("{\n")
@@ -660,6 +687,24 @@ func (g *Generator) generateStmt(stmt ast.Node) {
 
 func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 	g.writeIndent()
+
+	// Handle increment/decrement operators (x++, x--)
+	if stmt.Op != nil && (stmt.Op.Kind == tokens.PLUS_PLUS_TOKEN || stmt.Op.Kind == tokens.MINUS_MINUS_TOKEN) {
+		g.generateExpr(stmt.Lhs)
+		g.write(" %s;\n", stmt.Op.Value)
+		return
+	}
+
+	// Handle compound assignment operators (x += y, x -= y, etc.)
+	if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
+		g.generateExpr(stmt.Lhs)
+		g.write(" %s ", stmt.Op.Value)
+		g.generateExpr(stmt.Rhs)
+		g.write(";\n")
+		return
+	}
+
+	// Regular assignment (x = y)
 	g.generateExpr(stmt.Lhs)
 	g.write(" = ")
 	g.generateExpr(stmt.Rhs)
@@ -744,93 +789,45 @@ func (g *Generator) generateForStmt(stmt *ast.ForStmt) {
 	}
 
 	// Extract iterator variable name(s)
+	// Iterator is always VarDecl (always binds new variables)
+	varDecl, ok := stmt.Iterator.(*ast.VarDecl)
+	if !ok {
+		g.ctx.ReportError("codegen: iterator must be VarDecl", nil)
+		g.writeIndent()
+		g.write("/* invalid iterator type */\n")
+		return
+	}
+
 	var iterVarName string
 	var valueVarName string
 	hasValueVar := false
 
-	if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok {
-		// for let i in ... or for let i, v in ...
-		if len(varDecl.Decls) > 0 {
-			iterVarName = varDecl.Decls[0].Name.Name
-		}
-		if len(varDecl.Decls) > 1 {
-			valueVarName = varDecl.Decls[1].Name.Name
-			hasValueVar = true
-		}
-	} else if ident, ok := stmt.Iterator.(*ast.IdentifierExpr); ok {
-		// for i in ... (using existing variable)
-		iterVarName = ident.Name
-	} else if compLit, ok := stmt.Iterator.(*ast.CompositeLit); ok {
-		// for i, v in ... (using existing variables, no let)
-		// CompositeLit contains IdentifierExpr elements
-		if len(compLit.Elts) > 0 {
-			if firstIdent, ok := compLit.Elts[0].(*ast.IdentifierExpr); ok {
-				iterVarName = firstIdent.Name
-			}
-		}
-		if len(compLit.Elts) > 1 {
-			if secondIdent, ok := compLit.Elts[1].(*ast.IdentifierExpr); ok {
-				valueVarName = secondIdent.Name
-				hasValueVar = true
-			}
-		}
-	} else {
-		g.ctx.ReportError("codegen: unsupported iterator type in for loop", nil)
-		g.writeIndent()
-		g.write("/* unsupported iterator */\n")
-		return
+	if len(varDecl.Decls) > 0 {
+		iterVarName = varDecl.Decls[0].Name.Name
+	}
+	if len(varDecl.Decls) > 1 {
+		valueVarName = varDecl.Decls[1].Name.Name
+		hasValueVar = true
 	}
 
-	// Determine if we need to declare the variable (for let i) or just assign (for i)
-	isNewVar := false
+	// Check if iterator variable is discard (_) - if so, generate a temp variable
+	isDiscardIter := (iterVarName == "_")
+	isDiscardValue := (valueVarName == "_")
+
+	// If iterator is discard, generate a unique temp variable name
+	actualIterVarName := iterVarName
+	if isDiscardIter {
+		g.counter++
+		actualIterVarName = fmt.Sprintf("__loop_idx_%d", g.counter)
+	}
+
+	// Iterator always binds new variables (always VarDecl)
 	iterType := "int32_t"
-	if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok {
-		// for let i in ... - need to declare variable
-		isNewVar = true
-		if len(varDecl.Decls) > 0 {
-			if sym, found := g.mod.CurrentScope.Lookup(iterVarName); found && sym != nil && sym.Type != nil {
-				iterType = g.typeToC(sym.Type)
-			}
-		}
-	} else {
-		// for i in ... - using existing variable, just assign
+	if len(varDecl.Decls) > 0 {
 		if sym, found := g.mod.CurrentScope.Lookup(iterVarName); found && sym != nil && sym.Type != nil {
 			iterType = g.typeToC(sym.Type)
 		}
 	}
-
-	// Generate C for loop
-	g.writeIndent()
-	if isNewVar {
-		// Declare and initialize: for (int32_t i = start; ...)
-		g.write("for (%s %s = ", iterType, g.sanitizeName(iterVarName))
-	} else {
-		// Just assign: for (i = start; ...)
-		g.write("for (%s = ", g.sanitizeName(iterVarName))
-	}
-	g.generateExpr(rangeExpr.Start)
-	g.write("; %s ", g.sanitizeName(iterVarName))
-
-	// Determine comparison operator based on inclusive flag
-	if rangeExpr.Inclusive {
-		g.write("<=")
-	} else {
-		g.write("<")
-	}
-
-	g.write(" ")
-	g.generateExpr(rangeExpr.End)
-	g.write("; %s += ", g.sanitizeName(iterVarName))
-
-	// Increment value (default to 1 if not specified)
-	if rangeExpr.Incr != nil {
-		g.generateExpr(rangeExpr.Incr)
-	} else {
-		g.write("1")
-	}
-
-	g.write(") {\n")
-	g.indent++
 
 	// Enter for loop scope if available (for variable declarations)
 	if stmt.Scope != nil {
@@ -840,34 +837,70 @@ func (g *Generator) generateForStmt(stmt *ast.ForStmt) {
 		}
 	}
 
-	// If we have a value variable (for i, v in ...), we need to handle it
-	// For now, we'll just assign it the same value as the index
-	// TODO: Support array iteration where v would be array[i]
+	// Generate C for loop
+	g.writeIndent()
 	if hasValueVar {
-		// Check if this is a new variable (let) or existing variable
-		isNewValueVar := false
-		valueType := "int32_t" // Default
-		if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok && len(varDecl.Decls) > 1 {
-			// for let i, v in ... - need to declare v
-			isNewValueVar = true
+		// Dual variables: i is index (0, 1, 2, ...), v is value (start + i)
+		// Generate loop from 0 to (end - start) for exclusive, or (end - start) for inclusive
+		// For inclusive: i <= (end - start) gives indices 0..(end-start), which is (end-start+1) iterations
+		// For exclusive: i < (end - start) gives indices 0..(end-start-1), which is (end-start) iterations
+		g.write("for (%s %s = 0; %s ", iterType, actualIterVarName, actualIterVarName)
+		if rangeExpr.Inclusive {
+			g.write("<=")
+		} else {
+			g.write("<")
+		}
+		g.write(" (")
+		g.generateExpr(rangeExpr.End)
+		g.write(" - ")
+		g.generateExpr(rangeExpr.Start)
+		g.write("); %s += ", actualIterVarName)
+		// Increment value (default to 1 if not specified)
+		if rangeExpr.Incr != nil {
+			g.generateExpr(rangeExpr.Incr)
+		} else {
+			g.write("1")
+		}
+		g.write(") {\n")
+		g.indent++
+
+		// Assign value: v = start + i
+		if !isDiscardValue {
+			valueType := "int32_t" // Default
 			if sym, found := g.mod.CurrentScope.Lookup(valueVarName); found && sym != nil && sym.Type != nil {
 				valueType = g.typeToC(sym.Type)
 			}
-		} else {
-			// for i, v in ... - using existing variable, just assign
-			if sym, found := g.mod.CurrentScope.Lookup(valueVarName); found && sym != nil && sym.Type != nil {
-				valueType = g.typeToC(sym.Type)
-			}
+			g.writeIndent()
+			g.write("%s %s = ", valueType, g.sanitizeName(valueVarName))
+			g.generateExpr(rangeExpr.Start)
+			g.write(" + %s;\n", actualIterVarName)
 		}
-		// For range loops, value is same as index for now
-		g.writeIndent()
-		if isNewValueVar {
-			// Declare and assign: int32_t v = i;
-			g.write("%s %s = %s;\n", valueType, g.sanitizeName(valueVarName), g.sanitizeName(iterVarName))
+	} else {
+		// Single variable: it's the value, iterate from start to end
+		g.write("for (%s %s = ", iterType, actualIterVarName)
+		g.generateExpr(rangeExpr.Start)
+		g.write("; %s ", actualIterVarName)
+
+		// Determine comparison operator based on inclusive flag
+		if rangeExpr.Inclusive {
+			g.write("<=")
 		} else {
-			// Just assign: v = i;
-			g.write("%s = %s;\n", g.sanitizeName(valueVarName), g.sanitizeName(iterVarName))
+			g.write("<")
 		}
+
+		g.write(" ")
+		g.generateExpr(rangeExpr.End)
+		g.write("; %s += ", actualIterVarName)
+
+		// Increment value (default to 1 if not specified)
+		if rangeExpr.Incr != nil {
+			g.generateExpr(rangeExpr.Incr)
+		} else {
+			g.write("1")
+		}
+
+		g.write(") {\n")
+		g.indent++
 	}
 
 	// Generate loop body
@@ -885,109 +918,155 @@ func (g *Generator) generateForStmt(stmt *ast.ForStmt) {
 // C: for (int i = 0; i < array_length; i++) { v = array[i]; ... }
 func (g *Generator) generateForArray(stmt *ast.ForStmt, arrayType *types.ArrayType) {
 	// Extract iterator variable name(s)
+	// Iterator is always VarDecl (always binds new variables)
+	varDecl, ok := stmt.Iterator.(*ast.VarDecl)
+	if !ok {
+		g.ctx.ReportError("codegen: iterator must be VarDecl", nil)
+		return
+	}
+
 	var iterVarName string
 	var valueVarName string
 	hasValueVar := false
 
-	if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok {
-		if len(varDecl.Decls) > 0 {
-			iterVarName = varDecl.Decls[0].Name.Name
-		}
-		if len(varDecl.Decls) > 1 {
-			valueVarName = varDecl.Decls[1].Name.Name
-			hasValueVar = true
-		}
-	} else if ident, ok := stmt.Iterator.(*ast.IdentifierExpr); ok {
-		iterVarName = ident.Name
-	} else if compLit, ok := stmt.Iterator.(*ast.CompositeLit); ok {
-		if len(compLit.Elts) > 0 {
-			if firstIdent, ok := compLit.Elts[0].(*ast.IdentifierExpr); ok {
-				iterVarName = firstIdent.Name
-			}
-		}
-		if len(compLit.Elts) > 1 {
-			if secondIdent, ok := compLit.Elts[1].(*ast.IdentifierExpr); ok {
-				valueVarName = secondIdent.Name
-				hasValueVar = true
-			}
-		}
-	} else {
-		g.ctx.ReportError("codegen: unsupported iterator type in for loop", nil)
-		return
+	if len(varDecl.Decls) > 0 {
+		iterVarName = varDecl.Decls[0].Name.Name
+	}
+	if len(varDecl.Decls) > 1 {
+		valueVarName = varDecl.Decls[1].Name.Name
+		hasValueVar = true
 	}
 
-	// Determine if we need to declare the variable
-	isNewVar := false
-	iterType := "int32_t"
-	if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok {
-		isNewVar = true
-		if len(varDecl.Decls) > 0 {
-			if sym, found := g.mod.CurrentScope.Lookup(iterVarName); found && sym != nil && sym.Type != nil {
-				iterType = g.typeToC(sym.Type)
-			}
-		}
+	// Determine semantics: single variable = value (need hidden index), dual = index, value
+	isSingleVar := !hasValueVar
+	var actualValueVarName string
+	var originalIterVarName string
+	if isSingleVar {
+		// Single variable: it's the value, not the index
+		actualValueVarName = iterVarName
+		originalIterVarName = iterVarName
+		// Generate a hidden index variable
+		g.counter++
+		iterVarName = fmt.Sprintf("__loop_idx_%d", g.counter)
+		hasValueVar = true // Treat as if we have a value variable
+		valueVarName = actualValueVarName
 	} else {
-		if sym, found := g.mod.CurrentScope.Lookup(iterVarName); found && sym != nil && sym.Type != nil {
-			iterType = g.typeToC(sym.Type)
-		}
+		originalIterVarName = iterVarName
 	}
+
+	// Check if iterator variable is discard (_) - if so, generate a temp variable
+	// For single var, check the original name (before we changed it to hidden index)
+	isDiscardIter := (originalIterVarName == "_")
+	isDiscardValue := (valueVarName == "_")
+
+	// If iterator is discard, generate a unique temp variable name
+	actualIterVarName := iterVarName
+	if isDiscardIter {
+		// If single var and discard, we already have a hidden index, so use it
+		if !isSingleVar {
+			g.counter++
+			actualIterVarName = fmt.Sprintf("__loop_idx_%d", g.counter)
+		}
+		// For single var discard case, iterVarName is already the hidden index, so use it
+	} else if actualIterVarName == "" {
+		// Fallback: if iterVarName is empty for some reason, generate a temp
+		g.counter++
+		actualIterVarName = fmt.Sprintf("__loop_idx_%d", g.counter)
+	}
+
+	// Index is always new (hidden for single var, or VarDecl for dual var)
+	// Iterator always binds new variables
+	iterType := "int32_t" // Index is always i32
 
 	// Generate array length variable name
 	g.counter++
 	arrayLenVar := fmt.Sprintf("__array_len_%d", g.counter)
 
-	// Get array length and generate for loop
-	if arrayType.Length >= 0 {
-		// Fixed-size array - generate for loop directly
-		g.writeIndent()
-		if isNewVar {
-			g.write("for (%s %s = 0; %s < %d; %s++) {\n", iterType, g.sanitizeName(iterVarName), g.sanitizeName(iterVarName), arrayType.Length, g.sanitizeName(iterVarName))
-		} else {
-			g.write("for (%s = 0; %s < %d; %s++) {\n", g.sanitizeName(iterVarName), g.sanitizeName(iterVarName), arrayType.Length, g.sanitizeName(iterVarName))
+	// Get array length and check for empty arrays first
+	var arrayLength int = -1
+
+	// Helper to unwrap CastExpr and get CompositeLit
+	var compLit *ast.CompositeLit
+	if castExpr, ok := stmt.Range.(*ast.CastExpr); ok {
+		// Unwrap cast: [] as []i32 -> the CompositeLit is inside the cast
+		if cl, ok := castExpr.X.(*ast.CompositeLit); ok {
+			compLit = cl
 		}
+	} else if cl, ok := stmt.Range.(*ast.CompositeLit); ok {
+		compLit = cl
+	}
+
+	// First, check if it's an array literal (including empty ones)
+	if compLit != nil {
+		// Array literal: use the number of elements directly
+		arrayLength = len(compLit.Elts)
+	} else if arrayType.Length >= 0 {
+		// Fixed-size array
+		arrayLength = arrayType.Length
+	} else if ident, ok := stmt.Range.(*ast.IdentifierExpr); ok {
+		// Check if we stored the array length for this variable
+		if storedLen, found := g.arrayLengths[ident.Name]; found {
+			arrayLength = storedLen
+		}
+	}
+
+	// Handle empty arrays - generate a loop that never executes
+	// This handles both compile-time known empty arrays and runtime empty arrays
+	if arrayLength == 0 {
+		// Empty array - generate loop that never executes: for (int i = 0; i < 0; i++)
+		g.writeIndent()
+		g.write("for (%s %s = 0; %s < 0; %s++) {\n", iterType, actualIterVarName, actualIterVarName, actualIterVarName)
+		g.indent++
+		// Enter scope for variable declarations (even though loop won't run)
+		if stmt.Scope != nil {
+			if forScope, ok := stmt.Scope.(*table.SymbolTable); ok {
+				restore := g.mod.EnterScope(forScope)
+				defer restore()
+			}
+		}
+		// For empty arrays, we still need to declare the value variable if it exists
+		// But we won't assign anything since the loop never runs
+		if hasValueVar && !isDiscardValue {
+			valueType := g.typeToC(arrayType.Element)
+			if sym, found := g.mod.CurrentScope.Lookup(valueVarName); found && sym != nil && sym.Type != nil {
+				valueType = g.typeToC(sym.Type)
+			}
+			// Declare but don't initialize (will never be used since loop doesn't run)
+			g.writeIndent()
+			g.write("%s %s;\n", valueType, g.sanitizeName(valueVarName))
+		}
+		// Generate loop body (will never execute, but needed for scope)
+		if stmt.Body != nil {
+			g.generateBlock(stmt.Body)
+		}
+		g.indent--
+		g.writeIndent()
+		g.write("}\n")
+		return
+	}
+
+	// Generate for loop for non-empty arrays
+	if arrayLength >= 0 {
+		// We know the length (fixed-size or from literal)
+		g.writeIndent()
+		// Index is always new (hidden for single var, or VarDecl for dual var)
+		g.write("for (%s %s = 0; %s < %d; %s++) {\n", iterType, actualIterVarName, actualIterVarName, arrayLength, actualIterVarName)
 		g.indent++
 	} else {
-		// Dynamic array - need to get length from expression
-		// Check if the range is an array literal - if so, use its length directly
-		var numElements int = -1
-		if compLit, ok := stmt.Range.(*ast.CompositeLit); ok {
-			// Array literal: use the number of elements directly
-			numElements = len(compLit.Elts)
-		} else if ident, ok := stmt.Range.(*ast.IdentifierExpr); ok {
-			// Check if we stored the array length for this variable
-			if storedLen, found := g.arrayLengths[ident.Name]; found {
-				numElements = storedLen
-			}
-		}
-
-		if numElements >= 0 {
-			// We know the length from the literal
-			g.writeIndent()
-			if isNewVar {
-				g.write("for (%s %s = 0; %s < %d; %s++) {\n", iterType, g.sanitizeName(iterVarName), g.sanitizeName(iterVarName), numElements, g.sanitizeName(iterVarName))
-			} else {
-				g.write("for (%s = 0; %s < %d; %s++) {\n", g.sanitizeName(iterVarName), g.sanitizeName(iterVarName), numElements, g.sanitizeName(iterVarName))
-			}
-			g.indent++
-		} else {
-			// Variable or expression - try to calculate length
-			// For variables, sizeof won't work on pointers, so we need a better solution
-			// For now, try sizeof but warn that it may not work for pointers
-			g.writeIndent()
-			g.write("int %s = sizeof(", arrayLenVar)
-			g.generateExpr(stmt.Range)
-			g.write(") / sizeof(")
-			g.generateExpr(stmt.Range)
-			g.write("[0]);\n")
-			// Now generate the for loop
-			g.writeIndent()
-			if isNewVar {
-				g.write("for (%s %s = 0; %s < %s; %s++) {\n", iterType, g.sanitizeName(iterVarName), g.sanitizeName(iterVarName), arrayLenVar, g.sanitizeName(iterVarName))
-			} else {
-				g.write("for (%s = 0; %s < %s; %s++) {\n", g.sanitizeName(iterVarName), g.sanitizeName(iterVarName), arrayLenVar, g.sanitizeName(iterVarName))
-			}
-			g.indent++
-		}
+		// Variable or expression - try to calculate length
+		// For variables, sizeof won't work on pointers, so we need a better solution
+		// For now, try sizeof but warn that it may not work for pointers
+		g.writeIndent()
+		g.write("int %s = sizeof(", arrayLenVar)
+		g.generateExpr(stmt.Range)
+		g.write(") / sizeof(")
+		g.generateExpr(stmt.Range)
+		g.write("[0]);\n")
+		// Now generate the for loop
+		g.writeIndent()
+		// Index is always new
+		g.write("for (%s %s = 0; %s < %s; %s++) {\n", iterType, actualIterVarName, actualIterVarName, arrayLenVar, actualIterVarName)
+		g.indent++
 	}
 
 	// Enter for loop scope
@@ -998,29 +1077,19 @@ func (g *Generator) generateForArray(stmt *ast.ForStmt, arrayType *types.ArrayTy
 		}
 	}
 
-	// If we have a value variable, assign array[i] to it
-	if hasValueVar {
-		isNewValueVar := false
+	// If we have a value variable and it's not discard, assign array[i] to it
+	if hasValueVar && !isDiscardValue {
+		// Value variable is always new (always VarDecl now, always binds new variables)
 		valueType := g.typeToC(arrayType.Element)
-		if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok && len(varDecl.Decls) > 1 {
-			isNewValueVar = true
-			if sym, found := g.mod.CurrentScope.Lookup(valueVarName); found && sym != nil && sym.Type != nil {
-				valueType = g.typeToC(sym.Type)
-			}
-		} else {
-			if sym, found := g.mod.CurrentScope.Lookup(valueVarName); found && sym != nil && sym.Type != nil {
-				valueType = g.typeToC(sym.Type)
-			}
+		// Look up the value variable type
+		if sym, found := g.mod.CurrentScope.Lookup(valueVarName); found && sym != nil && sym.Type != nil {
+			valueType = g.typeToC(sym.Type)
 		}
 
 		g.writeIndent()
-		if isNewValueVar {
-			g.write("%s %s = ", valueType, g.sanitizeName(valueVarName))
-		} else {
-			g.write("%s = ", g.sanitizeName(valueVarName))
-		}
+		g.write("%s %s = ", valueType, g.sanitizeName(valueVarName))
 		g.generateExpr(stmt.Range)
-		g.write("[%s];\n", g.sanitizeName(iterVarName))
+		g.write("[%s];\n", actualIterVarName)
 	}
 
 	// Generate loop body
@@ -1082,6 +1151,8 @@ func (g *Generator) generateExpr(expr ast.Expression) {
 		g.generateBinaryExpr(e)
 	case *ast.UnaryExpr:
 		g.generateUnaryExpr(e)
+	case *ast.PostfixExpr:
+		g.generatePostfixExpr(e)
 	case *ast.CallExpr:
 		g.generateCallExpr(e)
 	case *ast.ParenExpr:
@@ -1309,8 +1380,44 @@ func (g *Generator) inferExprType(expr ast.Expression) types.SemType {
 		if compLit.Type != nil {
 			return g.typeFromTypeNode(compLit.Type)
 		}
-		// Otherwise, try to infer from context (e.g., if inside a cast)
-		// For now, return unknown - the typechecker should have resolved this
+		// Otherwise, try to infer from elements (for array literals)
+		if len(compLit.Elts) > 0 {
+			// Infer element type from first element
+			firstElemType := g.inferExprType(compLit.Elts[0])
+			if firstElemType != nil && !firstElemType.Equals(types.TypeUnknown) {
+				// Create array type with dynamic length (-1)
+				return &types.ArrayType{
+					Element: firstElemType,
+					Length:  -1, // Dynamic array
+				}
+			}
+		}
+		// If we can't infer, return unknown
+	}
+
+	// Try selector expressions (field access: obj.field)
+	if selectorExpr, ok := expr.(*ast.SelectorExpr); ok {
+		// Infer the base type (e.g., Point for p.X)
+		baseType := g.inferExprType(selectorExpr.X)
+		if baseType == nil || baseType.Equals(types.TypeUnknown) {
+			return types.TypeUnknown
+		}
+
+		// Unwrap NamedType to get underlying struct
+		if namedType, ok := baseType.(*types.NamedType); ok {
+			baseType = namedType.Underlying
+		}
+
+		// Check if it's a struct type
+		if structType, ok := baseType.(*types.StructType); ok {
+			// Look up the field name
+			fieldName := selectorExpr.Field.Name
+			for _, field := range structType.Fields {
+				if field.Name == fieldName {
+					return field.Type
+				}
+			}
+		}
 	}
 
 	return types.TypeUnknown
@@ -1321,7 +1428,9 @@ func (g *Generator) isStringType(typ types.SemType) bool {
 	if typ == nil {
 		return false
 	}
-	if prim, ok := typ.(*types.PrimitiveType); ok {
+	// Unwrap NamedType to check underlying type
+	unwrapped := types.UnwrapType(typ)
+	if prim, ok := unwrapped.(*types.PrimitiveType); ok {
 		return prim.GetName() == types.TYPE_STRING
 	}
 	return false
@@ -1332,7 +1441,9 @@ func (g *Generator) isIntegerType(typ types.SemType) bool {
 	if typ == nil {
 		return false
 	}
-	if prim, ok := typ.(*types.PrimitiveType); ok {
+	// Unwrap NamedType to check underlying type
+	unwrapped := types.UnwrapType(typ)
+	if prim, ok := unwrapped.(*types.PrimitiveType); ok {
 		name := prim.GetName()
 		return name == types.TYPE_I8 || name == types.TYPE_I16 || name == types.TYPE_I32 || name == types.TYPE_I64 ||
 			name == types.TYPE_U8 || name == types.TYPE_U16 || name == types.TYPE_U32 || name == types.TYPE_U64
@@ -1343,6 +1454,11 @@ func (g *Generator) isIntegerType(typ types.SemType) bool {
 func (g *Generator) generateUnaryExpr(expr *ast.UnaryExpr) {
 	g.write(expr.Op.Value)
 	g.generateExpr(expr.X)
+}
+
+func (g *Generator) generatePostfixExpr(expr *ast.PostfixExpr) {
+	g.generateExpr(expr.X)
+	g.write(expr.Op.Value)
 }
 
 func (g *Generator) generateScopeResolutionExpr(expr *ast.ScopeResolutionExpr) {
@@ -1387,12 +1503,28 @@ func (g *Generator) generateScopeResolutionExpr(expr *ast.ScopeResolutionExpr) {
 
 func (g *Generator) generateSelectorExpr(expr *ast.SelectorExpr) {
 	// SelectorExpr: obj.field or obj.method
-	// For field access: obj.field -> obj.field in C
+	// For field access: obj.field -> obj.field in C (or obj->field if obj is a pointer)
 	// For method calls: handled in CallExpr with SelectorExpr as Fun
+
+	// Check if the base expression is a pointer type
+	baseType := g.inferExprType(expr.X)
+	isPointer := false
+	if baseType != nil && !baseType.Equals(types.TypeUnknown) {
+		// Check if it's a reference type or pointer type
+		if _, ok := baseType.(*types.ReferenceType); ok {
+			isPointer = true
+		}
+	}
 
 	// Generate the object expression
 	g.generateExpr(expr.X)
-	g.write(".")
+
+	// Use -> for pointers, . for values
+	if isPointer {
+		g.write("->")
+	} else {
+		g.write(".")
+	}
 
 	// Generate the field name
 	if expr.Field != nil {
@@ -1421,25 +1553,27 @@ func (g *Generator) generateCastExpr(expr *ast.CastExpr) {
 	}
 
 	cType := g.typeToC(targetType)
-	g.write("(%s)(", cType)
 
-	// If the expression being cast is a CompositeLit, we can use the target type
-	// to help generate the composite literal correctly
+	// If the expression being cast is a CompositeLit, generate it with the target type directly
+	// This avoids double casts like (Point)((Point){...}) -> (Point){...}
 	if compLit, ok := expr.X.(*ast.CompositeLit); ok {
-		// Temporarily set the type on the CompositeLit for generation
-		// This helps when the composite literal doesn't have an explicit type
-		originalType := compLit.Type
-		if compLit.Type == nil {
-			// Use the cast target type as the composite literal type
-			// We'll restore it after generation
-			compLit.Type = expr.Type
+		// For named types, generateCompositeLitWithType already includes the cast
+		// For anonymous structs, we need to add the cast prefix
+		if _, ok := targetType.(*types.NamedType); ok {
+			// Named type: generateCompositeLitWithType will produce (TypeName){...}
+			// So we just call it without adding another cast prefix
+			g.generateCompositeLitWithType(compLit, targetType, false)
+		} else {
+			// Anonymous struct or other type: need cast prefix
+			g.write("(%s)", cType)
+			g.generateCompositeLitWithType(compLit, targetType, false)
 		}
-		g.generateExpr(expr.X)
-		compLit.Type = originalType // Restore original type
-	} else {
-		g.generateExpr(expr.X)
+		return
 	}
 
+	// For other expressions, use normal cast syntax
+	g.write("(%s)(", cType)
+	g.generateExpr(expr.X)
 	g.write(")")
 }
 
@@ -1489,10 +1623,11 @@ func (g *Generator) generateCompositeLit(expr *ast.CompositeLit) {
 	}
 
 	// Generate the composite literal with the inferred type
-	g.generateCompositeLitWithType(expr, litType)
+	// For standalone expressions, use cast for anonymous structs
+	g.generateCompositeLitWithType(expr, litType, false)
 }
 
-func (g *Generator) generateCompositeLitWithType(expr *ast.CompositeLit, litType types.SemType) {
+func (g *Generator) generateCompositeLitWithType(expr *ast.CompositeLit, litType types.SemType, isInitializer bool) {
 	// Check if it's a struct type
 	if namedType, ok := litType.(*types.NamedType); ok {
 		if _, ok := namedType.Underlying.(*types.StructType); ok {
@@ -1508,7 +1643,6 @@ func (g *Generator) generateCompositeLitWithType(expr *ast.CompositeLit, litType
 				if kv, ok := elt.(*ast.KeyValueExpr); ok {
 					// KeyValueExpr: .field = value (for structs) or key => value (for maps)
 					if fieldIdent, ok := kv.Key.(*ast.IdentifierExpr); ok {
-						// Struct field: .field = value
 						fieldName := fieldIdent.Name
 						g.write(".%s = ", g.sanitizeName(fieldName))
 						g.generateExpr(kv.Value)
@@ -1527,6 +1661,44 @@ func (g *Generator) generateCompositeLitWithType(expr *ast.CompositeLit, litType
 			g.write("}")
 			return
 		}
+	}
+
+	// Check if it's an anonymous struct type (direct StructType, not wrapped in NamedType)
+	if structType, ok := litType.(*types.StructType); ok {
+		// Anonymous struct literal: {.X = 3, .Y = 4}
+		// For variable initialization, don't use cast (C allows direct initialization)
+		// For expressions, use cast with compound literal syntax
+		if !isInitializer {
+			g.write("(")
+			g.write(g.structTypeToC(structType))
+			g.write(")")
+		}
+		g.write("{")
+
+		// Generate field initializers
+		for i, elt := range expr.Elts {
+			if i > 0 {
+				g.write(", ")
+			}
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				if fieldIdent, ok := kv.Key.(*ast.IdentifierExpr); ok {
+					fieldName := fieldIdent.Name
+					g.write(".%s = ", g.sanitizeName(fieldName))
+					g.generateExpr(kv.Value)
+				} else {
+					// Should not happen for struct literals, but handle gracefully
+					g.generateExpr(kv.Key)
+					g.write(" => ")
+					g.generateExpr(kv.Value)
+				}
+			} else {
+				// Plain expression (should not happen for structs, but handle gracefully)
+				g.generateExpr(elt)
+			}
+		}
+
+		g.write("}")
+		return
 	}
 
 	// Check if it's an array type
@@ -1658,15 +1830,46 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 		methodName := selector.Field.Name
 
 		// Find the type name and method
+		// Handle reference types: &Point -> Point
 		var typeName string
 		var funcType *types.FunctionType
+		var needsAddressOf bool
 
-		if namedType, ok := objType.(*types.NamedType); ok {
+		var namedType *types.NamedType
+		if refType, ok := objType.(*types.ReferenceType); ok {
+			if nt, ok := refType.Inner.(*types.NamedType); ok {
+				namedType = nt
+			}
+		} else if nt, ok := objType.(*types.NamedType); ok {
+			namedType = nt
+		}
+
+		if namedType != nil {
 			typeName = namedType.Name
 			if typeSym, found := g.mod.ModuleScope.GetSymbol(typeName); found && typeSym != nil {
 				if typeSym.Methods != nil {
 					if methodInfo, exists := typeSym.Methods[methodName]; exists && methodInfo != nil {
 						funcType = methodInfo.FuncType
+						// Find the method declaration in AST to check receiver type
+						if g.mod.AST != nil {
+							for _, node := range g.mod.AST.Nodes {
+								if methodDecl, ok := node.(*ast.MethodDecl); ok {
+									if methodDecl.Name != nil && methodDecl.Name.Name == methodName {
+										if methodDecl.Receiver != nil && methodDecl.Receiver.Type != nil {
+											// Check if receiver type is a reference type
+											if _, ok := methodDecl.Receiver.Type.(*ast.ReferenceType); ok {
+												// Method expects &T receiver, and we're calling on value type T
+												// So we need to pass &obj
+												if _, ok := objType.(*types.NamedType); ok {
+													needsAddressOf = true
+													break
+												}
+											}
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -1683,6 +1886,10 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 		g.write("%s(", cFuncName)
 
 		// First argument is the receiver (the object)
+		// If needsAddressOf is true, pass &obj (for methods with &T receiver called on value)
+		if needsAddressOf {
+			g.write("&")
+		}
 		g.generateExpr(selector.X)
 
 		// Generate other arguments
@@ -1800,6 +2007,10 @@ func (g *Generator) typeToC(typ types.SemType) string {
 		}
 		// For other named types, unwrap to underlying
 		return g.typeToC(t.Underlying)
+	case *types.ReferenceType:
+		// Reference type &T -> T* in C
+		innerType := g.typeToC(t.Inner)
+		return fmt.Sprintf("%s*", innerType)
 	case *types.StructType:
 		// Anonymous struct - generate inline struct definition
 		// For now, use a generic struct pointer (void*)
@@ -1821,6 +2032,25 @@ func (g *Generator) typeToC(typ types.SemType) string {
 		return fmt.Sprintf("%s*", elType)
 	}
 	return "void"
+}
+
+// structTypeToC generates an inline struct type definition for anonymous structs
+// Example: struct { int32_t X; int32_t Y; }
+func (g *Generator) structTypeToC(structType *types.StructType) string {
+	var buf strings.Builder
+	buf.WriteString("struct {")
+	for i, field := range structType.Fields {
+		if i > 0 {
+			buf.WriteString(";")
+		}
+		fieldTypeC := g.typeToC(field.Type)
+		buf.WriteString(fmt.Sprintf(" %s %s", fieldTypeC, g.sanitizeName(field.Name)))
+	}
+	if len(structType.Fields) > 0 {
+		buf.WriteString(";")
+	}
+	buf.WriteString(" }")
+	return buf.String()
 }
 
 func (g *Generator) typeFromTypeNode(node ast.TypeNode) types.SemType {
@@ -1969,28 +2199,33 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		if argType == nil || argType.Equals(types.TypeUnknown) {
 			// Still unknown - default to string to avoid crashes
 			formatParts = append(formatParts, "%s")
-		} else if g.isStringType(argType) {
-			formatParts = append(formatParts, "%s")
-		} else if prim, ok := argType.(*types.PrimitiveType); ok {
-			switch prim.GetName() {
-			case types.TYPE_I32:
+		} else {
+			// Unwrap NamedType to get underlying type for format specifier determination
+			unwrappedType := types.UnwrapType(argType)
+
+			if g.isStringType(unwrappedType) {
+				formatParts = append(formatParts, "%s")
+			} else if prim, ok := unwrappedType.(*types.PrimitiveType); ok {
+				switch prim.GetName() {
+				case types.TYPE_I32:
+					formatParts = append(formatParts, "%d")
+				case types.TYPE_I64:
+					formatParts = append(formatParts, "%ld")
+				case types.TYPE_F32:
+					formatParts = append(formatParts, "%.6g")
+				case types.TYPE_F64:
+					formatParts = append(formatParts, "%.15g")
+				case types.TYPE_BOOL:
+					formatParts = append(formatParts, "%s") // Will format as "true"/"false"
+				default:
+					formatParts = append(formatParts, "%s")
+				}
+			} else if g.isIntegerType(unwrappedType) {
+				// Fallback for integer types that aren't PrimitiveType
 				formatParts = append(formatParts, "%d")
-			case types.TYPE_I64:
-				formatParts = append(formatParts, "%ld")
-			case types.TYPE_F32:
-				formatParts = append(formatParts, "%.6g")
-			case types.TYPE_F64:
-				formatParts = append(formatParts, "%.15g")
-			case types.TYPE_BOOL:
-				formatParts = append(formatParts, "%s") // Will format as "true"/"false"
-			default:
+			} else {
 				formatParts = append(formatParts, "%s")
 			}
-		} else if g.isIntegerType(argType) {
-			// Fallback for integer types that aren't PrimitiveType
-			formatParts = append(formatParts, "%d")
-		} else {
-			formatParts = append(formatParts, "%s")
 		}
 	}
 

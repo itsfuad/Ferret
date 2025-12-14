@@ -12,17 +12,17 @@ import (
 type TypeCompatibility int
 
 const (
-	// Incompatible types cannot be used together
+	// Incompatible types cannot be used together (not castable at all)
 	Incompatible TypeCompatibility = iota
 
 	// Identical types are exactly the same
 	Identical
 
-	// Assignable means source can be assigned to target (may involve implicit conversion)
-	Assignable
+	// ImplicitCastable means source can be assigned to target (implicit conversion allowed)
+	ImplicitCastable
 
-	// LossyConvertible means conversion may lose information (requires explicit cast)
-	LossyConvertible
+	// ExplicitCastable means conversion requires an explicit cast (but is valid)
+	ExplicitCastable
 )
 
 func (tc TypeCompatibility) String() string {
@@ -31,10 +31,10 @@ func (tc TypeCompatibility) String() string {
 		return "incompatible"
 	case Identical:
 		return "identical"
-	case Assignable:
-		return "assignable"
-	case LossyConvertible:
-		return "lossy convertible"
+	case ImplicitCastable:
+		return "implicit castable"
+	case ExplicitCastable:
+		return "explicit castable"
 	default:
 		return "unknown"
 	}
@@ -118,7 +118,7 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	// none can be assigned to any optional type (T?)
 	if source.Equals(types.TypeNone) {
 		if _, ok := target.(*types.OptionalType); ok {
-			return Assignable
+			return ImplicitCastable
 		}
 		return Incompatible
 	}
@@ -134,10 +134,10 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		targetUnwrapped := types.UnwrapType(target)
 
 		if types.IsUntypedInt(source) && types.IsInteger(targetUnwrapped) {
-			return Assignable
+			return ImplicitCastable
 		}
 		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
-			return Assignable
+			return ImplicitCastable
 		}
 		return Incompatible
 	}
@@ -150,26 +150,24 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		if srcOk && tgtOk {
 			// byte -> u8 or u8 -> byte requires explicit cast
 			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
-				return LossyConvertible
+				return ExplicitCastable
 			}
 			if types.IsIntegerTypeName(srcName) && types.IsFloatTypeName(tgtName) {
-
 				if isLosslessNumericConversion(source, target) {
-					return Assignable
+					return ImplicitCastable
 				}
-
-				return LossyConvertible
+				return ExplicitCastable
 			}
 
 			if types.IsFloatTypeName(srcName) && types.IsIntegerTypeName(tgtName) {
-				return LossyConvertible
+				return ExplicitCastable
 			}
 		}
 
 		if isLosslessNumericConversion(source, target) {
-			return Assignable
+			return ImplicitCastable
 		}
-		return LossyConvertible
+		return ExplicitCastable
 	}
 
 	// Check interface compatibility
@@ -180,6 +178,22 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		// Actually, we can't do this here without context. Let's handle it differently.
 		// We'll check this in the caller with context.
 		_ = targetIface
+	}
+
+	// Check if target is a NamedType and source matches its underlying type
+	// This allows: i32 -> Integer where type Integer i32;
+	// But NOT: Integer -> i32 (reverse) or Integer1 -> Integer2 (named to named)
+	// These require explicit casting to preserve type safety
+	if targetNamed, ok := target.(*types.NamedType); ok {
+		targetUnderlying := targetNamed.Unwrap()
+		// Only allow if source is NOT a NamedType (i.e., source is the base type)
+		// This ensures we only allow base -> named, not named -> named or named -> base
+		if _, sourceIsNamed := source.(*types.NamedType); !sourceIsNamed {
+			// Source is a base type, check if it matches the underlying type
+			if source.Equals(targetUnderlying) {
+				return ImplicitCastable
+			}
+		}
 	}
 
 	// Check struct compatibility (unwrap NamedType to get underlying structure)
@@ -197,7 +211,7 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 				if source.Equals(target) {
 					return Identical
 				}
-				return Assignable
+				return ImplicitCastable
 			}
 		}
 	}
@@ -223,7 +237,7 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 	// none can be assigned to any optional type (T?)
 	if source.Equals(types.TypeNone) {
 		if _, ok := target.(*types.OptionalType); ok {
-			return Assignable
+			return ImplicitCastable
 		}
 		return Incompatible
 	}
@@ -239,10 +253,10 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 		targetUnwrapped := types.UnwrapType(target)
 
 		if types.IsUntypedInt(source) && types.IsInteger(targetUnwrapped) {
-			return Assignable
+			return ImplicitCastable
 		}
 		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
-			return Assignable
+			return ImplicitCastable
 		}
 		return Incompatible
 	}
@@ -255,23 +269,23 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 		if srcOk && tgtOk {
 			// byte -> u8 or u8 -> byte requires explicit cast
 			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
-				return LossyConvertible
+				return ExplicitCastable
 			}
 			if types.IsIntegerTypeName(srcName) && types.IsFloatTypeName(tgtName) {
 				if isLosslessNumericConversion(source, target) {
-					return Assignable
+					return ImplicitCastable
 				}
-				return LossyConvertible
+				return ExplicitCastable
 			}
 			if types.IsFloatTypeName(srcName) && types.IsIntegerTypeName(tgtName) {
-				return LossyConvertible
+				return ExplicitCastable
 			}
 		}
 
 		if isLosslessNumericConversion(source, target) {
-			return Assignable
+			return ImplicitCastable
 		}
-		return LossyConvertible
+		return ExplicitCastable
 	}
 
 	// Check interface compatibility
@@ -287,26 +301,54 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 	}
 	if targetIface != nil {
 		if implementsInterface(ctx, mod, source, targetIface) {
-			return Assignable
+			return ImplicitCastable
 		}
 	}
 
-	// Check struct compatibility (unwrap NamedType to get underlying structure)
+	// Check if target is a NamedType and source matches its underlying type
+	// This allows: i32 -> Integer where type Integer i32; (implicit)
+	// But NOT: Integer -> i32 (reverse) or Integer1 -> Integer2 (named to named) - these require explicit cast
+	if targetNamed, ok := target.(*types.NamedType); ok {
+		targetUnderlying := targetNamed.Unwrap()
+		// Only allow if source is NOT a NamedType (i.e., source is the base type)
+		// This ensures we only allow base -> named, not named -> named or named -> base
+		if _, sourceIsNamed := source.(*types.NamedType); !sourceIsNamed {
+			// Source is a base type, check if it matches the underlying type
+			if source.Equals(targetUnderlying) {
+				return ImplicitCastable
+			}
+		}
+	}
+
+	// Check for explicit castable cases (named -> base, named -> named with same underlying)
+	// These require explicit casting to preserve type safety
 	srcUnwrapped := types.UnwrapType(source)
 	tgtUnwrapped := types.UnwrapType(target)
 
+	// If underlying types are compatible, it's explicitly castable (not implicitly)
+	if types.IsNumeric(srcUnwrapped) && types.IsNumeric(tgtUnwrapped) {
+		// Both are numeric, can be explicitly cast
+		return ExplicitCastable
+	}
+
+	// If underlying types are the same, can be explicitly cast
+	if srcUnwrapped.Equals(tgtUnwrapped) {
+		return ExplicitCastable
+	}
+
+	// Check struct compatibility (unwrap NamedType to get underlying structure)
 	// If target is a NamedType and source matches the underlying structure,
 	// allow assignment (e.g., { .x = 1, .y = 2 } can be assigned to Point if Point wraps struct { .x: i32, .y: i32 })
 	if srcStruct, srcOk := srcUnwrapped.(*types.StructType); srcOk {
 		if tgtStruct, tgtOk := tgtUnwrapped.(*types.StructType); tgtOk {
 			// Check if structs are structurally compatible
 			if areStructsCompatible(srcStruct, tgtStruct) {
-				// If target is a NamedType, this is a structural -> nominal conversion (assignable)
+				// If target is a NamedType, this is a structural -> nominal conversion (implicit castable)
 				// If both are anonymous or both are named and identical, it's identical
 				if source.Equals(target) {
 					return Identical
 				}
-				return Assignable
+				return ImplicitCastable
 			}
 		}
 	}
@@ -355,11 +397,37 @@ func isLosslessNumericConversion(source, target types.SemType) bool {
 }
 
 // getConversionError returns a human-readable error message for type incompatibility
+// getExplicitCastHint returns a help message suggesting an explicit cast
+func getExplicitCastHint(exprText string, targetType types.SemType) string {
+	if exprText == "" {
+		exprText = "expression"
+	}
+	return fmt.Sprintf("use an explicit cast: %s as %s", exprText, targetType.String())
+}
+
+// getConversionHint returns a hint message based on compatibility result
+// Returns empty string if no hint is needed (Identical, ImplicitCastable) or incompatible
+func getConversionHint(source, target types.SemType, compatibility TypeCompatibility, exprText string) string {
+	switch compatibility {
+	case Identical, ImplicitCastable:
+		// No hint needed - these work implicitly
+		return ""
+	case ExplicitCastable:
+		// Suggest explicit cast
+		return getExplicitCastHint(exprText, target)
+	case Incompatible:
+		// No hint - cannot be cast
+		return ""
+	default:
+		return ""
+	}
+}
+
 func getConversionError(source, target types.SemType, compatibility TypeCompatibility) string {
 	switch compatibility {
 	case Incompatible:
 		return fmt.Sprintf("cannot use type '%s' as type '%s'", source, target)
-	case LossyConvertible:
+	case ExplicitCastable:
 		// Check if target has smaller bit size than source
 		srcName, srcOk := types.GetPrimitiveName(source)
 		tgtName, tgtOk := types.GetPrimitiveName(target)
@@ -373,10 +441,10 @@ func getConversionError(source, target types.SemType, compatibility TypeCompatib
 				return fmt.Sprintf("%s (possible data loss)", msg)
 			}
 		}
-		// Same size but different types (e.g., byte vs u8)
+		// Same size but different types (e.g., byte vs u8, or named types)
 		return msg
 
-	case Identical, Assignable:
+	case Identical, ImplicitCastable:
 		// These are not errors
 		return ""
 

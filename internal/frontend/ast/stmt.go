@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 )
 
 // Module represents a Ferret source file (pure syntax tree)
@@ -78,8 +79,9 @@ func (c *ConstDecl) Loc() *source.Location { return &c.Location }
 
 // AssignStmt represents an assignment statement
 type AssignStmt struct {
-	Lhs Expression // left-hand side (can be IdentifierExpr, SelectorExpr, etc.)
-	Rhs Expression // right-hand side
+	Lhs Expression    // left-hand side (can be IdentifierExpr, SelectorExpr, etc.)
+	Rhs Expression    // right-hand side
+	Op  *tokens.Token // assignment operator (nil for =, otherwise +=, -=, etc., or ++/-- for increment/decrement)
 	source.Location
 }
 

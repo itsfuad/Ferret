@@ -271,14 +271,38 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 	}
 }
 
-// parseExprOrAssign: expr; or expr = expr;
+// parseExprOrAssign: expr; or expr = expr; or expr += expr; or x++; etc.
 func (p *Parser) parseExprOrAssign() ast.Node {
 
 	lhs := p.parseExpr()
 
-	// Check for assignment
-	if p.match(tokens.EQUALS_TOKEN) {
-		p.advance()
+	// Check for increment/decrement operators (x++, x--)
+	if p.match(tokens.PLUS_PLUS_TOKEN, tokens.MINUS_MINUS_TOKEN) {
+		op := p.advance()
+		p.expect(tokens.SEMICOLON_TOKEN)
+
+		return &ast.AssignStmt{
+			Lhs:      lhs,
+			Rhs:      nil, // No RHS for ++/--
+			Op:       &op,
+			Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, &op.End),
+		}
+	}
+
+	// Check for compound assignment operators (x += y, x -= y, etc.)
+	compoundOps := []tokens.TOKEN{
+		tokens.EQUALS_TOKEN,
+		tokens.PLUS_EQUALS_TOKEN,
+		tokens.MINUS_EQUALS_TOKEN,
+		tokens.MUL_EQUALS_TOKEN,
+		tokens.DIV_EQUALS_TOKEN,
+		tokens.MOD_EQUALS_TOKEN,
+		tokens.EXP_EQUALS_TOKEN,
+		tokens.POW_EQUALS_TOKEN,
+	}
+
+	if p.match(compoundOps...) {
+		op := p.advance()
 		rhs := p.parseExpr()
 
 		p.expect(tokens.SEMICOLON_TOKEN)
@@ -286,6 +310,7 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 		return &ast.AssignStmt{
 			Lhs:      lhs,
 			Rhs:      rhs,
+			Op:       &op,
 			Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, rhs.Loc().End),
 		}
 	}
@@ -1046,15 +1071,10 @@ func (p *Parser) makeLocation(start source.Position) source.Location {
 	return *source.NewLocation(&p.filepath, &start, &end)
 }
 
-// parseForStmt parses: for [let] i in range { } or for [let] i, v in range { }
+// parseForStmt parses: for i in range { } or for i, v in range { }
+// Iterator variables are always bound as new variables (like Rust), similar to function parameters
 func (p *Parser) parseForStmt() *ast.ForStmt {
 	start := p.expect(tokens.FOR_TOKEN).Start
-
-	// Check for optional 'let' keyword
-	hasLet := p.match(tokens.LET_TOKEN)
-	if hasLet {
-		p.advance()
-	}
 
 	// Parse first iterator variable name (index or value)
 	firstTok := p.expect(tokens.IDENTIFIER_TOKEN)
@@ -1077,51 +1097,24 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 	// Parse body
 	body := p.parseBlock()
 
-	// Create iterator node (VarDecl if 'let' was used, IdentifierExpr otherwise)
-	var iterator ast.Node
-	if hasLet {
-		// Create VarDecl for 'for let i in ...' or 'for let i, v in ...'
-		declItems := []ast.DeclItem{
-			{
-				Name:  &ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
-				Type:  nil, // Type inferred from range
-				Value: nil, // Value comes from range iteration
-			},
-		}
-		if hasSecond {
-			declItems = append(declItems, ast.DeclItem{
-				Name:  &ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
-				Type:  nil, // Type inferred from range element type
-				Value: nil, // Value comes from range iteration
-			})
-		}
-		iterator = &ast.VarDecl{
-			Decls:    declItems,
-			Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End),
-		}
-	} else {
-		// Without 'let', use existing variables (IdentifierExpr)
-		// For dual variables (i, v), we need a way to represent both
-		// We'll use a custom structure or handle it in semantic analysis
-		if hasSecond {
-			// For dual variables without 'let', create a tuple-like structure
-			// Since we don't have a TupleExpr, we'll use a CompositeLit to hold both identifiers
-			// The semantic analyzer will understand this pattern
-			iterator = &ast.CompositeLit{
-				Type: nil,
-				Elts: []ast.Expression{
-					&ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
-					&ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
-				},
-				Location: *source.NewLocation(&p.filepath, &firstTok.Start, &secondTok.End),
-			}
-		} else {
-			// Single identifier - references existing variable
-			iterator = &ast.IdentifierExpr{
-				Name:     firstTok.Value,
-				Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End),
-			}
-		}
+	// Always create VarDecl for iterator variables (always binds new variables, like function parameters)
+	declItems := []ast.DeclItem{
+		{
+			Name:  &ast.IdentifierExpr{Name: firstTok.Value, Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End)},
+			Type:  nil, // Type inferred from range
+			Value: nil, // Value comes from range iteration
+		},
+	}
+	if hasSecond {
+		declItems = append(declItems, ast.DeclItem{
+			Name:  &ast.IdentifierExpr{Name: secondTok.Value, Location: *source.NewLocation(&p.filepath, &secondTok.Start, &secondTok.End)},
+			Type:  nil, // Type inferred from range element type
+			Value: nil, // Value comes from range iteration
+		})
+	}
+	iterator := &ast.VarDecl{
+		Decls:    declItems,
+		Location: *source.NewLocation(&p.filepath, &firstTok.Start, &firstTok.End),
 	}
 
 	return &ast.ForStmt{
