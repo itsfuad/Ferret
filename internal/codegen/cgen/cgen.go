@@ -21,27 +21,39 @@ type Generator struct {
 	ctx          *context_v2.CompilerContext
 	mod          *context_v2.Module
 	buf          strings.Builder
+	fileScopeBuf strings.Builder // Buffer for file-scope wrapper functions and vtable instances
 	indent       int
 	indentStr    string
 	counter      int            // Counter for generating unique temporary variable names
 	arrayLengths map[string]int // Map variable names to their array literal lengths
+	// Track generated wrapper functions and vtable instances to avoid duplicates
+	generatedWrappers map[string]bool // key: wrapper function name
+	generatedVtables  map[string]bool // key: vtable instance name
+	// Helper to write directly to fileScopeBuf
+	writingToFileScope bool // Flag to indicate we should write to fileScopeBuf instead of buf
 }
 
 // New creates a new C code generator
 func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
 	return &Generator{
-		ctx:          ctx,
-		mod:          mod,
-		indentStr:    "    ",
-		arrayLengths: make(map[string]int),
+		ctx:               ctx,
+		mod:               mod,
+		indentStr:         "    ",
+		arrayLengths:      make(map[string]int),
+		generatedWrappers: make(map[string]bool),
+		generatedVtables:  make(map[string]bool),
 	}
 }
 
 // Generate generates C code for the module
 func (g *Generator) Generate() (string, error) {
+	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: starting\n")
 	g.writeHeader()
+	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: after writeHeader, buf length=%d\n", g.buf.Len())
 	g.writeIncludes()
+	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: after writeIncludes, buf length=%d\n", g.buf.Len())
 	g.writeRuntimeDeclarations()
+	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: after writeRuntimeDeclarations, buf length=%d\n", g.buf.Len())
 
 	// Generate struct/type definitions first
 	if g.mod.AST != nil {
@@ -54,6 +66,8 @@ func (g *Generator) Generate() (string, error) {
 	}
 
 	// Generate code for each top-level declaration
+	// This may populate fileScopeBuf with wrapper functions and vtable instances
+	funcsEndPos := g.buf.Len()
 	if g.mod.AST != nil {
 		for _, node := range g.mod.AST.Nodes {
 			switch n := node.(type) {
@@ -68,8 +82,58 @@ func (g *Generator) Generate() (string, error) {
 			}
 		}
 	}
+	funcsEndPos = g.buf.Len() // Position after all functions/methods
 
-	return g.buf.String(), nil
+	// Now insert the file-scope code that was generated during code generation
+	// Insert it after all functions/methods but before main (or at end if no main)
+	fileScopeCode := g.fileScopeBuf.String()
+	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: fileScopeCode length=%d\n", len(fileScopeCode))
+	if fileScopeCode != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Generate: inserting fileScopeCode after functions (funcsEndPos=%d)\n", funcsEndPos)
+		// Get everything we've generated so far
+		allCode := g.buf.String()
+		// Find where main() starts to insert before it
+		mainPos := strings.Index(allCode, "\nint main()")
+		if mainPos == -1 {
+			mainPos = strings.Index(allCode, "\nvoid main()")
+		}
+		if mainPos != -1 {
+			// Insert before main
+			beforeMain := allCode[:mainPos+1] // Include the newline
+			afterMain := allCode[mainPos+1:]
+			g.buf.Reset()
+			g.buf.WriteString(beforeMain)
+			g.buf.WriteString("// Interface wrapper functions and vtable instances\n")
+			g.buf.WriteString(fileScopeCode)
+			g.buf.WriteString("\n")
+			g.buf.WriteString(afterMain)
+			fmt.Fprintf(os.Stderr, "[DEBUG] Generate: inserted fileScopeCode before main at position %d\n", mainPos)
+		} else {
+			// No main found, insert at end
+			g.buf.WriteString("\n// Interface wrapper functions and vtable instances\n")
+			g.buf.WriteString(fileScopeCode)
+			g.buf.WriteString("\n")
+			fmt.Fprintf(os.Stderr, "[DEBUG] Generate: inserted fileScopeCode at end (no main found)\n")
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Generate: fileScopeCode is empty!\n")
+	}
+
+	result := g.buf.String()
+	fmt.Fprintf(os.Stderr, "[DEBUG] Generate: final result length=%d\n", len(result))
+	if strings.Contains(result, "interface.h") {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Generate: ✓ interface.h found in final result\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Generate: ✗ interface.h NOT found in final result!\n")
+		// Show the includes section
+		lines := strings.Split(result, "\n")
+		for i, line := range lines {
+			if i < 15 && strings.Contains(line, "include") {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Generate: line %d: %s\n", i+1, line)
+			}
+		}
+	}
+	return result, nil
 }
 
 func (g *Generator) writeHeader() {
@@ -88,9 +152,23 @@ func (g *Generator) writeIncludes() {
 
 func (g *Generator) writeRuntimeDeclarations() {
 	// Include the runtime headers
+	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: writing io.h, buf length=%d\n", g.buf.Len())
 	g.write("#include \"io.h\"\n")
-	g.write("#include \"interface.h\"\n")
+	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: after io.h, buf length=%d\n", g.buf.Len())
+	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: writing interface.h\n")
+	g.write("#include \"interface.h\"\n") // Required for ferret_interface_t type
+	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: after interface.h, buf length=%d\n", g.buf.Len())
+	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: writing newline\n")
 	g.write("\n")
+	fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: done, buf length=%d\n", g.buf.Len())
+	// Debug: check if interface.h is actually in the buffer
+	bufContent := g.buf.String()
+	if strings.Contains(bufContent, "interface.h") {
+		fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: ✓ interface.h found in buffer\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: ✗ interface.h NOT found in buffer!\n")
+		fmt.Fprintf(os.Stderr, "[DEBUG] writeRuntimeDeclarations: last 100 chars of buffer: %s\n", bufContent[max(0, len(bufContent)-100):])
+	}
 }
 
 func (g *Generator) generateFunction(decl *ast.FuncDecl) {
@@ -307,63 +385,94 @@ func (g *Generator) generateInterfaceAssignment(varName string, ifaceType types.
 	tempVarName := fmt.Sprintf("__temp_%d", g.counter)
 	concreteCType := g.typeToC(concreteType)
 
-	// Store the concrete value
-	g.write("{\n")
-	g.indent++
-	g.writeIndent()
-	g.write("%s %s = ", concreteCType, tempVarName)
-	g.generateExpr(valueExpr)
-	g.write(";\n")
-
 	// Generate vtable instance name
 	interfaceName := g.getInterfaceName(ifaceType)
 	vtableVarName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(interfaceName) + "_vtable_inst"
 	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
 
-	// Generate wrapper functions and vtable instance
-	// First, generate wrapper functions for each interface method
+	// Generate wrapper functions and vtable instance at file scope (before the block)
+	// First, generate wrapper functions for each interface method (only once per wrapper)
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: concreteTypeName=%s, interfaceName=%s\n", concreteTypeName, interfaceName)
 	typeSym, found := g.lookupTypeSymbol(concreteTypeName)
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: typeSym found=%v, hasMethods=%v\n", found, typeSym != nil && typeSym.Methods != nil)
 	if found && typeSym != nil && typeSym.Methods != nil {
 		for _, method := range iface.Methods {
 			methodInfo, hasMethod := typeSym.Methods[method.Name]
+			fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: method %s, hasMethod=%v\n", method.Name, hasMethod)
 			if hasMethod {
 				wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_" + g.sanitizeName(interfaceName) + "_wrapper"
-				methodCopy := method // Create a copy to pass pointer
-				g.generateMethodWrapperForInterface(concreteTypeName, method.Name, methodInfo.FuncType, wrapperName, &methodCopy)
+				fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: wrapperName=%s, alreadyGenerated=%v\n", wrapperName, g.generatedWrappers[wrapperName])
+				// Only generate if not already generated
+				if !g.generatedWrappers[wrapperName] {
+					methodCopy := method // Create a copy to pass pointer
+					// Generate wrapper function at file scope (static, no indentation) - use fileScopeBuf
+					fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: generating wrapper function %s\n", wrapperName)
+					// Set flag to write to fileScopeBuf
+					oldWritingToFileScope := g.writingToFileScope
+					g.writingToFileScope = true
+					g.generateMethodWrapperForInterfaceAtFileScope(concreteTypeName, method.Name, methodInfo.FuncType, wrapperName, &methodCopy)
+					g.writingToFileScope = oldWritingToFileScope
+					fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: wrapper generated, fileScopeBuf length=%d\n", g.fileScopeBuf.Len())
+					g.generatedWrappers[wrapperName] = true
+				}
 			}
 		}
 	}
 
-	// Now generate vtable instance with wrapper function pointers
-	g.writeIndent()
-	g.write("static %s %s = {", vtableTypeName, vtableVarName)
+	// Generate vtable instance at file scope (only once per vtable)
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: vtableVarName=%s, alreadyGenerated=%v\n", vtableVarName, g.generatedVtables[vtableVarName])
+	if !g.generatedVtables[vtableVarName] {
+		fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: generating vtable instance %s\n", vtableVarName)
+		// Set flag to write to fileScopeBuf
+		oldWritingToFileScope := g.writingToFileScope
+		g.writingToFileScope = true
+		g.write("static %s %s = {", vtableTypeName, vtableVarName)
+		if found && typeSym != nil && typeSym.Methods != nil {
+			first := true
+			for _, method := range iface.Methods {
+				if !first {
+					g.write(", ")
+				}
+				first = false
 
-	if found && typeSym != nil && typeSym.Methods != nil {
-		first := true
-		for _, method := range iface.Methods {
-			if !first {
-				g.write(", ")
-			}
-			first = false
-
-			_, hasMethod := typeSym.Methods[method.Name]
-			if hasMethod {
-				// Use wrapper function pointer
-				wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_" + g.sanitizeName(interfaceName) + "_wrapper"
-				g.write(".%s = %s", g.sanitizeName(method.Name), wrapperName)
+				_, hasMethod := typeSym.Methods[method.Name]
+				if hasMethod {
+					// Use wrapper function pointer
+					wrapperName := g.sanitizeName(concreteTypeName) + "_" + g.sanitizeName(method.Name) + "_" + g.sanitizeName(interfaceName) + "_wrapper"
+					g.write(".%s = %s", g.sanitizeName(method.Name), wrapperName)
+				}
 			}
 		}
+		g.write("};\n")
+		g.writingToFileScope = oldWritingToFileScope
+		fmt.Fprintf(os.Stderr, "[DEBUG] generateInterfaceAssignment: vtable generated, fileScopeBuf length=%d\n", g.fileScopeBuf.Len())
+		g.generatedVtables[vtableVarName] = true
 	}
-
-	g.write("};\n")
 
 	// Assign interface value with data and vtable pointers
-	g.write("%s = (ferret_interface_t) { .data = &%s, .vtable = (void**)&%s }",
-		g.sanitizeName(varName), tempVarName, vtableVarName)
+	// vtable is void**, so we need a pointer to a pointer to the vtable instance
+	// Create a static pointer variable to hold the vtable address, then point to that pointer
+	vtablePtrName := vtableVarName + "_ptr"
+	// Generate the pointer variable at file scope (in fileScopeBuf) - only once per vtable
+	ptrKey := vtablePtrName
+	if !g.generatedVtables[ptrKey] {
+		oldWritingToFileScope := g.writingToFileScope
+		g.writingToFileScope = true
+		g.write("static %s* %s = &%s;\n", vtableTypeName, vtablePtrName, vtableVarName)
+		g.writingToFileScope = oldWritingToFileScope
+		g.generatedVtables[ptrKey] = true
+	}
 
-	g.indent--
+	// Generate temporary variable at function scope (not in a block) to avoid scope issues
 	g.writeIndent()
-	g.write("}")
+	g.write("%s %s = ", concreteCType, tempVarName)
+	g.generateExpr(valueExpr)
+	g.write(";\n")
+
+	// Assign interface value - use address of temp variable (which is in function scope, not block scope)
+	g.writeIndent()
+	g.write("%s = (ferret_interface_t) { .data = &%s, .vtable = (void**)&%s };\n",
+		g.sanitizeName(varName), tempVarName, vtablePtrName)
 }
 
 // generateInterfaceMethodCall generates code to call a method on an interface using vtable dispatch
@@ -399,8 +508,9 @@ func (g *Generator) generateInterfaceMethodCall(objExpr ast.Expression, methodNa
 	vtableTypeName := g.sanitizeName(interfaceName) + "_vtable"
 
 	// Generate vtable cast and method call
-	// Cast vtable and call method: ((Interface_vtable*)obj.vtable)->method(obj.data, args...)
+	// vtable is void**, so we need to dereference it: ((Interface_vtable*)*obj.vtable)->method(obj.data, args...)
 	g.write("((%s*)", vtableTypeName)
+	g.write("*")
 	g.generateExpr(objExpr)
 	g.write(".vtable)->%s(", g.sanitizeName(methodName))
 	g.generateExpr(objExpr)
@@ -415,11 +525,14 @@ func (g *Generator) generateInterfaceMethodCall(objExpr ast.Expression, methodNa
 
 // generateMethodWrapperForInterface generates a wrapper function for interface method dispatch
 // Converts void* self to concrete type and calls the actual method
-func (g *Generator) generateMethodWrapperForInterface(typeName, methodName string, funcType *types.FunctionType, wrapperName string, ifaceMethod *types.InterfaceMethod) {
+// This version generates the wrapper at file scope (static, no indentation)
+func (g *Generator) generateMethodWrapperForInterfaceAtFileScope(typeName, methodName string, funcType *types.FunctionType, wrapperName string, ifaceMethod *types.InterfaceMethod) {
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateMethodWrapperForInterfaceAtFileScope: wrapperName=%s, current buf length=%d\n", wrapperName, g.buf.Len())
 	// Generate wrapper function signature matching interface method
 	returnType := g.typeToC(ifaceMethod.FuncType.Return)
-	g.writeIndent()
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateMethodWrapperForInterfaceAtFileScope: writing function signature\n")
 	g.write("static %s %s(void* self", returnType, wrapperName)
+	fmt.Fprintf(os.Stderr, "[DEBUG] generateMethodWrapperForInterfaceAtFileScope: after signature, buf length=%d\n", g.buf.Len())
 
 	// Use interface method parameters (they define the vtable signature)
 	for _, param := range ifaceMethod.FuncType.Params {
@@ -438,34 +551,9 @@ func (g *Generator) generateMethodWrapperForInterface(typeName, methodName strin
 	}
 
 	// Call actual method: TypeName_method((TypeName*)self, params...)
-	// Check if method needs address-of for receiver
-	needsAddressOf := false
-	typeSym, found := g.lookupTypeSymbol(typeName)
-	if found && typeSym != nil && typeSym.Methods != nil {
-		if _, hasMethod := typeSym.Methods[methodName]; hasMethod {
-			// Check AST for receiver type
-			if g.mod.AST != nil {
-				for _, node := range g.mod.AST.Nodes {
-					if methodDecl, ok := node.(*ast.MethodDecl); ok {
-						if methodDecl.Name != nil && methodDecl.Name.Name == methodName {
-							if methodDecl.Receiver != nil && methodDecl.Receiver.Type != nil {
-								if _, ok := methodDecl.Receiver.Type.(*ast.ReferenceType); ok {
-									needsAddressOf = true
-									break
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	g.write("%s(", actualMethodName)
-	if needsAddressOf {
-		g.write("&")
-	}
-	g.write("((%s*)self)", concreteCType)
+	// self is already a void* (pointer), so we just cast it to the concrete type
+	// If the method takes a pointer receiver, self is already a pointer, so no & needed
+	g.write("%s((%s*)self", actualMethodName, concreteCType)
 
 	// Pass through parameters
 	for _, param := range ifaceMethod.FuncType.Params {
@@ -474,8 +562,14 @@ func (g *Generator) generateMethodWrapperForInterface(typeName, methodName strin
 	g.write(");\n")
 
 	g.indent--
-	g.writeIndent()
-	g.write("}\n")
+	g.write("}\n\n")
+}
+
+// generateMethodWrapperForInterface generates a wrapper function for interface method dispatch
+// Converts void* self to concrete type and calls the actual method
+// This is kept for backward compatibility but should use generateMethodWrapperForInterfaceAtFileScope
+func (g *Generator) generateMethodWrapperForInterface(typeName, methodName string, funcType *types.FunctionType, wrapperName string, ifaceMethod *types.InterfaceMethod) {
+	g.generateMethodWrapperForInterfaceAtFileScope(typeName, methodName, funcType, wrapperName, ifaceMethod)
 }
 
 // getInterfaceName gets the interface name from a type
@@ -791,12 +885,65 @@ func (g *Generator) GenerateHeader() string {
 	g.write("#include <stdint.h>\n")
 	g.write("#include <stdbool.h>\n\n")
 
+	// Include runtime headers if needed (for interface types)
+	g.write("#include \"interface.h\"\n\n")
+
+	// Generate type definitions (structs, interfaces, etc.)
+	if g.mod.AST != nil {
+		for _, node := range g.mod.AST.Nodes {
+			switch n := node.(type) {
+			case *ast.TypeDecl:
+				g.generateTypeDecl(n)
+			}
+		}
+	}
+
 	// Generate function and constant declarations
 	if g.mod.AST != nil {
 		for _, node := range g.mod.AST.Nodes {
 			switch n := node.(type) {
 			case *ast.FuncDecl:
 				g.generateFunctionSignature(n)
+			case *ast.MethodDecl:
+				// Methods are converted to functions, so generate function signature
+				if n.Name != nil && n.Receiver != nil {
+					receiverType := g.typeFromTypeNode(n.Receiver.Type)
+					if receiverType != nil && !receiverType.Equals(types.TypeUnknown) {
+						var typeName string
+						if named, ok := receiverType.(*types.NamedType); ok {
+							typeName = named.Name
+						} else if ref, ok := receiverType.(*types.ReferenceType); ok {
+							if named, ok := ref.Inner.(*types.NamedType); ok {
+								typeName = named.Name
+							}
+						}
+						if typeName != "" {
+							// Get method signature from symbol
+							if typeSym, found := g.mod.ModuleScope.GetSymbol(typeName); found && typeSym != nil && typeSym.Methods != nil {
+								if methodInfo, exists := typeSym.Methods[n.Name.Name]; exists && methodInfo != nil {
+									funcName := g.sanitizeName(typeName) + "_" + g.sanitizeName(n.Name.Name)
+									returnType := g.typeToC(methodInfo.FuncType.Return)
+									g.write("%s %s(", returnType, funcName)
+									// First parameter is receiver
+									var receiverCType string
+									if ref, ok := receiverType.(*types.ReferenceType); ok {
+										if named, ok := ref.Inner.(*types.NamedType); ok {
+											receiverCType = g.typeToC(named) + "*"
+										}
+									} else {
+										receiverCType = g.typeToC(receiverType)
+									}
+									g.write("%s self", receiverCType)
+									// Other parameters
+									for _, param := range methodInfo.FuncType.Params {
+										g.write(", %s %s", g.typeToC(param.Type), g.sanitizeName(param.Name))
+									}
+									g.write(");\n")
+								}
+							}
+						}
+					}
+				}
 			case *ast.ConstDecl:
 				g.generateConstDeclaration(n)
 			}
@@ -810,27 +957,19 @@ func (g *Generator) GenerateHeader() string {
 	return result
 }
 
-// GenerateImplementation generates C implementation code (with includes)
+// GenerateImplementation generates C implementation code (without includes - they're in the .c file)
 func (g *Generator) GenerateImplementation() string {
+	fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: starting\n")
 	var buf strings.Builder
 	oldBuf := g.buf
 	g.buf = buf
 
-	// Write includes and runtime header
-	g.writeIncludes()
-	g.writeRuntimeDeclarations()
-
-	// Generate struct/type definitions first
-	if g.mod.AST != nil {
-		for _, node := range g.mod.AST.Nodes {
-			switch n := node.(type) {
-			case *ast.TypeDecl:
-				g.generateTypeDecl(n)
-			}
-		}
-	}
+	// Don't write includes here - they're added by the pipeline when creating the .c file
+	// This keeps the implementation clean and allows the .c file to include its .h file
+	// Type definitions are in the header file, so don't duplicate them here
 
 	// Generate code for each top-level declaration
+	// This may populate fileScopeBuf with wrapper functions and vtable instances
 	if g.mod.AST != nil {
 		for _, node := range g.mod.AST.Nodes {
 			switch n := node.(type) {
@@ -846,7 +985,43 @@ func (g *Generator) GenerateImplementation() string {
 		}
 	}
 
+	// Now insert the file-scope code that was generated during code generation
+	// Insert it after all functions/methods but before main (or at end if no main)
+	fileScopeCode := g.fileScopeBuf.String()
+	fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: fileScopeCode length=%d\n", len(fileScopeCode))
+	if fileScopeCode != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: inserting fileScopeCode\n")
+		// Get everything we've generated so far
+		allCode := g.buf.String()
+		// Find where main() starts to insert before it
+		mainPos := strings.Index(allCode, "\nint main()")
+		if mainPos == -1 {
+			mainPos = strings.Index(allCode, "\nvoid main()")
+		}
+		if mainPos != -1 {
+			// Insert before main
+			beforeMain := allCode[:mainPos+1] // Include the newline
+			afterMain := allCode[mainPos+1:]
+			g.buf.Reset()
+			g.buf.WriteString(beforeMain)
+			g.buf.WriteString("// Interface wrapper functions and vtable instances\n")
+			g.buf.WriteString(fileScopeCode)
+			g.buf.WriteString("\n")
+			g.buf.WriteString(afterMain)
+			fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: inserted fileScopeCode before main at position %d\n", mainPos)
+		} else {
+			// No main found, insert at end
+			g.buf.WriteString("\n// Interface wrapper functions and vtable instances\n")
+			g.buf.WriteString(fileScopeCode)
+			g.buf.WriteString("\n")
+			fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: inserted fileScopeCode at end (no main found)\n")
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: fileScopeCode is empty!\n")
+	}
+
 	result := g.buf.String()
+	fmt.Fprintf(os.Stderr, "[DEBUG] GenerateImplementation: final result length=%d\n", len(result))
 	g.buf = oldBuf
 	return result
 }
@@ -2598,7 +2773,11 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 }
 
 func (g *Generator) write(format string, args ...interface{}) {
-	g.buf.WriteString(fmt.Sprintf(format, args...))
+	if g.writingToFileScope {
+		g.fileScopeBuf.WriteString(fmt.Sprintf(format, args...))
+	} else {
+		g.buf.WriteString(fmt.Sprintf(format, args...))
+	}
 }
 
 func (g *Generator) writeIndent() {

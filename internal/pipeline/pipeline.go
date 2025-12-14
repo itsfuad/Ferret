@@ -645,7 +645,51 @@ func (p *Pipeline) runCodegenPhase() error {
 		}
 	}
 
-	// Step 2: Generate main file that includes all headers
+	// Step 2: Generate .h and .c files for entry module (same as imported modules)
+	// This provides a clean, consistent approach with include guards
+	var entryHeaderName string
+	var entryImplName string
+	if entryModule != "" {
+		module, exists := p.ctx.GetModule(entryModule)
+		if exists {
+			// Generate header file for entry module
+			gen := cgen.New(p.ctx, module)
+			headerContent := gen.GenerateHeader()
+			entryHeaderName = p.sanitizeModuleName(entryModule) + ".h"
+			headerPath := filepath.Join(tempDir, entryHeaderName)
+			if err := os.WriteFile(headerPath, []byte(headerContent), 0644); err != nil {
+				p.ctx.ReportError(fmt.Sprintf("failed to write header for %s: %v", entryModule, err), nil)
+			}
+
+			// Generate implementation file for entry module
+			implContent := gen.GenerateImplementation()
+			var implBuilder strings.Builder
+			implBuilder.WriteString("// Generated C code from Ferret\n")
+			implBuilder.WriteString("// Module: " + entryModule + "\n\n")
+			implBuilder.WriteString("#include <stdio.h>\n")
+			implBuilder.WriteString("#include <stdlib.h>\n")
+			implBuilder.WriteString("#include <string.h>\n")
+			implBuilder.WriteString("#include <stdint.h>\n")
+			implBuilder.WriteString("#include <math.h>\n")
+			implBuilder.WriteString("\n")
+			implBuilder.WriteString("#include \"io.h\"\n")
+			implBuilder.WriteString("#include \"interface.h\"\n")
+			implBuilder.WriteString("#include \"" + entryHeaderName + "\"\n\n")
+			implBuilder.WriteString(implContent)
+
+			entryImplName = p.sanitizeModuleName(entryModule) + ".c"
+			implPath := filepath.Join(tempDir, entryImplName)
+			if err := os.WriteFile(implPath, []byte(implBuilder.String()), 0644); err != nil {
+				p.ctx.ReportError(fmt.Sprintf("failed to write implementation for %s: %v", entryModule, err), nil)
+			} else {
+				cFiles = append(cFiles, implPath)
+			}
+		}
+	}
+
+	// Step 3: Generate main.c that just includes all module headers
+	// The entry module's .c file contains main() and all implementations
+	// main.c is just a simple file that includes headers (for consistency, though it may not be needed)
 	mainCFile := filepath.Join(tempDir, "main.c")
 	var mainBuilder strings.Builder
 	mainBuilder.WriteString("// Generated C code from Ferret\n")
@@ -654,47 +698,21 @@ func (p *Pipeline) runCodegenPhase() error {
 	mainBuilder.WriteString("#include <stdlib.h>\n")
 	mainBuilder.WriteString("#include <string.h>\n")
 	mainBuilder.WriteString("#include <stdint.h>\n")
-	mainBuilder.WriteString("#include <math.h>\n") // For pow() function
+	mainBuilder.WriteString("#include <math.h>\n")
 	mainBuilder.WriteString("\n")
-	mainBuilder.WriteString("#include \"io.h\"\n\n")
+	mainBuilder.WriteString("#include \"io.h\"\n")
+	mainBuilder.WriteString("#include \"interface.h\"\n")
+	mainBuilder.WriteString("\n")
 
-	// Include all module headers
+	// Include all module headers (imported modules first, then entry module)
 	for _, importPath := range importedModules {
 		headerName := p.sanitizeModuleName(importPath) + ".h"
 		mainBuilder.WriteString("#include \"" + headerName + "\"\n")
 	}
-	mainBuilder.WriteString("\n")
-
-	// Generate entry module code
-	if entryModule != "" {
-		module, exists := p.ctx.GetModule(entryModule)
-		if exists {
-			gen := cgen.New(p.ctx, module)
-			moduleCode, err := gen.Generate()
-			if err != nil {
-				p.ctx.ReportError(fmt.Sprintf("code generation failed for %s: %v", entryModule, err), nil)
-			} else {
-				// Extract just the function definitions (skip header/includes)
-				lines := strings.Split(moduleCode, "\n")
-				var funcLines []string
-				skipHeader := true
-				for _, line := range lines {
-					// Skip header comments and includes
-					if skipHeader && (strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#include") || strings.TrimSpace(line) == "" || strings.Contains(line, "Runtime function declarations")) {
-						continue
-					}
-					skipHeader = false
-					funcLines = append(funcLines, line)
-				}
-
-				if len(funcLines) > 0 {
-					mainBuilder.WriteString("// Functions from " + entryModule + "\n")
-					mainBuilder.WriteString(strings.Join(funcLines, "\n"))
-					mainBuilder.WriteString("\n")
-				}
-			}
-		}
+	if entryHeaderName != "" {
+		mainBuilder.WriteString("#include \"" + entryHeaderName + "\"\n")
 	}
+	mainBuilder.WriteString("\n")
 
 	if err := os.WriteFile(mainCFile, []byte(mainBuilder.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write main C file: %w", err)
