@@ -35,9 +35,26 @@ const { Content } = await post.render();
     <body>
         <Navbar showSearch={false} />
         <main class="page">
+            <a class="back-link" href="/blog">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                    <line x1="9" y1="12" x2="21" y2="12"></line>
+                </svg>
+                <span>Back to blog</span>
+            </a>
             <article class="post">
-                <p class="date">{post.data.pubDate.toLocaleDateString()}</p>
                 <h1>{post.data.title}</h1>
+                <p class="date">{post.data.pubDate.toLocaleDateString()}</p>
                 <p class="desc">{post.data.description}</p>
                 {
                     post.data.tags && (
@@ -80,6 +97,22 @@ const { Content } = await post.render();
         padding: 3rem 1.5rem 4rem;
         margin: 0 auto;
     }
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--accent-color);
+        text-decoration: none;
+        font-weight: 500;
+        margin-bottom: 1rem;
+    }
+    .back-link svg {
+        width: 16px;
+        height: 16px;
+    }
+    .back-link:hover {
+        text-decoration: underline;
+    }
     .post {
         display: grid;
         gap: 0.75rem;
@@ -112,5 +145,12 @@ const { Content } = await post.render();
     }
     .content :global(p) {
         line-height: 1.7;
+    }
+    
+    .content :global(img) {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
     }
 </style>

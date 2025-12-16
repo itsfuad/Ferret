@@ -1,8 +1,8 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import svelte from '@astrojs/svelte';
 import ferretGrammarJson from './syntax/fer.tmLanguage.json';
+import d2 from 'astro-d2';
 
 // Cast to any to avoid type errors with the complex grammar structure
 const ferretGrammar = /** @type {any} */ (ferretGrammarJson);
@@ -107,9 +107,12 @@ export default defineConfig({
                 ],
             },
         ],
-    }), 
-      svelte(),
-    ],
+    }), d2({
+      sketch: true,
+      layout: 'elk',
+      // Disable generating diagrams when deploying on Vercel.
+      skipGeneration: !!process.env['VERCEL'],
+    })],
 
     vite: {
         plugins: [],
