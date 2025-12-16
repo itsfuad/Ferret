@@ -105,6 +105,7 @@ func (g *Generator) writeRuntimeDeclarations() {
 	g.write("#include \"io.h\"\n")        // Runtime header for I/O functions
 	g.write("#include \"interface.h\"\n") // Required for ferret_interface_t type
 	g.write("#include \"bigint.h\"\n")    // Required for 128/256-bit integer types
+	g.write("#include \"optional.h\"\n")  // Required for optional types
 	g.write("\n")
 }
 
@@ -863,7 +864,11 @@ func (g *Generator) GenerateHeader() string {
 	g.write("#include <stdbool.h>\n\n")
 
 	// Include runtime headers if needed (for interface types)
-	g.write("#include \"interface.h\"\n\n")
+	g.write("#include \"interface.h\"\n")
+	g.write("#include \"optional.h\"\n\n")
+
+	// Generate optional type definitions for all optional types used in the module
+	g.generateOptionalTypeDefinitions()
 
 	// Generate type definitions (structs, interfaces, etc.)
 	if g.mod.AST != nil {
@@ -1045,23 +1050,141 @@ func (g *Generator) generateVarDecl(decl *ast.VarDecl) {
 					g.generateExpr(item.Value)
 					g.write(")")
 				} else {
-					// If the value is a CompositeLit and we have a type from the variable declaration,
-					// use the variable's type directly for generation
-					// This handles cases like: let fruits : []str = ["apple", "banana", "cherry"];
-					if compLit, ok := item.Value.(*ast.CompositeLit); ok {
-						if compLit.Type == nil && varType != nil && !varType.Equals(types.TypeUnknown) {
-							// Generate composite literal with the variable's type
-							// For variable initialization, don't use cast for anonymous structs
-							g.generateCompositeLitWithType(compLit, varType, true)
-							// Store array length for dynamic arrays initialized with literals
-							if arrayType, ok := varType.(*types.ArrayType); ok && arrayType.Length < 0 {
-								g.arrayLengths[item.Name.Name] = len(compLit.Elts)
+					// Check if we need to wrap a value into an optional (T -> T?)
+					if optType, ok := varType.(*types.OptionalType); ok {
+						// Check if value is a none literal
+						if lit, ok := item.Value.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+							// Initializing with none - generate proper none struct
+							g.write("((ferret_optional_%s){.value = 0, .is_some = 0})", g.getOptionalTypeName(optType.Inner))
+						} else {
+							// Check if value is a literal that needs wrapping
+							if lit, ok := item.Value.(*ast.BasicLit); ok {
+								// For integer/float literals with numeric inner types, always wrap
+								if lit.Kind == ast.INT || lit.Kind == ast.FLOAT {
+									innerUnwrapped := types.UnwrapType(optType.Inner)
+									if prim, ok := innerUnwrapped.(*types.PrimitiveType); ok {
+										// Check if inner type is numeric
+										name := prim.GetName()
+										isNumeric := name == types.TYPE_I8 || name == types.TYPE_I16 || name == types.TYPE_I32 || name == types.TYPE_I64 ||
+											name == types.TYPE_U8 || name == types.TYPE_U16 || name == types.TYPE_U32 || name == types.TYPE_U64 ||
+											name == types.TYPE_F32 || name == types.TYPE_F64
+										if isNumeric {
+											// Wrap: T -> T? by creating optional struct
+											g.write("((ferret_optional_%s){.value = ", g.getOptionalTypeName(optType.Inner))
+											g.generateExpr(item.Value)
+											g.write(", .is_some = 1})")
+										} else {
+											g.generateExpr(item.Value)
+										}
+									} else {
+										g.generateExpr(item.Value)
+									}
+								} else {
+									// For non-numeric literals, check type compatibility
+									valueType := g.inferExprType(item.Value)
+									innerUnwrapped := types.UnwrapType(optType.Inner)
+									if valueType != nil && !valueType.Equals(types.TypeUnknown) {
+										valueUnwrapped := types.UnwrapType(valueType)
+										// Check if types match
+										if valueUnwrapped.Equals(innerUnwrapped) {
+											// Wrap: T -> T? by creating optional struct
+											g.write("((ferret_optional_%s){.value = ", g.getOptionalTypeName(optType.Inner))
+											g.generateExpr(item.Value)
+											g.write(", .is_some = 1})")
+										} else {
+											g.generateExpr(item.Value)
+										}
+									} else {
+										g.generateExpr(item.Value)
+									}
+								}
+							} else {
+								valueType := g.inferExprType(item.Value)
+								// Variable is optional - check if value needs wrapping
+								if valueType != nil && !valueType.Equals(types.TypeUnknown) {
+									// Unwrap types to compare inner types correctly
+									unwrappedValueType := types.UnwrapType(valueType)
+									unwrappedInnerType := types.UnwrapType(optType.Inner)
+									
+									// Check if value type matches inner type (needs wrapping)
+									if unwrappedValueType.Equals(unwrappedInnerType) {
+										// Wrap: T -> T? by creating optional struct
+										g.write("((ferret_optional_%s){.value = ", g.getOptionalTypeName(optType.Inner))
+										g.generateExpr(item.Value)
+										g.write(", .is_some = 1})")
+									} else {
+										// Value is already optional or different type - generate as-is
+										g.generateExpr(item.Value)
+									}
+								} else {
+									// Type unknown - generate as-is
+									g.generateExpr(item.Value)
+								}
+							}
+						}
+					} else if named, ok := varType.(*types.NamedType); ok {
+						// Check if underlying is optional
+						if optType, ok := named.Underlying.(*types.OptionalType); ok {
+							// Check if value is a none literal
+							if lit, ok := item.Value.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+								// Initializing with none - generate proper none struct
+								g.write("((ferret_optional_%s){.value = 0, .is_some = 0})", g.getOptionalTypeName(optType.Inner))
+							} else {
+								valueType := g.inferExprType(item.Value)
+								if valueType != nil && !valueType.Equals(types.TypeUnknown) {
+									unwrappedValueType := types.UnwrapType(valueType)
+									unwrappedInnerType := types.UnwrapType(optType.Inner)
+									if unwrappedValueType.Equals(unwrappedInnerType) {
+										// Wrap: T -> T?
+										g.write("((ferret_optional_%s){.value = ", g.getOptionalTypeName(optType.Inner))
+										g.generateExpr(item.Value)
+										g.write(", .is_some = 1})")
+									} else {
+										g.generateExpr(item.Value)
+									}
+								} else {
+									g.generateExpr(item.Value)
+								}
+							}
+						} else {
+							// If the value is a CompositeLit and we have a type from the variable declaration,
+							// use the variable's type directly for generation
+							// This handles cases like: let fruits : []str = ["apple", "banana", "cherry"];
+							if compLit, ok := item.Value.(*ast.CompositeLit); ok {
+								if compLit.Type == nil && varType != nil && !varType.Equals(types.TypeUnknown) {
+									// Generate composite literal with the variable's type
+									// For variable initialization, don't use cast for anonymous structs
+									g.generateCompositeLitWithType(compLit, varType, true)
+									// Store array length for dynamic arrays initialized with literals
+									if arrayType, ok := varType.(*types.ArrayType); ok && arrayType.Length < 0 {
+										g.arrayLengths[item.Name.Name] = len(compLit.Elts)
+									}
+								} else {
+									g.generateExpr(item.Value)
+								}
+							} else {
+								g.generateExpr(item.Value)
+							}
+						}
+					} else {
+						// If the value is a CompositeLit and we have a type from the variable declaration,
+						// use the variable's type directly for generation
+						// This handles cases like: let fruits : []str = ["apple", "banana", "cherry"];
+						if compLit, ok := item.Value.(*ast.CompositeLit); ok {
+							if compLit.Type == nil && varType != nil && !varType.Equals(types.TypeUnknown) {
+								// Generate composite literal with the variable's type
+								// For variable initialization, don't use cast for anonymous structs
+								g.generateCompositeLitWithType(compLit, varType, true)
+								// Store array length for dynamic arrays initialized with literals
+								if arrayType, ok := varType.(*types.ArrayType); ok && arrayType.Length < 0 {
+									g.arrayLengths[item.Name.Name] = len(compLit.Elts)
+								}
+							} else {
+								g.generateExpr(item.Value)
 							}
 						} else {
 							g.generateExpr(item.Value)
 						}
-					} else {
-						g.generateExpr(item.Value)
 					}
 				}
 				g.write(";\n")
@@ -1197,8 +1320,68 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 	}
 
 	// Regular assignment (x = y)
+	// Check if we need to wrap the value for optional types
+	lhsType := g.inferExprType(stmt.Lhs)
+	rhsType := g.inferExprType(stmt.Rhs)
+	
 	g.generateExpr(stmt.Lhs)
 	g.write(" = ")
+	
+	// Check if LHS is optional and RHS needs wrapping
+	if lhsType != nil && !lhsType.Equals(types.TypeUnknown) {
+		var lhsOptType *types.OptionalType
+		if opt, ok := lhsType.(*types.OptionalType); ok {
+			lhsOptType = opt
+		} else if named, ok := lhsType.(*types.NamedType); ok {
+			if opt, ok := named.Underlying.(*types.OptionalType); ok {
+				lhsOptType = opt
+			}
+		}
+		
+		if lhsOptType != nil {
+			// Check if RHS is a none literal (check both AST node and type)
+			isNone := false
+			if lit, ok := stmt.Rhs.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+				isNone = true
+			} else if rhsType != nil && rhsType.Equals(types.TypeNone) {
+				// Also check if type is TypeNone
+				isNone = true
+			}
+			
+			if isNone {
+				// Assigning none to optional - generate proper none struct
+				g.write("((ferret_optional_%s){.value = 0, .is_some = 0})", g.getOptionalTypeName(lhsOptType.Inner))
+				g.write(";\n")
+				return
+			}
+			
+			if rhsType != nil && !rhsType.Equals(types.TypeUnknown) {
+				// LHS is optional - check if RHS needs wrapping
+				unwrappedRhsType := types.UnwrapType(rhsType)
+				unwrappedInnerType := types.UnwrapType(lhsOptType.Inner)
+				
+				if unwrappedRhsType.Equals(unwrappedInnerType) {
+					// RHS is the inner type, needs wrapping: T -> T?
+					g.write("((ferret_optional_%s){.value = ", g.getOptionalTypeName(lhsOptType.Inner))
+					g.generateExpr(stmt.Rhs)
+					g.write(", .is_some = 1})")
+					g.write(";\n")
+					return
+				}
+			}
+			
+			// Fallback: if RHS type is unknown or check failed, but LHS is optional and RHS is a literal,
+			// check if it's a none literal that wasn't caught above
+			if lit, ok := stmt.Rhs.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+				// Assigning none to optional - generate proper none struct
+				g.write("((ferret_optional_%s){.value = 0, .is_some = 0})", g.getOptionalTypeName(lhsOptType.Inner))
+				g.write(";\n")
+				return
+			}
+		}
+	}
+	
+	// No wrapping needed - generate as-is
 	g.generateExpr(stmt.Rhs)
 	g.write(";\n")
 }
@@ -1638,7 +1821,7 @@ func (g *Generator) generateExpr(expr ast.Expression) {
 	case *ast.BasicLit:
 		g.generateLiteral(e)
 	case *ast.IdentifierExpr:
-		g.write(g.sanitizeName(e.Name))
+		g.generateIdentifierExpr(e)
 	case *ast.BinaryExpr:
 		g.generateBinaryExpr(e)
 	case *ast.UnaryExpr:
@@ -1661,6 +1844,8 @@ func (g *Generator) generateExpr(expr ast.Expression) {
 		g.generateCastExpr(e)
 	case *ast.CompositeLit:
 		g.generateCompositeLit(e)
+	case *ast.CoalescingExpr:
+		g.generateCoalescingExpr(e)
 	case *ast.RangeExpr:
 		// RangeExpr as standalone expression (e.g., let arr := 0..10)
 		// For now, we'll generate a placeholder - ranges in assignments might need array generation
@@ -1702,6 +1887,10 @@ func (g *Generator) generateLiteral(lit *ast.BasicLit) {
 		} else {
 			g.write("0")
 		}
+	case ast.NONE:
+		// Generate none constant - use the none constant defined for optional types
+		// The none constant is defined for each optional type in the header file
+		g.write("none")
 	}
 }
 
@@ -1772,10 +1961,174 @@ func (g *Generator) generateBinaryExpr(expr *ast.BinaryExpr) {
 		return
 	}
 
+	// Handle none comparisons (== none, != none)
+	if expr.Op.Kind == tokens.DOUBLE_EQUAL_TOKEN || expr.Op.Kind == tokens.NOT_EQUAL_TOKEN {
+		xType := g.inferExprType(expr.X)
+		yType := g.inferExprType(expr.Y)
+
+		// Check if comparing with none
+		var optType *types.OptionalType
+		var isNoneComparison bool
+
+		if xType != nil {
+			if opt, ok := xType.(*types.OptionalType); ok {
+				optType = opt
+				isNoneComparison = true
+			} else if named, ok := xType.(*types.NamedType); ok {
+				if opt, ok := named.Underlying.(*types.OptionalType); ok {
+					optType = opt
+					isNoneComparison = true
+				}
+			}
+		}
+		if !isNoneComparison && yType != nil {
+			if opt, ok := yType.(*types.OptionalType); ok {
+				optType = opt
+				isNoneComparison = true
+			} else if named, ok := yType.(*types.NamedType); ok {
+				if opt, ok := named.Underlying.(*types.OptionalType); ok {
+					optType = opt
+					isNoneComparison = true
+				}
+			}
+		}
+
+		// Check if one side is a none literal (check both AST node and type)
+		var noneSide ast.Expression
+		var otherSide ast.Expression
+		if lit, ok := expr.X.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+			noneSide = expr.X
+			otherSide = expr.Y
+			isNoneComparison = true
+		} else if xType != nil && xType.Equals(types.TypeNone) {
+			// Check if type is TypeNone
+			noneSide = expr.X
+			otherSide = expr.Y
+			isNoneComparison = true
+		} else if lit, ok := expr.Y.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+			noneSide = expr.Y
+			otherSide = expr.X
+			isNoneComparison = true
+		} else if yType != nil && yType.Equals(types.TypeNone) {
+			// Check if type is TypeNone
+			noneSide = expr.Y
+			otherSide = expr.X
+			isNoneComparison = true
+		}
+
+		if isNoneComparison {
+			// Generate: opt.is_some == 0 (for == none) or opt.is_some != 0 (for != none)
+			if noneSide != nil {
+				// Comparing with none literal - check is_some field
+				// For identifier expressions, we need the variable name itself (not .value)
+				// because we're comparing the optional, not the narrowed value
+				if ident, ok := otherSide.(*ast.IdentifierExpr); ok {
+					// Use the variable name directly for comparison
+					varName := g.sanitizeName(ident.Name)
+					if expr.Op.Kind == tokens.DOUBLE_EQUAL_TOKEN {
+						g.write("%s.is_some == 0", varName)
+					} else {
+						g.write("%s.is_some != 0", varName)
+					}
+				} else {
+					// For non-identifier expressions, generate normally and add .is_some
+					if expr.Op.Kind == tokens.DOUBLE_EQUAL_TOKEN {
+						g.generateExpr(otherSide)
+						g.write(".is_some == 0")
+					} else {
+						g.generateExpr(otherSide)
+						g.write(".is_some != 0")
+					}
+				}
+				return
+			} else if optType != nil {
+				// Both sides are optionals - compare is_some fields
+				// Check if one side is none constant
+				if lit, ok := expr.X.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+					// X is none, Y is optional - compare Y.is_some with 0
+					if expr.Op.Kind == tokens.DOUBLE_EQUAL_TOKEN {
+						g.generateExpr(expr.Y)
+						g.write(".is_some == 0")
+					} else {
+						g.generateExpr(expr.Y)
+						g.write(".is_some != 0")
+					}
+				} else if lit, ok := expr.Y.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
+					// Y is none, X is optional - compare X.is_some with 0
+					if expr.Op.Kind == tokens.DOUBLE_EQUAL_TOKEN {
+						g.generateExpr(expr.X)
+						g.write(".is_some == 0")
+					} else {
+						g.generateExpr(expr.X)
+						g.write(".is_some != 0")
+					}
+				} else {
+					// Both sides are optionals - compare is_some fields
+					g.generateExpr(expr.X)
+					g.write(".is_some")
+					g.write(" %s ", expr.Op.Value)
+					g.generateExpr(expr.Y)
+					g.write(".is_some")
+				}
+				return
+			}
+		}
+	}
+
 	// Regular binary expression (numeric operations: +, -, *, /, %, comparisons: >, <, <=, >=, ==, !=)
 	g.generateExpr(expr.X)
 	g.write(" %s ", expr.Op.Value)
 	g.generateExpr(expr.Y)
+}
+
+// generateIdentifierExpr generates code for an identifier expression.
+// Handles type narrowing: if a variable was originally optional but has been narrowed
+// to the inner type, it generates `.value` to unwrap the optional.
+func (g *Generator) generateIdentifierExpr(expr *ast.IdentifierExpr) {
+	varName := g.sanitizeName(expr.Name)
+	
+	// Get the type from the expression (may be narrowed)
+	exprType := g.inferExprType(expr)
+	
+	// Get the original declared type from the symbol table
+	// The symbol table should have the original type (not the narrowed one)
+	var originalType types.SemType
+	if sym, ok := g.mod.CurrentScope.Lookup(expr.Name); ok && sym != nil && sym.Type != nil {
+		originalType = sym.Type
+	}
+	
+	// Check if we need to unwrap an optional
+	// If the original type is optional but the current (narrowed) type is not,
+	// we need to access .value to unwrap it
+	if originalType != nil && exprType != nil && !exprType.Equals(types.TypeUnknown) {
+		// Check if original type is optional
+		var originalOptType *types.OptionalType
+		if opt, ok := originalType.(*types.OptionalType); ok {
+			originalOptType = opt
+		} else if named, ok := originalType.(*types.NamedType); ok {
+			if opt, ok := named.Underlying.(*types.OptionalType); ok {
+				originalOptType = opt
+			}
+		}
+		
+		// If original is optional, check if current type is the inner type (narrowed)
+		if originalOptType != nil {
+			// Check if the current type is not optional (has been narrowed)
+			// Unwrap NamedType to compare with inner type
+			unwrappedExprType := types.UnwrapType(exprType)
+			unwrappedInnerType := types.UnwrapType(originalOptType.Inner)
+			
+			// If it's been narrowed to the inner type, we need to unwrap
+			if unwrappedExprType.Equals(unwrappedInnerType) {
+				// Variable has been narrowed from T? to T, need to unwrap
+				g.write("%s.value", varName)
+				return
+			}
+		}
+	}
+	
+	// No narrowing or not an optional - just write the variable name
+	g.write(varName)
 }
 
 // inferExprType gets the type of an expression.
@@ -2018,6 +2371,50 @@ func (g *Generator) generateCastExpr(expr *ast.CastExpr) {
 	g.write(")")
 }
 
+// generateCoalescingExpr generates code for the coalescing operator (a ?? b)
+// If a is none (is_some == 0), returns b, otherwise returns a.value
+func (g *Generator) generateCoalescingExpr(expr *ast.CoalescingExpr) {
+	// Get the type of the condition (should be optional)
+	condType := g.inferExprType(expr.Cond)
+
+	// Check if condition is an optional type
+	if _, ok := condType.(*types.OptionalType); ok {
+		// Generate: (cond.is_some ? cond.value : default)
+		g.write("(")
+		g.generateExpr(expr.Cond)
+		g.write(".is_some ? ")
+		g.generateExpr(expr.Cond)
+		g.write(".value : ")
+		g.generateExpr(expr.Default)
+		g.write(")")
+	} else if named, ok := condType.(*types.NamedType); ok {
+		// Check if underlying is optional
+		if _, ok := named.Underlying.(*types.OptionalType); ok {
+			g.write("(")
+			g.generateExpr(expr.Cond)
+			g.write(".is_some ? ")
+			g.generateExpr(expr.Cond)
+			g.write(".value : ")
+			g.generateExpr(expr.Default)
+			g.write(")")
+		} else {
+			// Not an optional - this shouldn't happen if type checking worked
+			g.ctx.ReportError("codegen: coalescing operator requires optional type", nil)
+			g.write("/* error: not optional */")
+		}
+	} else {
+		// Fallback: assume it's an optional and generate the code anyway
+		// Type checker should have caught this, but be defensive
+		g.write("(")
+		g.generateExpr(expr.Cond)
+		g.write(".is_some ? ")
+		g.generateExpr(expr.Cond)
+		g.write(".value : ")
+		g.generateExpr(expr.Default)
+		g.write(")")
+	}
+}
+
 func (g *Generator) generateCompositeLit(expr *ast.CompositeLit) {
 	// CompositeLit: struct literals, array literals, map literals
 	// Examples:
@@ -2210,10 +2607,39 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 									return
 								} else if len(expr.Args) == 1 {
 									// Single argument - use type-specific function
+									// Check if argument is optional and unwrap it
+									argType := g.inferExprType(expr.Args[0])
 									g.writeIndent()
-									g.write("%s(", g.getPrintFunctionName(funcName, expr.Args[0]))
-									g.generateExpr(expr.Args[0])
-									g.write(");\n")
+									if optType, ok := argType.(*types.OptionalType); ok {
+										// Optional type - unwrap it for printing
+										innerType := optType.Inner
+										// Generate code to unwrap and print
+										g.write("if (")
+										g.generateExpr(expr.Args[0])
+										g.write(".is_some) { ")
+										// Print the value
+										g.write("%s(", g.getPrintFunctionNameForType(funcName, innerType))
+										g.generateExpr(expr.Args[0])
+										g.write(".value); } else { ferret_io_%s(\"<none>\"); }\n", funcName)
+									} else if named, ok := argType.(*types.NamedType); ok {
+										if optType, ok := named.Underlying.(*types.OptionalType); ok {
+											innerType := optType.Inner
+											g.write("if (")
+											g.generateExpr(expr.Args[0])
+											g.write(".is_some) { ")
+											g.write("%s(", g.getPrintFunctionNameForType(funcName, innerType))
+											g.generateExpr(expr.Args[0])
+											g.write(".value); } else { ferret_io_%s(\"<none>\"); }\n", funcName)
+										} else {
+											g.write("%s(", g.getPrintFunctionName(funcName, expr.Args[0]))
+											g.generateExpr(expr.Args[0])
+											g.write(");\n")
+										}
+									} else {
+										g.write("%s(", g.getPrintFunctionName(funcName, expr.Args[0]))
+										g.generateExpr(expr.Args[0])
+										g.write(");\n")
+									}
 									return
 								} else {
 									// Multiple arguments - format and concatenate
@@ -2366,10 +2792,39 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 					return
 				} else if len(expr.Args) == 1 {
 					// Single argument - use type-specific function
+					// Check if argument is optional and unwrap it
+					argType := g.inferExprType(expr.Args[0])
 					g.writeIndent()
-					g.write("%s(", g.getPrintFunctionName(funcName, expr.Args[0]))
-					g.generateExpr(expr.Args[0])
-					g.write(");\n")
+					if optType, ok := argType.(*types.OptionalType); ok {
+						// Optional type - unwrap it for printing
+						innerType := optType.Inner
+						// Generate code to unwrap and print
+						g.write("if (")
+						g.generateExpr(expr.Args[0])
+						g.write(".is_some) { ")
+						// Print the value
+						g.write("%s(", g.getPrintFunctionNameForType(funcName, innerType))
+						g.generateExpr(expr.Args[0])
+						g.write(".value); } else { ferret_io_%s(\"<none>\"); }\n", funcName)
+					} else if named, ok := argType.(*types.NamedType); ok {
+						if optType, ok := named.Underlying.(*types.OptionalType); ok {
+							innerType := optType.Inner
+							g.write("if (")
+							g.generateExpr(expr.Args[0])
+							g.write(".is_some) { ")
+							g.write("%s(", g.getPrintFunctionNameForType(funcName, innerType))
+							g.generateExpr(expr.Args[0])
+							g.write(".value); } else { ferret_io_%s(\"<none>\"); }\n", funcName)
+						} else {
+							g.write("%s(", g.getPrintFunctionName(funcName, expr.Args[0]))
+							g.generateExpr(expr.Args[0])
+							g.write(");\n")
+						}
+					} else {
+						g.write("%s(", g.getPrintFunctionName(funcName, expr.Args[0]))
+						g.generateExpr(expr.Args[0])
+						g.write(");\n")
+					}
 					return
 				} else {
 					// Multiple arguments - format and concatenate
@@ -2512,8 +2967,180 @@ func (g *Generator) typeToC(typ types.SemType) string {
 		// Dynamic array: []T - use pointer for now
 		// TODO: Implement proper dynamic array support
 		return fmt.Sprintf("%s*", elType)
+	case *types.OptionalType:
+		// Optional types: T? -> ferret_optional_T
+		return fmt.Sprintf("ferret_optional_%s", g.getOptionalTypeName(t.Inner))
 	}
 	return "void"
+}
+
+// generateOptionalTypeDefinitions generates typedef struct definitions for all optional types used in the module
+func (g *Generator) generateOptionalTypeDefinitions() {
+	// Collect all optional types used in the module
+	optionalTypes := make(map[string]types.SemType)
+
+	var collectOptionalTypes func(expr ast.Expression)
+	collectOptionalTypes = func(expr ast.Expression) {
+		if expr == nil {
+			return
+		}
+
+		// Check expression type
+		exprType := g.inferExprType(expr)
+		if optType, ok := exprType.(*types.OptionalType); ok {
+			typeName := g.getOptionalTypeName(optType.Inner)
+			if _, exists := optionalTypes[typeName]; !exists {
+				optionalTypes[typeName] = optType.Inner
+			}
+		}
+
+		// Recursively check sub-expressions
+		switch e := expr.(type) {
+		case *ast.BinaryExpr:
+			collectOptionalTypes(e.X)
+			collectOptionalTypes(e.Y)
+		case *ast.UnaryExpr:
+			collectOptionalTypes(e.X)
+		case *ast.CallExpr:
+			for _, arg := range e.Args {
+				collectOptionalTypes(arg)
+			}
+		case *ast.CoalescingExpr:
+			collectOptionalTypes(e.Cond)
+			collectOptionalTypes(e.Default)
+		case *ast.ParenExpr:
+			collectOptionalTypes(e.X)
+		}
+	}
+
+	// Scan all variable declarations and expressions in the module
+	if g.mod.AST != nil {
+		for _, node := range g.mod.AST.Nodes {
+			switch n := node.(type) {
+			case *ast.VarDecl:
+				for _, item := range n.Decls {
+					if item.Type != nil {
+						varType := g.typeFromTypeNode(item.Type)
+						if optType, ok := varType.(*types.OptionalType); ok {
+							typeName := g.getOptionalTypeName(optType.Inner)
+							if _, exists := optionalTypes[typeName]; !exists {
+								optionalTypes[typeName] = optType.Inner
+							}
+						}
+					}
+					if item.Value != nil {
+						collectOptionalTypes(item.Value)
+					}
+				}
+			case *ast.FuncDecl:
+				// Collect optional types from function parameters and return type
+				if n.Type != nil {
+					if n.Type.Params != nil {
+						for _, param := range n.Type.Params {
+							if param.Type != nil {
+								paramType := g.typeFromTypeNode(param.Type)
+								if optType, ok := paramType.(*types.OptionalType); ok {
+									typeName := g.getOptionalTypeName(optType.Inner)
+									if _, exists := optionalTypes[typeName]; !exists {
+										optionalTypes[typeName] = optType.Inner
+									}
+								}
+							}
+						}
+					}
+					if n.Type.Result != nil {
+						returnType := g.typeFromTypeNode(n.Type.Result)
+						if optType, ok := returnType.(*types.OptionalType); ok {
+							typeName := g.getOptionalTypeName(optType.Inner)
+							if _, exists := optionalTypes[typeName]; !exists {
+								optionalTypes[typeName] = optType.Inner
+							}
+						}
+					}
+				}
+				if n.Body != nil {
+					var scanStmt func(ast.Node)
+					scanStmt = func(node ast.Node) {
+						if node == nil {
+							return
+						}
+						switch s := node.(type) {
+						case *ast.ExprStmt:
+							if s.X != nil {
+								collectOptionalTypes(s.X)
+							}
+						case *ast.VarDecl:
+							for _, item := range s.Decls {
+								if item.Type != nil {
+									varType := g.typeFromTypeNode(item.Type)
+									if optType, ok := varType.(*types.OptionalType); ok {
+										typeName := g.getOptionalTypeName(optType.Inner)
+										if _, exists := optionalTypes[typeName]; !exists {
+											optionalTypes[typeName] = optType.Inner
+										}
+									}
+								}
+								if item.Value != nil {
+									collectOptionalTypes(item.Value)
+								}
+							}
+						case *ast.AssignStmt:
+							if s.Lhs != nil {
+								collectOptionalTypes(s.Lhs)
+							}
+							if s.Rhs != nil {
+								collectOptionalTypes(s.Rhs)
+							}
+						case *ast.IfStmt:
+							if s.Cond != nil {
+								collectOptionalTypes(s.Cond)
+							}
+							if s.Body != nil {
+								for _, stmt := range s.Body.Nodes {
+									scanStmt(stmt)
+								}
+							}
+							if s.Else != nil {
+								if elseBlock, ok := s.Else.(*ast.Block); ok {
+									for _, stmt := range elseBlock.Nodes {
+										scanStmt(stmt)
+									}
+								}
+							}
+						case *ast.Block:
+							for _, stmt := range s.Nodes {
+								scanStmt(stmt)
+							}
+						}
+					}
+					for _, stmt := range n.Body.Nodes {
+						scanStmt(stmt)
+					}
+				}
+			}
+		}
+	}
+
+	// Track if we've generated the default none constant
+	noneGenerated := false
+	
+	// Generate typedef struct for each optional type
+	for typeName, innerType := range optionalTypes {
+		innerCType := g.typeToC(innerType)
+		g.write("typedef struct {\n")
+		g.write("    %s value;\n", innerCType)
+		g.write("    int is_some;\n")
+		g.write("} ferret_optional_%s;\n", typeName)
+		
+		// Generate none constant - use int32_t as default if available, otherwise first type
+		if !noneGenerated {
+			// Generate a default none constant for the first optional type found
+			// This will be used as the default none constant (similar to true/false)
+			g.write("static const ferret_optional_%s none = ((ferret_optional_%s){.value = 0, .is_some = 0});\n", typeName, typeName)
+			noneGenerated = true
+		}
+		g.write("\n")
+	}
 }
 
 // structTypeToC generates an inline struct type definition for anonymous structs
@@ -2544,6 +3171,71 @@ func (g *Generator) typeFromTypeNode(node ast.TypeNode) types.SemType {
 func (g *Generator) sanitizeName(name string) string {
 	// Replace invalid C identifier characters
 	return strings.ReplaceAll(name, "::", "_")
+}
+
+// getOptionalTypeName generates a C identifier name for an optional type
+// e.g., i32 -> int32_t, str -> str (for optional struct names)
+func (g *Generator) getOptionalTypeName(innerType types.SemType) string {
+	// Get the base C type name
+	baseType := g.typeToC(innerType)
+	// Sanitize it for use in struct name (remove *, [], etc.)
+	// For simple types like int32_t, use as-is
+	// For complex types, we need to create a valid identifier
+	baseType = strings.ReplaceAll(baseType, "*", "_ptr")
+	baseType = strings.ReplaceAll(baseType, "[", "_arr")
+	baseType = strings.ReplaceAll(baseType, "]", "")
+	baseType = strings.ReplaceAll(baseType, " ", "_")
+	return baseType
+}
+
+// getPrintFunctionNameForType returns the appropriate Print/Println function name based on type
+func (g *Generator) getPrintFunctionNameForType(funcName string, argType types.SemType) string {
+	if argType == nil {
+		return fmt.Sprintf("ferret_io_%s", funcName)
+	}
+
+	// Get the base function name (Print or Println)
+	baseName := "Print"
+	if funcName == "Println" {
+		baseName = "Println"
+	}
+
+	// Map type to function suffix
+	switch t := argType.(type) {
+	case *types.PrimitiveType:
+		switch t.GetName() {
+		case types.TYPE_I8:
+			return fmt.Sprintf("ferret_io_%s_i8", baseName)
+		case types.TYPE_I16:
+			return fmt.Sprintf("ferret_io_%s_i16", baseName)
+		case types.TYPE_I32:
+			return fmt.Sprintf("ferret_io_%s_i32", baseName)
+		case types.TYPE_I64:
+			return fmt.Sprintf("ferret_io_%s_i64", baseName)
+		case types.TYPE_U8:
+			return fmt.Sprintf("ferret_io_%s_u8", baseName)
+		case types.TYPE_U16:
+			return fmt.Sprintf("ferret_io_%s_u16", baseName)
+		case types.TYPE_U32:
+			return fmt.Sprintf("ferret_io_%s_u32", baseName)
+		case types.TYPE_U64:
+			return fmt.Sprintf("ferret_io_%s_u64", baseName)
+		case types.TYPE_F32:
+			return fmt.Sprintf("ferret_io_%s_f32", baseName)
+		case types.TYPE_F64:
+			return fmt.Sprintf("ferret_io_%s_f64", baseName)
+		case types.TYPE_BOOL:
+			return fmt.Sprintf("ferret_io_%s_bool", baseName)
+		case types.TYPE_STRING:
+			return fmt.Sprintf("ferret_io_%s", baseName)
+		}
+	case *types.NamedType:
+		// Unwrap to underlying type
+		return g.getPrintFunctionNameForType(funcName, t.Underlying)
+	}
+
+	// Fallback to string version
+	return fmt.Sprintf("ferret_io_%s", baseName)
 }
 
 // getPrintFunctionName returns the appropriate Print/Println function name based on argument type
@@ -2666,9 +3358,35 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 			// Defaulting to string causes segfaults when the value is not a string
 			g.ctx.ReportError(fmt.Sprintf("codegen: cannot determine type for print argument (expression type: %T)", arg), nil)
 			formatParts = append(formatParts, "%s") // Still add format to prevent syntax errors, but will likely crash
+		} else if argType.Equals(types.TypeNone) {
+			// none type - print as string
+			formatParts = append(formatParts, "%s")
 		} else {
+			// Check if it's an optional type - if so, use %s format since we'll format as string
+			var actualType types.SemType
+			isOptional := false
+			if optType, ok := argType.(*types.OptionalType); ok {
+				actualType = optType.Inner
+				isOptional = true
+			} else if named, ok := argType.(*types.NamedType); ok {
+				if optType, ok := named.Underlying.(*types.OptionalType); ok {
+					actualType = optType.Inner
+					isOptional = true
+				} else {
+					actualType = argType
+				}
+			} else {
+				actualType = argType
+			}
+
+			// For optional types, always use %s format since we format as string ("value" or "none")
+			if isOptional {
+				formatParts = append(formatParts, "%s")
+				continue // Skip the rest, format is set
+			}
+
 			// Unwrap NamedType to get underlying type for format specifier determination
-			unwrappedType := types.UnwrapType(argType)
+			unwrappedType := types.UnwrapType(actualType)
 
 			if g.isStringType(unwrappedType) {
 				formatParts = append(formatParts, "%s")
@@ -2706,6 +3424,96 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		}
 	}
 
+	// Generate temp buffers for optional values BEFORE snprintf
+	// We need to format optional values that have a value, using the same logic as their inner type T
+	optionalTempBuffers := make(map[int]string) // map from arg index to temp buffer name
+	
+	for i, arg := range args {
+		argType := g.inferExprType(arg)
+		if argType == nil || argType.Equals(types.TypeUnknown) {
+			if ident, ok := arg.(*ast.IdentifierExpr); ok {
+				if sym, found := g.mod.CurrentScope.Lookup(ident.Name); found && sym != nil && sym.Type != nil {
+					argType = sym.Type
+				}
+			}
+		}
+		
+		// Check if this is an optional type that needs formatting
+		var innerType types.SemType
+		if optType, ok := argType.(*types.OptionalType); ok {
+			innerType = optType.Inner
+		} else if named, ok := argType.(*types.NamedType); ok {
+			if optType, ok := named.Underlying.(*types.OptionalType); ok {
+				innerType = optType.Inner
+			}
+		}
+		
+		if innerType != nil {
+			// We need a temp buffer for this optional - format it before the main snprintf
+			tempBuf := fmt.Sprintf("__opt_val_%d_%d", g.counter, i)
+			optionalTempBuffers[i] = tempBuf
+			g.writeIndent()
+			g.write("char %s[64]; ", tempBuf)
+			
+			// Generate code to format the optional value: if has value, format inner type T, else "none"
+			g.writeIndent()
+			g.write("if (")
+			g.generateExpr(arg)
+			g.write(".is_some) { ")
+			
+			// Format using the same logic as the inner type T
+			unwrappedInner := types.UnwrapType(innerType)
+			if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+				// String - just copy the value
+				g.write("strncpy(%s, ", tempBuf)
+				g.generateExpr(arg)
+				g.write(".value, sizeof(%s) - 1); %s[sizeof(%s) - 1] = '\\0';", tempBuf, tempBuf, tempBuf)
+			} else if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
+				// Bool - format as "true" or "false"
+				g.write("strcpy(%s, ", tempBuf)
+				g.generateExpr(arg)
+				g.write(".value ? \"true\" : \"false\");")
+			} else {
+				// Numeric or other types - use snprintf with appropriate format
+				// Determine format specifier based on inner type T (reusing existing type handlers)
+				g.buf.WriteString("snprintf(")
+				g.buf.WriteString(tempBuf)
+				g.buf.WriteString(", sizeof(")
+				g.buf.WriteString(tempBuf)
+				g.buf.WriteString("), \"")
+				// Write format specifier directly (same logic as format string building)
+				if g.isStringType(unwrappedInner) {
+					g.buf.WriteString("%s")
+				} else if prim, ok := unwrappedInner.(*types.PrimitiveType); ok {
+					switch prim.GetName() {
+					case types.TYPE_I8, types.TYPE_I16, types.TYPE_I32:
+						g.buf.WriteString("%d")
+					case types.TYPE_I64:
+						g.buf.WriteString("%ld")
+					case types.TYPE_U8, types.TYPE_U16, types.TYPE_U32:
+						g.buf.WriteString("%u")
+					case types.TYPE_U64:
+						g.buf.WriteString("%lu")
+					case types.TYPE_F32:
+						g.buf.WriteString("%.6g")
+					case types.TYPE_F64:
+						g.buf.WriteString("%.15g")
+					default:
+						g.buf.WriteString("%d")
+					}
+				} else if g.isIntegerType(unwrappedInner) {
+					g.buf.WriteString("%d")
+				} else {
+					g.buf.WriteString("%d")
+				}
+				g.buf.WriteString("\", ")
+				g.generateExpr(arg)
+				g.buf.WriteString(".value);")
+			}
+			g.write(" } else { strcpy(%s, \"none\"); }\n", tempBuf)
+		}
+	}
+	
 	formatStr := strings.Join(formatParts, "")
 
 	// Generate: snprintf(bufName, sizeof(bufName), format, args...);
@@ -2725,13 +3533,38 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				}
 			}
 		}
-		// For bool, convert to string first
-		if prim, ok := argType.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
-			g.write("(")
-			g.generateExpr(arg)
-			g.write(" ? \"true\" : \"false\")")
+		
+		// Check if we have a temp buffer for this optional
+		if tempBuf, hasTempBuf := optionalTempBuffers[i]; hasTempBuf {
+			// Use the pre-formatted temp buffer
+			g.write("%s", tempBuf)
+		} else if argType != nil && argType.Equals(types.TypeNone) {
+			// Handle none type - print as string
+			g.write("\"none\"")
 		} else {
-			g.generateExpr(arg)
+			// Check if it's an optional type (should have been handled above, but just in case)
+			var isOptional bool
+			if _, ok := argType.(*types.OptionalType); ok {
+				isOptional = true
+			} else if named, ok := argType.(*types.NamedType); ok {
+				if _, ok := named.Underlying.(*types.OptionalType); ok {
+					isOptional = true
+				}
+			}
+			
+			if !isOptional {
+				// Not optional - handle normally using existing type handlers
+				if prim, ok := argType.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
+					g.write("(")
+					g.generateExpr(arg)
+					g.write(" ? \"true\" : \"false\")")
+				} else {
+					g.generateExpr(arg)
+				}
+			} else {
+				// Fallback for optionals without temp buffer (shouldn't happen)
+				g.write("\"none\"")
+			}
 		}
 	}
 	g.write("); ")

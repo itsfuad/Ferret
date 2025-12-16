@@ -115,10 +115,20 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	target = dereferenceType(target)
 
 	// Special handling for none
-	// none can be assigned to any optional type (T?)
+	// none can be assigned to any optional type (T?) or empty interface (interface{})
 	if source.Equals(types.TypeNone) {
 		if _, ok := target.(*types.OptionalType); ok {
 			return ImplicitCastable
+		}
+		// Check if target is an empty interface (interface{})
+		if iface, ok := target.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+			return ImplicitCastable
+		}
+		// Check if target is a named type wrapping an empty interface
+		if named, ok := target.(*types.NamedType); ok {
+			if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+				return ImplicitCastable
+			}
 		}
 		return Incompatible
 	}
@@ -234,10 +244,20 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 	target = dereferenceType(target)
 
 	// Special handling for none
-	// none can be assigned to any optional type (T?)
+	// none can be assigned to any optional type (T?) or empty interface (interface{})
 	if source.Equals(types.TypeNone) {
 		if _, ok := target.(*types.OptionalType); ok {
 			return ImplicitCastable
+		}
+		// Check if target is an empty interface (interface{})
+		if iface, ok := target.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+			return ImplicitCastable
+		}
+		// Check if target is a named type wrapping an empty interface
+		if named, ok := target.(*types.NamedType); ok {
+			if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+				return ImplicitCastable
+			}
 		}
 		return Incompatible
 	}

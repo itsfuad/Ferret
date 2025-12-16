@@ -87,17 +87,8 @@ func (p *Pipeline) Run() error {
 		return err
 	}
 
-	// Phase 4a: Type Check Method Signatures (attach methods to types)
 	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 4a] Type Check Method Signatures\n")
-	}
-	if err := p.runMethodSignatureTypeCheckPhase(); err != nil {
-		return err
-	}
-
-	// Phase 4b: Type Check Everything Else
-	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 4b] Type Check Bodies\n")
+		colors.CYAN.Printf("\n[Phase 4] Type Check\n")
 	}
 	if err := p.runTypeCheckerPhase(); err != nil {
 		return err
@@ -433,7 +424,7 @@ func (p *Pipeline) runResolverPhase() error {
 }
 
 // runMethodSignatureTypeCheckPhase type checks only method signatures (attaches methods to types)
-func (p *Pipeline) runMethodSignatureTypeCheckPhase() error {
+func runMethodSignatureTypeCheckPhase(p *Pipeline) error {
 	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
@@ -457,6 +448,9 @@ func (p *Pipeline) runMethodSignatureTypeCheckPhase() error {
 
 // runTypeCheckerPhase runs type checking on all resolved modules
 func (p *Pipeline) runTypeCheckerPhase() error {
+
+	runMethodSignatureTypeCheckPhase(p)
+
 	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
@@ -719,6 +713,7 @@ func (p *Pipeline) writeStandardIncludes(builder *strings.Builder) {
 func (p *Pipeline) writeRuntimeIncludes(builder *strings.Builder) {
 	builder.WriteString("#include \"io.h\"\n")
 	builder.WriteString("#include \"interface.h\"\n")
+	builder.WriteString("#include \"optional.h\"\n")
 }
 
 // buildExecutableMultiple compiles multiple C files into an executable
