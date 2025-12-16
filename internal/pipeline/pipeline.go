@@ -583,6 +583,7 @@ func (p *Pipeline) runCodegenPhase() error {
 		// Generate header file
 		gen := cgen.New(p.ctx, module)
 		headerContent := gen.GenerateHeader()
+		headerContent = codegen.FormatCSource(headerContent)
 		headerName := p.sanitizeModuleName(importPath) + ".h"
 		headerPath := filepath.Join(tempDir, headerName)
 		if err := os.WriteFile(headerPath, []byte(headerContent), 0644); err != nil {
@@ -602,7 +603,9 @@ func (p *Pipeline) runCodegenPhase() error {
 
 		implName := p.sanitizeModuleName(importPath) + ".c"
 		implPath := filepath.Join(tempDir, implName)
-		if err := os.WriteFile(implPath, []byte(implBuilder.String()), 0644); err != nil {
+		implOut := implBuilder.String()
+		implOut = codegen.FormatCSource(implOut)
+		if err := os.WriteFile(implPath, []byte(implOut), 0644); err != nil {
 			p.ctx.ReportError(fmt.Sprintf("failed to write implementation for %s: %v", importPath, err), nil)
 			continue
 		}
@@ -623,6 +626,7 @@ func (p *Pipeline) runCodegenPhase() error {
 			// Generate header file for entry module
 			gen := cgen.New(p.ctx, module)
 			headerContent := gen.GenerateHeader()
+			headerContent = codegen.FormatCSource(headerContent)
 			entryHeaderName = p.sanitizeModuleName(entryModule) + ".h"
 			headerPath := filepath.Join(tempDir, entryHeaderName)
 			if err := os.WriteFile(headerPath, []byte(headerContent), 0644); err != nil {
@@ -646,7 +650,9 @@ func (p *Pipeline) runCodegenPhase() error {
 
 			entryImplName = p.sanitizeModuleName(entryModule) + ".c"
 			implPath := filepath.Join(tempDir, entryImplName)
-			if err := os.WriteFile(implPath, []byte(implBuilder.String()), 0644); err != nil {
+			implOut := implBuilder.String()
+			implOut = codegen.FormatCSource(implOut)
+			if err := os.WriteFile(implPath, []byte(implOut), 0644); err != nil {
 				p.ctx.ReportError(fmt.Sprintf("failed to write implementation for %s: %v", entryModule, err), nil)
 			} else {
 				cFiles = append(cFiles, implPath)

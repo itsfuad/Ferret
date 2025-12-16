@@ -151,6 +151,7 @@ type Config struct {
 	OutputPath string // Where to write compiled output
 	Extension  string // Source file extension (default: ".fer")
 	KeepCFile  bool   // Keep generated C file after compilation
+	FormatC    bool   // Format generated C files when keeping them
 	Debug      bool   // Debug mode
 	SaveAST    bool   // Save AST to file
 

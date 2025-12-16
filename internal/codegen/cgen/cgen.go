@@ -1029,9 +1029,7 @@ func (g *Generator) generateVarDecl(decl *ast.VarDecl) {
 				// Interface assignment - declare variable first, then assign in a block
 				g.write(";\n")
 				// Generate assignment in a block scope (for temporary variables)
-				g.writeIndent()
 				g.generateInterfaceAssignment(item.Name.Name, varType, item.Value)
-				g.write(";\n")
 			} else {
 				// Regular assignment
 				g.write(" = ")
@@ -1259,6 +1257,23 @@ func (g *Generator) generateBlock(block *ast.Block) {
 	}
 }
 
+// isPrintLikeCall returns true for Print/Println calls (native io helpers) so
+// we can emit them as full statements without an extra semicolon.
+func (g *Generator) isPrintLikeCall(call *ast.CallExpr) bool {
+	switch fn := call.Fun.(type) {
+	case *ast.ScopeResolutionExpr:
+		if fn.Selector == nil {
+			return false
+		}
+		name := fn.Selector.Name
+		return name == "Print" || name == "Println"
+	case *ast.IdentifierExpr:
+		return fn.Name == "Print" || fn.Name == "Println"
+	default:
+		return false
+	}
+}
+
 func (g *Generator) generateStmt(stmt ast.Node) {
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
@@ -1284,9 +1299,14 @@ func (g *Generator) generateStmt(stmt ast.Node) {
 		if s.X == nil {
 			return
 		}
-		g.writeIndent()
-		g.generateExpr(s.X)
-		g.write(";\n")
+		if call, ok := s.X.(*ast.CallExpr); ok && g.isPrintLikeCall(call) {
+			// Print/Println emit their own indentation/terminators
+			g.generateCallExpr(call)
+		} else {
+			g.writeIndent()
+			g.generateExpr(s.X)
+			g.write(";\n")
+		}
 	case *ast.Block:
 		g.writeIndent()
 		g.write("{\n")
@@ -3638,7 +3658,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 
 	// Generate a temporary buffer and format string
 	g.writeIndent()
-	g.write("char %s[1024]; ", bufName)
+	g.write("char %s[1024];\n", bufName)
 
 	// Build format string
 	formatParts := []string{}
@@ -3752,29 +3772,33 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 			tempBuf := fmt.Sprintf("__opt_val_%d_%d", g.counter, i)
 			optionalTempBuffers[i] = tempBuf
 			g.writeIndent()
-			g.write("char %s[64]; ", tempBuf)
+			g.write("char %s[64];\n", tempBuf)
 
 			// Generate code to format the optional value: if has value, format inner type T, else "none"
 			g.writeIndent()
 			g.write("if (")
 			g.generateExpr(arg)
-			g.write(".is_some) { ")
+			g.write(".is_some) {\n")
+			g.indent++
 
 			// Format using the same logic as the inner type T
 			unwrappedInner := types.UnwrapType(innerType)
 			if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
 				// String - just copy the value
+				g.writeIndent()
 				g.write("strncpy(%s, ", tempBuf)
 				g.generateExpr(arg)
 				g.write(".value, sizeof(%s) - 1); %s[sizeof(%s) - 1] = '\\0';", tempBuf, tempBuf, tempBuf)
 			} else if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
 				// Bool - format as "true" or "false"
+				g.writeIndent()
 				g.write("strcpy(%s, ", tempBuf)
 				g.generateExpr(arg)
 				g.write(".value ? \"true\" : \"false\");")
 			} else {
 				// Numeric or other types - use snprintf with appropriate format
 				// Determine format specifier based on inner type T (reusing existing type handlers)
+				g.writeIndent()
 				g.buf.WriteString("snprintf(")
 				g.buf.WriteString(tempBuf)
 				g.buf.WriteString(", sizeof(")
@@ -3809,13 +3833,23 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				g.generateExpr(arg)
 				g.buf.WriteString(".value);")
 			}
-			g.write(" } else { strcpy(%s, \"none\"); }\n", tempBuf)
+			g.write("\n")
+			g.indent--
+			g.writeIndent()
+			g.write("} else {\n")
+			g.indent++
+			g.writeIndent()
+			g.write("strcpy(%s, \"none\");\n", tempBuf)
+			g.indent--
+			g.writeIndent()
+			g.write("}\n")
 		}
 	}
 
 	formatStr := strings.Join(formatParts, "")
 
 	// Generate: snprintf(bufName, sizeof(bufName), format, args...);
+	g.writeIndent()
 	g.write("snprintf(%s, sizeof(%s), \"%s\", ", bufName, bufName, formatStr)
 	for i, arg := range args {
 		if i > 0 {
@@ -3866,12 +3900,14 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 			}
 		}
 	}
-	g.write("); ")
+	g.write(");\n")
 
 	// Call the string version of Print/Println
 	if funcName == "Println" {
+		g.writeIndent()
 		g.write("ferret_io_Println(%s);\n", bufName)
 	} else {
+		g.writeIndent()
 		g.write("ferret_io_Print(%s);\n", bufName)
 	}
 }

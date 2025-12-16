@@ -32,6 +32,8 @@ type Options struct {
 	OutputExecutable string
 	// Keep generated C file after compilation
 	KeepCFile bool
+	// Keep and format generated C files
+	KeepCFileFmt bool
 	// Skip codegen (stop after type checking)
 	SkipCodegen bool
 }
@@ -105,7 +107,8 @@ func Compile(opts *Options) Result {
 		BuiltinModulesPath: builtinPath,
 		RuntimePath:        runtimePath, // Runtime path relative to executable
 		OutputPath:         outputPath,
-		KeepCFile:          opts.KeepCFile,
+		KeepCFile:          opts.KeepCFile || opts.KeepCFileFmt,
+		FormatC:            opts.KeepCFileFmt,
 		SkipCodegen:        opts.SkipCodegen,
 	}
 

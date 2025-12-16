@@ -19,12 +19,14 @@ func main() {
 	saveAST := flag.Bool("ast", false, "Save AST")
 	help := flag.Bool("h", false, "Show help")
 	outputPath := flag.String("o", "", "Output executable path")
-	keepCFile := flag.Bool("c", false, "Keep generated C file after compilation")
+	keepCFile := flag.Bool("c", false, "Keep generated C files (unformatted)")
+	keepCFileFmt := flag.Bool("cfc", false, "Keep generated C files (formatted)")
 	typecheckOnly := flag.Bool("t", false, "Stop after type checking (skip codegen)")
 	flag.BoolVar(debug, "debug", false, "Enable debug output")
 	flag.BoolVar(showVersion, "version", false, "Show version")
 	flag.BoolVar(help, "help", false, "Show help")
-	flag.BoolVar(keepCFile, "keep-c", false, "Keep generated C file after compilation")
+	flag.BoolVar(keepCFile, "keep-c", false, "Keep generated C files (unformatted)")
+	flag.BoolVar(keepCFileFmt, "keep-c-fmt", false, "Keep generated C files (formatted)")
 	flag.BoolVar(typecheckOnly, "typecheck", false, "Stop after type checking (skip codegen)")
 
 	flag.Parse()
@@ -75,6 +77,7 @@ func main() {
 		LogFormat:        compiler.ANSI,
 		OutputExecutable: *outputPath,
 		KeepCFile:        *keepCFile,
+		KeepCFileFmt:     *keepCFileFmt,
 		SkipCodegen:      *typecheckOnly,
 	})
 
