@@ -701,19 +701,12 @@ func (p *Pipeline) sanitizeModuleName(importPath string) string {
 
 // writeStandardIncludes writes standard C library includes to a builder
 func (p *Pipeline) writeStandardIncludes(builder *strings.Builder) {
-	builder.WriteString("#include <stdio.h>\n")
-	builder.WriteString("#include <stdlib.h>\n")
-	builder.WriteString("#include <string.h>\n")
-	builder.WriteString("#include <stdint.h>\n")
-	builder.WriteString("#include <math.h>\n")
-	builder.WriteString("\n")
+	codegen.WriteStandardIncludes(builder)
 }
 
 // writeRuntimeIncludes writes runtime header includes to a builder
 func (p *Pipeline) writeRuntimeIncludes(builder *strings.Builder) {
-	builder.WriteString("#include \"io.h\"\n")
-	builder.WriteString("#include \"interface.h\"\n")
-	builder.WriteString("#include \"optional.h\"\n")
+	codegen.WriteRuntimeIncludes(builder)
 }
 
 // buildExecutableMultiple compiles multiple C files into an executable

@@ -154,6 +154,88 @@ func InferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	return inferExprType(ctx, mod, expr)
 }
 
+// ResolvedExprType returns the most accurate type for an expression by using any
+// type information already stored on the AST (populated during semantic
+// analysis) before falling back to inference.
+func ResolvedExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) types.SemType {
+	if expr == nil {
+		return types.TypeUnknown
+	}
+
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.IdentifierExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.BinaryExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.UnaryExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.PostfixExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.PrefixExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.CallExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.SelectorExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.IndexExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.CastExpr:
+		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
+			return e.TypeInfo
+		}
+	case *ast.ParenExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.ScopeResolutionExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.RangeExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.CoalescingExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.ForkExpr:
+		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
+			return e.Type
+		}
+	case *ast.FuncLit:
+		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
+			return e.TypeInfo
+		}
+	case *ast.CompositeLit:
+		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
+			return e.TypeInfo
+		}
+	}
+
+	return InferExprType(ctx, mod, expr)
+}
+
 // inferExprType is the internal implementation of InferExprType.
 // This is pure type inference without any compatibility checking.
 // Returns TYPE_UNTYPED for literals that haven't been contextualized yet.

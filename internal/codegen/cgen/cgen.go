@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"compiler/colors"
+	"compiler/internal/codegen"
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/symbols"
@@ -92,20 +93,12 @@ func (g *Generator) writeHeader() {
 }
 
 func (g *Generator) writeIncludes() {
-	g.write("#include <stdio.h>\n")
-	g.write("#include <stdlib.h>\n")
-	g.write("#include <string.h>\n")
-	g.write("#include <stdint.h>\n")
-	g.write("#include <math.h>\n") // For pow() function
-	g.write("\n")
+	codegen.WriteStandardIncludes(&g.buf)
 }
 
 func (g *Generator) writeRuntimeDeclarations() {
 	// Include the runtime headers
-	g.write("#include \"io.h\"\n")        // Runtime header for I/O functions
-	g.write("#include \"interface.h\"\n") // Required for ferret_interface_t type
-	g.write("#include \"bigint.h\"\n")    // Required for 128/256-bit integer types
-	g.write("#include \"optional.h\"\n")  // Required for optional types
+	codegen.WriteRuntimeIncludes(&g.buf)
 	g.write("\n")
 }
 
@@ -1105,7 +1098,7 @@ func (g *Generator) generateVarDecl(decl *ast.VarDecl) {
 									// Unwrap types to compare inner types correctly
 									unwrappedValueType := types.UnwrapType(valueType)
 									unwrappedInnerType := types.UnwrapType(optType.Inner)
-									
+
 									// Check if value type matches inner type (needs wrapping)
 									if unwrappedValueType.Equals(unwrappedInnerType) {
 										// Wrap: T -> T? by creating optional struct
@@ -1323,10 +1316,10 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 	// Check if we need to wrap the value for optional types
 	lhsType := g.inferExprType(stmt.Lhs)
 	rhsType := g.inferExprType(stmt.Rhs)
-	
+
 	g.generateExpr(stmt.Lhs)
 	g.write(" = ")
-	
+
 	// Check if LHS is optional and RHS needs wrapping
 	if lhsType != nil && !lhsType.Equals(types.TypeUnknown) {
 		var lhsOptType *types.OptionalType
@@ -1337,7 +1330,7 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 				lhsOptType = opt
 			}
 		}
-		
+
 		if lhsOptType != nil {
 			// Check if RHS is a none literal (check both AST node and type)
 			isNone := false
@@ -1347,19 +1340,19 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 				// Also check if type is TypeNone
 				isNone = true
 			}
-			
+
 			if isNone {
 				// Assigning none to optional - generate proper none struct
 				g.write("((ferret_optional_%s){.value = 0, .is_some = 0})", g.getOptionalTypeName(lhsOptType.Inner))
 				g.write(";\n")
 				return
 			}
-			
+
 			if rhsType != nil && !rhsType.Equals(types.TypeUnknown) {
 				// LHS is optional - check if RHS needs wrapping
 				unwrappedRhsType := types.UnwrapType(rhsType)
 				unwrappedInnerType := types.UnwrapType(lhsOptType.Inner)
-				
+
 				if unwrappedRhsType.Equals(unwrappedInnerType) {
 					// RHS is the inner type, needs wrapping: T -> T?
 					g.write("((ferret_optional_%s){.value = ", g.getOptionalTypeName(lhsOptType.Inner))
@@ -1369,7 +1362,7 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 					return
 				}
 			}
-			
+
 			// Fallback: if RHS type is unknown or check failed, but LHS is optional and RHS is a literal,
 			// check if it's a none literal that wasn't caught above
 			if lit, ok := stmt.Rhs.(*ast.BasicLit); ok && lit.Kind == ast.NONE {
@@ -1380,7 +1373,7 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 			}
 		}
 	}
-	
+
 	// No wrapping needed - generate as-is
 	g.generateExpr(stmt.Rhs)
 	g.write(";\n")
@@ -2086,17 +2079,17 @@ func (g *Generator) generateBinaryExpr(expr *ast.BinaryExpr) {
 // to the inner type, it generates `.value` to unwrap the optional.
 func (g *Generator) generateIdentifierExpr(expr *ast.IdentifierExpr) {
 	varName := g.sanitizeName(expr.Name)
-	
+
 	// Get the type from the expression (may be narrowed)
 	exprType := g.inferExprType(expr)
-	
+
 	// Get the original declared type from the symbol table
 	// The symbol table should have the original type (not the narrowed one)
 	var originalType types.SemType
 	if sym, ok := g.mod.CurrentScope.Lookup(expr.Name); ok && sym != nil && sym.Type != nil {
 		originalType = sym.Type
 	}
-	
+
 	// Check if we need to unwrap an optional
 	// If the original type is optional but the current (narrowed) type is not,
 	// we need to access .value to unwrap it
@@ -2110,14 +2103,14 @@ func (g *Generator) generateIdentifierExpr(expr *ast.IdentifierExpr) {
 				originalOptType = opt
 			}
 		}
-		
+
 		// If original is optional, check if current type is the inner type (narrowed)
 		if originalOptType != nil {
 			// Check if the current type is not optional (has been narrowed)
 			// Unwrap NamedType to compare with inner type
 			unwrappedExprType := types.UnwrapType(exprType)
 			unwrappedInnerType := types.UnwrapType(originalOptType.Inner)
-			
+
 			// If it's been narrowed to the inner type, we need to unwrap
 			if unwrappedExprType.Equals(unwrappedInnerType) {
 				// Variable has been narrowed from T? to T, need to unwrap
@@ -2126,95 +2119,14 @@ func (g *Generator) generateIdentifierExpr(expr *ast.IdentifierExpr) {
 			}
 		}
 	}
-	
+
 	// No narrowing or not an optional - just write the variable name
 	g.write(varName)
 }
 
 // inferExprType gets the type of an expression.
-// First checks if type is stored in the AST node (populated during semantic analysis),
-// otherwise falls back to type inference from the typechecker.
 func (g *Generator) inferExprType(expr ast.Expression) types.SemType {
-	if expr == nil {
-		return types.TypeUnknown
-	}
-
-	// First, check if type information is stored in the AST node (populated by semantic analysis)
-	// This is the preferred path as it's faster and uses already-computed type information
-	switch e := expr.(type) {
-	case *ast.BasicLit:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.IdentifierExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.BinaryExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.UnaryExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.PostfixExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.PrefixExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.CallExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.SelectorExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.IndexExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.CastExpr:
-		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
-			return e.TypeInfo
-		}
-	case *ast.ParenExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.ScopeResolutionExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.RangeExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.CoalescingExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.ForkExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.FuncLit:
-		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
-			return e.TypeInfo
-		}
-	case *ast.CompositeLit:
-		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
-			return e.TypeInfo
-		}
-	}
-
-	// Fallback: use type inference from typechecker if type not stored in AST
-	// This handles edge cases where type wasn't stored or wasn't computed yet
-	return typechecker.InferExprType(g.ctx, g.mod, expr)
+	return typechecker.ResolvedExprType(g.ctx, g.mod, expr)
 }
 
 // isStringType checks if a type is string
@@ -3123,7 +3035,7 @@ func (g *Generator) generateOptionalTypeDefinitions() {
 
 	// Track if we've generated the default none constant
 	noneGenerated := false
-	
+
 	// Generate typedef struct for each optional type
 	for typeName, innerType := range optionalTypes {
 		innerCType := g.typeToC(innerType)
@@ -3131,7 +3043,7 @@ func (g *Generator) generateOptionalTypeDefinitions() {
 		g.write("    %s value;\n", innerCType)
 		g.write("    int is_some;\n")
 		g.write("} ferret_optional_%s;\n", typeName)
-		
+
 		// Generate none constant - use int32_t as default if available, otherwise first type
 		if !noneGenerated {
 			// Generate a default none constant for the first optional type found
@@ -3427,7 +3339,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 	// Generate temp buffers for optional values BEFORE snprintf
 	// We need to format optional values that have a value, using the same logic as their inner type T
 	optionalTempBuffers := make(map[int]string) // map from arg index to temp buffer name
-	
+
 	for i, arg := range args {
 		argType := g.inferExprType(arg)
 		if argType == nil || argType.Equals(types.TypeUnknown) {
@@ -3437,7 +3349,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				}
 			}
 		}
-		
+
 		// Check if this is an optional type that needs formatting
 		var innerType types.SemType
 		if optType, ok := argType.(*types.OptionalType); ok {
@@ -3447,20 +3359,20 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				innerType = optType.Inner
 			}
 		}
-		
+
 		if innerType != nil {
 			// We need a temp buffer for this optional - format it before the main snprintf
 			tempBuf := fmt.Sprintf("__opt_val_%d_%d", g.counter, i)
 			optionalTempBuffers[i] = tempBuf
 			g.writeIndent()
 			g.write("char %s[64]; ", tempBuf)
-			
+
 			// Generate code to format the optional value: if has value, format inner type T, else "none"
 			g.writeIndent()
 			g.write("if (")
 			g.generateExpr(arg)
 			g.write(".is_some) { ")
-			
+
 			// Format using the same logic as the inner type T
 			unwrappedInner := types.UnwrapType(innerType)
 			if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
@@ -3513,7 +3425,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 			g.write(" } else { strcpy(%s, \"none\"); }\n", tempBuf)
 		}
 	}
-	
+
 	formatStr := strings.Join(formatParts, "")
 
 	// Generate: snprintf(bufName, sizeof(bufName), format, args...);
@@ -3533,7 +3445,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				}
 			}
 		}
-		
+
 		// Check if we have a temp buffer for this optional
 		if tempBuf, hasTempBuf := optionalTempBuffers[i]; hasTempBuf {
 			// Use the pre-formatted temp buffer
@@ -3551,7 +3463,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 					isOptional = true
 				}
 			}
-			
+
 			if !isOptional {
 				// Not optional - handle normally using existing type handlers
 				if prim, ok := argType.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {

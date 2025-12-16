@@ -4,6 +4,8 @@ node_modules
 dist
 *.ast.json
 
+.gocache
+
 # Ignore ferret files from being tracked by git from the root directory
 /*.fer
 *.c
