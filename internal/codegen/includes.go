@@ -12,11 +12,17 @@ var (
 		"#include <math.h>",
 	}
 
+	headerIncludes = []string{
+		"#include <stdint.h>",
+		"#include <stdbool.h>",
+	}
+
 	// Runtime headers needed by generated code. Keep this in one place so both
 	// pipeline and cgen stay in sync as the runtime grows.
 	runtimeIncludes = []string{
 		"#include \"io.h\"",
 		"#include \"interface.h\"",
+		"#include \"map.h\"",
 		"#include \"bigint.h\"",
 		"#include \"optional.h\"",
 	}
@@ -36,6 +42,13 @@ func RuntimeIncludes() string {
 	return b.String()
 }
 
+// HeaderIncludes returns the minimal standard includes needed in generated headers.
+func HeaderIncludes() string {
+	var b strings.Builder
+	WriteHeaderIncludes(&b)
+	return b.String()
+}
+
 // WriteStandardIncludes writes the standard C library includes to the builder.
 func WriteStandardIncludes(builder *strings.Builder) {
 	for _, inc := range standardIncludes {
@@ -51,4 +64,13 @@ func WriteRuntimeIncludes(builder *strings.Builder) {
 		builder.WriteString(inc)
 		builder.WriteString("\n")
 	}
+}
+
+// WriteHeaderIncludes writes minimal standard includes for generated headers.
+func WriteHeaderIncludes(builder *strings.Builder) {
+	for _, inc := range headerIncludes {
+		builder.WriteString(inc)
+		builder.WriteString("\n")
+	}
+	builder.WriteString("\n")
 }

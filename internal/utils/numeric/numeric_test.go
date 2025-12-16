@@ -213,7 +213,6 @@ func TestStringToFloat(t *testing.T) {
 	}
 }
 
-
 func TestNumericToOrdinal(t *testing.T) {
 	tests := []struct {
 		input    int

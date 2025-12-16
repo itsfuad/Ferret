@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"compiler/colors"
@@ -36,15 +37,23 @@ type Generator struct {
 	indentStr    string
 	counter      int            // Counter for generating unique temporary variable names
 	arrayLengths map[string]int // Map variable names to their array literal lengths
+	optionalTyps map[string]types.SemType
 }
 
 // New creates a new C code generator
 func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
+	optTypes := make(map[string]types.SemType)
+	if stored := codegen.OptionalTypesFromModule(mod); stored != nil {
+		for k, v := range stored {
+			optTypes[k] = v
+		}
+	}
 	return &Generator{
 		ctx:          ctx,
 		mod:          mod,
 		indentStr:    "    ",
 		arrayLengths: make(map[string]int),
+		optionalTyps: optTypes,
 	}
 }
 
@@ -849,16 +858,18 @@ func (g *Generator) GenerateHeader() string {
 	oldBuf := g.buf
 	g.buf = buf
 
+	// Collect optional types up front so typedefs exist before use
+	g.collectOptionalTypes()
+
 	// Generate header guard
 	guardName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")) + "_H"
 	g.write("#ifndef %s\n", guardName)
 	g.write("#define %s\n\n", guardName)
-	g.write("#include <stdint.h>\n")
-	g.write("#include <stdbool.h>\n\n")
+	codegen.WriteHeaderIncludes(&g.buf)
 
-	// Include runtime headers if needed (for interface types)
-	g.write("#include \"interface.h\"\n")
-	g.write("#include \"optional.h\"\n\n")
+	// Include runtime headers (shared list)
+	codegen.WriteRuntimeIncludes(&g.buf)
+	g.write("\n")
 
 	// Generate optional type definitions for all optional types used in the module
 	g.generateOptionalTypeDefinitions()
@@ -938,9 +949,8 @@ func (g *Generator) GenerateImplementation() string {
 	oldBuf := g.buf
 	g.buf = buf
 
-	// Don't write includes here - they're added by the pipeline when creating the .c file
-	// This keeps the implementation clean and allows the .c file to include its .h file
-	// Type definitions are in the header file, so don't duplicate them here
+	// Don't write includes here - they're added by the pipeline when creating the .c file.
+	// This keeps the implementation clean and allows the .c file to include its .h file.
 
 	// Collect and generate all interface code upfront (wrappers and vtables)
 	assignments := g.collectInterfaceAssignments()
@@ -1310,6 +1320,42 @@ func (g *Generator) generateAssignStmt(stmt *ast.AssignStmt) {
 		g.generateExpr(stmt.Rhs)
 		g.write(";\n")
 		return
+	}
+
+	// Map element assignment: map[key] = value
+	if idx, ok := stmt.Lhs.(*ast.IndexExpr); ok {
+		if mapType, ok := types.UnwrapType(g.inferExprType(idx.X)).(*types.MapType); ok {
+			g.counter++
+			mapTemp := fmt.Sprintf("__map_set_%d", g.counter)
+			g.counter++
+			keyTemp := fmt.Sprintf("__map_key_%d", g.counter)
+			g.counter++
+			valTemp := fmt.Sprintf("__map_val_%d", g.counter)
+
+			g.write("{\n")
+			g.indent++
+			g.writeIndent()
+			g.write("ferret_map_t* %s = ", mapTemp)
+			g.generateExpr(idx.X)
+			g.write(";\n")
+
+			g.writeIndent()
+			g.write("%s %s = ", g.typeToC(mapType.Key), keyTemp)
+			g.generateExpr(idx.Index)
+			g.write(";\n")
+
+			g.writeIndent()
+			g.write("%s %s = ", g.typeToC(mapType.Value), valTemp)
+			g.generateExpr(stmt.Rhs)
+			g.write(";\n")
+
+			g.writeIndent()
+			g.write("ferret_map_set(%s, &%s, &%s);\n", mapTemp, keyTemp, valTemp)
+			g.indent--
+			g.writeIndent()
+			g.write("}\n")
+			return
+		}
 	}
 
 	// Regular assignment (x = y)
@@ -1774,11 +1820,83 @@ func (g *Generator) generateForArray(stmt *ast.ForStmt, arrayType *types.ArrayTy
 // Ferret: for [let] k, v in map { }
 // C: (simplified - would need proper map implementation)
 func (g *Generator) generateForMap(stmt *ast.ForStmt, mapType *types.MapType) {
-	// For now, report error - map iteration needs proper map implementation
-	g.ctx.ReportError("codegen: map iteration not yet implemented", nil)
+	// Iterator is always VarDecl (binds new variables)
+	varDecl, ok := stmt.Iterator.(*ast.VarDecl)
+	if !ok {
+		g.ctx.ReportError("codegen: iterator must be VarDecl", nil)
+		g.writeIndent()
+		g.write("/* invalid iterator type */\n")
+		return
+	}
+
+	var keyVarName string
+	var valueVarName string
+	hasValueVar := false
+	if len(varDecl.Decls) > 0 {
+		keyVarName = varDecl.Decls[0].Name.Name
+	}
+	if len(varDecl.Decls) > 1 {
+		valueVarName = varDecl.Decls[1].Name.Name
+		hasValueVar = true
+	}
+
+	isDiscardKey := keyVarName == "_"
+	isDiscardValue := valueVarName == "_"
+
+	g.counter++
+	mapTemp := fmt.Sprintf("__map_iter_%d", g.counter)
+
+	keyCType := g.typeToC(mapType.Key)
+	valCType := g.typeToC(mapType.Value)
+
+	// Scope the loop variables to avoid leaking
 	g.writeIndent()
-	g.write("/* map iteration not yet implemented */\n")
-	// TODO: Implement map iteration when map type is fully implemented
+	g.write("{\n")
+	g.indent++
+
+	g.writeIndent()
+	g.write("ferret_map_t* %s = ", mapTemp)
+	g.generateExpr(stmt.Range)
+	g.write(";\n")
+
+	g.writeIndent()
+	g.write("ferret_map_iter_t __it;\n")
+	g.writeIndent()
+	g.write("void* __it_key;\n")
+	g.writeIndent()
+	g.write("void* __it_val;\n")
+
+	g.writeIndent()
+	g.write("if (%s && ferret_map_iter_begin(%s, &__it) && ferret_map_iter_next(%s, &__it, &__it_key, &__it_val)) {\n", mapTemp, mapTemp, mapTemp)
+	g.indent++
+	g.writeIndent()
+	g.write("do {\n")
+	g.indent++
+
+	// Bind key/value variables if not discarded
+	if !isDiscardKey && keyVarName != "" {
+		g.writeIndent()
+		g.write("%s %s = *(%s*)__it_key;\n", keyCType, g.sanitizeName(keyVarName), keyCType)
+	}
+	if hasValueVar && !isDiscardValue {
+		g.writeIndent()
+		g.write("%s %s = *(%s*)__it_val;\n", valCType, g.sanitizeName(valueVarName), valCType)
+	}
+
+	// Generate loop body
+	if stmt.Body != nil {
+		g.generateBlock(stmt.Body)
+	}
+
+	g.writeIndent()
+	g.write("} while (ferret_map_iter_next(%s, &__it, &__it_key, &__it_val));\n", mapTemp)
+	g.indent--
+	g.writeIndent()
+	g.write("}\n")
+
+	g.indent--
+	g.writeIndent()
+	g.write("}\n")
 }
 
 func (g *Generator) generateWhileStmt(stmt *ast.WhileStmt) {
@@ -1866,9 +1984,9 @@ func (g *Generator) generateExpr(expr ast.Expression) {
 func (g *Generator) generateLiteral(lit *ast.BasicLit) {
 	switch lit.Kind {
 	case ast.INT:
-		g.write(lit.Value)
+		g.write("%s", lit.Value)
 	case ast.FLOAT:
-		g.write(lit.Value)
+		g.write("%s", lit.Value)
 	case ast.STRING:
 		// Escape string for C
 		str := strings.ReplaceAll(lit.Value, `"`, `\"`)
@@ -2121,7 +2239,7 @@ func (g *Generator) generateIdentifierExpr(expr *ast.IdentifierExpr) {
 	}
 
 	// No narrowing or not an optional - just write the variable name
-	g.write(varName)
+	g.write("%s", varName)
 }
 
 // inferExprType gets the type of an expression.
@@ -2158,13 +2276,13 @@ func (g *Generator) isIntegerType(typ types.SemType) bool {
 }
 
 func (g *Generator) generateUnaryExpr(expr *ast.UnaryExpr) {
-	g.write(expr.Op.Value)
+	g.write("%s", expr.Op.Value)
 	g.generateExpr(expr.X)
 }
 
 func (g *Generator) generatePostfixExpr(expr *ast.PostfixExpr) {
 	g.generateExpr(expr.X)
-	g.write(expr.Op.Value)
+	g.write("%s", expr.Op.Value)
 }
 
 func (g *Generator) generateScopeResolutionExpr(expr *ast.ScopeResolutionExpr) {
@@ -2184,18 +2302,18 @@ func (g *Generator) generateScopeResolutionExpr(expr *ast.ScopeResolutionExpr) {
 
 					// For constants, use the prefixed name
 					if sym.Kind == symbols.SymbolConstant {
-						g.write(symbolName)
+						g.write("%s", symbolName)
 						return
 					}
 					// For variables, also use prefixed name
 					if sym.Kind == symbols.SymbolVariable {
-						g.write(symbolName)
+						g.write("%s", symbolName)
 						return
 					}
 					// For functions, this shouldn't happen here (should be in CallExpr)
 					// But handle it anyway
 					if sym.Kind == symbols.SymbolFunction {
-						g.write(symbolName)
+						g.write("%s", symbolName)
 						return
 					}
 				}
@@ -2234,7 +2352,7 @@ func (g *Generator) generateSelectorExpr(expr *ast.SelectorExpr) {
 
 	// Generate the field name
 	if expr.Field != nil {
-		g.write(g.sanitizeName(expr.Field.Name))
+		g.write("%s", g.sanitizeName(expr.Field.Name))
 	} else {
 		g.write("/* unknown field */")
 	}
@@ -2242,6 +2360,28 @@ func (g *Generator) generateSelectorExpr(expr *ast.SelectorExpr) {
 
 func (g *Generator) generateIndexExpr(expr *ast.IndexExpr) {
 	// IndexExpr: array[index] or map[key]
+	baseType := types.UnwrapType(g.inferExprType(expr.X))
+	if mapType, ok := baseType.(*types.MapType); ok {
+		// Map indexing returns optional value type
+		g.trackOptional(mapType.Value)
+		g.counter++
+		tmpMap := fmt.Sprintf("__map_tmp_%d", g.counter)
+		g.counter++
+		tmpKey := fmt.Sprintf("__map_key_%d", g.counter)
+		optTypeName := fmt.Sprintf("ferret_optional_%s", g.getOptionalTypeName(mapType.Value))
+		keyCType := g.typeToC(mapType.Key)
+		valueCType := g.typeToC(mapType.Value)
+
+		// Use GNU statement expression for single-eval of map/key
+		g.write("({ ferret_map_t* %s = ", tmpMap)
+		g.generateExpr(expr.X)
+		g.write("; %s %s = ", keyCType, tmpKey)
+		g.generateExpr(expr.Index)
+		g.write("; FERRET_MAP_GET_OPTIONAL(%s, &%s, %s, %s); })", tmpMap, tmpKey, optTypeName, valueCType)
+		return
+	}
+
+	// Array indexing
 	g.generateExpr(expr.X)
 	g.write("[")
 	g.generateExpr(expr.Index)
@@ -2291,6 +2431,7 @@ func (g *Generator) generateCoalescingExpr(expr *ast.CoalescingExpr) {
 
 	// Check if condition is an optional type
 	if _, ok := condType.(*types.OptionalType); ok {
+		g.trackOptional(condType.(*types.OptionalType).Inner)
 		// Generate: (cond.is_some ? cond.value : default)
 		g.write("(")
 		g.generateExpr(expr.Cond)
@@ -2302,6 +2443,9 @@ func (g *Generator) generateCoalescingExpr(expr *ast.CoalescingExpr) {
 	} else if named, ok := condType.(*types.NamedType); ok {
 		// Check if underlying is optional
 		if _, ok := named.Underlying.(*types.OptionalType); ok {
+			if opt, ok := named.Underlying.(*types.OptionalType); ok {
+				g.trackOptional(opt.Inner)
+			}
 			g.write("(")
 			g.generateExpr(expr.Cond)
 			g.write(".is_some ? ")
@@ -2420,7 +2564,7 @@ func (g *Generator) generateCompositeLitWithType(expr *ast.CompositeLit, litType
 		// For expressions, use cast with compound literal syntax
 		if !isInitializer {
 			g.write("(")
-			g.write(g.structTypeToC(structType))
+			g.write("%s", g.structTypeToC(structType))
 			g.write(")")
 		}
 		g.write("{")
@@ -2481,11 +2625,44 @@ func (g *Generator) generateCompositeLitWithType(expr *ast.CompositeLit, litType
 
 	// Check if it's a map type
 	if mapType, ok := litType.(*types.MapType); ok {
-		// Map literal: map[str]i32{"a" => 1, "b" => 2}
-		// For now, report error - maps need proper implementation
-		g.ctx.ReportError("codegen: map literals not yet implemented", nil)
-		g.write("/* map literal not yet implemented */")
-		_ = mapType // Avoid unused variable warning
+		g.trackOptional(mapType.Value)
+		hashFn, eqFn := g.mapHashEqualsForType(mapType.Key)
+		keyCType := g.typeToC(mapType.Key)
+		valCType := g.typeToC(mapType.Value)
+		keySize := g.cSizeOfType(mapType.Key)
+		valSize := g.cSizeOfType(mapType.Value)
+
+		if len(expr.Elts) == 0 {
+			// Empty map literal
+			g.write("ferret_map_new(%s, %s, %s, %s)", keySize, valSize, hashFn, eqFn)
+			return
+		}
+
+		// Non-empty map literal
+		g.write("ferret_map_from_pairs(%s, %s, (const %s[]){", keySize, valSize, keyCType)
+		for i, elt := range expr.Elts {
+			if i > 0 {
+				g.write(", ")
+			}
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				g.generateExpr(kv.Key)
+			} else {
+				g.ctx.ReportError("codegen: expected key => value in map literal", expr.Loc())
+				g.write("0")
+			}
+		}
+		g.write("}, (const %s[]){", valCType)
+		for i, elt := range expr.Elts {
+			if i > 0 {
+				g.write(", ")
+			}
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				g.generateExpr(kv.Value)
+			} else {
+				g.write("0")
+			}
+		}
+		g.write("}, %d, %s, %s)", len(expr.Elts), hashFn, eqFn)
 		return
 	}
 
@@ -2861,14 +3038,10 @@ func (g *Generator) typeToC(typ types.SemType) string {
 		innerType := g.typeToC(t.Inner)
 		return fmt.Sprintf("%s*", innerType)
 	case *types.StructType:
-		// Anonymous struct - generate inline struct definition
-		// For now, use a generic struct pointer (void*)
-		// TODO: Generate proper struct definitions
-		return "void*"
+		// Anonymous struct - emit inline struct definition
+		return g.structTypeToC(t)
 	case *types.MapType:
-		// Maps are implemented as hash tables - use void* for now
-		// TODO: Implement proper map type with key/value types
-		return "void*"
+		return "ferret_map_t*"
 	case *types.ArrayType:
 		// Array types: [N]T or []T
 		elType := g.typeToC(t.Element)
@@ -2881,173 +3054,203 @@ func (g *Generator) typeToC(typ types.SemType) string {
 		return fmt.Sprintf("%s*", elType)
 	case *types.OptionalType:
 		// Optional types: T? -> ferret_optional_T
+		g.trackOptional(t.Inner)
 		return fmt.Sprintf("ferret_optional_%s", g.getOptionalTypeName(t.Inner))
 	}
 	return "void"
 }
 
-// generateOptionalTypeDefinitions generates typedef struct definitions for all optional types used in the module
-func (g *Generator) generateOptionalTypeDefinitions() {
-	// Collect all optional types used in the module
-	optionalTypes := make(map[string]types.SemType)
+// trackOptional records an optional inner type for typedef emission.
+func (g *Generator) trackOptional(inner types.SemType) {
+	name := g.getOptionalTypeName(inner)
+	if _, ok := g.optionalTyps[name]; ok {
+		return
+	}
+	g.optionalTyps[name] = inner
+}
 
-	var collectOptionalTypes func(expr ast.Expression)
-	collectOptionalTypes = func(expr ast.Expression) {
-		if expr == nil {
+func (g *Generator) generateOptionalTypeDefinitions() {
+	// Build a complete view of optional types: tracked + AST/symbol scan
+	g.collectOptionalTypes()
+
+	optionalTypes := make(map[string]types.SemType, len(g.optionalTyps))
+	for k, v := range g.optionalTyps {
+		optionalTypes[k] = v
+	}
+
+	addOptional := func(t types.SemType) {
+		if t == nil {
 			return
 		}
-
-		// Check expression type
-		exprType := g.inferExprType(expr)
-		if optType, ok := exprType.(*types.OptionalType); ok {
-			typeName := g.getOptionalTypeName(optType.Inner)
-			if _, exists := optionalTypes[typeName]; !exists {
-				optionalTypes[typeName] = optType.Inner
+		if opt, ok := types.UnwrapType(t).(*types.OptionalType); ok {
+			name := g.getOptionalTypeName(opt.Inner)
+			if _, exists := optionalTypes[name]; !exists {
+				optionalTypes[name] = opt.Inner
 			}
-		}
-
-		// Recursively check sub-expressions
-		switch e := expr.(type) {
-		case *ast.BinaryExpr:
-			collectOptionalTypes(e.X)
-			collectOptionalTypes(e.Y)
-		case *ast.UnaryExpr:
-			collectOptionalTypes(e.X)
-		case *ast.CallExpr:
-			for _, arg := range e.Args {
-				collectOptionalTypes(arg)
-			}
-		case *ast.CoalescingExpr:
-			collectOptionalTypes(e.Cond)
-			collectOptionalTypes(e.Default)
-		case *ast.ParenExpr:
-			collectOptionalTypes(e.X)
 		}
 	}
 
-	// Scan all variable declarations and expressions in the module
+	var visitTypeNode func(ast.TypeNode)
+	visitTypeNode = func(node ast.TypeNode) {
+		if node == nil {
+			return
+		}
+		switch n := node.(type) {
+		case *ast.OptionalType:
+			visitTypeNode(n.Base)
+			if sem := g.typeFromTypeNode(n); sem != nil && !sem.Equals(types.TypeUnknown) {
+				addOptional(sem)
+			} else {
+				if ident, ok := n.Base.(*ast.IdentifierExpr); ok {
+					addOptional(types.NewOptional(types.FromTypeName(types.TYPE_NAME(ident.Name))))
+				}
+			}
+		case *ast.ReferenceType:
+			visitTypeNode(n.Base)
+		case *ast.ArrayType:
+			visitTypeNode(n.ElType)
+		case *ast.MapType:
+			visitTypeNode(n.Key)
+			visitTypeNode(n.Value)
+		case *ast.StructType:
+			for i := range n.Fields {
+				visitTypeNode(n.Fields[i].Type)
+			}
+		case *ast.InterfaceType:
+			for i := range n.Methods {
+				visitTypeNode(n.Methods[i].Type)
+			}
+		case *ast.ResultType:
+			visitTypeNode(n.Value)
+			visitTypeNode(n.Error)
+		case *ast.FuncType:
+			for i := range n.Params {
+				visitTypeNode(n.Params[i].Type)
+			}
+			visitTypeNode(n.Result)
+		}
+	}
+
+	var visitNode func(ast.Node)
+	visitNode = func(node ast.Node) {
+		if node == nil {
+			return
+		}
+		switch n := node.(type) {
+		case *ast.VarDecl:
+			for _, item := range n.Decls {
+				visitTypeNode(item.Type)
+			}
+		case *ast.ConstDecl:
+			for _, item := range n.Decls {
+				visitTypeNode(item.Type)
+			}
+		case *ast.AssignStmt:
+			visitNode(n.Lhs)
+			visitNode(n.Rhs)
+		case *ast.IfStmt:
+			if n.Body != nil {
+				for _, stmt := range n.Body.Nodes {
+					visitNode(stmt)
+				}
+			}
+			if n.Else != nil {
+				if block, ok := n.Else.(*ast.Block); ok {
+					for _, stmt := range block.Nodes {
+						visitNode(stmt)
+					}
+				}
+			}
+		case *ast.ForStmt:
+			if n.Iterator != nil {
+				visitNode(n.Iterator)
+			}
+			if n.Body != nil {
+				for _, stmt := range n.Body.Nodes {
+					visitNode(stmt)
+				}
+			}
+		case *ast.WhileStmt:
+			if n.Body != nil {
+				for _, stmt := range n.Body.Nodes {
+					visitNode(stmt)
+				}
+			}
+		case *ast.Block:
+			for _, stmt := range n.Nodes {
+				visitNode(stmt)
+			}
+		}
+	}
+
+	// Symbol table types
+	for _, sym := range g.mod.ModuleScope.GetAllSymbols() {
+		if sym == nil || sym.Type == nil {
+			continue
+		}
+		addOptional(sym.Type)
+	}
+
+	// AST types
 	if g.mod.AST != nil {
 		for _, node := range g.mod.AST.Nodes {
 			switch n := node.(type) {
+			case *ast.TypeDecl:
+				visitTypeNode(n.Type)
 			case *ast.VarDecl:
-				for _, item := range n.Decls {
-					if item.Type != nil {
-						varType := g.typeFromTypeNode(item.Type)
-						if optType, ok := varType.(*types.OptionalType); ok {
-							typeName := g.getOptionalTypeName(optType.Inner)
-							if _, exists := optionalTypes[typeName]; !exists {
-								optionalTypes[typeName] = optType.Inner
-							}
-						}
-					}
-					if item.Value != nil {
-						collectOptionalTypes(item.Value)
-					}
-				}
+				visitNode(n)
+			case *ast.ConstDecl:
+				visitNode(n)
 			case *ast.FuncDecl:
-				// Collect optional types from function parameters and return type
 				if n.Type != nil {
-					if n.Type.Params != nil {
-						for _, param := range n.Type.Params {
-							if param.Type != nil {
-								paramType := g.typeFromTypeNode(param.Type)
-								if optType, ok := paramType.(*types.OptionalType); ok {
-									typeName := g.getOptionalTypeName(optType.Inner)
-									if _, exists := optionalTypes[typeName]; !exists {
-										optionalTypes[typeName] = optType.Inner
-									}
-								}
-							}
-						}
-					}
-					if n.Type.Result != nil {
-						returnType := g.typeFromTypeNode(n.Type.Result)
-						if optType, ok := returnType.(*types.OptionalType); ok {
-							typeName := g.getOptionalTypeName(optType.Inner)
-							if _, exists := optionalTypes[typeName]; !exists {
-								optionalTypes[typeName] = optType.Inner
-							}
-						}
+					visitTypeNode(n.Type.Result)
+					for _, p := range n.Type.Params {
+						visitTypeNode(p.Type)
 					}
 				}
 				if n.Body != nil {
-					var scanStmt func(ast.Node)
-					scanStmt = func(node ast.Node) {
-						if node == nil {
-							return
-						}
-						switch s := node.(type) {
-						case *ast.ExprStmt:
-							if s.X != nil {
-								collectOptionalTypes(s.X)
-							}
-						case *ast.VarDecl:
-							for _, item := range s.Decls {
-								if item.Type != nil {
-									varType := g.typeFromTypeNode(item.Type)
-									if optType, ok := varType.(*types.OptionalType); ok {
-										typeName := g.getOptionalTypeName(optType.Inner)
-										if _, exists := optionalTypes[typeName]; !exists {
-											optionalTypes[typeName] = optType.Inner
-										}
-									}
-								}
-								if item.Value != nil {
-									collectOptionalTypes(item.Value)
-								}
-							}
-						case *ast.AssignStmt:
-							if s.Lhs != nil {
-								collectOptionalTypes(s.Lhs)
-							}
-							if s.Rhs != nil {
-								collectOptionalTypes(s.Rhs)
-							}
-						case *ast.IfStmt:
-							if s.Cond != nil {
-								collectOptionalTypes(s.Cond)
-							}
-							if s.Body != nil {
-								for _, stmt := range s.Body.Nodes {
-									scanStmt(stmt)
-								}
-							}
-							if s.Else != nil {
-								if elseBlock, ok := s.Else.(*ast.Block); ok {
-									for _, stmt := range elseBlock.Nodes {
-										scanStmt(stmt)
-									}
-								}
-							}
-						case *ast.Block:
-							for _, stmt := range s.Nodes {
-								scanStmt(stmt)
-							}
-						}
-					}
 					for _, stmt := range n.Body.Nodes {
-						scanStmt(stmt)
+						visitNode(stmt)
+					}
+				}
+			case *ast.MethodDecl:
+				if n.Receiver != nil {
+					visitTypeNode(n.Receiver.Type)
+				}
+				if n.Type != nil {
+					visitTypeNode(n.Type.Result)
+					for _, p := range n.Type.Params {
+						visitTypeNode(p.Type)
+					}
+				}
+				if n.Body != nil {
+					for _, stmt := range n.Body.Nodes {
+						visitNode(stmt)
 					}
 				}
 			}
 		}
 	}
 
-	// Track if we've generated the default none constant
-	noneGenerated := false
+	// Persist discovered optional types for reuse by other generators/phases
+	codegen.StoreOptionalTypes(g.mod, optionalTypes)
 
-	// Generate typedef struct for each optional type
-	for typeName, innerType := range optionalTypes {
+	keys := make([]string, 0, len(optionalTypes))
+	for k := range optionalTypes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	noneGenerated := false
+	for _, typeName := range keys {
+		innerType := optionalTypes[typeName]
 		innerCType := g.typeToC(innerType)
 		g.write("typedef struct {\n")
 		g.write("    %s value;\n", innerCType)
 		g.write("    int is_some;\n")
 		g.write("} ferret_optional_%s;\n", typeName)
 
-		// Generate none constant - use int32_t as default if available, otherwise first type
 		if !noneGenerated {
-			// Generate a default none constant for the first optional type found
-			// This will be used as the default none constant (similar to true/false)
 			g.write("static const ferret_optional_%s none = ((ferret_optional_%s){.value = 0, .is_some = 0});\n", typeName, typeName)
 			noneGenerated = true
 		}
@@ -3098,6 +3301,190 @@ func (g *Generator) getOptionalTypeName(innerType types.SemType) string {
 	baseType = strings.ReplaceAll(baseType, "]", "")
 	baseType = strings.ReplaceAll(baseType, " ", "_")
 	return baseType
+}
+
+// collectOptionalTypes pre-scans module types to populate optionalTyps.
+func (g *Generator) collectOptionalTypes() {
+	trackSem := func(t types.SemType) {
+		if t == nil {
+			return
+		}
+		if opt, ok := types.UnwrapType(t).(*types.OptionalType); ok {
+			g.trackOptional(opt.Inner)
+		}
+	}
+
+	var visitTypeNode func(ast.TypeNode)
+	visitTypeNode = func(node ast.TypeNode) {
+		if node == nil {
+			return
+		}
+		switch n := node.(type) {
+		case *ast.OptionalType:
+			visitTypeNode(n.Base)
+			inner := g.typeFromTypeNode(n.Base)
+			if inner != nil {
+				g.trackOptional(inner)
+			} else {
+				trackSem(g.typeFromTypeNode(n))
+			}
+		case *ast.ReferenceType:
+			visitTypeNode(n.Base)
+		case *ast.ArrayType:
+			visitTypeNode(n.ElType)
+		case *ast.MapType:
+			visitTypeNode(n.Key)
+			visitTypeNode(n.Value)
+		case *ast.StructType:
+			for i := range n.Fields {
+				visitTypeNode(n.Fields[i].Type)
+			}
+		case *ast.InterfaceType:
+			for i := range n.Methods {
+				visitTypeNode(n.Methods[i].Type)
+			}
+		case *ast.ResultType:
+			visitTypeNode(n.Value)
+			visitTypeNode(n.Error)
+		case *ast.FuncType:
+			for i := range n.Params {
+				visitTypeNode(n.Params[i].Type)
+			}
+			visitTypeNode(n.Result)
+		}
+	}
+
+	// Types from symbol table
+	for _, sym := range g.mod.ModuleScope.GetAllSymbols() {
+		if sym == nil || sym.Type == nil {
+			continue
+		}
+		trackSem(sym.Type)
+	}
+
+	// Types from AST
+	if g.mod.AST != nil {
+		var visitNode func(ast.Node)
+		visitNode = func(node ast.Node) {
+			if node == nil {
+				return
+			}
+			switch n := node.(type) {
+			case *ast.VarDecl:
+				for _, item := range n.Decls {
+					visitTypeNode(item.Type)
+				}
+			case *ast.ConstDecl:
+				for _, item := range n.Decls {
+					visitTypeNode(item.Type)
+				}
+			case *ast.AssignStmt:
+				visitNode(n.Lhs)
+				visitNode(n.Rhs)
+			case *ast.IfStmt:
+				if n.Body != nil {
+					for _, stmt := range n.Body.Nodes {
+						visitNode(stmt)
+					}
+				}
+				if n.Else != nil {
+					if block, ok := n.Else.(*ast.Block); ok {
+						for _, stmt := range block.Nodes {
+							visitNode(stmt)
+						}
+					}
+				}
+			case *ast.ForStmt:
+				if n.Iterator != nil {
+					visitNode(n.Iterator)
+				}
+				if n.Body != nil {
+					for _, stmt := range n.Body.Nodes {
+						visitNode(stmt)
+					}
+				}
+			case *ast.WhileStmt:
+				if n.Body != nil {
+					for _, stmt := range n.Body.Nodes {
+						visitNode(stmt)
+					}
+				}
+			case *ast.Block:
+				for _, stmt := range n.Nodes {
+					visitNode(stmt)
+				}
+			}
+		}
+
+		for _, node := range g.mod.AST.Nodes {
+			switch n := node.(type) {
+			case *ast.TypeDecl:
+				visitTypeNode(n.Type)
+			case *ast.VarDecl:
+				for _, item := range n.Decls {
+					visitTypeNode(item.Type)
+				}
+			case *ast.ConstDecl:
+				for _, item := range n.Decls {
+					visitTypeNode(item.Type)
+				}
+			case *ast.FuncDecl:
+				if n.Type != nil {
+					visitTypeNode(n.Type.Result)
+					for _, p := range n.Type.Params {
+						visitTypeNode(p.Type)
+					}
+				}
+				if n.Body != nil {
+					for _, stmt := range n.Body.Nodes {
+						visitNode(stmt)
+					}
+				}
+			case *ast.MethodDecl:
+				if n.Receiver != nil {
+					visitTypeNode(n.Receiver.Type)
+				}
+				if n.Type != nil {
+					visitTypeNode(n.Type.Result)
+					for _, p := range n.Type.Params {
+						visitTypeNode(p.Type)
+					}
+				}
+				if n.Body != nil {
+					for _, stmt := range n.Body.Nodes {
+						visitNode(stmt)
+					}
+				}
+			}
+		}
+	}
+}
+
+// mapHashEqualsForType picks runtime hash/equals helpers for a given key type.
+// Falls back to byte-wise hash/equals when we don't have a specialized function.
+func (g *Generator) mapHashEqualsForType(keyType types.SemType) (string, string) {
+	keyType = types.UnwrapType(keyType)
+	switch kt := keyType.(type) {
+	case *types.PrimitiveType:
+		switch kt.GetName() {
+		case types.TYPE_I32:
+			return "ferret_map_hash_i32", "ferret_map_equals_i32"
+		case types.TYPE_I64:
+			return "ferret_map_hash_i64", "ferret_map_equals_i64"
+		case types.TYPE_STRING:
+			return "ferret_map_hash_str", "ferret_map_equals_str"
+		}
+	case *types.NamedType:
+		// Recurse on underlying type
+		return g.mapHashEqualsForType(kt.Underlying)
+	}
+	// Default fallback for unsupported key types
+	return "ferret_map_hash_bytes", "ferret_map_equals_bytes"
+}
+
+// cSizeOfType returns a sizeof expression for the C type backing the semantic type.
+func (g *Generator) cSizeOfType(sem types.SemType) string {
+	return fmt.Sprintf("sizeof(%s)", g.typeToC(sem))
 }
 
 // getPrintFunctionNameForType returns the appropriate Print/Println function name based on type

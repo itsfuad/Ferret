@@ -64,6 +64,7 @@ var Colors = []COLOR{
 	ORANGE, BROWN, BRIGHT_BROWN, PINK, TEAL, AQUA, MAGENTA,
 	LIGHT_GREY, DARK_GREY, LIGHT_ORANGE, LIGHT_BLUE, LIGHT_GREEN, LIGHT_YELLOW,
 }
+
 func PrintAllColors() {
 
 	// for _, color := range Colors {

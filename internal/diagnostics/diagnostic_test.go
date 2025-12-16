@@ -303,7 +303,7 @@ func TestDiagnostic_MultipleFiles(t *testing.T) {
 		t.Fatalf("Expected 2 labels, got %d", len(diag.Labels))
 	}
 
-	if *diag.Labels[0].Location.Filename != file1	{
+	if *diag.Labels[0].Location.Filename != file1 {
 		t.Errorf("Expected first label from file1.fer, got %q", *diag.Labels[0].Location.Filename)
 	}
 

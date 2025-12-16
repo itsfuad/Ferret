@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	FN = "__func_lit__"
-	ST = "__struct_lit__"
+	FN   = "__func_lit__"
+	ST   = "__struct_lit__"
 	INTR = "__interface_lit__"
 	ENUM = "__enum_lit__"
 )
@@ -15,7 +15,7 @@ const (
 // Global counter for generating unique literal IDs
 var litCountermap = map[string]*int64{
 	FN:   new(int64),
-	ST: new(int64),
+	ST:   new(int64),
 	INTR: new(int64),
 	ENUM: new(int64),
 }

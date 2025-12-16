@@ -85,6 +85,9 @@ type Module struct {
 	// Source metadata
 	Content string // Raw source code (for diagnostics)
 
+	// Artifacts for downstream phases (codegen, etc.)
+	Artifacts map[string]interface{}
+
 	// Concurrency control
 	Mu sync.Mutex // Protects field updates during parallel parsing
 }
@@ -322,6 +325,7 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 		ModuleScope:  modScope,
 		CurrentScope: modScope,
 		Content:      code,
+		Artifacts:    make(map[string]interface{}),
 	}
 
 	ctx.AddModule(ctx.EntryModule, module)
@@ -455,11 +459,15 @@ func (ctx *CompilerContext) AddModule(importPath string, module interface{}) {
 			CurrentScope:   m.CurrentScope,
 			Imports:        make(map[string]*Import),
 			ImportAliasMap: make(map[string]string),
+			Artifacts:      make(map[string]interface{}),
 		}
 	default:
 		panic(fmt.Sprintf("unsupported module type: %T", module))
 	}
 
+	if mod.Artifacts == nil {
+		mod.Artifacts = make(map[string]interface{})
+	}
 	mod.ImportPath = importPath
 	ctx.Modules[importPath] = mod
 }
