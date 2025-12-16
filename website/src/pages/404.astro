@@ -1,7 +1,18 @@
 ---
 import '../styles/custom.css';
 ---
+<script is:inline>
+    // Theme system matching Starlight's implementation
+    const parseTheme = (theme) => theme === 'light' ? 'light' : 'dark';
 
+    function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+    }
+
+    // Initialize theme from localStorage
+    const savedTheme = parseTheme(localStorage.getItem('starlight-theme'));
+    setTheme(savedTheme);
+</script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,18 +111,5 @@ import '../styles/custom.css';
             Back to Home
         </a>
     </div>
-
-    <script is:inline>
-        // Theme system matching Starlight's implementation
-        const parseTheme = (theme) => theme === 'light' ? 'light' : 'dark';
-
-        function setTheme(theme) {
-            document.documentElement.dataset.theme = theme;
-        }
-
-        // Initialize theme from localStorage
-        const savedTheme = parseTheme(localStorage.getItem('starlight-theme'));
-        setTheme(savedTheme);
-    </script>
 </body>
 </html>

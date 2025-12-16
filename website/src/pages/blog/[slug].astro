@@ -1,0 +1,116 @@
+---
+import "../../styles/custom.css";
+import { getCollection } from "astro:content";
+import Navbar from "../../components/Navbar.astro";
+
+export async function getStaticPaths() {
+    const posts = await getCollection("blog");
+    return posts.map((post) => ({
+        params: { slug: post.slug },
+        props: { post },
+    }));
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+---
+
+<script is:inline>
+    // Theme system matching Starlight's implementation
+    const parseTheme = (theme) => (theme === "light" ? "light" : "dark");
+
+    function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+    }
+
+    // Initialize theme from localStorage
+    const savedTheme = parseTheme(localStorage.getItem("starlight-theme"));
+    setTheme(savedTheme);
+</script>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>{post.data.title} | Ferret Blog</title>
+    </head>
+    <body>
+        <Navbar showSearch={false} />
+        <main class="page">
+            <article class="post">
+                <p class="date">{post.data.pubDate.toLocaleDateString()}</p>
+                <h1>{post.data.title}</h1>
+                <p class="desc">{post.data.description}</p>
+                {
+                    post.data.tags && (
+                        <div class="tags">
+                            {post.data.tags.map((tag) => (
+                                <span class="tag">{tag}</span>
+                            ))}
+                        </div>
+                    )
+                }
+                <div class="content">
+                    <Content />
+                </div>
+            </article>
+        </main>
+    </body>
+</html>
+
+<style>
+    :global(:root) {
+        --sl-color-bg: var(--background);
+        --sl-color-bg-surface: var(--background);
+        --sl-color-text: var(--foreground);
+        --sl-color-text-muted: var(--muted-foreground);
+        --sl-color-hairline: var(--border);
+        --sl-color-text-accent: var(--accent-color);
+    }
+    :global(body) {
+        margin: 0;
+        font-family:
+            "Inter",
+            system-ui,
+            -apple-system,
+            sans-serif;
+        background: var(--background);
+        color: var(--foreground);
+    }
+    .page {
+        max-width: 960px;
+        padding: 3rem 1.5rem 4rem;
+        margin: 0 auto;
+    }
+    .post {
+        display: grid;
+        gap: 0.75rem;
+    }
+    .date {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--sl-color-text-muted);
+    }
+    h1 {
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 2.6rem);
+    }
+    .desc {
+        margin: 0;
+        color: var(--sl-color-text-muted);
+        line-height: 1.6;
+    }
+    .tags {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
+    .tag {
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        background: var(--sl-color-hairline);
+        color: var(--sl-color-text);
+        font-size: 0.8rem;
+    }
+    .content :global(p) {
+        line-height: 1.7;
+    }
+</style>

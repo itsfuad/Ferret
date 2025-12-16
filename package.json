@@ -1,0 +1,6 @@
+{
+	"devDependencies": {
+		"@astrojs/svelte": "^7.2.4",
+		"svelte": "^5.46.0"
+	}
+}

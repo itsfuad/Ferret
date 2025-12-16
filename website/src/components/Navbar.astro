@@ -8,16 +8,17 @@ import type { StarlightRouteData } from '@astrojs/starlight/route-data';
 
 interface NavbarProps extends StarlightRouteData {
     showSearch?: boolean;
+    showPlayground?: boolean;
 }
 
-const { showSearch = false } = Astro.props as NavbarProps;
+const { showSearch = false, showPlayground = true } = Astro.props as NavbarProps;
 
 // Get current path to conditionally show/hide nav items
 const currentPath = Astro.url.pathname;
 const isHome = currentPath === '/' || currentPath === '/index' || currentPath === '/index/';
 const isPlayground = currentPath.startsWith('/play');
-const isDocs = !isHome && !isPlayground;
----
+const isBlog = currentPath.startsWith('/blog');
+const isDocs = !isHome && !isPlayground && !isBlog;---
 
 <nav class="navbar">
     <div class="navbar-left">
@@ -33,19 +34,34 @@ const isDocs = !isHome && !isPlayground;
             <SearchBar />
         )}
         
+        {/* Show blogs link */}
+        <a href="/blog" class="nav-link">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16v16H4z"/>
+            <path d="M8 8h8"/>
+            <path d="M8 12h8"/>
+            <path d="M8 16h5"/>
+          </svg>
+          <span>Blogs</span>
+        </a>
+        
         {/* Show "Docs" link only when NOT on docs pages */}
         {!isDocs && (
-            <a href="/getting-started/introduction/" class="nav-link">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                </svg>
-                <span>Docs</span>
+          <a href="/getting-started/introduction/" class="nav-link">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 4h9a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H2z"/>
+                <path d="M22 4h-9a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h9z"/>
+              </svg>
+              <span>Docs</span>
             </a>
         )}
 
         {/* Show "Playground" link only when NOT on playground page */}
-        {!isPlayground && (
+        {(!isPlayground && showPlayground) && (
             <a href="/play" class="nav-link">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>

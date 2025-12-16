@@ -1,0 +1,155 @@
+---
+import "../styles/custom.css";
+import { getCollection } from "astro:content";
+import Navbar from "../components/Navbar.astro";
+
+const posts = (await getCollection("blog"))
+    .filter((p) => !p.data.draft)
+    .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+---
+
+<script is:inline>
+    // Theme system matching Starlight's implementation
+    const parseTheme = (theme) => (theme === "light" ? "light" : "dark");
+
+    function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+    }
+
+    // Initialize theme from localStorage
+    const savedTheme = parseTheme(localStorage.getItem("starlight-theme"));
+    setTheme(savedTheme);
+</script>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Ferret Blog</title>
+    </head>
+    <body>
+        <Navbar showSearch={false} showPlayground={false} />
+        <main class="page">
+            <section class="head">
+                <p class="eyebrow">Updates & Notes</p>
+                <h1>Ferret Blog</h1>
+                <p class="lede">
+                    Release news, design notes, and practical guides straight
+                    from the Ferret team.
+                </p>
+            </section>
+
+            <section class="posts">
+                {
+                    posts.map((post) => (
+                        <article class="post-card">
+                            <p class="date">
+                                {post.data.pubDate.toLocaleDateString()}
+                            </p>
+                            <h2>
+                                <a href={`/blog/${post.slug}/`}>
+                                    {post.data.title}
+                                </a>
+                            </h2>
+                            <p class="desc">{post.data.description}</p>
+                            {post.data.tags && (
+                                <div class="tags">
+                                    {post.data.tags.map((tag) => (
+                                        <span class="tag">{tag}</span>
+                                    ))}
+                                </div>
+                            )}
+                        </article>
+                    ))
+                }
+            </section>
+        </main>
+    </body>
+</html>
+
+<style>
+    :global(:root) {
+        --sl-color-bg: var(--background);
+        --sl-color-bg-surface: var(--background);
+        --sl-color-text: var(--foreground);
+        --sl-color-text-muted: var(--muted-foreground);
+        --sl-color-hairline: var(--border);
+        --sl-color-text-accent: var(--accent-color);
+    }
+    :global(body) {
+        margin: 0;
+        font-family:
+            "Inter",
+            system-ui,
+            -apple-system,
+            sans-serif;
+        background: var(--background);
+        color: var(--foreground);
+    }
+    .page {
+        max-width: 960px;
+        padding: 3rem 1.5rem 4rem;
+        margin: 0 auto;
+    }
+    .head {
+        margin-bottom: 2rem;
+    }
+    .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.78rem;
+        color: var(--sl-color-text-accent);
+        margin: 0 0 0.5rem;
+    }
+    h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(2rem, 3vw, 2.6rem);
+    }
+    .lede {
+        margin: 0;
+        color: var(--sl-color-text-muted);
+        max-width: 640px;
+        line-height: 1.6;
+    }
+    .posts {
+        display: grid;
+        gap: 1rem;
+    }
+    .post-card {
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.75rem;
+        background: var(--sl-color-bg-surface);
+    }
+    .date {
+        margin: 0 0 0.35rem;
+        font-size: 0.85rem;
+        color: var(--sl-color-text-muted);
+    }
+    h2 {
+        margin: 0 0 0.35rem;
+        font-size: 1.25rem;
+    }
+    h2 a {
+        color: inherit;
+        text-decoration: none;
+    }
+    h2 a:hover {
+        text-decoration: underline;
+    }
+    .desc {
+        margin: 0 0 0.5rem;
+        color: var(--sl-color-text-muted);
+        line-height: 1.5;
+    }
+    .tags {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
+    .tag {
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        background: var(--sl-color-hairline);
+        color: var(--sl-color-text);
+        font-size: 0.8rem;
+    }
+</style>

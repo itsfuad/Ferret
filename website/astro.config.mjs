@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import svelte from '@astrojs/svelte';
 import ferretGrammarJson from './syntax/fer.tmLanguage.json';
 
 // Cast to any to avoid type errors with the complex grammar structure
@@ -106,7 +107,9 @@ export default defineConfig({
                 ],
             },
         ],
-    })],
+    }), 
+      svelte(),
+    ],
 
     vite: {
         plugins: [],
