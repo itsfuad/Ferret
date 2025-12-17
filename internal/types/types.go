@@ -492,7 +492,7 @@ type InterfaceMethod struct {
 }
 
 // InterfaceType represents interface types: interface { method1(...), method2(...) }
-// Named interfaces like "type Shape interface{}" use NamedType wrapper
+// Named interfaces like "type Shape any" use NamedType wrapper
 type InterfaceType struct {
 	ID      string            // Unique ID for type identity (from AST or generated)
 	Methods []InterfaceMethod // Required methods
@@ -504,7 +504,7 @@ func NewInterface(methods []InterfaceMethod) *InterfaceType {
 
 func (i *InterfaceType) String() string {
 	if len(i.Methods) == 0 {
-		return "interface{}" // Empty interface (any type)
+		return "any" // Empty interface (any type)
 	}
 	methodStrs := make([]string, len(i.Methods))
 	for j, m := range i.Methods {

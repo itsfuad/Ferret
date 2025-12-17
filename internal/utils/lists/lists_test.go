@@ -8,9 +8,9 @@ const errMsg = "Has() = %v, want %v"
 
 type Test struct {
 	name     string
-	slice    interface{}
-	item     interface{}
-	equalFn  interface{}
+	slice    any
+	item     any
+	equalFn  any
 	expected bool
 }
 
@@ -85,8 +85,8 @@ func TestHas(t *testing.T) {
 
 type SomeTest struct {
 	name      string
-	slice     interface{}
-	predicate interface{}
+	slice     any
+	predicate any
 	expected  bool
 }
 

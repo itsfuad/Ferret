@@ -15,9 +15,9 @@ func main() {
 	<-make(chan struct{})
 }
 
-func compile(this js.Value, args []js.Value) interface{} {
+func compile(this js.Value, args []js.Value) any {
 	if len(args) < 2 {
-		return map[string]interface{}{
+		return map[string]any{
 			"success": false,
 			"output":  "Invalid arguments: expected (code: string, debug: bool)",
 		}
@@ -29,7 +29,7 @@ func compile(this js.Value, args []js.Value) interface{} {
 		LogFormat: compiler.HTML,
 	})
 
-	return map[string]interface{}{
+	return map[string]any{
 		"success": result.Success,
 		"output":  result.Output,
 	}

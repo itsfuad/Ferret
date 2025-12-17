@@ -115,7 +115,7 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	target = dereferenceType(target)
 
 	// Special handling for none
-	// none can be assigned to any optional type (T?) or empty interface (interface{})
+	// none can be assigned to any optional type (T?) or empty interface (any)
 	if source.Equals(types.TypeNone) {
 		if _, ok := target.(*types.OptionalType); ok {
 			return ImplicitCastable
@@ -249,7 +249,7 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 		if _, ok := target.(*types.OptionalType); ok {
 			return ImplicitCastable
 		}
-		// Check if target is an empty interface (interface{})
+		// Check if target is an empty interface (any)
 		if iface, ok := target.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
 			return ImplicitCastable
 		}

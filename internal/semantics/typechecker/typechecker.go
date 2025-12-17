@@ -394,7 +394,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 }
 
 // checkVarDecl type checks variable/constant declarations
-func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl interface{}, isConst bool) {
+func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl any, isConst bool) {
 	var declItems []ast.DeclItem
 
 	switch d := decl.(type) {

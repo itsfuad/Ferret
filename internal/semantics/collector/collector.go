@@ -237,7 +237,7 @@ func collectBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block
 }
 
 // collectVarDecl handles variable and constant declarations
-func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl interface{}, kind symbols.SymbolKind) {
+func collectVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl any, kind symbols.SymbolKind) {
 	var declItems []ast.DeclItem
 
 	switch d := decl.(type) {

@@ -2285,7 +2285,7 @@ func (g *Generator) generateScopeResolutionExpr(expr *ast.ScopeResolutionExpr) {
 		}
 	}
 	// Fallback: generate error comment
-	g.ctx.ReportError(fmt.Sprintf("codegen: unsupported scope resolution"), nil)
+	g.ctx.ReportError("codegen: unsupported scope resolution", nil)
 	g.write("/* error: scope resolution */")
 }
 

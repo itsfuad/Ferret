@@ -29,7 +29,7 @@ func StoreOptionalTypes(mod *context_v2.Module, optTypes map[string]types.SemTyp
 	}
 
 	if mod.Artifacts == nil {
-		mod.Artifacts = make(map[string]interface{})
+		mod.Artifacts = make(map[string]any)
 	}
 
 	copied := make(map[string]types.SemType, len(optTypes))

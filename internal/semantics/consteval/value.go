@@ -11,7 +11,7 @@ import (
 type ConstValue struct {
 	Kind  ConstKind
 	Type  types.SemType
-	Value interface{} // Actual value: *big.Int, *big.Float, bool, string
+	Value any // Actual value: *big.Int, *big.Float, bool, string
 }
 
 // ConstKind categorizes the type of constant value

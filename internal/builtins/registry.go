@@ -8,7 +8,7 @@ import (
 // ModuleCreator is an interface to avoid circular dependency with context_v2
 type ModuleCreator interface {
 	GetUniverse() *table.SymbolTable
-	AddModule(importPath string, module interface{})
+	AddModule(importPath string, module any)
 }
 
 // RegisterAllBuiltins registers all native builtin modules
@@ -17,7 +17,7 @@ func RegisterAllBuiltins(creator ModuleCreator) {
 }
 
 // createNativeModule creates a synthetic module with native functions
-func createNativeModule(creator ModuleCreator, importPath string, funcs []NativeFunction) interface{} {
+func createNativeModule(creator ModuleCreator, importPath string, funcs []NativeFunction) any {
 	modScope := table.NewSymbolTable(creator.GetUniverse())
 
 	// Register each native function

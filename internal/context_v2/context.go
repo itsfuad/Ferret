@@ -86,7 +86,7 @@ type Module struct {
 	Content string // Raw source code (for diagnostics)
 
 	// Artifacts for downstream phases (codegen, etc.)
-	Artifacts map[string]interface{}
+	Artifacts map[string]any
 
 	// Concurrency control
 	Mu sync.Mutex // Protects field updates during parallel parsing
@@ -326,7 +326,7 @@ func (ctx *CompilerContext) SetEntryPointWithCode(code, moduleName string) error
 		ModuleScope:  modScope,
 		CurrentScope: modScope,
 		Content:      code,
-		Artifacts:    make(map[string]interface{}),
+		Artifacts:    make(map[string]any),
 	}
 
 	ctx.AddModule(ctx.EntryModule, module)
@@ -432,8 +432,8 @@ func (ctx *CompilerContext) isRemoteImport(importPath string) bool {
 }
 
 // AddModule registers a module in the context
-// Accepts interface{} to support both *Module and *builtins.NativeModule
-func (ctx *CompilerContext) AddModule(importPath string, module interface{}) {
+// Accepts any to support both *Module and *builtins.NativeModule
+func (ctx *CompilerContext) AddModule(importPath string, module any) {
 	if module == nil {
 		panic(fmt.Sprintf("cannot add nil module for %q", importPath))
 	}
@@ -446,7 +446,7 @@ func (ctx *CompilerContext) AddModule(importPath string, module interface{}) {
 		return
 	}
 
-	// Convert interface{} to *Module
+	// Convert any to *Module
 	var mod *Module
 	switch m := module.(type) {
 	case *Module:
@@ -460,14 +460,14 @@ func (ctx *CompilerContext) AddModule(importPath string, module interface{}) {
 			CurrentScope:   m.CurrentScope,
 			Imports:        make(map[string]*Import),
 			ImportAliasMap: make(map[string]string),
-			Artifacts:      make(map[string]interface{}),
+			Artifacts:      make(map[string]any),
 		}
 	default:
 		panic(fmt.Sprintf("unsupported module type: %T", module))
 	}
 
 	if mod.Artifacts == nil {
-		mod.Artifacts = make(map[string]interface{})
+		mod.Artifacts = make(map[string]any)
 	}
 	mod.ImportPath = importPath
 	ctx.Modules[importPath] = mod

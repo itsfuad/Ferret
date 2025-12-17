@@ -51,7 +51,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 			CurrentScope: modScope,
 			Content:      "",
 			AST:          nil,
-			Artifacts:    make(map[string]interface{}),
+			Artifacts:    make(map[string]any),
 		}
 		p.ctx.AddModule(importPath, module)
 	}

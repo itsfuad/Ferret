@@ -7,61 +7,61 @@ import (
 )
 
 // Print methods (default to stdout)
-func (c COLOR) Printf(format string, args ...interface{}) {
+func (c COLOR) Printf(format string, args ...any) {
 	fmt.Printf(string(c)+format+string(RESET), args...)
 }
 
-func (c COLOR) Println(args ...interface{}) {
+func (c COLOR) Println(args ...any) {
 	fmt.Print(string(c))
 	fmt.Println(args...)
 	fmt.Print(string(RESET))
 }
 
-func (c COLOR) Print(args ...interface{}) {
+func (c COLOR) Print(args ...any) {
 	fmt.Print(string(c))
 	fmt.Print(args...)
 	fmt.Print(string(RESET))
 }
 
 // Fprint methods (write to specific writer)
-func (c COLOR) Fprintf(w io.Writer, format string, args ...interface{}) {
+func (c COLOR) Fprintf(w io.Writer, format string, args ...any) {
 	fmt.Fprintf(w, string(c)+format+string(RESET), args...)
 }
 
-func (c COLOR) Fprintln(w io.Writer, args ...interface{}) {
+func (c COLOR) Fprintln(w io.Writer, args ...any) {
 	fmt.Fprint(w, string(c))
 	fmt.Fprintln(w, args...)
 	fmt.Fprint(w, string(RESET))
 }
 
-func (c COLOR) Fprint(w io.Writer, args ...interface{}) {
+func (c COLOR) Fprint(w io.Writer, args ...any) {
 	fmt.Fprint(w, string(c))
 	fmt.Fprint(w, args...)
 	fmt.Fprint(w, string(RESET))
 }
 
-func (c COLOR) Sprintf(format string, args ...interface{}) string {
+func (c COLOR) Sprintf(format string, args ...any) string {
 	return string(c) + fmt.Sprintf(format, args...) + string(RESET)
 }
 
-func (c COLOR) Sprintln(args ...interface{}) string {
+func (c COLOR) Sprintln(args ...any) string {
 	return string(c) + fmt.Sprintln(args...) + string(RESET)
 }
 
-func (c COLOR) Sprint(args ...interface{}) string {
+func (c COLOR) Sprint(args ...any) string {
 	return string(c) + fmt.Sprint(args...) + string(RESET)
 }
 
 // Helper functions
-func PrintWithColor(color COLOR, args ...interface{}) {
+func PrintWithColor(color COLOR, args ...any) {
 	color.Print(args...)
 }
 
-func FprintWithColor(w io.Writer, color COLOR, args ...interface{}) {
+func FprintWithColor(w io.Writer, color COLOR, args ...any) {
 	color.Fprint(w, args...)
 }
 
-func SprintWithColor(color COLOR, args ...interface{}) string {
+func SprintWithColor(color COLOR, args ...any) string {
 	return color.Sprint(args...)
 }
 
