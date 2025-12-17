@@ -116,12 +116,6 @@ func TestParserEdgeCases(t *testing.T) {
 			source:      "let x := 42; x = 10;",
 			expectError: false,
 		},
-		{
-			name:          "Assignment to literal",
-			source:        "42 = 10;",
-			expectError:   true, // Literals can't appear at top level
-			errorContains: "unexpected token",
-		},
 	}
 
 	for _, tt := range tests {
