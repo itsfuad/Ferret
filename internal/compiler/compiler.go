@@ -8,6 +8,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/context_v2"
 	"compiler/internal/pipeline"
+	"compiler/internal/utils/fs"
 )
 
 type FORMAT int
@@ -55,29 +56,11 @@ func Compile(opts *Options) Result {
 			return Result{Success: false, Output: fmt.Sprintf("Failed to resolve path: %v", err)}
 		}
 
-		if _, err := os.Stat(absPath); os.IsNotExist(err) {
-			return Result{Success: false, Output: fmt.Sprintf("File not found: %s", opts.EntryFile)}
+		if !fs.IsValidFile(absPath) {
+			return Result{Success: false, Output: fmt.Sprintf("Invalid file path: %v", absPath)}
 		}
 
-		// Find the actual project root (where runtime/ directory is)
-		// Start from the entry file's directory and walk up until we find runtime/
 		entryDir := filepath.Dir(absPath)
-		currentDir := entryDir
-		for {
-			runtimePath := filepath.Join(currentDir, "runtime")
-			if _, err := os.Stat(runtimePath); err == nil {
-				// Found runtime directory, this is the project root
-				projectRoot = currentDir
-				break
-			}
-			parent := filepath.Dir(currentDir)
-			if parent == currentDir {
-				// Reached filesystem root, use entry file's directory as fallback
-				projectRoot = entryDir
-				break
-			}
-			currentDir = parent
-		}
 		projectName = filepath.Base(entryDir)
 	}
 
@@ -87,16 +70,10 @@ func Compile(opts *Options) Result {
 	runtimePath := filepath.Join(execDir, "../runtime")
 
 	// Determine output path
-	outputPath := filepath.Join(projectRoot, "bin", projectName)
+	outputPath := "bin"
 	if opts.OutputExecutable != "" {
 		// Use user-specified path
 		outputPath = opts.OutputExecutable
-		// Make it absolute if it's not already
-		if !filepath.IsAbs(outputPath) {
-			if absPath, err := filepath.Abs(outputPath); err == nil {
-				outputPath = absPath
-			}
-		}
 	}
 
 	config := &context_v2.Config{

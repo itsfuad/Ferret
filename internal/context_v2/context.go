@@ -365,7 +365,7 @@ func (ctx *CompilerContext) FilePathToImportPath(filePath string) string {
 // fromModulePath is optional - if provided, relative imports will be resolved relative to that module's directory
 func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, ModuleType, error) {
 	// Normalize import path to ensure consistent lookup
-	importPath = fs.NormalizeImportPath(importPath)
+	importPath = fs.NormalizePath(importPath)
 
 	// Determine module type
 	packageName := fs.FirstPart(importPath)

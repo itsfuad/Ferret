@@ -150,14 +150,12 @@
 
     // Initialize Go WASM
     let wasmReady = false;
-    let wasmGo = null;
-
+    
     async function initWasm() {
         try {
             console.log("🔄 Loading Ferret WASM compiler...");
 
             const go = new Go();
-            wasmGo = go;
 
             // Clear any service worker cache
             if ("serviceWorker" in navigator) {

@@ -6,7 +6,8 @@ func IsCapitalized(str string) bool {
 	if len(str) == 0 {
 		return false
 	}
-	return str[0] >= 'A' && str[0] <= 'Z'
+	firstChar := rune(str[0])
+	return firstChar >= 'A' && firstChar <= 'Z'
 }
 
 func ToSentenceCase(str string) string {

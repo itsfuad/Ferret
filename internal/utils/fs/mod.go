@@ -18,20 +18,7 @@ func IsDir(path string) bool {
 	return err == nil && fileInfo.Mode().IsDir()
 }
 
-// NormalizePath normalizes a path to use forward slashes and removes leading/trailing slashes.
-// This is a utility for FirstPart and LastPart to handle various input formats.
-func NormalizePath(path string) string {
-	if path == "" {
-		return ""
-	}
-	// Replace backslashes with forward slashes
-	normalized := strings.ReplaceAll(path, "\\", "/")
-	// Remove leading and trailing slashes
-	normalized = strings.Trim(normalized, "/")
-	return normalized
-}
-
-// NormalizeImportPath normalizes an import path with additional processing:
+// NormalizePath normalizes an import path with additional processing:
 // - Trims leading/trailing whitespace
 // - Replaces backslashes with forward slashes
 // - Collapses multiple consecutive slashes into one
@@ -42,7 +29,7 @@ func NormalizePath(path string) string {
 //   - "myproject//utils"  -> "myproject/utils"
 //   - "/myproject/utils/" -> "myproject/utils"
 //   - "myproject\utils"   -> "myproject/utils"
-func NormalizeImportPath(importPath string) string {
+func NormalizePath(importPath string) string {
 	// Trim whitespace
 	importPath = strings.TrimSpace(importPath)
 

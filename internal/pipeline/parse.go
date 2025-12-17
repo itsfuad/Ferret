@@ -176,7 +176,7 @@ func (p *Pipeline) extractTopLevelImports(astModule *ast.Module) []importInfo {
 
 		if impStmt.Path != nil {
 			importPath := strings.Trim(impStmt.Path.Value, "\"")
-			importPath = fs.NormalizeImportPath(importPath)
+			importPath = fs.NormalizePath(importPath)
 			if importPath != "" {
 				imports = append(imports, importInfo{
 					path:     importPath,
