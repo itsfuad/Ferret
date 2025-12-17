@@ -2,12 +2,9 @@ package cgen
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
-	"compiler/colors"
 	"compiler/internal/codegen"
 	"compiler/internal/context_v2"
 	"compiler/internal/frontend/ast"
@@ -16,6 +13,7 @@ import (
 	"compiler/internal/semantics/typechecker"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
+	ustrings "compiler/internal/utils/strings"
 )
 
 // interfaceAssignmentInfo holds information about an interface assignment
@@ -57,60 +55,6 @@ func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
 	}
 }
 
-// Generate generates C code for the module
-func (g *Generator) Generate() (string, error) {
-	g.writeHeader()
-	g.writeIncludes()
-	g.writeRuntimeDeclarations()
-
-	// Generate struct/type definitions first
-	if g.mod.AST != nil {
-		for _, node := range g.mod.AST.Nodes {
-			switch n := node.(type) {
-			case *ast.TypeDecl:
-				g.generateTypeDecl(n)
-			}
-		}
-	}
-
-	// Collect and generate all interface code upfront (wrappers and vtables)
-	assignments := g.collectInterfaceAssignments()
-	g.generateAllInterfaceCode(assignments)
-
-	// Generate code for each top-level declaration
-	if g.mod.AST != nil {
-		for _, node := range g.mod.AST.Nodes {
-			switch n := node.(type) {
-			case *ast.FuncDecl:
-				g.generateFunction(n)
-			case *ast.MethodDecl:
-				g.generateMethod(n)
-			case *ast.VarDecl:
-				g.generateVarDecl(n)
-			case *ast.ConstDecl:
-				g.generateConstDecl(n)
-			}
-		}
-	}
-
-	return g.buf.String(), nil
-}
-
-func (g *Generator) writeHeader() {
-	g.write("// Generated C code from Ferret\n")
-	g.write("// Module: %s\n\n", g.mod.ImportPath)
-}
-
-func (g *Generator) writeIncludes() {
-	codegen.WriteStandardIncludes(&g.buf)
-}
-
-func (g *Generator) writeRuntimeDeclarations() {
-	// Include the runtime headers
-	codegen.WriteRuntimeIncludes(&g.buf)
-	g.write("\n")
-}
-
 func (g *Generator) generateFunction(decl *ast.FuncDecl) {
 	if decl.Name == nil {
 		return
@@ -147,7 +91,7 @@ func (g *Generator) generateFunction(decl *ast.FuncDecl) {
 	cFuncName := g.sanitizeName(funcName)
 	if funcName != "main" && g.mod.ImportPath != g.ctx.EntryModule {
 		// Prefix with module path to avoid conflicts
-		modulePrefix := strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")
+		modulePrefix := ustrings.ToIdentifier(g.mod.ImportPath)
 		cFuncName = g.sanitizeName(modulePrefix) + "_" + cFuncName
 	}
 
@@ -788,7 +732,7 @@ func (g *Generator) generateFunctionSignature(decl *ast.FuncDecl) {
 	cFuncName := g.sanitizeName(funcName)
 	if funcName != "main" && g.mod.ImportPath != g.ctx.EntryModule {
 		// Prefix with module path to avoid conflicts
-		modulePrefix := strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")
+		modulePrefix := ustrings.ToIdentifier(g.mod.ImportPath)
 		cFuncName = g.sanitizeName(modulePrefix) + "_" + cFuncName
 	}
 
@@ -843,7 +787,7 @@ func (g *Generator) generateConstDeclaration(decl *ast.ConstDecl) {
 		// For constants from non-entry modules, prefix with module name
 		constName := g.sanitizeName(item.Name.Name)
 		if g.mod.ImportPath != g.ctx.EntryModule {
-			modulePrefix := strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")
+			modulePrefix := ustrings.ToIdentifier(g.mod.ImportPath)
 			constName = g.sanitizeName(modulePrefix) + "_" + constName
 		}
 
@@ -862,7 +806,7 @@ func (g *Generator) GenerateHeader() string {
 	g.collectOptionalTypes()
 
 	// Generate header guard
-	guardName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")) + "_H"
+	guardName := ustrings.ToHeaderGuard(g.mod.ImportPath)
 	g.write("#ifndef %s\n", guardName)
 	g.write("#define %s\n\n", guardName)
 	codegen.WriteHeaderIncludes(&g.buf)
@@ -1227,7 +1171,7 @@ func (g *Generator) generateConstDecl(decl *ast.ConstDecl) {
 		constName := g.sanitizeName(item.Name.Name)
 		if g.mod.ImportPath != g.ctx.EntryModule {
 			// Prefix with module path to avoid conflicts
-			modulePrefix := strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")
+			modulePrefix := ustrings.ToIdentifier(g.mod.ImportPath)
 			constName = g.sanitizeName(modulePrefix) + "_" + constName
 		}
 		g.write("const %s %s", g.typeToC(varType), constName)
@@ -2317,7 +2261,7 @@ func (g *Generator) generateScopeResolutionExpr(expr *ast.ScopeResolutionExpr) {
 				sym, found := importedMod.ModuleScope.GetSymbol(expr.Selector.Name)
 				if found && sym != nil {
 					// Generate the symbol name with module prefix
-					modulePrefix := strings.ReplaceAll(strings.ReplaceAll(importPath, "/", "_"), "-", "_")
+					modulePrefix := ustrings.ToIdentifier(importPath)
 					symbolName := g.sanitizeName(modulePrefix) + "_" + g.sanitizeName(expr.Selector.Name)
 
 					// For constants, use the prefixed name
@@ -2762,7 +2706,7 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 							// Regular Ferret function from imported module
 							// Generate function name with module prefix to avoid conflicts
 							// Use import path to create unique function name
-							modulePrefix := strings.ReplaceAll(strings.ReplaceAll(importPath, "/", "_"), "-", "_")
+							modulePrefix := ustrings.ToIdentifier(importPath)
 							funcName := g.sanitizeName(modulePrefix) + "_" + g.sanitizeName(scopeRes.Selector.Name)
 							g.write("%s(", funcName)
 						} else {
@@ -2963,7 +2907,7 @@ func (g *Generator) generateCallExpr(expr *ast.CallExpr) {
 			// Function is in current module - use same prefixing logic as function definition
 			if funcName != "main" && g.mod.ImportPath != g.ctx.EntryModule {
 				// Prefix with module path to avoid conflicts
-				modulePrefix := strings.ReplaceAll(strings.ReplaceAll(g.mod.ImportPath, "/", "_"), "-", "_")
+				modulePrefix := ustrings.ToIdentifier(g.mod.ImportPath)
 				cFuncName = g.sanitizeName(modulePrefix) + "_" + cFuncName
 			}
 		}
@@ -3920,30 +3864,4 @@ func (g *Generator) writeIndent() {
 	for i := 0; i < g.indent; i++ {
 		g.buf.WriteString(g.indentStr)
 	}
-}
-
-// GenerateModule generates C code for a module and writes it to a file
-func GenerateModule(ctx *context_v2.CompilerContext, mod *context_v2.Module, outputPath string) error {
-	gen := New(ctx, mod)
-	code, err := gen.Generate()
-	if err != nil {
-		return err
-	}
-
-	// Ensure output directory exists
-	dir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	// Write C code
-	if err := os.WriteFile(outputPath, []byte(code), 0644); err != nil {
-		return err
-	}
-
-	if ctx.Config.Debug {
-		colors.GREEN.Printf("  ✓ Generated: %s\n", outputPath)
-	}
-
-	return nil
 }

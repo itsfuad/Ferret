@@ -3,7 +3,7 @@ package parser
 import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/lexer"
-	"compiler/internal/utils/strings"
+	"strings"
 	"testing"
 )
 

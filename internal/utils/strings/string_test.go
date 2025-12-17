@@ -26,67 +26,6 @@ func TestIsCapitalized(t *testing.T) {
 	}
 }
 
-func TestToSentenceCase(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"hello", "Hello"},
-		{"Hello", "Hello"},
-		{"", ""},
-		{"a", "A"},
-		{"already Capitalized", "Already Capitalized"},
-		{"123", "123"},
-	}
-
-	for _, test := range tests {
-		result := ToSentenceCase(test.input)
-		if result != test.expected {
-			t.Errorf("ToSentenceCase(%q) = %q, expected %q", test.input, result, test.expected)
-		}
-	}
-}
-
-func TestToUpperCase(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"hello", "HELLO"},
-		{"Hello", "HELLO"},
-		{"", ""},
-		{"ALREADY UPPERCASE", "ALREADY UPPERCASE"},
-		{"mixed CASE", "MIXED CASE"},
-	}
-
-	for _, test := range tests {
-		result := ToUpperCase(test.input)
-		if result != test.expected {
-			t.Errorf("ToUpperCase(%q) = %q, expected %q", test.input, result, test.expected)
-		}
-	}
-}
-
-func TestToLowerCase(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"HELLO", "hello"},
-		{"Hello", "hello"},
-		{"", ""},
-		{"already lowercase", "already lowercase"},
-		{"MIXED case", "mixed case"},
-	}
-
-	for _, test := range tests {
-		result := ToLowerCase(test.input)
-		if result != test.expected {
-			t.Errorf("ToLowerCase(%q) = %q, expected %q", test.input, result, test.expected)
-		}
-	}
-}
-
 func TestPlural(t *testing.T) {
 	tests := []struct {
 		singular string
@@ -109,5 +48,30 @@ func TestPlural(t *testing.T) {
 			t.Errorf("Plural(%q, %q, %d) = %q, expected %q",
 				test.singular, test.plural, test.count, result, test.expected)
 		}
+	}
+}
+
+func TestToIdentifier(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"my/mod-name", "my_mod_name"},
+		{"my.mod/name", "my_mod_name"},
+		{"my\\mod\\name", "my_mod_name"},
+		{"name::with::colons", "name_with_colons"},
+	}
+
+	for _, tt := range tests {
+		if got := ToIdentifier(tt.input); got != tt.want {
+			t.Errorf("ToIdentifier(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestToHeaderGuard(t *testing.T) {
+	got := ToHeaderGuard("my/mod-name")
+	if got != "MY_MOD_NAME_H" {
+		t.Errorf("ToHeaderGuard(%q) = %q, want %q", "my/mod-name", got, "MY_MOD_NAME_H")
 	}
 }

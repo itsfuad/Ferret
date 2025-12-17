@@ -10,21 +10,6 @@ func IsCapitalized(str string) bool {
 	return firstChar >= 'A' && firstChar <= 'Z'
 }
 
-func ToSentenceCase(str string) string {
-	if len(str) == 0 {
-		return str
-	}
-	return strings.ToUpper(str[:1]) + str[1:]
-}
-
-func ToUpperCase(str string) string {
-	return strings.ToUpper(str)
-}
-
-func ToLowerCase(str string) string {
-	return strings.ToLower(str)
-}
-
 func Pluralize(singular, plural string, count int) string {
 	if count == 1 {
 		return singular
@@ -32,8 +17,23 @@ func Pluralize(singular, plural string, count int) string {
 	return plural
 }
 
-// Contains checks if a string contains a substring.
-// This is a more efficient implementation than manual searching.
-func Contains(s, substr string) bool {
-	return strings.Contains(s, substr)
+// ToIdentifier converts a path-ish string into a stable identifier-ish form.
+// Useful for generating file names / C symbols / header guards from module paths.
+func ToIdentifier(s string) string {
+	if s == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer(
+		"/", "_",
+		"\\", "_",
+		"-", "_",
+		".", "_",
+		"::", "_",
+	)
+	return replacer.Replace(s)
+}
+
+// ToHeaderGuard converts a module path into a C header guard name (including suffix).
+func ToHeaderGuard(s string) string {
+	return strings.ToUpper(ToIdentifier(s)) + "_H"
 }

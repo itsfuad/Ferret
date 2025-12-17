@@ -12,6 +12,7 @@ import (
 	"compiler/internal/codegen/cgen"
 	"compiler/internal/context_v2"
 	"compiler/internal/phase"
+	ustrings "compiler/internal/utils/strings"
 )
 
 // runCodegenPhase runs code generation on all type-checked modules
@@ -134,8 +135,8 @@ func (p *Pipeline) generateModuleCode(importPath, tempDir string, imports []stri
 	var implBuilder strings.Builder
 	implBuilder.WriteString("// Generated C code from Ferret\n")
 	implBuilder.WriteString("// Module: " + importPath + "\n\n")
-	p.writeStandardIncludes(&implBuilder)
-	p.writeRuntimeIncludes(&implBuilder)
+	codegen.WriteStandardIncludes(&implBuilder)
+	codegen.WriteRuntimeIncludes(&implBuilder)
 	if len(imports) > 0 {
 		for _, importPath := range imports {
 			headerName := p.sanitizeModuleName(importPath) + ".h"
@@ -161,17 +162,7 @@ func (p *Pipeline) generateModuleCode(importPath, tempDir string, imports []stri
 }
 
 func (p *Pipeline) sanitizeModuleName(importPath string) string {
-	name := strings.ReplaceAll(strings.ReplaceAll(importPath, "/", "_"), "-", "_")
-	name = strings.ReplaceAll(name, ".", "_")
-	return name
-}
-
-func (p *Pipeline) writeStandardIncludes(builder *strings.Builder) {
-	codegen.WriteStandardIncludes(builder)
-}
-
-func (p *Pipeline) writeRuntimeIncludes(builder *strings.Builder) {
-	codegen.WriteRuntimeIncludes(builder)
+	return ustrings.ToIdentifier(importPath)
 }
 
 func (p *Pipeline) buildExecutableMultiple(cFiles []string, execPath, includeDir string) error {
@@ -182,5 +173,5 @@ func (p *Pipeline) buildExecutableMultiple(cFiles []string, execPath, includeDir
 	opts.OutputPath = execPath
 	opts.Debug = p.ctx.Config.Debug
 
-	return codegen.BuildExecutableMultiple(p.ctx, cFiles, includeDir, opts)
+	return codegen.BuildExecutable(p.ctx, cFiles, includeDir, opts)
 }

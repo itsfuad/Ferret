@@ -10,6 +10,7 @@ import (
 
 	"compiler/colors"
 	"compiler/internal/context_v2"
+	utilsfs "compiler/internal/utils/fs"
 )
 
 // BuildOptions configures how to build the executable
@@ -36,115 +37,8 @@ func DefaultBuildOptions() *BuildOptions {
 	}
 }
 
-// BuildExecutable compiles the generated C code into an executable
-func BuildExecutable(ctx *context_v2.CompilerContext, cFilePath string, opts *BuildOptions) error {
-	if opts == nil {
-		opts = DefaultBuildOptions()
-	}
-
-	// Determine runtime path
-	runtimePath := opts.RuntimePath
-
-	// If runtime path is already absolute and exists, use it
-	if filepath.IsAbs(runtimePath) {
-		if _, err := os.Stat(runtimePath); err == nil {
-			// Path exists, use it
-		} else {
-			// Absolute path doesn't exist, try project root
-			if ctx.Config.ProjectRoot != "" {
-				possibleRuntime := filepath.Join(ctx.Config.ProjectRoot, "runtime")
-				if absRuntime, err := filepath.Abs(possibleRuntime); err == nil {
-					if _, err := os.Stat(absRuntime); err == nil {
-						runtimePath = absRuntime
-					}
-				}
-			}
-		}
-	} else {
-		// Relative path - try project root first (most reliable)
-		if ctx.Config.ProjectRoot != "" {
-			possibleRuntime := filepath.Join(ctx.Config.ProjectRoot, "runtime")
-			if absRuntime, err := filepath.Abs(possibleRuntime); err == nil {
-				if _, err := os.Stat(absRuntime); err == nil {
-					runtimePath = absRuntime
-				}
-			}
-		}
-
-		// Fallback: try relative to C file
-		if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-			cFileDir := filepath.Dir(cFilePath)
-			possibleRuntime := filepath.Join(cFileDir, "..", "..", "runtime")
-			if absRuntime, err := filepath.Abs(possibleRuntime); err == nil {
-				if _, err := os.Stat(absRuntime); err == nil {
-					runtimePath = absRuntime
-				}
-			}
-		}
-
-		// If still not found, try as absolute path
-		if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-			if absRuntime, err := filepath.Abs(runtimePath); err == nil {
-				if _, err := os.Stat(absRuntime); err == nil {
-					runtimePath = absRuntime
-				}
-			}
-		}
-	}
-
-	// Check if runtime directory exists
-	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-		return fmt.Errorf("runtime directory not found: %s", runtimePath)
-	}
-
-	// Build runtime library
-	runtimeC := filepath.Join(runtimePath, "io.c")
-	if _, err := os.Stat(runtimeC); os.IsNotExist(err) {
-		return fmt.Errorf("runtime file not found: %s", runtimeC)
-	}
-
-	// Determine output path
-	outputPath := opts.OutputPath
-	if outputPath == "" {
-		// Use same name as C file but without .c extension
-		outputPath = cFilePath[:len(cFilePath)-2]
-		if runtime.GOOS == "windows" {
-			outputPath += ".exe"
-		}
-	}
-
-	// Build command
-	args := []string{}
-	args = append(args, opts.CFlags...)
-	// Add include directory for runtime headers
-	args = append(args, "-I", runtimePath)
-	args = append(args, "-o", outputPath)
-	args = append(args, cFilePath)
-	args = append(args, runtimeC)
-	args = append(args, "-lm") // Link math library for pow() function
-
-	if ctx.Config.Debug || opts.Debug {
-		colors.CYAN.Printf("Building executable: %s %v\n", opts.CC, args)
-	}
-
-	// Run compiler
-	cmd := exec.Command(opts.CC, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("compilation failed: %w", err)
-	}
-
-	if ctx.Config.Debug || opts.Debug {
-		colors.GREEN.Printf("  ✓ Built: %s\n", outputPath)
-	}
-
-	return nil
-}
-
-// BuildExecutableMultiple compiles multiple C files into an executable
-func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, includeDir string, opts *BuildOptions) error {
+// BuildExecutable compiles multiple C files into an executable
+func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDir string, opts *BuildOptions) error {
 	if opts == nil {
 		opts = DefaultBuildOptions()
 	}
@@ -163,7 +57,7 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 	}
 
 	// Check if runtime directory exists
-	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
+	if !utilsfs.IsDir(runtimePath) {
 		return fmt.Errorf("runtime directory not found: %s", runtimePath)
 	}
 
@@ -179,7 +73,7 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 
 	// Check that all runtime files exist
 	for _, runtimeFile := range runtimeFiles {
-		if _, err := os.Stat(runtimeFile); os.IsNotExist(err) {
+		if !utilsfs.IsValidFile(runtimeFile) {
 			// Some runtime files are optional (array.c, string_builder.c)
 			// Only io.c, interface.c, and bigint.c are required
 			if strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") || strings.HasSuffix(runtimeFile, "bigint.c") {
@@ -205,7 +99,7 @@ func BuildExecutableMultiple(ctx *context_v2.CompilerContext, cFiles []string, i
 	args = append(args, cFiles...)
 	// Add runtime files (only include if they exist)
 	for _, runtimeFile := range runtimeFiles {
-		if _, err := os.Stat(runtimeFile); err == nil {
+		if utilsfs.IsValidFile(runtimeFile) {
 			args = append(args, runtimeFile)
 		}
 	}

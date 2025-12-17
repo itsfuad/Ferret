@@ -28,27 +28,6 @@ var (
 	}
 )
 
-// StandardIncludes returns the formatted standard C includes with a trailing blank line.
-func StandardIncludes() string {
-	var b strings.Builder
-	WriteStandardIncludes(&b)
-	return b.String()
-}
-
-// RuntimeIncludes returns the formatted runtime includes (no trailing blank line).
-func RuntimeIncludes() string {
-	var b strings.Builder
-	WriteRuntimeIncludes(&b)
-	return b.String()
-}
-
-// HeaderIncludes returns the minimal standard includes needed in generated headers.
-func HeaderIncludes() string {
-	var b strings.Builder
-	WriteHeaderIncludes(&b)
-	return b.String()
-}
-
 // WriteStandardIncludes writes the standard C library includes to the builder.
 func WriteStandardIncludes(builder *strings.Builder) {
 	for _, inc := range standardIncludes {
