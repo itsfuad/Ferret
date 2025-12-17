@@ -46,7 +46,7 @@
     --sl-nav-height: 3.5rem;
     --sl-z-index-navbar: 1000;
     
-    --scroll-thumb: hsla(var(--accent-hsl), 0.3);
+    --scroll-thumb: hsla(var(--accent-hsl), 0.5);
     --scroll-thumb-hover: hsla(var(--accent-hsl), 0.8);
 }
 

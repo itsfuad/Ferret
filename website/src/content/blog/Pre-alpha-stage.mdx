@@ -11,6 +11,55 @@ In practice, this means the core compilation pipeline is now usable end-to-end f
 
 > **Status note:** “Pre-alpha passed” does not mean “feature-complete”. It means the project is now stable enough to begin *alpha-style* testing: exercising the compiler on real inputs, iterating quickly, and turning failures into actionable issues.
 
+## Roadmap at a glance
+
+```d2
+direction: right
+
+style: {
+  stroke: "#3b82f6"
+  stroke-width: 3
+}
+
+pre: "Pre-alpha\\n✅ Passed\\n\\nBuilt-ins expanded\\nInput architecture stabilized" {
+  style.fill: "#e8f5e9"
+  style.stroke: "#16a34a"
+}
+
+preview: "Alpha preview (now)\\n🧪 Testing\\n\\nTry real programs\\nReport diagnostics + wrong-code" {
+  style.fill: "#fff7ed"
+  style.stroke: "#f97316"
+}
+
+alpha: "Alpha\\nStabilization\\n\\nMap codegen\\nResult E!T\\nCatch\\nRuntime integration" {
+  style.fill: "#eff6ff"
+  style.stroke: "#3b82f6"
+}
+
+post: "Post-alpha\\nWASM pipeline\\n\\nTowards executable generation" {
+  style.fill: "#f5f3ff"
+  style.stroke: "#8b5cf6"
+}
+
+pre -> preview -> alpha -> post
+```
+
+## Compiler phases (simplified)
+
+```d2
+direction: right
+
+parse: "Parse\\n(lexer + AST)"
+collect: "Collect\\n(decls + scopes)"
+resolve: "Resolve\\n(names + imports)"
+typecheck: "Type-check\\n(infer + validate)"
+cfg: "CFG\\n(flow analysis)"
+codegen: "Codegen\\n(emit C)"
+runtime: "Runtime\\n(headers + helpers)"
+
+parse -> collect -> resolve -> typecheck -> cfg -> codegen -> runtime
+```
+
 ## What changed since pre-alpha
 
 - **Built-in types expanded**: more of the “standard toolbox” is now available to write non-trivial examples without workarounds.
@@ -78,15 +127,3 @@ If you hit something unclear while testing the alpha preview, please include:
 - The smallest `.fer` snippet that reproduces the issue
 - The command you ran (`./bin/ferret ...`)
 - The full compiler output (errors/warnings)
-
-## In progress for Codegen
-- Map
-- Result `E!T`
-- Catch
-
-## In progress for architecture
-- Input syntax + Codegen
-- Runtime integration
-
-## Post alpha 
-- Extend wasm support upto the executable generation

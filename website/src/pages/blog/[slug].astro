@@ -1,4 +1,5 @@
 ---
+import '@astrojs/starlight/style/markdown.css';
 import "../../styles/custom.css";
 import { getCollection } from "astro:content";
 import Navbar from "../../components/Navbar.astro";
@@ -87,8 +88,9 @@ const { Content } = await post.render();
         --sl-color-text-muted: var(--muted-foreground);
         --sl-color-hairline: var(--border);
         --sl-color-text-accent: var(--accent-color);
+        --sl-color-bg-inline-code: var(--muted);
     }
-    body{
+    body {
         margin: 0;
         padding: 0;
         background: var(--background);
@@ -158,16 +160,86 @@ const { Content } = await post.render();
         min-width: 0;
         overflow-wrap: anywhere;
         word-break: normal;
+        color: var(--sl-color-text);
+    }
+
+    /* Markdown typography */
+    .content :global(:is(h1, h2, h3, h4, h5, h6)) {
+        line-height: 1.2;
+        font-weight: 650;
+        color: var(--foreground);
+        margin: 1.5rem 0 0.75rem;
+        scroll-margin-top: calc(var(--sl-nav-height) + 1.25rem);
+    }
+
+    .content :global(h2) {
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid
+            color-mix(in srgb, var(--sl-color-hairline) 70%, transparent);
+    }
+
+    .content :global(a) {
+        color: var(--sl-color-text-accent);
+        text-decoration: underline;
+        text-underline-offset: 0.18em;
+    }
+
+    .content :global(a:hover) {
+        opacity: 0.9;
+    }
+
+    .content :global(:is(ul, ol)) {
+        margin: 0.5rem 0 0.75rem;
+        padding-left: 1.25rem;
+    }
+
+    .content :global(li + li) {
+        margin-top: 0.25rem;
+    }
+
+    .content :global(blockquote) {
+        margin: 0.75rem 0;
+        padding: 0.75rem 1rem;
+        border-left: 3px solid var(--sl-color-hairline);
+        background: color-mix(
+            in srgb,
+            var(--sl-color-bg) 92%,
+            var(--sl-color-text-accent)
+        );
+        border-radius: 0.6rem;
+    }
+
+    .content :global(hr) {
+        border: none;
+        border-top: 1px solid var(--sl-color-hairline);
+        margin: 1.5rem 0;
+    }
+
+    .content :global(code) {
+        background-color: var(--sl-color-bg-inline-code);
+        border: 1px solid
+            color-mix(in srgb, var(--sl-color-hairline) 70%, transparent);
+        border-radius: 0.4rem;
+        padding: 0.125rem 0.375rem;
+        font-size: 0.9em;
+        overflow-wrap: anywhere;
     }
 
     .content :global(pre) {
         max-width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.75rem;
+        padding: 0.9rem 1rem;
+        background: color-mix(in srgb, var(--sl-color-bg) 95%, black);
     }
 
-    .content :global(code) {
-        overflow-wrap: anywhere;
+    .content :global(pre code) {
+        background: transparent;
+        border: none;
+        padding: 0;
+        font-size: 0.95em;
     }
 
     .content :global(table) {
@@ -176,6 +248,42 @@ const { Content } = await post.render();
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         border-collapse: collapse;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.75rem;
+    }
+
+    .content :global(th),
+    .content :global(td) {
+        border-bottom: 1px solid var(--sl-color-hairline);
+        padding: 0.55rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+        white-space: nowrap;
+    }
+
+    .content :global(th) {
+        font-weight: 600;
+        background: color-mix(
+            in srgb,
+            var(--sl-color-bg) 92%,
+            var(--sl-color-text-accent)
+        );
+    }
+
+    .content :global(tr:nth-child(even) td) {
+        background: color-mix(
+            in srgb,
+            var(--sl-color-bg) 96%,
+            var(--sl-color-text-accent)
+        );
+    }
+
+    /* D2 diagrams: add a subtle frame */
+    .content :global(img[src^="/d2/"]) {
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.9rem;
+        background: color-mix(in srgb, var(--sl-color-bg) 92%, black);
+        padding: 0.5rem;
     }
 
     .content :global(svg),
