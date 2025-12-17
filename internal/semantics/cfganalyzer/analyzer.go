@@ -6,6 +6,7 @@ import (
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/consteval"
 	"compiler/internal/semantics/controlflow"
+	"compiler/internal/semantics/table"
 )
 
 // AnalyzeModule performs control flow analysis on a module.
@@ -53,10 +54,20 @@ func checkNodeForConstantConditions(ctx *context_v2.CompilerContext, mod *contex
 
 	switch n := node.(type) {
 	case *ast.FuncDecl:
+		if n.Scope != nil {
+			if scope, ok := n.Scope.(*table.SymbolTable); ok {
+				defer mod.EnterScope(scope)()
+			}
+		}
 		if n.Body != nil {
 			checkBlockForConstantConditions(ctx, mod, n.Body)
 		}
 	case *ast.MethodDecl:
+		if n.Scope != nil {
+			if scope, ok := n.Scope.(*table.SymbolTable); ok {
+				defer mod.EnterScope(scope)()
+			}
+		}
 		if n.Body != nil {
 			checkBlockForConstantConditions(ctx, mod, n.Body)
 		}
@@ -69,6 +80,12 @@ func checkNodeForConstantConditions(ctx *context_v2.CompilerContext, mod *contex
 func checkBlockForConstantConditions(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block) {
 	if block == nil {
 		return
+	}
+
+	if block.Scope != nil {
+		if scope, ok := block.Scope.(*table.SymbolTable); ok {
+			defer mod.EnterScope(scope)()
+		}
 	}
 
 	for _, node := range block.Nodes {

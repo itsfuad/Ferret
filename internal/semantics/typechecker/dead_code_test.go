@@ -1,10 +1,20 @@
 package typechecker
 
 import (
+	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
+	"compiler/internal/semantics/cfganalyzer"
 	"strings"
 	"testing"
 )
+
+func parseCollectCheckAndAnalyze(t *testing.T, src string) (*context_v2.Module, *context_v2.CompilerContext) {
+	t.Helper()
+
+	mod, ctx := parseCollectAndCheck(t, src)
+	cfganalyzer.AnalyzeModule(ctx, mod)
+	return mod, ctx
+}
 
 func TestIfConstantConditions(t *testing.T) {
 	tests := []struct {
@@ -91,7 +101,7 @@ func TestIfConstantConditions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := parseCollectAndCheck(t, tt.code)
+			_, ctx := parseCollectCheckAndAnalyze(t, tt.code)
 			diags := ctx.Diagnostics.Diagnostics()
 
 			if tt.expectWarning {
@@ -172,7 +182,7 @@ func TestWhileConstantConditions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := parseCollectAndCheck(t, tt.code)
+			_, ctx := parseCollectCheckAndAnalyze(t, tt.code)
 			diags := ctx.Diagnostics.Diagnostics()
 
 			if tt.expectWarning {
