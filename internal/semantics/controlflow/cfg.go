@@ -504,7 +504,7 @@ func (b *CFGBuilder) reportUnreachableCodeRange(start, end ast.Node) {
 	}
 
 	b.ctx.Diagnostics.Add(
-		diagnostics.NewWarning("unreachable code").
+		diagnostics.NewError("unreachable code").
 			WithPrimaryLabel(rangeLocation, "this code will never execute").
 			WithHelp("remove this code or restructure control flow"),
 	)
