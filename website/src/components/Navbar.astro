@@ -37,24 +37,25 @@ const isDocs = !isHome && !isPlayground && !isBlog;
 
         {/* Show blogs link */}
         {
-            
-            !isBlog && (<a href="/blog" class="nav-link">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <path d="M12 20h9"></path>
-                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                </svg>
-                <span>Blogs</span>
-            </a>)
+            !isBlog && (
+                <a href="/blog" class="nav-link">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                    <span>Blogs</span>
+                </a>
+            )
         }
 
         {/* Show "Docs" link only when NOT on docs pages */}
@@ -201,6 +202,8 @@ const isDocs = !isHome && !isPlayground && !isBlog;
         background: var(--background);
         border-bottom: 1px solid var(--border);
         z-index: 100;
+        box-sizing: border-box;
+        line-height: 1;
     }
 
     a[href="/getting-started/introduction/"] {
@@ -243,6 +246,7 @@ const isDocs = !isHome && !isPlayground && !isBlog;
         flex-wrap: nowrap;
         width: 100%;
         justify-content: flex-end;
+        min-width: 0;
     }
 
     .nav-link {
@@ -256,11 +260,12 @@ const isDocs = !isHome && !isPlayground && !isBlog;
         transition: all 0.15s ease;
         font-size: 0.875rem;
         font-weight: 500;
-        border: none;
+        border: 1px solid transparent;
         background: transparent;
         cursor: pointer;
         white-space: nowrap;
         flex-shrink: 0;
+        line-height: 1;
     }
 
     .nav-link:hover {
@@ -403,6 +408,32 @@ const isDocs = !isHome && !isPlayground && !isBlog;
         const next = toggleTheme(current);
         setTheme(next);
     });
+
+    // Keep Starlight's layout offsets in sync with our navbar height (docs pages).
+    // This avoids "almost matching" heights across docs vs standalone pages.
+    function syncStarlightNavHeight(): void {
+        const navbar = document.querySelector<HTMLElement>(".navbar");
+        if (!navbar) return;
+
+        const setVar = () => {
+            const height = navbar.getBoundingClientRect().height;
+            if (height > 0) {
+                document.documentElement.style.setProperty(
+                    "--sl-nav-height",
+                    `${Math.round(height)}px`,
+                );
+            }
+        };
+
+        setVar();
+        // Recompute when content changes (e.g. search UI, responsive breakpoints).
+        const ro = new ResizeObserver(() => setVar());
+        ro.observe(navbar);
+        window.addEventListener("orientationchange", setVar, { passive: true });
+    }
+
+    // Run after initial layout to get accurate measurements.
+    requestAnimationFrame(syncStarlightNavHeight);
 
     // Mobile menu toggle handler (navbar button)
     const mobileMenuToggle = document.getElementById("mobile-menu-toggle");
