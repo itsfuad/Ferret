@@ -44,6 +44,10 @@
 
     /* Default; overwritten at runtime by Navbar resize observer for a perfect fit. */
     --sl-nav-height: 3.5rem;
+    --sl-z-index-navbar: 1000;
+    
+    --scroll-thumb: hsla(var(--accent-hsl), 0.3);
+    --scroll-thumb-hover: hsla(var(--accent-hsl), 0.8);
 }
 
 :root[data-theme="dark"] {
@@ -58,7 +62,7 @@
     --sl-color-accent: var(--accent-color);
     --sl-color-accent-high: var(--accent-color);
     --sl-color-text-accent: var(--accent-color);
-
+    
     --neutral: rgba(126, 126, 126, 0.164);
     --neutral-hover: rgba(148, 148, 148, 0.344);
 
@@ -110,6 +114,12 @@ main:has(.hero) .content-panel {
     padding-top: calc(var(--sl-nav-height)) !important;
 }
 
+.page-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
 /* Adjust content padding to remove extra top space */
 .content-panel {
     padding-top: 1rem !important;
@@ -120,6 +130,24 @@ main:has(.hero) .content-panel {
 mobile-starlight-toc {
     display: block;
     margin-bottom: 4rem !important;
+}
+
+/* Scrollbar design */
+body::-webkit-scrollbar {
+    width: 10px;
+}
+
+body::-webkit-scrollbar-track {
+    background: var(--background);
+}
+
+body::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: 5px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+    background: var(--scroll-thumb-hover);
 }
 
 /* Hide navbar burger menu on mobile - we show it below TOC instead */

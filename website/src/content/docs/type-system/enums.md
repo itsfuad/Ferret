@@ -29,7 +29,4 @@ match status {
 }
 ```
 
-## Next Steps
 
-- [Learn about Interfaces](/interfaces)
-- [Explore Match Expressions](/match)

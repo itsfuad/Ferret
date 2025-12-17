@@ -31,47 +31,51 @@ const { Content } = await post.render();
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" type="image/png" href="/favicon.png">
+        <link rel="icon" type="image/png" href="/favicon.png" />
         <title>{post.data.title} | Ferret Blog</title>
     </head>
     <body>
-        <Navbar showSearch={false} />
-        <main class="page">
-            <a class="back-link" href="/blog">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                    <line x1="9" y1="12" x2="21" y2="12"></line>
-                </svg>
-                <span>Back to blog</span>
-            </a>
-            <article class="post">
-                <h1>{post.data.title}</h1>
-                <p class="date">{post.data.pubDate.toLocaleDateString()}</p>
-                <p class="desc">{post.data.description}</p>
-                {
-                    post.data.tags && (
-                        <div class="tags">
-                            {post.data.tags.map((tag) => (
-                                <span class="tag">{tag}</span>
-                            ))}
-                        </div>
-                    )
-                }
-                <div class="content">
-                    <Content />
-                </div>
-            </article>
-        </main>
+        <div class="page-container">
+            <header>
+                <Navbar showSearch={false} />
+            </header>
+            <main class="page">
+                <a class="back-link" href="/blog">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                        <line x1="9" y1="12" x2="21" y2="12"></line>
+                    </svg>
+                    <span>Back to blog</span>
+                </a>
+                <article class="post">
+                    <p class="date">{post.data.pubDate.toLocaleDateString()}</p>
+                    <h1>{post.data.title}</h1>
+                    <p class="desc">{post.data.description}</p>
+                    {
+                        post.data.tags && (
+                            <div class="tags">
+                                {post.data.tags.map((tag) => (
+                                    <span class="tag">{tag}</span>
+                                ))}
+                            </div>
+                        )
+                    }
+                    <div class="content">
+                        <Content />
+                    </div>
+                </article>
+            </main>
+        </div>
     </body>
 </html>
 
@@ -84,15 +88,15 @@ const { Content } = await post.render();
         --sl-color-hairline: var(--border);
         --sl-color-text-accent: var(--accent-color);
     }
-    :global(body) {
+    body{
         margin: 0;
-        font-family:
-            "Inter",
-            system-ui,
-            -apple-system,
-            sans-serif;
+        padding: 0;
         background: var(--background);
+        background-image: var(--pattern-dots);
         color: var(--foreground);
+    }
+    main {
+        padding-top: calc(var(--sl-nav-height) + 2rem) !important;
     }
     .page {
         max-width: 960px;

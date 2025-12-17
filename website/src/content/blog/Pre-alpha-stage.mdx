@@ -1,0 +1,92 @@
+---
+title: "Pre-alpha stage"
+description: "Current stage of Ferret and its progress towards the alpha version."
+pubDate: 2025-12-17
+tags: [updates]
+---
+
+Ferret has officially moved past the **pre-alpha** milestone.
+
+In practice, this means the core compilation pipeline is now usable end-to-end for a growing subset of the language: you can write `.fer`, compile it, and start validating real programs while we stabilize the remaining pieces needed for a proper alpha release.
+
+> **Status note:** “Pre-alpha passed” does not mean “feature-complete”. It means the project is now stable enough to begin *alpha-style* testing: exercising the compiler on real inputs, iterating quickly, and turning failures into actionable issues.
+
+## What changed since pre-alpha
+
+- **Built-in types expanded**: more of the “standard toolbox” is now available to write non-trivial examples without workarounds.
+- **Input architecture stabilized**: the parser/input layer has been consolidated so we can iterate on syntax and codegen together with fewer breaking changes.
+- **Alpha preview opened**: you can start testing the current alpha build and report gaps, bugs, and ergonomics issues.
+
+> **Annotation (scope):** this post is a progress snapshot, not a full changelog. Deeper design details live in the architecture post and the main docs.
+
+## Alpha preview: how to try it
+
+If you want to test the current alpha build locally, the quickest path is to build the compiler and run it on one of the repo examples.
+
+**Linux/macOS**
+
+```bash
+./scripts/build-all.sh
+./bin/ferret examples/hello.fer
+```
+
+**Windows**
+
+```batch
+scripts\build-all.bat
+bin\ferret.exe examples\hello.fer
+```
+
+> **Note:** command-line flags must come before the input file (example: `./bin/ferret -o myprog examples/hello.fer`).
+
+## Work in progress
+
+This is what we’re actively finishing to make “alpha” feel coherent and testable.
+
+### Codegen
+
+- **Map**
+  - Emit consistent map operations and runtime calls across targets.
+  - Validate performance and memory behavior with a few representative workloads.
+- **Result `E!T`**
+  - Make `E!T` flow reliably through function signatures, returns, and propagation patterns.
+  - Ensure diagnostics are clear when error/success branches are mixed incorrectly.
+- **Catch**
+  - Finalize the semantics and lower it into straightforward codegen.
+  - Ensure interactions with `E!T` stay predictable (especially in nested contexts).
+
+### Architecture
+
+- **Input syntax + codegen**
+  - Keep syntax changes coupled to codegen to avoid “parses but doesn’t compile” states.
+  - Reduce the number of special cases in lowering by keeping the AST and typed IR aligned.
+- **Runtime integration**
+  - Tighten the boundary between compiler-emitted code and runtime helpers.
+  - Make sure the runtime surface stays small and intentional as features land.
+
+> **Annotation (testing focus):** the most valuable reports right now are (1) wrong-code bugs, (2) confusing error messages, and (3) cases where a feature works in type-checking but fails later in the pipeline.
+
+## After alpha
+
+- **WASM support → executable generation**
+  - Extend the current WASM pipeline beyond “module output” toward a full executable/story for running compiled programs.
+
+## Feedback
+
+If you hit something unclear while testing the alpha preview, please include:
+
+- The smallest `.fer` snippet that reproduces the issue
+- The command you ran (`./bin/ferret ...`)
+- The full compiler output (errors/warnings)
+
+## In progress for Codegen
+- Map
+- Result `E!T`
+- Catch
+
+## In progress for architecture
+- Input syntax + Codegen
+- Runtime integration
+
+## Post alpha 
+- Extend wasm support upto the executable generation

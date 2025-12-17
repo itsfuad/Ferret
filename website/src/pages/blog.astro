@@ -23,47 +23,51 @@ const posts = (await getCollection("blog"))
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="icon" type="image/png" href="/favicon.png">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
         <title>Ferret Blog</title>
     </head>
     <body>
-        <Navbar showSearch={false} showPlayground={false} />
-        <main class="page">
-            <section class="head">
-                <p class="eyebrow">Updates & Notes</p>
-                <h1>Blogs</h1>
-                <p class="lede">
-                    Release news, design notes, and practical guides straight
-                    from the Ferret team.
-                </p>
-            </section>
+        <div class="page-container">
+            <header>
+                <Navbar showSearch={false} showPlayground={false} />
+            </header>
+            <main class="page">
+                <section class="head">
+                    <p class="eyebrow">Updates & Notes</p>
+                    <h1>Blogs</h1>
+                    <p class="lede">
+                        Release news, design notes, and practical guides
+                        straight from the Ferret team.
+                    </p>
+                </section>
 
-            <section class="posts">
-                {
-                    posts.map((post) => (
-                        <article class="post-card">
-                            <p class="date">
-                                {post.data.pubDate.toLocaleDateString()}
-                            </p>
-                            <h2>
-                                <a href={`/blog/${post.slug}/`}>
-                                    {post.data.title}
-                                </a>
-                            </h2>
-                            <p class="desc">{post.data.description}</p>
-                            {post.data.tags && (
-                                <div class="tags">
-                                    {post.data.tags.map((tag) => (
-                                        <span class="tag">{tag}</span>
-                                    ))}
-                                </div>
-                            )}
-                        </article>
-                    ))
-                }
-            </section>
-        </main>
+                <section class="posts">
+                    {
+                        posts.map((post) => (
+                            <article class="post-card">
+                                <p class="date">
+                                    {post.data.pubDate.toLocaleDateString()}
+                                </p>
+                                <h2>
+                                    <a href={`/blog/${post.slug}/`}>
+                                        {post.data.title}
+                                    </a>
+                                </h2>
+                                <p class="desc">{post.data.description}</p>
+                                {post.data.tags && (
+                                    <div class="tags">
+                                        {post.data.tags.map((tag) => (
+                                            <span class="tag">{tag}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </article>
+                        ))
+                    }
+                </section>
+            </main>
+        </div>
     </body>
 </html>
 
@@ -76,15 +80,15 @@ const posts = (await getCollection("blog"))
         --sl-color-hairline: var(--border);
         --sl-color-text-accent: var(--accent-color);
     }
-    :global(body) {
+    body{
         margin: 0;
-        font-family:
-            "Inter",
-            system-ui,
-            -apple-system,
-            sans-serif;
+        padding: 0;
         background: var(--background);
+        background-image: var(--pattern-dots);
         color: var(--foreground);
+    }
+    main {
+        padding-top: calc(var(--sl-nav-height) + 2rem) !important;
     }
     .page {
         max-width: 960px;
