@@ -1,0 +1,62 @@
+
+
+
+// Test interface implementation in Ferret
+
+// Define an interface
+type Shape interface {
+    area() -> i32,
+    move(x: i32, y: i32)
+};
+
+// Define a Point struct
+type Point struct {
+    .X: i32,
+    .Y: i32,
+};
+
+// Implement Shape interface for Point
+fn (p: Point) area() -> i32 {
+    return 0;
+}
+
+fn (p: Point) move(x: i32, y: i32) {
+    // Move the point - note: this doesn't modify p since it's by value
+}
+
+// Define a Circle struct
+type Circle struct {
+    .center: Point,
+    .radius: i32,
+};
+
+// Implement Shape interface for Circle
+fn (c: Circle) area() -> i32 {
+    return 3 * c.radius * c.radius; // approximate
+}
+
+fn (c: Circle) move(x: i32, y: i32) {
+    // Move the circle - note: this doesn't modify c since it's by value
+}
+
+// Test interface assignments
+let p: Point = { .X = 10, .Y = 20 };
+let shape1: Shape = p as Shape; // Valid: Point implements Shape
+
+let c: Circle = { .center = { .X = 0, .Y = 0 }, .radius = 5 };
+let shape2: Shape = c as Shape; // Valid: Circle implements Shape
+
+// Test empty interface (all types implement it)
+type AnyType interface {};
+
+let any1: AnyType = p;
+let any2: AnyType = c;
+let any3: AnyType = 42;
+let any4: AnyType = "hello";
+
+// Test interface method calls
+let area1 := shape1.area();
+let area2 := shape2.area();
+
+shape1.move(100, 200);
+shape2.move(300, 400);

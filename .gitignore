@@ -7,10 +7,11 @@ dist
 .gocache
 
 # Ignore ferret files from being tracked by git from the root directory
-/*.fer
-*.c
+/*.c
+!runtime/**/*.c
+/*.h
+!runtime/**/*.h
 # Generated C files are temporary and deleted after compilation
-*.h
 *.o
 *.exe
 *.dll
