@@ -88,6 +88,62 @@ func (l *Literal) hirNode()              {}
 func (l *Literal) hirExpr()              {}
 func (l *Literal) Loc() *source.Location { return &l.Location }
 
+// OptionalNone represents a typed none value for an optional type.
+type OptionalNone struct {
+	Type     types.SemType
+	Location source.Location
+}
+
+func (o *OptionalNone) hirNode()              {}
+func (o *OptionalNone) hirExpr()              {}
+func (o *OptionalNone) Loc() *source.Location { return &o.Location }
+
+// OptionalSome wraps a value into an optional type.
+type OptionalSome struct {
+	Value    Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (o *OptionalSome) hirNode()              {}
+func (o *OptionalSome) hirExpr()              {}
+func (o *OptionalSome) Loc() *source.Location { return &o.Location }
+
+// OptionalIsSome checks if an optional has a value.
+type OptionalIsSome struct {
+	Value    Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (o *OptionalIsSome) hirNode()              {}
+func (o *OptionalIsSome) hirExpr()              {}
+func (o *OptionalIsSome) Loc() *source.Location { return &o.Location }
+
+// OptionalIsNone checks if an optional is none.
+type OptionalIsNone struct {
+	Value    Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (o *OptionalIsNone) hirNode()              {}
+func (o *OptionalIsNone) hirExpr()              {}
+func (o *OptionalIsNone) Loc() *source.Location { return &o.Location }
+
+// OptionalUnwrap unwraps an optional with an optional fallback.
+// If Default is nil, it represents a forced unwrap (assumed safe by type checking).
+type OptionalUnwrap struct {
+	Value    Expr
+	Default  Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (o *OptionalUnwrap) hirNode()              {}
+func (o *OptionalUnwrap) hirExpr()              {}
+func (o *OptionalUnwrap) Loc() *source.Location { return &o.Location }
+
 // BinaryExpr represents a binary operation.
 type BinaryExpr struct {
 	X        Expr
