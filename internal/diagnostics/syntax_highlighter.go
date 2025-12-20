@@ -11,6 +11,30 @@ import (
 	"compiler/internal/tokens"
 )
 
+type keytype int
+
+const (
+	STRING keytype = iota
+	CHAR
+	NUMBER
+	KEYWORD
+	TYPE
+	TEXT
+	OP
+	COMMENT
+)
+
+var colorMap = map[keytype]colors.COLOR{
+	STRING: colors.LIGHT_GREEN,
+	CHAR:   colors.LIGHT_ORANGE,
+	NUMBER: colors.LIGHT_ORANGE,
+	KEYWORD: colors.PURPLE,
+	TEXT: colors.WHITE,
+	OP: colors.WHITE,
+	COMMENT: colors.GREY,
+	TYPE: colors.CYAN,
+}
+
 // SyntaxHighlighter provides syntax highlighting for Ferret code snippets
 type SyntaxHighlighter struct {
 	enabled bool
@@ -59,7 +83,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			for i < len(line) && unicode.IsSpace(rune(line[i])) {
 				i++
 			}
-			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.WHITE})
+			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colorMap[TEXT]})
 			continue
 		}
 
@@ -77,7 +101,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			if i < len(line) {
 				i++ // Include closing quote
 			}
-			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_GREEN})
+			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colorMap[STRING]})
 			continue
 		}
 
@@ -95,7 +119,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			if i < len(line) {
 				i++ // Include closing quote
 			}
-			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_ORANGE})
+			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colorMap[CHAR]})
 			continue
 		}
 
@@ -105,7 +129,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			for i < len(line) && (unicode.IsDigit(rune(line[i])) || line[i] == '.' || line[i] == '_') {
 				i++
 			}
-			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_ORANGE})
+			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colorMap[NUMBER]})
 			continue
 		}
 
@@ -120,9 +144,9 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			// Determine color based on token type using tokens package
 			var color colors.COLOR
 			if tokens.IsKeyword(word) {
-				color = colors.PURPLE // Keywords
+				color = colorMap[KEYWORD]
 			} else if tokens.IsBuiltinType(word) {
-				color = colors.CYAN // Types
+				color = colorMap[TYPE]
 			} else {
 				color = colors.WHITE // Regular identifiers
 			}
@@ -132,14 +156,14 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 
 		// Comments
 		if i+1 < len(line) && line[i] == '/' && line[i+1] == '/' {
-			tokensSlice = append(tokensSlice, Token{Text: line[i:], Color: colors.GREY})
+			tokensSlice = append(tokensSlice, Token{Text: line[i:], Color: colorMap[COMMENT]})
 			break
 		}
 
 		// Operators and punctuation (keep white)
 		start := i
 		i++
-		tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.WHITE})
+		tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colorMap[OP]})
 	}
 
 	return tokensSlice

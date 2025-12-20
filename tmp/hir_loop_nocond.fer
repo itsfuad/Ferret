@@ -1,0 +1,6 @@
+fn f() -> i32 {
+    while {
+        let x := 1;
+    }
+    return 42;
+}

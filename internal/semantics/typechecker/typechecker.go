@@ -7,6 +7,7 @@ import (
 	"compiler/internal/semantics/consteval"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
+	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
 	"compiler/internal/utils"
@@ -485,6 +486,15 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Enter while loop scope if it exists
 		if n.Scope != nil {
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
+		}
+
+		if n.Cond == nil {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("expected condition after 'while'").
+					WithPrimaryLabel(source.NewLocation(n.Filename, n.Body.Start, n.Body.Start), "add a condition value here"),
+			)
+			checkBlock(ctx, mod, n.Body)
+			return
 		}
 
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)

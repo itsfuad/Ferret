@@ -918,11 +918,15 @@ func (l *Lowerer) lowerCallExpr(expr *hir.CallExpr) hir.Expr {
 		args = append(args, l.lowerExpr(arg, expected))
 	}
 
+	callType := expr.Type
+	if funType != nil && funType.Return != nil {
+		callType = funType.Return
+	}
 	call := &hir.CallExpr{
 		Fun:      l.lowerExpr(expr.Fun, types.TypeUnknown),
 		Args:     args,
 		Catch:    nil,
-		Type:     expr.Type,
+		Type:     callType,
 		Location: expr.Location,
 	}
 

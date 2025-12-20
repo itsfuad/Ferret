@@ -397,7 +397,8 @@ func (b *CFGBuilder) buildFor(stmt *hir.ForStmt, current *BasicBlock, exitBlock 
 // buildWhile handles while loops.
 func (b *CFGBuilder) buildWhile(stmt *hir.WhileStmt, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
 	// Check if condition is literally true (infinite loop candidate).
-	isLiteralTrue := isLiteralTrue(stmt.Cond)
+	// Missing conditions are handled as a typechecking error; avoid piling on CFG errors.
+	isInfiniteCond := isLiteralTrue(stmt.Cond)
 
 	// Extract variables used in the condition.
 	conditionVars := extractVariablesFromExpr(stmt.Cond)
@@ -418,7 +419,9 @@ func (b *CFGBuilder) buildWhile(stmt *hir.WhileStmt, current *BasicBlock, exitBl
 	// After block (loop exit).
 	afterBlock := b.newBlock()
 	afterBlock.Location = stmt.Loc()
-	addEdge(headerBlock, afterBlock) // Condition false exits loop.
+	if !isInfiniteCond {
+		addEdge(headerBlock, afterBlock) // Condition false exits loop.
+	}
 
 	// Set up loop context for break/continue.
 	oldLoop := b.currentLoop
@@ -473,7 +476,7 @@ func (b *CFGBuilder) buildWhile(stmt *hir.WhileStmt, current *BasicBlock, exitBl
 	// 2. Condition variable modified in WRONG direction AND no break/return - obviously infinite
 	// 3. Condition variables NEVER modified AND no break/return - definitely infinite
 	if !loopHasBreak && !loopHasReturn {
-		if isLiteralTrue {
+		if isInfiniteCond {
 			// Definite infinite loop: while true { ... }.
 			b.ctx.Diagnostics.Add(
 				diagnostics.NewError("infinite loop without escape").
@@ -504,7 +507,7 @@ func (b *CFGBuilder) buildWhile(stmt *hir.WhileStmt, current *BasicBlock, exitBl
 		}
 	}
 
-	afterBlock.Reachable = true // Can always exit via condition (or break).
+	afterBlock.Reachable = !isInfiniteCond || loopHasBreak
 	return afterBlock
 }
 

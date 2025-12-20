@@ -1,0 +1,10 @@
+fn fallible() -> string ! i32 {
+    return 1;
+}
+
+fn g() -> i32 {
+    let v := fallible() catch {
+        return 0;
+    };
+    return v;
+}

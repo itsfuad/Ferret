@@ -1133,11 +1133,11 @@ func (p *Parser) parseRangeExpr() ast.Expression {
 	return p.parseExpr()
 }
 
-// parseWhileStmt parses: while [cond] { }
+// parseWhileStmt parses: while cond { }
 func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 	start := p.expect(tokens.WHILE_TOKEN).Start
 
-	// Parse condition (optional - nil means infinite loop)
+	// Parse condition (required, but allow nil for error recovery).
 	var cond ast.Expression
 	if !p.match(tokens.OPEN_CURLY) {
 		cond = p.parseExpr()

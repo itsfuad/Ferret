@@ -73,10 +73,9 @@ func (f *ForStmt) INode()                {} // Implements Node interface
 func (f *ForStmt) Block()                {} // Block is a marker interface for all statements
 func (f *ForStmt) Loc() *source.Location { return &f.Location }
 
-// WhileStmt represents a while loop: while [cond] { }
-// Condition is optional - nil means infinite loop
+// WhileStmt represents a while loop: while cond { }
 type WhileStmt struct {
-	Cond  Expression  // condition (nil for infinite loop)
+	Cond  Expression  // condition (required; may be nil during error recovery)
 	Body  *Block      // loop body
 	Scope SymbolTable // Symbol table for while loop scope (filled during collection)
 	source.Location
