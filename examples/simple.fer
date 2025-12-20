@@ -1,5 +1,13 @@
 import "std/io";
 
 fn main() {
+    
+    let s := 23;
+    
+    for i, s in 0..20 {
+        i+=7;
+        s++;
+    }
+
     io::Println("Hello from Ferret!");
 }

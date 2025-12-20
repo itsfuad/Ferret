@@ -268,22 +268,18 @@ if x < y {
     println("x is greater or equal");
 }
 
-for let i, v in arrayLike {
-    println(i, v);
-}
-
-for i, v in arrayLike { // i , v delcared as existing variables
+for i, v in arrayLike { // i is read-only (loop index)
     println(i, v);
 }
 
 // skip index or value using _
-for let _, v in arrayLike {
+for _, v in arrayLike {
     println(v);
 }
-for let i, _ in arrayLike {
+for i, _ in arrayLike {
     println(i);
 }
-for let _, _ in arrayLike {
+for _, _ in arrayLike {
     // do something
 }
 

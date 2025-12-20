@@ -224,6 +224,10 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	case *ast.CoalescingExpr:
 		return inferCoalescingExprType(ctx, mod, e)
 
+	case *ast.PrefixExpr:
+		// Prefix operators (++, --) return the type of the operand
+		return inferExprType(ctx, mod, e.X)
+
 	case *ast.PostfixExpr:
 		// Postfix operators (++, --) return the type of the operand
 		return inferExprType(ctx, mod, e.X)

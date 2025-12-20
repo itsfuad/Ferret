@@ -798,6 +798,13 @@ func extractVariablesFromExpr(expr hir.Expr) []string {
 		for _, arg := range e.Args {
 			vars = append(vars, extractVariablesFromExpr(arg)...)
 		}
+	case *hir.ArrayLenExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
+	case *hir.MapIterInitExpr:
+		vars = append(vars, extractVariablesFromExpr(e.Map)...)
+	case *hir.MapIterNextExpr:
+		vars = append(vars, extractVariablesFromExpr(e.Map)...)
+		vars = append(vars, extractVariablesFromExpr(e.Iter)...)
 	case *hir.SelectorExpr:
 		vars = append(vars, extractVariablesFromExpr(e.X)...)
 	case *hir.IndexExpr:

@@ -58,11 +58,11 @@ func (i *IfStmt) INode()                {} // Implements Node interface
 func (i *IfStmt) Block()                {} // Block is a marker interface for all statements
 func (i *IfStmt) Loc() *source.Location { return &i.Location }
 
-// ForStmt represents a for-in loop: for [let] i in range { }
+// ForStmt represents a for-in loop: for i in range { }
 // Range can be start..end or start..end:incr
-// Iterator can be IdentifierExpr (for i in ...) or VarDecl (for let i in ...)
+// Iterator is a VarDecl that binds new loop variables scoped to the loop body.
 type ForStmt struct {
-	Iterator Node        // loop variable: IdentifierExpr or VarDecl
+	Iterator Node        // loop variable declaration
 	Range    Expression  // range expression (e.g., 0..10 or 0..10:2)
 	Body     *Block      // loop body
 	Scope    SymbolTable // Symbol table for for loop scope (filled during collection)

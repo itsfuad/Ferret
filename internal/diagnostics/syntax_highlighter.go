@@ -95,7 +95,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			if i < len(line) {
 				i++ // Include closing quote
 			}
-			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_YELLOW})
+			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_ORANGE})
 			continue
 		}
 
@@ -105,7 +105,7 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			for i < len(line) && (unicode.IsDigit(rune(line[i])) || line[i] == '.' || line[i] == '_') {
 				i++
 			}
-			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_YELLOW})
+			tokensSlice = append(tokensSlice, Token{Text: line[start:i], Color: colors.LIGHT_ORANGE})
 			continue
 		}
 

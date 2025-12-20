@@ -801,15 +801,70 @@ func collectForStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stm
 	defer mod.EnterScope(forScope)()
 
 	// Collect iterator (VarDecl or IdentifierExpr)
-	// If it's a VarDecl, it will be declared in the for scope
-	// If it's an IdentifierExpr, it references an existing variable
 	if stmt.Iterator != nil {
+		if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok {
+			checkForIteratorShadowing(ctx, mod, varDecl)
+		}
 		collectNode(ctx, mod, stmt.Iterator)
+		markForIteratorIndexReadOnly(mod, stmt.Iterator)
 	}
 
 	// Collect symbols in the for body
 	if stmt.Body != nil {
 		collectNode(ctx, mod, stmt.Body)
+	}
+}
+
+func checkForIteratorShadowing(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.VarDecl) {
+	if decl == nil || mod.CurrentScope == nil {
+		return
+	}
+
+	parent := mod.CurrentScope.Parent()
+	if parent == nil {
+		return
+	}
+
+	for _, item := range decl.Decls {
+		if item.Name == nil || item.Name.Name == "_" {
+			continue
+		}
+
+		if existing, ok := parent.Lookup(item.Name.Name); ok && isValueSymbol(existing.Kind) {
+			diag := diagnostics.NewWarning(fmt.Sprintf("loop variable '%s' shadows an outer declaration", item.Name.Name)).
+				WithCode(diagnostics.ErrRedeclaredSymbol).
+				WithPrimaryLabel(&item.Name.Location, fmt.Sprintf("'%s' already declared in an outer scope", item.Name.Name)).
+				WithHelp("use a different loop variable name")
+			if existing.Decl != nil {
+				diag = diag.WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here")
+			}
+			ctx.Diagnostics.Add(diag)
+		}
+	}
+}
+
+func isValueSymbol(kind symbols.SymbolKind) bool {
+	switch kind {
+	case symbols.SymbolVariable, symbols.SymbolConstant, symbols.SymbolParameter, symbols.SymbolReceiver:
+		return true
+	default:
+		return false
+	}
+}
+
+func markForIteratorIndexReadOnly(mod *context_v2.Module, iterator ast.Node) {
+	varDecl, ok := iterator.(*ast.VarDecl)
+	if !ok || varDecl == nil || len(varDecl.Decls) < 2 {
+		return
+	}
+
+	first := varDecl.Decls[0]
+	if first.Name == nil || first.Name.Name == "_" {
+		return
+	}
+
+	if sym, ok := mod.CurrentScope.GetSymbol(first.Name.Name); ok {
+		sym.IsLoopIndex = true
 	}
 }
 

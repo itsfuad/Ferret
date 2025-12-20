@@ -369,13 +369,15 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Check range expression first to infer element type
 		var rangeElemType types.SemType = types.TypeUnknown
 		var rangeType types.SemType = types.TypeUnknown
+		isIterable := true
 		if n.Range != nil {
 			// Skip empty array checks for RangeExpr (e.g., 10..=15) - they're not arrays
 			_, isRangeExpr := n.Range.(*ast.RangeExpr)
 
 			rangeType = checkExpr(ctx, mod, n.Range, types.TypeUnknown)
-			// Extract element type from array - for integer ranges this will be i32
-			if arrayType, ok := rangeType.(*types.ArrayType); ok {
+			unwrappedRange := types.UnwrapType(rangeType)
+			// Extract element type from array/map - for integer ranges this will be i32
+			if arrayType, ok := unwrappedRange.(*types.ArrayType); ok {
 				rangeElemType = arrayType.Element
 
 				// Check for empty arrays - error: loop will never execute
@@ -385,6 +387,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 						WithPrimaryLabel(n.Range.Loc(), "this array is empty").
 						WithNote("Remove this loop or use a non-empty array"))
 				}
+			} else if _, ok := unwrappedRange.(*types.MapType); !ok {
+				isIterable = false
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("type '%s' is not iterable", unwrappedRange.String())).
+						WithCode(diagnostics.ErrInvalidType).
+						WithPrimaryLabel(n.Range.Loc(), "for loop expects an iterable value"),
+				)
 			}
 
 			// Check for empty array literals (not range expressions)
@@ -411,7 +420,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 		// Check iterator
 		if n.Iterator != nil {
-			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok {
+			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok && isIterable {
 				// For VarDecl iterator: apply types and validate structure
 				// For array iteration with two variables: first is index (i32), second is value (element type)
 				// For single variable or range iteration: variable gets range element type
@@ -436,8 +445,18 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					} else {
 						// Infer type based on position and range type
 						var inferredType types.SemType
-						// Check if range is an array (not a numeric range)
-						if _, ok := rangeType.(*types.ArrayType); ok {
+						// Check if range is a map
+						if mapType, ok := types.UnwrapType(rangeType).(*types.MapType); ok {
+							// Map iteration: key first, value second
+							if len(varDecl.Decls) == 1 {
+								inferredType = mapType.Key
+							} else if idx == 0 {
+								inferredType = mapType.Key
+							} else {
+								inferredType = mapType.Value
+							}
+						} else if _, ok := types.UnwrapType(rangeType).(*types.ArrayType); ok {
+							// Check if range is an array (not a numeric range)
 							// Array iteration
 							if len(varDecl.Decls) == 2 && idx == 0 {
 								// First variable in dual-iterator: index is always i32
@@ -1507,6 +1526,15 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 				)
 				return
 			}
+			if sym.IsLoopIndex {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot modify loop index '%s'", ident.Name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(stmt.Lhs.Loc(), "modifications to loop index has no effect").
+						WithNote("loop index variable is updated on each iteration, so your changes won't have any effect"),
+				)
+				return
+			}
 		}
 	}
 
@@ -1622,6 +1650,40 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// For now, method calls with reference receivers handle invalidation separately
 }
 
+func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression, targetType types.SemType, op tokens.Token) {
+	if ident, ok := target.(*ast.IdentifierExpr); ok {
+		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+			if sym.Kind == symbols.SymbolConstant {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
+						WithPrimaryLabel(target.Loc(), "cannot modify constant").
+						WithSecondaryLabel(sym.Decl.Loc(), "declared as constant here").
+						WithHelp("constants are immutable; use 'let' for mutable variables"),
+				)
+				return
+			}
+			if sym.IsLoopIndex {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot modify loop index '%s'", ident.Name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(target.Loc(), "modifications to loop index has no effect").
+						WithNote("loop index variable is updated on each iteration, so your changes won't have any effect"),
+				)
+				return
+			}
+			sym.ConstValue = nil
+		}
+	}
+
+	if !types.IsNumeric(targetType) {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("cannot use %s operator on non-numeric type '%s'", op.Value, targetType.String())).
+				WithPrimaryLabel(target.Loc(), "expected numeric type").
+				WithHelp("increment/decrement operators only work on numeric types"),
+		)
+	}
+}
+
 // checkBlock type checks a block of statements
 func checkBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block) {
 	if block == nil {
@@ -1674,6 +1736,14 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.UnaryExpr:
 		// Recursively check operand
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+	case *ast.PrefixExpr:
+		// Validate ++/-- target and operand type
+		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
+	case *ast.PostfixExpr:
+		// Validate ++/-- target and operand type
+		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
 
 	case *ast.IndexExpr:
 		// Check both array and index expressions

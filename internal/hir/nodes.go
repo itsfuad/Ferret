@@ -277,6 +277,42 @@ func (r *RangeExpr) hirNode()              {}
 func (r *RangeExpr) hirExpr()              {}
 func (r *RangeExpr) Loc() *source.Location { return &r.Location }
 
+// ArrayLenExpr represents getting the length of an array expression.
+type ArrayLenExpr struct {
+	X        Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (a *ArrayLenExpr) hirNode()              {}
+func (a *ArrayLenExpr) hirExpr()              {}
+func (a *ArrayLenExpr) Loc() *source.Location { return &a.Location }
+
+// MapIterInitExpr represents initializing a map iterator.
+type MapIterInitExpr struct {
+	Map      Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (m *MapIterInitExpr) hirNode()              {}
+func (m *MapIterInitExpr) hirExpr()              {}
+func (m *MapIterInitExpr) Loc() *source.Location { return &m.Location }
+
+// MapIterNextExpr advances a map iterator and yields whether another entry exists.
+type MapIterNextExpr struct {
+	Map      Expr
+	Iter     Expr
+	Key      *Ident
+	Value    *Ident
+	Type     types.SemType
+	Location source.Location
+}
+
+func (m *MapIterNextExpr) hirNode()              {}
+func (m *MapIterNextExpr) hirExpr()              {}
+func (m *MapIterNextExpr) Loc() *source.Location { return &m.Location }
+
 // IndexExpr represents an index operation (arr[i]).
 type IndexExpr struct {
 	X        Expr

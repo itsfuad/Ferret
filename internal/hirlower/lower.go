@@ -3,15 +3,18 @@ package hirlower
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/hir"
+	"compiler/internal/semantics/consteval"
 	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
+	"fmt"
 )
 
 // Lowerer rewrites source-shaped HIR into a lowered, canonical form.
 type Lowerer struct {
 	ctx               *context_v2.CompilerContext
 	currentReturnType types.SemType
+	tempCounter       int
 }
 
 // New creates a new HIR lowerer.
@@ -279,9 +282,21 @@ func (l *Lowerer) lowerIfStmt(stmt *hir.IfStmt) *hir.IfStmt {
 	}
 }
 
-func (l *Lowerer) lowerForStmt(stmt *hir.ForStmt) *hir.ForStmt {
+func (l *Lowerer) lowerForStmt(stmt *hir.ForStmt) hir.Node {
 	if stmt == nil {
 		return nil
+	}
+
+	if rangeExpr := unwrapRangeExpr(stmt.Range); rangeExpr != nil {
+		return l.lowerRangeFor(stmt, rangeExpr)
+	}
+
+	rangeType := types.UnwrapType(dereferenceType(l.exprType(stmt.Range)))
+	if arrayType, ok := rangeType.(*types.ArrayType); ok {
+		return l.lowerArrayFor(stmt, arrayType)
+	}
+	if mapType, ok := rangeType.(*types.MapType); ok {
+		return l.lowerMapFor(stmt, mapType)
 	}
 
 	return &hir.ForStmt{
@@ -302,6 +317,366 @@ func (l *Lowerer) lowerWhileStmt(stmt *hir.WhileStmt) *hir.WhileStmt {
 		Body:     l.lowerBlock(stmt.Body),
 		Location: stmt.Location,
 	}
+}
+
+func (l *Lowerer) lowerRangeFor(stmt *hir.ForStmt, rng *hir.RangeExpr) hir.Node {
+	loc := stmt.Location
+	elemType := l.rangeElementType(stmt.Range, rng)
+	if elemType == nil {
+		elemType = types.TypeUnknown
+	}
+
+	startExpr := l.lowerExpr(rng.Start, elemType)
+	endExpr := l.lowerExpr(rng.End, elemType)
+	var incrExpr hir.Expr
+	if rng.Incr != nil {
+		incrExpr = l.lowerExpr(rng.Incr, elemType)
+	} else {
+		incrExpr = defaultIncrementLiteral(elemType, loc)
+	}
+
+	startIdent := l.newTempIdent("__range_start_", elemType, loc)
+	endIdent := l.newTempIdent("__range_end_", elemType, loc)
+	incrIdent := l.newTempIdent("__range_incr_", elemType, loc)
+
+	prelude := []hir.Node{
+		newVarDecl(startIdent, elemType, startExpr, loc),
+		newVarDecl(endIdent, elemType, endExpr, loc),
+		newVarDecl(incrIdent, elemType, incrExpr, loc),
+	}
+
+	items, iterLoc, isDecl := iteratorItems(stmt.Iterator)
+	if len(items) == 0 {
+		return &hir.ForStmt{
+			Iterator: l.lowerNode(stmt.Iterator),
+			Range:    l.lowerExpr(stmt.Range, types.TypeUnknown),
+			Body:     l.lowerBlock(stmt.Body),
+			Location: stmt.Location,
+		}
+	}
+
+	firstIdent := l.newTempIdent("__for_first_", types.TypeBool, loc)
+	prelude = append(prelude, newVarDecl(firstIdent, types.TypeBool, boolLiteral(true, loc), loc))
+
+	sign, signKnown := incrementSign(rng.Incr)
+	condToken := tokens.LESS_TOKEN
+	negCondToken := tokens.GREATER_TOKEN
+	if rng.Inclusive {
+		condToken = tokens.LESS_EQUAL_TOKEN
+		negCondToken = tokens.GREATER_EQUAL_TOKEN
+	}
+
+	loweredBody := l.lowerBlock(stmt.Body)
+	if len(items) == 1 {
+		item := items[0]
+		valueIdent := item.Name
+		valueType := declItemType(item)
+		if valueType == nil || valueType.Equals(types.TypeUnknown) {
+			valueType = elemType
+		}
+
+		valueNeedsDecl := isDecl
+		if isDiscardIdent(valueIdent) {
+			valueIdent = l.newTempIdent("__range_val_", valueType, loc)
+			valueNeedsDecl = true
+		}
+
+		if valueNeedsDecl {
+			prelude = append(prelude, newVarDecl(valueIdent, valueType, startIdent, iterLoc))
+		} else {
+			prelude = append(prelude, newAssign(valueIdent, startIdent, tokens.EQUALS_TOKEN, iterLoc))
+		}
+
+		incrAssign := newAssign(valueIdent, incrIdent, tokens.PLUS_EQUALS_TOKEN, loc)
+		condExpr := rangeCondExpr(valueIdent, endIdent, incrIdent, elemType, condToken, negCondToken, sign, signKnown, loc)
+		loopNodes := l.buildLoopBody(firstIdent, incrAssign, condExpr, nil, loweredBody, loc)
+		return l.wrapLoop(prelude, loopNodes, loc)
+	}
+
+	indexItem := items[0]
+	valueItem := items[1]
+
+	indexType := declItemType(indexItem)
+	if indexType == nil || indexType.Equals(types.TypeUnknown) {
+		indexType = elemType
+	}
+
+	indexIdent := indexItem.Name
+	indexNeedsDecl := isDecl
+	if isDiscardIdent(indexIdent) {
+		indexIdent = l.newTempIdent("__range_idx_", indexType, loc)
+		indexNeedsDecl = true
+	}
+
+	zero := zeroLiteral(indexType, loc)
+	if indexNeedsDecl {
+		prelude = append(prelude, newVarDecl(indexIdent, indexType, zero, iterLoc))
+	} else {
+		prelude = append(prelude, newAssign(indexIdent, zero, tokens.EQUALS_TOKEN, iterLoc))
+	}
+
+	valueIdent := valueItem.Name
+	if isDiscardIdent(valueIdent) {
+		valueIdent = nil
+	} else if isDecl {
+		valueType := declItemType(valueItem)
+		if valueType == nil || valueType.Equals(types.TypeUnknown) {
+			valueType = elemType
+		}
+		prelude = append(prelude, newVarDecl(valueIdent, valueType, nil, iterLoc))
+	}
+
+	limitIdent := l.newTempIdent("__range_limit_", elemType, loc)
+	limitExpr := newBinary(endIdent, startIdent, tokens.MINUS_TOKEN, elemType, loc)
+	prelude = append(prelude, newVarDecl(limitIdent, elemType, limitExpr, loc))
+
+	incrAssign := newAssign(indexIdent, incrIdent, tokens.PLUS_EQUALS_TOKEN, loc)
+	condExpr := rangeCondExpr(indexIdent, limitIdent, incrIdent, elemType, condToken, negCondToken, sign, signKnown, loc)
+	var valueAssign hir.Node
+	if valueIdent != nil {
+		valueExpr := newBinary(startIdent, indexIdent, tokens.PLUS_TOKEN, elemType, loc)
+		valueAssign = newAssign(valueIdent, valueExpr, tokens.EQUALS_TOKEN, loc)
+	}
+
+	loopNodes := l.buildLoopBody(firstIdent, incrAssign, condExpr, valueAssign, loweredBody, loc)
+	return l.wrapLoop(prelude, loopNodes, loc)
+}
+
+func (l *Lowerer) lowerArrayFor(stmt *hir.ForStmt, arrayType *types.ArrayType) hir.Node {
+	loc := stmt.Location
+	arrayExpr := l.lowerExpr(stmt.Range, types.TypeUnknown)
+
+	arraySemType := l.exprType(stmt.Range)
+	if arraySemType == nil {
+		arraySemType = types.TypeUnknown
+	}
+
+	prelude := []hir.Node{}
+	rangeValue := arrayExpr
+	if !isSimpleValue(arrayExpr) {
+		arrayIdent := l.newTempIdent("__for_arr_", arraySemType, loc)
+		prelude = append(prelude, newVarDecl(arrayIdent, arraySemType, arrayExpr, loc))
+		rangeValue = arrayIdent
+	}
+
+	lenIdent := l.newTempIdent("__for_len_", types.TypeI32, loc)
+	lenExpr := &hir.ArrayLenExpr{
+		X:        rangeValue,
+		Type:     types.TypeI32,
+		Location: loc,
+	}
+	prelude = append(prelude, newVarDecl(lenIdent, types.TypeI32, lenExpr, loc))
+
+	items, iterLoc, isDecl := iteratorItems(stmt.Iterator)
+	if len(items) == 0 {
+		return &hir.ForStmt{
+			Iterator: l.lowerNode(stmt.Iterator),
+			Range:    l.lowerExpr(stmt.Range, types.TypeUnknown),
+			Body:     l.lowerBlock(stmt.Body),
+			Location: stmt.Location,
+		}
+	}
+
+	elemType := arrayType.Element
+	if elemType == nil {
+		elemType = types.TypeUnknown
+	}
+
+	var indexIdent *hir.Ident
+	var valueIdent *hir.Ident
+
+	if len(items) == 1 {
+		valueItem := items[0]
+		if !isDiscardIdent(valueItem.Name) {
+			valueIdent = valueItem.Name
+			if isDecl {
+				valueType := declItemType(valueItem)
+				if valueType == nil || valueType.Equals(types.TypeUnknown) {
+					valueType = elemType
+				}
+				prelude = append(prelude, newVarDecl(valueIdent, valueType, nil, iterLoc))
+			}
+		}
+
+		indexIdent = l.newTempIdent("__array_idx_", types.TypeI32, loc)
+		prelude = append(prelude, newVarDecl(indexIdent, types.TypeI32, intLiteral(0, types.TypeI32, loc), iterLoc))
+	} else {
+		indexItem := items[0]
+		valueItem := items[1]
+
+		indexIdent = indexItem.Name
+		indexNeedsDecl := isDecl
+		if isDiscardIdent(indexIdent) {
+			indexIdent = l.newTempIdent("__array_idx_", types.TypeI32, loc)
+			indexNeedsDecl = true
+		}
+		zero := intLiteral(0, types.TypeI32, loc)
+		if indexNeedsDecl {
+			prelude = append(prelude, newVarDecl(indexIdent, types.TypeI32, zero, iterLoc))
+		} else {
+			prelude = append(prelude, newAssign(indexIdent, zero, tokens.EQUALS_TOKEN, iterLoc))
+		}
+
+		if !isDiscardIdent(valueItem.Name) {
+			valueIdent = valueItem.Name
+			if isDecl {
+				valueType := declItemType(valueItem)
+				if valueType == nil || valueType.Equals(types.TypeUnknown) {
+					valueType = elemType
+				}
+				prelude = append(prelude, newVarDecl(valueIdent, valueType, nil, iterLoc))
+			}
+		}
+	}
+
+	firstIdent := l.newTempIdent("__for_first_", types.TypeBool, loc)
+	prelude = append(prelude, newVarDecl(firstIdent, types.TypeBool, boolLiteral(true, loc), loc))
+
+	incrAssign := newAssign(indexIdent, intLiteral(1, types.TypeI32, loc), tokens.PLUS_EQUALS_TOKEN, loc)
+	condExpr := newBinary(indexIdent, lenIdent, tokens.LESS_TOKEN, types.TypeBool, loc)
+
+	var valueAssign hir.Node
+	if valueIdent != nil {
+		indexExpr := &hir.IndexExpr{
+			X:        rangeValue,
+			Index:    indexIdent,
+			Type:     elemType,
+			Location: loc,
+		}
+		valueAssign = newAssign(valueIdent, indexExpr, tokens.EQUALS_TOKEN, loc)
+	}
+
+	loopNodes := l.buildLoopBody(firstIdent, incrAssign, condExpr, valueAssign, l.lowerBlock(stmt.Body), loc)
+	return l.wrapLoop(prelude, loopNodes, loc)
+}
+
+func (l *Lowerer) lowerMapFor(stmt *hir.ForStmt, mapType *types.MapType) hir.Node {
+	loc := stmt.Location
+	mapExpr := l.lowerExpr(stmt.Range, types.TypeUnknown)
+
+	mapSemType := l.exprType(stmt.Range)
+	if mapSemType == nil {
+		mapSemType = types.TypeUnknown
+	}
+
+	prelude := []hir.Node{}
+	rangeValue := mapExpr
+	if !isSimpleValue(mapExpr) {
+		mapIdent := l.newTempIdent("__for_map_", mapSemType, loc)
+		prelude = append(prelude, newVarDecl(mapIdent, mapSemType, mapExpr, loc))
+		rangeValue = mapIdent
+	}
+
+	iterIdent := l.newTempIdent("__map_iter_", types.TypeUnknown, loc)
+	iterInit := &hir.MapIterInitExpr{
+		Map:      rangeValue,
+		Type:     types.TypeUnknown,
+		Location: loc,
+	}
+	prelude = append(prelude, newVarDecl(iterIdent, types.TypeUnknown, iterInit, loc))
+
+	keyType := types.TypeUnknown
+	valType := types.TypeUnknown
+	if mapType != nil {
+		if mapType.Key != nil {
+			keyType = mapType.Key
+		}
+		if mapType.Value != nil {
+			valType = mapType.Value
+		}
+	}
+
+	keyTemp := l.newTempIdent("__map_key_", keyType, loc)
+	valTemp := l.newTempIdent("__map_val_", valType, loc)
+	prelude = append(prelude, newVarDecl(keyTemp, keyType, nil, loc))
+	prelude = append(prelude, newVarDecl(valTemp, valType, nil, loc))
+
+	items, iterLoc, isDecl := iteratorItems(stmt.Iterator)
+	if len(items) == 0 {
+		return &hir.ForStmt{
+			Iterator: l.lowerNode(stmt.Iterator),
+			Range:    l.lowerExpr(stmt.Range, types.TypeUnknown),
+			Body:     l.lowerBlock(stmt.Body),
+			Location: stmt.Location,
+		}
+	}
+
+	var keyIdent *hir.Ident
+	var valueIdent *hir.Ident
+
+	keyItem := items[0]
+	if !isDiscardIdent(keyItem.Name) {
+		keyIdent = keyItem.Name
+		if isDecl {
+			keyDeclType := declItemType(keyItem)
+			if keyDeclType == nil || keyDeclType.Equals(types.TypeUnknown) {
+				keyDeclType = keyType
+			}
+			prelude = append(prelude, newVarDecl(keyIdent, keyDeclType, nil, iterLoc))
+		}
+	}
+
+	if len(items) > 1 {
+		valueItem := items[1]
+		if !isDiscardIdent(valueItem.Name) {
+			valueIdent = valueItem.Name
+			if isDecl {
+				valDeclType := declItemType(valueItem)
+				if valDeclType == nil || valDeclType.Equals(types.TypeUnknown) {
+					valDeclType = valType
+				}
+				prelude = append(prelude, newVarDecl(valueIdent, valDeclType, nil, iterLoc))
+			}
+		}
+	}
+
+	cond := &hir.MapIterNextExpr{
+		Map:      rangeValue,
+		Iter:     iterIdent,
+		Key:      keyTemp,
+		Value:    valTemp,
+		Type:     types.TypeBool,
+		Location: loc,
+	}
+
+	notCond := &hir.UnaryExpr{
+		Op:       token(tokens.NOT_TOKEN),
+		X:        cond,
+		Type:     types.TypeBool,
+		Location: loc,
+	}
+
+	loopNodes := []hir.Node{
+		&hir.IfStmt{
+			Cond: notCond,
+			Body: &hir.Block{
+				Nodes:    []hir.Node{&hir.BreakStmt{Location: loc}},
+				Location: loc,
+			},
+			Location: loc,
+		},
+	}
+
+	if keyIdent != nil {
+		loopNodes = append(loopNodes, newAssign(keyIdent, keyTemp, tokens.EQUALS_TOKEN, iterLoc))
+	}
+	if valueIdent != nil {
+		loopNodes = append(loopNodes, newAssign(valueIdent, valTemp, tokens.EQUALS_TOKEN, iterLoc))
+	}
+
+	body := l.lowerBlock(stmt.Body)
+	if body != nil && len(body.Nodes) > 0 {
+		loopNodes = append(loopNodes, body.Nodes...)
+	}
+
+	whileStmt := &hir.WhileStmt{
+		Cond:     boolLiteral(true, loc),
+		Body:     &hir.Block{Nodes: loopNodes, Location: loc},
+		Location: loc,
+	}
+
+	prelude = append(prelude, whileStmt)
+	return &hir.Block{Nodes: prelude, Location: loc}
 }
 
 func (l *Lowerer) lowerMatchStmt(stmt *hir.MatchStmt) *hir.MatchStmt {
@@ -427,6 +802,27 @@ func (l *Lowerer) lowerExpr(expr hir.Expr, expected types.SemType) hir.Expr {
 			Inclusive: e.Inclusive,
 			Type:      e.Type,
 			Location:  e.Location,
+		}
+	case *hir.ArrayLenExpr:
+		lowered = &hir.ArrayLenExpr{
+			X:        l.lowerExpr(e.X, types.TypeUnknown),
+			Type:     e.Type,
+			Location: e.Location,
+		}
+	case *hir.MapIterInitExpr:
+		lowered = &hir.MapIterInitExpr{
+			Map:      l.lowerExpr(e.Map, types.TypeUnknown),
+			Type:     e.Type,
+			Location: e.Location,
+		}
+	case *hir.MapIterNextExpr:
+		lowered = &hir.MapIterNextExpr{
+			Map:      l.lowerExpr(e.Map, types.TypeUnknown),
+			Iter:     l.lowerExpr(e.Iter, types.TypeUnknown),
+			Key:      e.Key,
+			Value:    e.Value,
+			Type:     e.Type,
+			Location: e.Location,
 		}
 	case *hir.IndexExpr:
 		lowered = &hir.IndexExpr{X: l.lowerExpr(e.X, types.TypeUnknown), Index: l.lowerExpr(e.Index, types.TypeUnknown), Type: e.Type, Location: e.Location}
@@ -832,6 +1228,12 @@ func (l *Lowerer) exprType(expr hir.Expr) types.SemType {
 		return safeType(e.Type)
 	case *hir.RangeExpr:
 		return safeType(e.Type)
+	case *hir.ArrayLenExpr:
+		return safeType(e.Type)
+	case *hir.MapIterInitExpr:
+		return safeType(e.Type)
+	case *hir.MapIterNextExpr:
+		return safeType(e.Type)
 	case *hir.IndexExpr:
 		return safeType(e.Type)
 	case *hir.CastExpr:
@@ -891,6 +1293,274 @@ func (l *Lowerer) expectedArgType(fn *types.FunctionType, index int) types.SemTy
 		return fn.Params[index].Type
 	}
 	return fn.Params[last].Type
+}
+
+func iteratorItems(iterator hir.Node) ([]hir.DeclItem, source.Location, bool) {
+	switch it := iterator.(type) {
+	case *hir.VarDecl:
+		return it.Decls, it.Location, true
+	case *hir.Ident:
+		return []hir.DeclItem{{Name: it, Type: it.Type}}, it.Location, false
+	default:
+		return nil, source.Location{}, false
+	}
+}
+
+func declItemType(item hir.DeclItem) types.SemType {
+	if item.Type != nil && !item.Type.Equals(types.TypeUnknown) {
+		return item.Type
+	}
+	if item.Name != nil && item.Name.Type != nil {
+		return item.Name.Type
+	}
+	return types.TypeUnknown
+}
+
+func isDiscardIdent(ident *hir.Ident) bool {
+	if ident == nil {
+		return true
+	}
+	return ident.Name == "_"
+}
+
+func (l *Lowerer) rangeElementType(rangeExpr hir.Expr, rng *hir.RangeExpr) types.SemType {
+	rangeType := types.UnwrapType(dereferenceType(l.exprType(rangeExpr)))
+	if arrayType, ok := rangeType.(*types.ArrayType); ok && arrayType.Element != nil {
+		return arrayType.Element
+	}
+	if rng != nil {
+		if startType := l.exprType(rng.Start); startType != nil && !startType.Equals(types.TypeUnknown) {
+			return startType
+		}
+		if endType := l.exprType(rng.End); endType != nil && !endType.Equals(types.TypeUnknown) {
+			return endType
+		}
+	}
+	return types.TypeUnknown
+}
+
+func (l *Lowerer) newTempIdent(prefix string, typ types.SemType, loc source.Location) *hir.Ident {
+	l.tempCounter++
+	if typ == nil {
+		typ = types.TypeUnknown
+	}
+	return &hir.Ident{
+		Name:     fmt.Sprintf("%s%d", prefix, l.tempCounter),
+		Type:     typ,
+		Location: loc,
+	}
+}
+
+func newVarDecl(ident *hir.Ident, typ types.SemType, value hir.Expr, loc source.Location) *hir.VarDecl {
+	if typ == nil {
+		typ = types.TypeUnknown
+	}
+	return &hir.VarDecl{
+		Decls:    []hir.DeclItem{{Name: ident, Type: typ, Value: value}},
+		Location: loc,
+	}
+}
+
+func newAssign(lhs hir.Expr, rhs hir.Expr, op tokens.TOKEN, loc source.Location) *hir.AssignStmt {
+	return &hir.AssignStmt{
+		Lhs:      lhs,
+		Rhs:      rhs,
+		Op:       tokenPtr(op),
+		Location: loc,
+	}
+}
+
+func newBinary(lhs hir.Expr, rhs hir.Expr, op tokens.TOKEN, typ types.SemType, loc source.Location) *hir.BinaryExpr {
+	return &hir.BinaryExpr{
+		X:        lhs,
+		Op:       token(op),
+		Y:        rhs,
+		Type:     typ,
+		Location: loc,
+	}
+}
+
+func token(kind tokens.TOKEN) tokens.Token {
+	return tokens.Token{Kind: kind, Value: string(kind)}
+}
+
+func tokenPtr(kind tokens.TOKEN) *tokens.Token {
+	tok := token(kind)
+	return &tok
+}
+
+func boolLiteral(value bool, loc source.Location) *hir.Literal {
+	val := "false"
+	if value {
+		val = "true"
+	}
+	return &hir.Literal{
+		Kind:     hir.LiteralBool,
+		Value:    val,
+		Type:     types.TypeBool,
+		Location: loc,
+	}
+}
+
+func intLiteral(value int, typ types.SemType, loc source.Location) *hir.Literal {
+	if typ == nil {
+		typ = types.TypeUnknown
+	}
+	return &hir.Literal{
+		Kind:     hir.LiteralInt,
+		Value:    fmt.Sprintf("%d", value),
+		Type:     typ,
+		Location: loc,
+	}
+}
+
+func floatLiteral(value string, typ types.SemType, loc source.Location) *hir.Literal {
+	if typ == nil {
+		typ = types.TypeUnknown
+	}
+	return &hir.Literal{
+		Kind:     hir.LiteralFloat,
+		Value:    value,
+		Type:     typ,
+		Location: loc,
+	}
+}
+
+func defaultIncrementLiteral(typ types.SemType, loc source.Location) *hir.Literal {
+	unwrapped := types.UnwrapType(typ)
+	if types.IsFloat(unwrapped) {
+		return floatLiteral("1.0", typ, loc)
+	}
+	return intLiteral(1, typ, loc)
+}
+
+func zeroLiteral(typ types.SemType, loc source.Location) *hir.Literal {
+	unwrapped := types.UnwrapType(typ)
+	if types.IsFloat(unwrapped) {
+		return floatLiteral("0.0", typ, loc)
+	}
+	return intLiteral(0, typ, loc)
+}
+
+func isSimpleValue(expr hir.Expr) bool {
+	switch e := expr.(type) {
+	case *hir.Ident, *hir.SelectorExpr, *hir.ScopeResolutionExpr:
+		return true
+	case *hir.ParenExpr:
+		return isSimpleValue(e.X)
+	default:
+		return false
+	}
+}
+
+func (l *Lowerer) buildLoopBody(firstIdent *hir.Ident, incrAssign *hir.AssignStmt, cond hir.Expr, preBody hir.Node, body *hir.Block, loc source.Location) []hir.Node {
+	firstIf := &hir.IfStmt{
+		Cond: firstIdent,
+		Body: &hir.Block{
+			Nodes:    []hir.Node{newAssign(firstIdent, boolLiteral(false, loc), tokens.EQUALS_TOKEN, loc)},
+			Location: loc,
+		},
+		Else: &hir.Block{
+			Nodes:    []hir.Node{incrAssign},
+			Location: loc,
+		},
+		Location: loc,
+	}
+
+	notCond := &hir.UnaryExpr{
+		Op:       token(tokens.NOT_TOKEN),
+		X:        cond,
+		Type:     types.TypeBool,
+		Location: loc,
+	}
+	breakIf := &hir.IfStmt{
+		Cond: notCond,
+		Body: &hir.Block{
+			Nodes:    []hir.Node{&hir.BreakStmt{Location: loc}},
+			Location: loc,
+		},
+		Location: loc,
+	}
+
+	nodes := []hir.Node{firstIf, breakIf}
+	if preBody != nil {
+		nodes = append(nodes, preBody)
+	}
+	if body != nil && len(body.Nodes) > 0 {
+		nodes = append(nodes, body.Nodes...)
+	}
+	return nodes
+}
+
+func (l *Lowerer) wrapLoop(prelude []hir.Node, loopNodes []hir.Node, loc source.Location) hir.Node {
+	whileStmt := &hir.WhileStmt{
+		Cond:     boolLiteral(true, loc),
+		Body:     &hir.Block{Nodes: loopNodes, Location: loc},
+		Location: loc,
+	}
+	nodes := append(prelude, whileStmt)
+	return &hir.Block{Nodes: nodes, Location: loc}
+}
+
+func unwrapRangeExpr(expr hir.Expr) *hir.RangeExpr {
+	switch e := expr.(type) {
+	case *hir.RangeExpr:
+		return e
+	case *hir.ParenExpr:
+		return unwrapRangeExpr(e.X)
+	case *hir.CastExpr:
+		return unwrapRangeExpr(e.X)
+	default:
+		return nil
+	}
+}
+
+func incrementSign(expr hir.Expr) (int, bool) {
+	if expr == nil {
+		return 1, true
+	}
+	val := consteval.EvaluateHIRExpr(nil, nil, expr)
+	if val == nil || !val.IsConstant() {
+		return 0, false
+	}
+	if intVal, ok := val.AsInt(); ok {
+		if intVal.Sign() == 0 {
+			return 0, false
+		}
+		return intVal.Sign(), true
+	}
+	if floatVal, ok := val.AsFloat(); ok {
+		if floatVal.Sign() == 0 {
+			return 0, false
+		}
+		return floatVal.Sign(), true
+	}
+	return 0, false
+}
+
+func rangeCondExpr(value hir.Expr, end hir.Expr, incr *hir.Ident, elemType types.SemType, posCond tokens.TOKEN, negCond tokens.TOKEN, sign int, signKnown bool, loc source.Location) hir.Expr {
+	if signKnown {
+		if sign < 0 {
+			return newBinary(value, end, negCond, types.TypeBool, loc)
+		}
+		return newBinary(value, end, posCond, types.TypeBool, loc)
+	}
+
+	incrType := elemType
+	if incr != nil && incr.Type != nil && !incr.Type.Equals(types.TypeUnknown) {
+		incrType = incr.Type
+	}
+	zero := zeroLiteral(incrType, loc)
+
+	posCheck := newBinary(incr, zero, tokens.GREATER_TOKEN, types.TypeBool, loc)
+	negCheck := newBinary(incr, zero, tokens.LESS_TOKEN, types.TypeBool, loc)
+	posCondExpr := newBinary(value, end, posCond, types.TypeBool, loc)
+	negCondExpr := newBinary(value, end, negCond, types.TypeBool, loc)
+
+	posAnd := newBinary(posCheck, posCondExpr, tokens.AND_TOKEN, types.TypeBool, loc)
+	negAnd := newBinary(negCheck, negCondExpr, tokens.AND_TOKEN, types.TypeBool, loc)
+
+	return newBinary(posAnd, negAnd, tokens.OR_TOKEN, types.TypeBool, loc)
 }
 
 func isNoneExpr(expr hir.Expr) bool {
