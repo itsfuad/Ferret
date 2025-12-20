@@ -144,6 +144,40 @@ func (o *OptionalUnwrap) hirNode()              {}
 func (o *OptionalUnwrap) hirExpr()              {}
 func (o *OptionalUnwrap) Loc() *source.Location { return &o.Location }
 
+// ResultOk wraps a value into the ok variant of a result.
+type ResultOk struct {
+	Value    Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (r *ResultOk) hirNode()              {}
+func (r *ResultOk) hirExpr()              {}
+func (r *ResultOk) Loc() *source.Location { return &r.Location }
+
+// ResultErr wraps a value into the error variant of a result.
+type ResultErr struct {
+	Value    Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (r *ResultErr) hirNode()              {}
+func (r *ResultErr) hirExpr()              {}
+func (r *ResultErr) Loc() *source.Location { return &r.Location }
+
+// ResultUnwrap handles a result value with a catch clause.
+type ResultUnwrap struct {
+	Value    Expr
+	Catch    *CatchClause
+	Type     types.SemType
+	Location source.Location
+}
+
+func (r *ResultUnwrap) hirNode()              {}
+func (r *ResultUnwrap) hirExpr()              {}
+func (r *ResultUnwrap) Loc() *source.Location { return &r.Location }
+
 // BinaryExpr represents a binary operation.
 type BinaryExpr struct {
 	X        Expr

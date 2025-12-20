@@ -1655,7 +1655,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.CallExpr:
 		checkCallExpr(ctx, mod, e)
 		// Validate catch clause if present
-		if e.Catch != nil && e.Catch.Handler != nil {
+		if e.Catch != nil {
 			checkCatchClause(ctx, mod, e)
 		}
 
@@ -2404,18 +2404,19 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 		return // Error already reported in validateResultTypeHandling
 	}
 
-	// get the scope of the catch block
-	scope := catch.Handler.Scope.(*table.SymbolTable)
-	defer mod.EnterScope(scope)()
-	// check catch block
-	// set the catch error identifier type to the error type
-	if catch.ErrIdent != nil {
-		if sym, ok := mod.CurrentScope.Lookup(catch.ErrIdent.Name); ok {
-			sym.Type = resultType.Err
+	if catch.Handler != nil {
+		// get the scope of the catch block
+		scope := catch.Handler.Scope.(*table.SymbolTable)
+		defer mod.EnterScope(scope)()
+		// set the catch error identifier type to the error type
+		if catch.ErrIdent != nil {
+			if sym, ok := mod.CurrentScope.Lookup(catch.ErrIdent.Name); ok {
+				sym.Type = resultType.Err
+			}
 		}
+		// check the catch block
+		checkBlock(ctx, mod, catch.Handler)
 	}
-	// check the catch block
-	checkBlock(ctx, mod, catch.Handler)
 	// check the fallback expression - must match the OK type of the result
 	if catch.Fallback != nil {
 		// Use checkAssignLike to validate type compatibility and report errors

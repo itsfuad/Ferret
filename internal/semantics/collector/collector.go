@@ -898,7 +898,7 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 				collectNode(ctx, mod, n)
 			}
 		}
-		// Collect fallback expression if present (in original scope, not handler scope)
+		// Collect fallback expression if present (in handler scope if one exists)
 		if e.Catch != nil && e.Catch.Fallback != nil {
 			collectExpr(ctx, mod, e.Catch.Fallback)
 		}

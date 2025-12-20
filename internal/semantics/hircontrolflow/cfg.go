@@ -122,6 +122,32 @@ func (b *CFGBuilder) BuildFunctionCFG(funcDecl *hir.FuncDecl) *ControlFlowGraph 
 	return cfg
 }
 
+// BuildBlockCFG builds a control flow graph for an arbitrary block.
+func (b *CFGBuilder) BuildBlockCFG(block *hir.Block) *ControlFlowGraph {
+	cfg := &ControlFlowGraph{
+		Entry: b.newBlock(),
+		Exit:  b.newBlock(),
+	}
+
+	cfg.Entry.Reachable = true
+	if block != nil {
+		cfg.Entry.Location = block.Loc()
+		cfg.Exit.Location = block.Loc()
+	}
+
+	current := cfg.Entry
+	current = b.buildBlock(block, current, cfg.Exit)
+
+	if current != nil && current.CanFallThru {
+		addEdge(current, cfg.Exit)
+	}
+	if block == nil {
+		addEdge(cfg.Entry, cfg.Exit)
+	}
+
+	return cfg
+}
+
 // buildBlock processes a block of statements.
 func (b *CFGBuilder) buildBlock(block *hir.Block, current *BasicBlock, exitBlock *BasicBlock) *BasicBlock {
 	if block == nil {
@@ -609,6 +635,11 @@ func AllPathsReturn(cfg *ControlFlowGraph) bool {
 	// DFS to check if we can reach exit without returning.
 	visited := make(map[*BasicBlock]bool)
 	return !canReachExitWithoutReturn(cfg.Entry, cfg.Exit, visited)
+}
+
+// MissingReturnBranches returns branch blocks that reach exit without returning.
+func MissingReturnBranches(cfg *ControlFlowGraph) []*BasicBlock {
+	return findMissingReturnBranches(cfg)
 }
 
 // canReachExitWithoutReturn checks if exit is reachable without a return.

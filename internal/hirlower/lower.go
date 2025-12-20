@@ -20,7 +20,7 @@ func New(ctx *context_v2.CompilerContext) *Lowerer {
 }
 
 // LowerModule performs a lowering pass over a HIR module.
-// This pass makes optional operations explicit for later MIR/codegen stages.
+// This pass makes optional and result operations explicit for later MIR/codegen stages.
 func (l *Lowerer) LowerModule(mod *hir.Module) *hir.Module {
 	if mod == nil {
 		return nil
@@ -242,10 +242,20 @@ func (l *Lowerer) lowerReturnStmt(stmt *hir.ReturnStmt) *hir.ReturnStmt {
 	}
 
 	if resultType, ok := types.UnwrapType(expected).(*types.ResultType); ok {
+		loc := locationFromExpr(stmt.Result)
 		if stmt.IsError {
-			expected = resultType.Err
-		} else {
-			expected = resultType.Ok
+			errValue := l.lowerExpr(stmt.Result, resultType.Err)
+			return &hir.ReturnStmt{
+				Result:   &hir.ResultErr{Value: errValue, Type: expected, Location: loc},
+				IsError:  false,
+				Location: stmt.Location,
+			}
+		}
+		okValue := l.lowerExpr(stmt.Result, resultType.Ok)
+		return &hir.ReturnStmt{
+			Result:   &hir.ResultOk{Value: okValue, Type: expected, Location: loc},
+			IsError:  false,
+			Location: stmt.Location,
 		}
 	}
 
@@ -368,6 +378,33 @@ func (l *Lowerer) lowerExpr(expr hir.Expr, expected types.SemType) hir.Expr {
 			Type:     e.Type,
 			Location: e.Location,
 		}
+	case *hir.ResultOk:
+		innerExpected := types.TypeUnknown
+		if resultType, ok := types.UnwrapType(e.Type).(*types.ResultType); ok {
+			innerExpected = resultType.Ok
+		}
+		lowered = &hir.ResultOk{
+			Value:    l.lowerExpr(e.Value, innerExpected),
+			Type:     e.Type,
+			Location: e.Location,
+		}
+	case *hir.ResultErr:
+		innerExpected := types.TypeUnknown
+		if resultType, ok := types.UnwrapType(e.Type).(*types.ResultType); ok {
+			innerExpected = resultType.Err
+		}
+		lowered = &hir.ResultErr{
+			Value:    l.lowerExpr(e.Value, innerExpected),
+			Type:     e.Type,
+			Location: e.Location,
+		}
+	case *hir.ResultUnwrap:
+		lowered = &hir.ResultUnwrap{
+			Value:    l.lowerExpr(e.Value, types.TypeUnknown),
+			Catch:    l.lowerCatchClause(e.Catch, e.Type),
+			Type:     e.Type,
+			Location: e.Location,
+		}
 	case *hir.BinaryExpr:
 		lowered = l.lowerBinaryExpr(e)
 	case *hir.UnaryExpr:
@@ -473,7 +510,7 @@ func (l *Lowerer) lowerCoalescingExpr(expr *hir.CoalescingExpr) hir.Expr {
 	}
 }
 
-func (l *Lowerer) lowerCallExpr(expr *hir.CallExpr) *hir.CallExpr {
+func (l *Lowerer) lowerCallExpr(expr *hir.CallExpr) hir.Expr {
 	if expr == nil {
 		return nil
 	}
@@ -485,16 +522,34 @@ func (l *Lowerer) lowerCallExpr(expr *hir.CallExpr) *hir.CallExpr {
 		args = append(args, l.lowerExpr(arg, expected))
 	}
 
-	return &hir.CallExpr{
+	call := &hir.CallExpr{
 		Fun:      l.lowerExpr(expr.Fun, types.TypeUnknown),
 		Args:     args,
-		Catch:    l.lowerCatchClause(expr.Catch),
+		Catch:    nil,
+		Type:     expr.Type,
+		Location: expr.Location,
+	}
+
+	if expr.Catch == nil {
+		return call
+	}
+
+	fallbackExpected := expr.Type
+	if funType != nil {
+		if resultType, ok := types.UnwrapType(funType.Return).(*types.ResultType); ok {
+			fallbackExpected = resultType.Ok
+		}
+	}
+
+	return &hir.ResultUnwrap{
+		Value:    call,
+		Catch:    l.lowerCatchClause(expr.Catch, fallbackExpected),
 		Type:     expr.Type,
 		Location: expr.Location,
 	}
 }
 
-func (l *Lowerer) lowerCatchClause(clause *hir.CatchClause) *hir.CatchClause {
+func (l *Lowerer) lowerCatchClause(clause *hir.CatchClause, fallbackExpected types.SemType) *hir.CatchClause {
 	if clause == nil {
 		return nil
 	}
@@ -502,7 +557,7 @@ func (l *Lowerer) lowerCatchClause(clause *hir.CatchClause) *hir.CatchClause {
 	return &hir.CatchClause{
 		ErrIdent: clause.ErrIdent,
 		Handler:  l.lowerBlock(clause.Handler),
-		Fallback: l.lowerExpr(clause.Fallback, types.TypeUnknown),
+		Fallback: l.lowerExpr(clause.Fallback, fallbackExpected),
 		Location: clause.Location,
 	}
 }
@@ -645,6 +700,8 @@ func (l *Lowerer) isOptionalProducer(expr hir.Expr) bool {
 			return isOptionalType(fn.Return)
 		}
 		return false
+	case *hir.ResultUnwrap:
+		return isOptionalType(l.exprType(e))
 	case *hir.IndexExpr:
 		baseType := types.UnwrapType(l.exprType(e.X))
 		_, ok := baseType.(*types.MapType)
@@ -754,6 +811,12 @@ func (l *Lowerer) exprType(expr hir.Expr) types.SemType {
 	case *hir.OptionalIsNone:
 		return safeType(e.Type)
 	case *hir.OptionalUnwrap:
+		return safeType(e.Type)
+	case *hir.ResultOk:
+		return safeType(e.Type)
+	case *hir.ResultErr:
+		return safeType(e.Type)
+	case *hir.ResultUnwrap:
 		return safeType(e.Type)
 	case *hir.BinaryExpr:
 		return safeType(e.Type)
