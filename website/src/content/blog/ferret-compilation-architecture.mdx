@@ -1,6 +1,6 @@
 ---
 title: "Ferret to Binary: A Deep Architectural Walkthrough"
-description: "Phase graphs, shared context, CFG reasoning, and runtime integration for Ferret's .fer -> C -> binary pipeline."
+description: "Phase graphs, shared context, HIR/CFG reasoning, and runtime integration for Ferret's .fer -> C -> binary pipeline."
 pubDate: 2025-12-16
 tags: [ferret, compiler, architecture]
 ---
@@ -9,7 +9,7 @@ This is a detailed map of Ferret's compiler architecture aimed at compiler engin
 
 - How phases communicate through a shared compiler context.
 - How modules are scheduled, resolved, and type-checked.
-- How CFG/analysis fits into the pipeline.
+- How HIR/CFG analysis fits into the pipeline.
 - How codegen and the runtime cooperate (includes, helpers, formatting).
 - Determinism and failure modes.
 
@@ -173,12 +173,23 @@ compiler: {
     checks.interfaces -> context.diagnostics: "type error"
   }
   
-  phase5_cfg: {
-    label: "Phase 5: CFG"
+  phase5_hir: {
+    label: "Phase 5: HIR Gen"
+    style.fill: "#e0f7fa"
+    style.stroke: "#00838f"
+    
+    hirgen: "HIR Gen\n(AST -> HIR)"
+    hirmodule: "HIR Module\n(source-shaped)"
+    
+    hirgen -> hirmodule
+  }
+  
+  phase6_cfg: {
+    label: "Phase 6: HIR CFG"
     style.fill: "#fce4ec"
     style.stroke: "#c2185b"
     
-    cfganalyzer: "CFG Analyzer\n(per module)"
+    cfganalyzer: "HIR CFG Analyzer\n(per module)"
     buildcfg: "BuildFunctionCFG\n(per function)"
     structure: {
       entryblock: "Entry Block\n(function start)"
@@ -199,7 +210,7 @@ compiler: {
     }
     errorcheck: "HasErrors()\ncheck"
     skipcodegen: "Skip Codegen\nwhen errors"
-    proceedcodegen: "Proceed to\nCodegen"
+    proceedcodegen: "Proceed to\nHIR lowering"
     
     cfganalyzer -> buildcfg
     buildcfg -> structure.entryblock
@@ -212,12 +223,23 @@ compiler: {
     errorcheck -> proceedcodegen: "no errors"
   }
   
-  phase6_codegen: {
-    label: "Phase 6: Codegen"
+  phase7_lowering: {
+    label: "Phase 7: HIR Lowering"
+    style.fill: "#ede7f6"
+    style.stroke: "#5e35b1"
+    
+    lower: "Lower HIR\n(desugar/normalize)"
+    lowered: "Lowered HIR"
+    
+    lower -> lowered
+  }
+  
+  phase8_codegen: {
+    label: "Phase 8: Codegen"
     style.fill: "#e0f2f1"
     style.stroke: "#00695c"
     
-    codegen: "Codegen\n(emit C)"
+    codegen: "Codegen\n(emit C, AST-backed today)"
     includes: {
       includesgo: "includes.go\n(single source)"
       standard: "Standard\nincludes"
@@ -290,9 +312,11 @@ compiler: {
   phase1_parse.coordination.topoorder -> phase2_collect.collector: "topo order"
   phase2_collect.modulescope -> phase3_resolve.resolver: "symbols"
   phase3_resolve.boundast -> phase4_typecheck.typechecker: "bound AST"
-  phase4_typecheck.typedast -> phase5_cfg.cfganalyzer: "typed AST"
-  phase5_cfg.proceedcodegen -> phase6_codegen.codegen: "CFG data"
-  phase6_codegen.ccode -> runtime -> build.cc -> build.linker -> binary
+  phase4_typecheck.typedast -> phase5_hir.hirgen: "typed AST"
+  phase5_hir.hirmodule -> phase6_cfg.cfganalyzer: "HIR"
+  phase6_cfg.proceedcodegen -> phase7_lowering.lower: "HIR"
+  phase7_lowering.lowered -> phase8_codegen.codegen: "lowered HIR"
+  phase8_codegen.ccode -> runtime -> build.cc -> build.linker -> binary
   
   # Context in center - compact box connecting all phases
   # Context feeds phases (outgoing connections)
@@ -303,15 +327,17 @@ compiler: {
   context -> phase2_collect: "topo order"
   context -> phase3_resolve: "symbols"
   context -> phase4_typecheck: "universe"
-  context -> phase5_cfg: "typed AST"
-  context -> phase6_codegen: "CFG data"
+  context -> phase5_hir: "typed AST"
+  context -> phase6_cfg: "HIR"
+  context -> phase7_lowering: "HIR"
+  context -> phase8_codegen: "typed AST (current backend)"
   
   # Error feedback to context (incoming connections - all phases report)
   phase1_parse.lexparse.parser -> context.diagnostics: "parse errors"
   phase2_collect.collector -> context.diagnostics: "collect errors"
   phase3_resolve.resolver -> context.diagnostics: "resolve errors"
   phase4_typecheck.typechecker -> context.diagnostics: "type errors"
-  phase5_cfg.cfganalyzer -> context.diagnostics: "CFG errors"
+  phase6_cfg.cfganalyzer -> context.diagnostics: "HIR CFG errors"
   
   # Data updates to context
   phase1_parse.lexparse.parser -> context.modules: "store AST"
@@ -319,7 +345,7 @@ compiler: {
   phase1_parse.coordination.topoorder -> context.topoorder: "compute"
   
   # Runtime integration
-  phase6_codegen.includes.runtime -> runtime.headers: "includes"
+  phase8_codegen.includes.runtime -> runtime.headers: "includes"
   build.cc.compile -> build.linker.linkruntime: "object files"
   runtime.impl -> build.linker.linkruntime: "runtime objects"
 }
@@ -366,15 +392,27 @@ Key architectural principles:
 - **Optional safety**: Validates that optionals are unwrapped before use.
 - **Error accumulation**: All type errors are collected; codegen is skipped when errors exist.
 
-### Phase 5: CFG Analysis
+### Phase 5: HIR Generation
+
+- **AST → HIR**: Lower the typed AST into source-shaped HIR with stable node kinds.
+- **Location fidelity**: Preserve source spans for precise diagnostics downstream.
+- **Phase boundary**: HIR becomes the canonical input for CFG analysis and later lowering.
+
+### Phase 6: HIR CFG Analysis
 
 - **Per-function CFGs**: Each function gets its own control flow graph with entry, statement, branch, and exit blocks.
 - **Unreachable detection**: Code after `return`, `break`, or `continue` is flagged as unreachable.
 - **Return validation**: Functions with non-void return types must have returns on all paths.
 - **Loop context**: Tracks nested loops for `break`/`continue` validation.
-- **Codegen gate**: Code generation is skipped when CFG analysis finds errors.
+- **Codegen gate**: Code generation is skipped when HIR CFG analysis finds errors.
 
-### Phase 6: Code Generation
+### Phase 7: HIR Lowering
+
+- **Desugaring**: Normalize optional/result/catch syntax into lowered forms for MIR/codegen.
+- **Simplification**: Reduce surface constructs into fewer core HIR forms.
+- **Backend prep**: Establishes a stable, lowered IR for MIR and target backends.
+
+### Phase 8: Code Generation
 
 - **Single source of truth**: `includes.go` centralizes all runtime header includes, ensuring consistency.
 - **Deterministic output**: Stable include order and naming make generated code predictable and diff-friendly.
@@ -382,6 +420,7 @@ Key architectural principles:
 - **Separate formatting**: C formatting is a post-processing step, keeping codegen logic simple.
 - **Module headers**: Each module generates its own `.h` and `.c` files; modules include each other's headers.
 - **Build integration**: Generated C is compiled and linked with runtime sources to produce the final executable.
+- **Current backend note**: The C backend still consumes the typed AST while HIR lowering is bootstrapped for MIR/backends.
 
 ## How to Exercise the Pipeline
 
@@ -417,7 +456,7 @@ Useful debugging techniques:
 
 ## Design Principles
 
-- **Narrow phases**: Each stage does one job (collect symbols, check types, build CFG) and doesn't redo previous work.
+- **Narrow phases**: Each stage does one job (collect symbols, check types, build HIR CFG) and doesn't redo previous work.
 - **Shared context**: Modules, diagnostics, topo order, and universe types live in one place; phases consume and enrich it.
 - **Runtime-first**: Feature logic (optionals, maps, interfaces) is centralized in `runtime/`; codegen only wires types to these helpers.
 - **Deterministic output**: Stable emission and formatting reduce friction for users and for compiler development.

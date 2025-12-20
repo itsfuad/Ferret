@@ -51,6 +51,7 @@ const (
 	ErrInvalidCatch            = "T0024"
 	ErrInvalidErrorReturn      = "T0025"
 	ErrMissingCatch            = "T0026"
+	ErrUseBeforeDecl           = "T0027"
 
 	// Module/Import errors (M prefix)
 	ErrModuleNotFound    = "M0001"

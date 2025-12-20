@@ -54,10 +54,26 @@ func (p *Pipeline) Run() error {
 	}
 
 	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 5] Control Flow Analysis\n")
+		colors.CYAN.Printf("\n[Phase 5] HIR Generation\n")
 	}
-	
+
+	if err := p.runHIRGenerationPhase(); err != nil {
+		return err
+	}
+
+	if p.ctx.Config.Debug {
+		colors.CYAN.Printf("\n[Phase 6] Control Flow Analysis (HIR)\n")
+	}
+
 	if err := p.runCFGAnalysisPhase(); err != nil {
+		return err
+	}
+
+	if p.ctx.Config.Debug {
+		colors.CYAN.Printf("\n[Phase 7] HIR Lowering\n")
+	}
+
+	if err := p.runHIRLoweringPhase(); err != nil {
 		return err
 	}
 
@@ -67,15 +83,15 @@ func (p *Pipeline) Run() error {
 		}
 		return fmt.Errorf("compilation failed with errors")
 	}
-	
+
 	if p.ctx.Config.SkipCodegen {
 		return nil
 	}
 
 	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 6] Code Generation\n")
+		colors.CYAN.Printf("\n[Phase 8] Code Generation\n")
 	}
-	
+
 	if err := p.runCodegenPhase(); err != nil {
 		return err
 	}

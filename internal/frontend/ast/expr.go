@@ -3,15 +3,13 @@ package ast
 import (
 	"compiler/internal/source"
 	"compiler/internal/tokens"
-	"compiler/internal/types"
 )
 
 // BinaryExpr represents a binary expression
 type BinaryExpr struct {
-	X    Expression    // left operand
-	Op   tokens.Token  // operator
-	Y    Expression    // right operand
-	Type types.SemType // type information (populated during semantic analysis)
+	X  Expression   // left operand
+	Op tokens.Token // operator
+	Y  Expression   // right operand
 	source.Location
 }
 
@@ -21,9 +19,8 @@ func (b *BinaryExpr) Loc() *source.Location { return &b.Location }
 
 // UnaryExpr represents a unary expression
 type UnaryExpr struct {
-	Op   tokens.Token  // operator
-	X    Expression    // operand
-	Type types.SemType // type information (populated during semantic analysis)
+	Op tokens.Token // operator
+	X  Expression   // operand
 	source.Location
 }
 
@@ -33,9 +30,8 @@ func (u *UnaryExpr) Loc() *source.Location { return &u.Location }
 
 // PrefixExpr represents a prefix increment/decrement expression (++x, --x)
 type PrefixExpr struct {
-	Op   tokens.Token  // operator (++, --)
-	X    Expression    // operand
-	Type types.SemType // type information (populated during semantic analysis)
+	Op tokens.Token // operator (++, --)
+	X  Expression   // operand
 	source.Location
 }
 
@@ -45,9 +41,8 @@ func (p *PrefixExpr) Loc() *source.Location { return &p.Location }
 
 // PostfixExpr represents a postfix increment/decrement expression (x++, x--)
 type PostfixExpr struct {
-	X    Expression    // operand
-	Op   tokens.Token  // operator (++, --)
-	Type types.SemType // type information (populated during semantic analysis)
+	X  Expression   // operand
+	Op tokens.Token // operator (++, --)
 	source.Location
 }
 
@@ -58,7 +53,6 @@ func (p *PostfixExpr) Loc() *source.Location { return &p.Location }
 // IdentifierExpr represents an identifier
 type IdentifierExpr struct {
 	Name string
-	Type types.SemType // type information (populated during semantic analysis, from symbol table)
 	source.Location
 }
 
@@ -85,10 +79,9 @@ func (c *CatchClause) Loc() *source.Location { return &c.Location }
 
 // CallExpr represents a function call expression
 type CallExpr struct {
-	Fun   Expression    // function expression
-	Args  []Expression  // function arguments
-	Catch *CatchClause  // Optional: error handling (nil if no catch)
-	Type  types.SemType // return type (populated during semantic analysis)
+	Fun   Expression   // function expression
+	Args  []Expression // function arguments
+	Catch *CatchClause // Optional: error handling (nil if no catch)
 	source.Location
 }
 
@@ -100,7 +93,6 @@ func (c *CallExpr) Loc() *source.Location { return &c.Location }
 type SelectorExpr struct {
 	X     Expression      // expression
 	Field *IdentifierExpr // field selector
-	Type  types.SemType   // type of the selected field (populated during semantic analysis)
 	source.Location
 }
 
@@ -112,11 +104,10 @@ func (s *SelectorExpr) Loc() *source.Location { return &s.Location }
 // Generates an array from start to end with optional increment
 // Inclusive controls whether end is included: .. (false) or ..= (true)
 type RangeExpr struct {
-	Start     Expression    // start value (e.g., 0)
-	End       Expression    // end value (e.g., 10)
-	Incr      Expression    // increment (optional, default 1)
-	Inclusive bool          // true for ..=, false for ..
-	Type      types.SemType // array type (populated during semantic analysis)
+	Start     Expression // start value (e.g., 0)
+	End       Expression // end value (e.g., 10)
+	Incr      Expression // increment (optional, default 1)
+	Inclusive bool       // true for ..=, false for ..
 	source.Location
 }
 
@@ -126,9 +117,8 @@ func (r *RangeExpr) Loc() *source.Location { return &r.Location }
 
 // IndexExpr represents an index expression (array[index])
 type IndexExpr struct {
-	X     Expression    // expression
-	Index Expression    // index
-	Type  types.SemType // element type (populated during semantic analysis)
+	X     Expression // expression
+	Index Expression // index
 	source.Location
 }
 
@@ -138,9 +128,8 @@ func (i *IndexExpr) Loc() *source.Location { return &i.Location }
 
 // CastExpr represents a type cast expression (value as TargetType)
 type CastExpr struct {
-	X        Expression    // value being cast
-	Type     TypeNode      // target type (AST node)
-	TypeInfo types.SemType // resolved target type (populated during semantic analysis)
+	X    Expression // value being cast
+	Type TypeNode   // target type (AST node)
 	source.Location
 }
 
@@ -151,9 +140,8 @@ func (c *CastExpr) Loc() *source.Location { return &c.Location }
 // CoalescingExpr represents the coalescing operator (a ?? b)
 // If a is none/falsy, returns b
 type CoalescingExpr struct {
-	Cond    Expression    // condition (left side)
-	Default Expression    // default value (right side)
-	Type    types.SemType // result type (populated during semantic analysis)
+	Cond    Expression // condition (left side)
+	Default Expression // default value (right side)
 	source.Location
 }
 
@@ -163,8 +151,7 @@ func (e *CoalescingExpr) Loc() *source.Location { return &e.Location }
 
 // ForkExpr represents a fork expression for coroutines
 type ForkExpr struct {
-	Call Expression    // the function call to fork
-	Type types.SemType // return type (populated during semantic analysis)
+	Call Expression // the function call to fork
 	source.Location
 }
 
@@ -176,7 +163,6 @@ func (s *ForkExpr) Loc() *source.Location { return &s.Location }
 type ScopeResolutionExpr struct {
 	X        Expression      // left side (module or enum name)
 	Selector *IdentifierExpr // symbol being accessed
-	Type     types.SemType   // type of the resolved symbol (populated during semantic analysis)
 	source.Location
 }
 
@@ -187,8 +173,7 @@ func (s *ScopeResolutionExpr) Loc() *source.Location { return &s.Location }
 
 // ParenExpr represents a parenthesized expression
 type ParenExpr struct {
-	X    Expression    // expression within parentheses
-	Type types.SemType // type information (same as inner expression, populated during semantic analysis)
+	X Expression // expression within parentheses
 	source.Location
 }
 

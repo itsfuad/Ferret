@@ -3,7 +3,7 @@ import "std/io";
 fn main() {
     let fruits : []str = ["apple", "banana", "cherry"];
 
-    for let _, _ in fruits {
+    for _, _ in fruits {
         io::Println("Fruit ");
     }
 }

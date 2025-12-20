@@ -5,8 +5,6 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/semantics/consteval"
-
-	//"compiler/internal/semantics/controlflow"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/tokens"
@@ -19,15 +17,15 @@ import (
 	"strings"
 )
 
-// TypeCheckMethodSignatures only processes method signatures to attach methods to types
-// This must run before CheckModule so all methods are available
-func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+// TypeCheckTopLevelSignatures resolves types, method signatures, and function signatures.
+// This must run before CheckModule so forward references to functions work at module scope.
+func TypeCheckTopLevelSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	if mod.AST == nil {
 		return
 	}
 
 	if ctx.Config.Debug {
-		fmt.Printf("    [TypeCheckMethodSignatures for %s]\n", mod.ImportPath)
+		fmt.Printf("    [TypeCheckTopLevelSignatures for %s]\n", mod.ImportPath)
 	}
 
 	// Reset CurrentScope to ModuleScope
@@ -52,13 +50,165 @@ func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.
 		}
 	}
 
+	// Resolve top-level function signatures
+	for _, node := range mod.AST.Nodes {
+		if funcDecl, ok := node.(*ast.FuncDecl); ok {
+			checkFuncSignatureOnly(ctx, mod, funcDecl)
+		}
+	}
+
 	if ctx.Config.Debug {
 		fmt.Printf("    [Processed %d methods]\n", methodCount)
 	}
 }
 
+// TypeCheckMethodSignatures is kept for compatibility; it now runs the full top-level signature pass.
+func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	TypeCheckTopLevelSignatures(ctx, mod)
+}
+
+func checkFuncSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
+	if decl == nil || decl.Name == nil || decl.Type == nil {
+		return
+	}
+
+	funcType := TypeFromTypeNodeWithContext(ctx, mod, decl.Type)
+	if !isFuncLikeType(funcType) {
+		return
+	}
+
+	if sym, ok := mod.CurrentScope.Lookup(decl.Name.Name); ok {
+		sym.Type = funcType
+	}
+}
+
+func isFuncLikeType(t types.SemType) bool {
+	if t == nil {
+		return false
+	}
+	_, ok := types.UnwrapType(t).(*types.FunctionType)
+	return ok
+}
+
+func checkModuleScopeUseBeforeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, ident *ast.IdentifierExpr) {
+	if ctx == nil || mod == nil || ident == nil {
+		return
+	}
+
+	sym, ok := mod.CurrentScope.Lookup(ident.Name)
+	if !ok || sym == nil {
+		return
+	}
+	if sym.DeclaredScope != mod.ModuleScope {
+		return
+	}
+
+	if sym.Kind == symbols.SymbolFunction || sym.Kind == symbols.SymbolType {
+		return
+	}
+	if sym.Decl == nil {
+		return
+	}
+	declLoc := sym.Decl.Loc()
+	useLoc := ident.Loc()
+	if declLoc == nil || useLoc == nil || declLoc.Start == nil || useLoc.Start == nil {
+		return
+	}
+	if declLoc.Filename != nil && useLoc.Filename != nil && *declLoc.Filename != *useLoc.Filename {
+		return
+	}
+	if useLoc.Start.Index >= declLoc.Start.Index {
+		return
+	}
+
+	ctx.Diagnostics.Add(
+		diagnostics.NewError(fmt.Sprintf("'%s' used before declaration", ident.Name)).
+			WithCode(diagnostics.ErrUseBeforeDecl).
+			WithPrimaryLabel(useLoc, "used before declaration").
+			WithSecondaryLabel(declLoc, "declared here"),
+	)
+}
+
+func referencesIdentOutsideFuncLit(expr ast.Expression, name string) bool {
+	if expr == nil || name == "" {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		return e.Name == name
+	case *ast.BasicLit:
+		return false
+	case *ast.FuncLit:
+		return false
+	case *ast.BinaryExpr:
+		return referencesIdentOutsideFuncLit(e.X, name) || referencesIdentOutsideFuncLit(e.Y, name)
+	case *ast.UnaryExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.PrefixExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.PostfixExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.CallExpr:
+		if referencesIdentOutsideFuncLit(e.Fun, name) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if referencesIdentOutsideFuncLit(arg, name) {
+				return true
+			}
+		}
+		if e.Catch != nil && referencesIdentOutsideFuncLit(e.Catch.Fallback, name) {
+			return true
+		}
+		return false
+	case *ast.IndexExpr:
+		return referencesIdentOutsideFuncLit(e.X, name) || referencesIdentOutsideFuncLit(e.Index, name)
+	case *ast.SelectorExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.ScopeResolutionExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.CastExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.ParenExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.CompositeLit:
+		for _, elem := range e.Elts {
+			if kv, ok := elem.(*ast.KeyValueExpr); ok {
+				if referencesIdentOutsideFuncLit(kv.Value, name) {
+					return true
+				}
+				continue
+			}
+			if referencesIdentOutsideFuncLit(elem, name) {
+				return true
+			}
+		}
+		return false
+	case *ast.KeyValueExpr:
+		return referencesIdentOutsideFuncLit(e.Value, name)
+	case *ast.CoalescingExpr:
+		return referencesIdentOutsideFuncLit(e.Cond, name) || referencesIdentOutsideFuncLit(e.Default, name)
+	case *ast.RangeExpr:
+		if referencesIdentOutsideFuncLit(e.Start, name) {
+			return true
+		}
+		if referencesIdentOutsideFuncLit(e.End, name) {
+			return true
+		}
+		if referencesIdentOutsideFuncLit(e.Incr, name) {
+			return true
+		}
+		return false
+	case *ast.ForkExpr:
+		return referencesIdentOutsideFuncLit(e.Call, name)
+	default:
+		return false
+	}
+}
+
 // CheckModule performs type checking on a module.
-// Type declarations and method signatures are already checked in phase 4a.
+// Type declarations, method signatures, and top-level function signatures are already checked in phase 4a.
 // This phase checks function bodies, variables, and method bodies.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 
@@ -413,6 +563,15 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		sym, ok := mod.CurrentScope.GetSymbol(name)
 		if !ok {
 			continue
+		}
+
+		if item.Value != nil && referencesIdentOutsideFuncLit(item.Value, name) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("'%s' references itself in its initializer", name)).
+					WithCode(diagnostics.ErrCircularDependency).
+					WithPrimaryLabel(item.Value.Loc(), "self reference here").
+					WithSecondaryLabel(item.Name.Loc(), "declared here"),
+			)
 		}
 
 		// Determine the type
@@ -1491,6 +1650,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	// Recursively validate subexpressions before type inference
 	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		checkModuleScopeUseBeforeDecl(ctx, mod, e)
 	case *ast.CallExpr:
 		checkCallExpr(ctx, mod, e)
 		// Validate catch clause if present
@@ -1524,7 +1685,11 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	case *ast.ParenExpr:
 		// Check inner expression
-		return checkExpr(ctx, mod, e.X, expected)
+		innerType := checkExpr(ctx, mod, e.X, expected)
+		if mod != nil {
+			mod.SetExprType(expr, innerType)
+		}
+		return innerType
 
 	case *ast.CastExpr:
 		// Check expression being cast and validate cast compatibility
@@ -1612,14 +1777,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 					if areStructsCompatible(inferredStruct, expectedStruct) {
 						// Use the expected type (preserves named type)
 						resultType = expected
-						compLit.TypeInfo = resultType // Update stored type
 					}
 				}
 			} else if _, ok := expectedUnwrapped.(*types.ArrayType); ok {
 				// For array literals without explicit type, adopt the expected array type
 				// This allows [1, 2, 3] to adopt type [3]i32 when that's expected
 				resultType = expected
-				compLit.TypeInfo = resultType // Update stored type
 				// Validate the composite literal against the expected array type
 				checkCompositeLit(ctx, mod, compLit, expected)
 			}
@@ -1640,42 +1803,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	// Keep untyped literals untyped for better error messages
 	// They will be resolved in specific contexts that need concrete types
 
-	// Store the final resultType in the AST node (update if it changed)
-	switch e := expr.(type) {
-	case *ast.BasicLit:
-		e.Type = resultType
-	case *ast.IdentifierExpr:
-		e.Type = resultType
-	case *ast.BinaryExpr:
-		e.Type = resultType
-	case *ast.UnaryExpr:
-		e.Type = resultType
-	case *ast.PostfixExpr:
-		e.Type = resultType
-	case *ast.PrefixExpr:
-		e.Type = resultType
-	case *ast.CallExpr:
-		e.Type = resultType
-	case *ast.SelectorExpr:
-		e.Type = resultType
-	case *ast.IndexExpr:
-		e.Type = resultType
-	case *ast.CastExpr:
-		e.TypeInfo = resultType
-	case *ast.ParenExpr:
-		e.Type = resultType
-	case *ast.ScopeResolutionExpr:
-		e.Type = resultType
-	case *ast.RangeExpr:
-		e.Type = resultType
-	case *ast.CoalescingExpr:
-		e.Type = resultType
-	case *ast.ForkExpr:
-		e.Type = resultType
-	case *ast.FuncLit:
-		e.TypeInfo = resultType
-	case *ast.CompositeLit:
-		e.TypeInfo = resultType
+	if mod != nil {
+		mod.SetExprType(expr, resultType)
 	}
 
 	return resultType
@@ -2065,11 +2194,8 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 // - Checking argument count (regular and variadic functions)
 // - Validating argument types against parameter types
 func checkCallExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) {
-	// 0. If the function being called is a selector (method call), validate it first
-	if selector, ok := expr.Fun.(*ast.SelectorExpr); ok {
-		checkExpr(ctx, mod, selector.X, types.TypeUnknown)
-		checkSelectorExpr(ctx, mod, selector)
-	}
+	// 0. Validate the callee expression (ordering rules, selectors, nested calls, etc.)
+	checkExpr(ctx, mod, expr.Fun, types.TypeUnknown)
 
 	// 1. Infer the type of the expression being called
 	funType := inferExprType(ctx, mod, expr.Fun)

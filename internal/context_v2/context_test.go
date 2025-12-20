@@ -95,7 +95,9 @@ func TestModulePhaseTracking(t *testing.T) {
 		phase.PhaseCollected,
 		phase.PhaseResolved,
 		phase.PhaseTypeChecked,
+		phase.PhaseHIRGenerated,
 		phase.PhaseCFGAnalyzed,
+		phase.PhaseHIRLowered,
 		phase.PhaseCodeGen,
 	}
 
@@ -320,6 +322,8 @@ func TestModulePhaseString(t *testing.T) {
 		{phase.PhaseCollected, "Collected"},
 		{phase.PhaseResolved, "Resolved"},
 		{phase.PhaseTypeChecked, "TypeChecked"},
+		{phase.PhaseHIRGenerated, "HIRGenerated"},
+		{phase.PhaseHIRLowered, "HIRLowered"},
 		{phase.PhaseCodeGen, "CodeGen"},
 	}
 
@@ -445,7 +449,7 @@ func TestComputeTopologicalOrder(t *testing.T) {
 	expected := map[string]bool{"a": true, "b": true, "c": true, "d": true}
 	for _, modName := range order {
 		if !expected[modName] {
-			// may be built-in, 
+			// may be built-in,
 			// check if it's a built-in module
 			if mod, ok := ctx.GetModule(modName); ok && mod.Type == ModuleBuiltin {
 				continue
@@ -466,7 +470,7 @@ func TestComputeTopologicalOrder_NoDependencies(t *testing.T) {
 
 	ctx.ComputeTopologicalOrder()
 	order := ctx.GetModuleNames()
-	
+
 	// skip built-in modules
 	for i, modName := range order {
 		if mod, ok := ctx.GetModule(modName); ok && mod.Type == ModuleBuiltin {
@@ -492,7 +496,7 @@ func TestComputeTopologicalOrder_SingleModule(t *testing.T) {
 
 	ctx.ComputeTopologicalOrder()
 	order := ctx.GetModuleNames()
-	
+
 	// skip built-in modules
 	for i, modName := range order {
 		if mod, ok := ctx.GetModule(modName); ok && mod.Type == ModuleBuiltin {

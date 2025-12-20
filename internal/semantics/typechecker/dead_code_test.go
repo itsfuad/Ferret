@@ -1,9 +1,15 @@
-package typechecker
+package typechecker_test
 
 import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
-	"compiler/internal/semantics/cfganalyzer"
+	"compiler/internal/frontend/lexer"
+	"compiler/internal/frontend/parser"
+	"compiler/internal/hirgen"
+	"compiler/internal/semantics/collector"
+	"compiler/internal/semantics/hircfganalyzer"
+	"compiler/internal/semantics/table"
+	"compiler/internal/semantics/typechecker"
 	"strings"
 	"testing"
 )
@@ -11,8 +17,35 @@ import (
 func parseCollectCheckAndAnalyze(t *testing.T, src string) (*context_v2.Module, *context_v2.CompilerContext) {
 	t.Helper()
 
-	mod, ctx := parseCollectAndCheck(t, src)
-	cfganalyzer.AnalyzeModule(ctx, mod)
+	cfg := &context_v2.Config{
+		ProjectName: "test",
+		ProjectRoot: t.TempDir(),
+		Extension:   ".fer",
+	}
+	ctx := context_v2.New(cfg, false)
+	mod := &context_v2.Module{
+		FilePath:       "test.fer",
+		Content:        src,
+		ModuleScope:    table.NewSymbolTable(ctx.Universe),
+		ImportPath:     "test",
+		Imports:        make(map[string]*context_v2.Import),
+		ImportAliasMap: make(map[string]string),
+	}
+	mod.CurrentScope = mod.ModuleScope
+
+	diag := diagnostics.NewDiagnosticBag(mod.FilePath)
+	lex := lexer.New(mod.FilePath, src, diag)
+	tokens := lex.Tokenize(false)
+	mod.AST = parser.Parse(tokens, mod.FilePath, diag)
+
+	ctx.AddModule(mod.ImportPath, mod)
+
+	collector.CollectModule(ctx, mod)
+	typechecker.TypeCheckTopLevelSignatures(ctx, mod)
+	typechecker.CheckModule(ctx, mod)
+
+	hirMod := hirgen.New(ctx, mod).GenerateModule()
+	hircfganalyzer.AnalyzeModule(ctx, mod, hirMod)
 	return mod, ctx
 }
 

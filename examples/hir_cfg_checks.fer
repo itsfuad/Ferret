@@ -1,0 +1,32 @@
+fn main() {
+    // Constant condition (dead branch).
+    if true {
+        let ok := 1;
+    } else {
+        let never := 2;
+    }
+
+    // Unreachable code after return.
+    if 1 < 2 {
+        return;
+        let unreachable := 3;
+    }
+
+    // Infinite loop: while true with no escape.
+    let i := 0;
+    while true {
+        i = i + 1;
+    }
+
+    // Infinite loop: wrong direction modification.
+    let j := 0;
+    while j < 10 {
+        j = j - 1;
+    }
+
+    // Infinite loop: condition variable never modified.
+    let k := 0;
+    while k < 10 {
+        let temp := k + 1;
+    }
+}
