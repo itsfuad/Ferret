@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"compiler/colors"
@@ -92,8 +93,30 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("compilation failed with errors")
 	}
 
+	backend := strings.ToLower(strings.TrimSpace(p.ctx.Config.CodegenBackend))
+	if p.ctx.Config.SkipCodegen || backend == "" || backend == "none" {
+		if p.ctx.Config.Debug {
+			colors.YELLOW.Printf("\n[Skipping Code Generation] Codegen disabled (backend=%q)\n", backend)
+			colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
+		}
+		return nil
+	}
+
+	switch backend {
+	case "c":
+		if err := p.runCodegenPhase(); err != nil {
+			return err
+		}
+	case "qbe":
+		if err := p.runQBECodegenPhase(); err != nil {
+			return err
+		}
+	default:
+		p.ctx.ReportError(fmt.Sprintf("unknown codegen backend: %s", backend), nil)
+		return fmt.Errorf("unknown codegen backend: %s", backend)
+	}
+
 	if p.ctx.Config.Debug {
-		colors.YELLOW.Printf("\n[Skipping Code Generation] C backend detached (MIR is final for now)\n")
 		colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
 	}
 

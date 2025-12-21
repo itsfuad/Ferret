@@ -17,6 +17,10 @@ import (
 
 // runCodegenPhase runs code generation on all MIR-generated modules.
 func (p *Pipeline) runCodegenPhase() error {
+	if p.ctx.HasErrors() {
+		return fmt.Errorf("skipping codegen due to previous errors")
+	}
+
 	outputPath := p.ctx.Config.OutputPath
 	outputDir := filepath.Dir(outputPath)
 

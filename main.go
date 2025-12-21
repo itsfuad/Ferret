@@ -21,6 +21,7 @@ func main() {
 	outputPath := flag.String("o", "", "Output executable path")
 	keepCFile := flag.Bool("c", false, "Keep generated C files")
 	typecheckOnly := flag.Bool("t", false, "Stop after type checking (skip codegen)")
+	backend := flag.String("backend", "none", "Codegen backend: none, c, qbe")
 	flag.BoolVar(debug, "debug", false, "Enable debug output")
 	flag.BoolVar(showVersion, "version", false, "Show version")
 	flag.BoolVar(help, "help", false, "Show help")
@@ -76,6 +77,7 @@ func main() {
 		OutputExecutable: *outputPath,
 		KeepCFile:        *keepCFile,
 		SkipCodegen:      *typecheckOnly,
+		CodegenBackend:   *backend,
 	})
 
 	// Exit code

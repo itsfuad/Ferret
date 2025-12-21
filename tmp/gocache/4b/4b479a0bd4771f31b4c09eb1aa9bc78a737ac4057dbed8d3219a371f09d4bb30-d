@@ -1,0 +1,9 @@
+./codegen_phase.go
+./hir_lowering_phase.go
+./hir_phase.go
+./mir_phase.go
+./parse.go
+./phases.go
+./pipeline.go
+./qbe_codegen_phase.go
+./summary.go
