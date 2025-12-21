@@ -864,7 +864,7 @@ func markForIteratorIndexReadOnly(mod *context_v2.Module, iterator ast.Node) {
 	}
 
 	if sym, ok := mod.CurrentScope.GetSymbol(first.Name.Name); ok {
-		sym.IsLoopIndex = true
+		sym.IsReadonly = true
 	}
 }
 
@@ -940,11 +940,12 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 			if e.Catch.ErrIdent != nil {
 				// catch identifier is new on handler scope, so parent variable wont used if same name
 				mod.CurrentScope.Declare(e.Catch.ErrIdent.Name, &symbols.Symbol{
-					Name:     e.Catch.ErrIdent.Name,
-					Kind:     symbols.SymbolVariable,
-					Type:     types.TypeUnknown,
-					Decl:     e.Catch.ErrIdent,
-					Exported: false, // catch identifier is not exported
+					Name:       e.Catch.ErrIdent.Name,
+					Kind:       symbols.SymbolVariable,
+					Type:       types.TypeUnknown,
+					Decl:       e.Catch.ErrIdent,
+					Exported:   false, // catch identifier is not exported
+					IsReadonly: true,
 				})
 			}
 

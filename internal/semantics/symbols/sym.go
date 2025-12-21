@@ -30,7 +30,7 @@ type Symbol struct {
 	DeclaredScope SymbolTable            // Scope where this symbol was declared
 	Methods       map[string]*MethodInfo // Methods attached to this named type (only for SymbolType)
 	ConstValue    ConstValue             // Compile-time known value (for constants and const variables)
-	IsLoopIndex   bool                   // True for read-only loop index variables
+	IsReadonly    bool                   // True for read-only variables (loop index, catch error, etc.)
 
 	// Native function support (for builtin functions implemented in Go/C)
 	IsNative   bool   // true if this function is implemented in native code (Go/C)

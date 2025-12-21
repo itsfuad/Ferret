@@ -1536,12 +1536,12 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 				)
 				return
 			}
-			if sym.IsLoopIndex {
+			if sym.IsReadonly {
 				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot modify loop index '%s'", ident.Name)).
+					diagnostics.NewError(fmt.Sprintf("cannot modify read-only variable '%s'", ident.Name)).
 						WithCode(diagnostics.ErrInvalidAssignment).
-						WithPrimaryLabel(stmt.Lhs.Loc(), "modifications to loop index has no effect").
-						WithNote("loop index variable is updated on each iteration, so your changes won't have any effect"),
+						WithPrimaryLabel(stmt.Lhs.Loc(), "read-only variable").
+						WithNote("loop indices and catch errors are read-only"),
 				)
 				return
 			}
@@ -1672,12 +1672,12 @@ func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 				)
 				return
 			}
-			if sym.IsLoopIndex {
+			if sym.IsReadonly {
 				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot modify loop index '%s'", ident.Name)).
+					diagnostics.NewError(fmt.Sprintf("cannot modify read-only variable '%s'", ident.Name)).
 						WithCode(diagnostics.ErrInvalidAssignment).
-						WithPrimaryLabel(target.Loc(), "modifications to loop index has no effect").
-						WithNote("loop index variable is updated on each iteration, so your changes won't have any effect"),
+						WithPrimaryLabel(target.Loc(), "read-only variable").
+						WithNote("loop indices and catch errors are read-only"),
 				)
 				return
 			}
