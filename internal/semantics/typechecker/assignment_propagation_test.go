@@ -73,9 +73,10 @@ func TestConstantPropagationThroughAssignments(t *testing.T) {
 				let arr: [10]i32 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 				let i: i32 = 5;  // Explicitly typed to match parameter n
 				i = n;  // i is now non-constant
-				let x := arr[i];  // No error - can't determine at compile time
+				let x := arr[i];  // Error - index is not compile-time constant
 			}`,
-			expectError: false,
+			expectError:   true,
+			errorContains: "compile-time constant",
 		},
 		{
 			name: "constant propagation with subtraction",

@@ -77,6 +77,14 @@ func (p *Pipeline) Run() error {
 		return err
 	}
 
+	if p.ctx.Config.Debug {
+		colors.CYAN.Printf("\n[Phase 8] MIR Generation\n")
+	}
+
+	if err := p.runMIRGenerationPhase(); err != nil {
+		return err
+	}
+
 	if p.ctx.HasErrors() {
 		if p.ctx.Config.Debug {
 			colors.YELLOW.Printf("\n[Skipping Code Generation] Errors detected in previous phases\n")
@@ -84,23 +92,8 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("compilation failed with errors")
 	}
 
-	if p.ctx.Config.SkipCodegen {
-		return nil
-	}
-
 	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 8] Code Generation\n")
-	}
-
-	if err := p.runCodegenPhase(); err != nil {
-		return err
-	}
-
-	if p.ctx.HasErrors() {
-		return fmt.Errorf("compilation failed with errors")
-	}
-
-	if p.ctx.Config.Debug {
+		colors.YELLOW.Printf("\n[Skipping Code Generation] C backend detached (MIR is final for now)\n")
 		colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
 	}
 

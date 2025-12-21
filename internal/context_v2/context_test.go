@@ -98,6 +98,7 @@ func TestModulePhaseTracking(t *testing.T) {
 		phase.PhaseHIRGenerated,
 		phase.PhaseCFGAnalyzed,
 		phase.PhaseHIRLowered,
+		phase.PhaseMIRGenerated,
 		phase.PhaseCodeGen,
 	}
 
@@ -324,6 +325,7 @@ func TestModulePhaseString(t *testing.T) {
 		{phase.PhaseTypeChecked, "TypeChecked"},
 		{phase.PhaseHIRGenerated, "HIRGenerated"},
 		{phase.PhaseHIRLowered, "HIRLowered"},
+		{phase.PhaseMIRGenerated, "MIRGenerated"},
 		{phase.PhaseCodeGen, "CodeGen"},
 	}
 

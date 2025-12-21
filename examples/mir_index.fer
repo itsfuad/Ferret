@@ -1,0 +1,6 @@
+// MIR smoke test for array indexing
+fn main() {
+    let a: [3]i32 = [1, 2, 3];
+    let x := a[1];
+    a[2] = x + 5;
+}

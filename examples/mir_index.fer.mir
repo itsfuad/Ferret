@@ -1,0 +1,25 @@
+module examples/mir_index
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca [3]i32
+    %t2 = const i32 1
+    %t3 = ptr_add i32 %t1, 0
+    store %t3, %t2
+    %t4 = const i32 2
+    %t5 = ptr_add i32 %t1, 4
+    store %t5, %t4
+    %t6 = const i32 3
+    %t7 = ptr_add i32 %t1, 8
+    store %t7, %t6
+    %t8 = alloca i32
+    %t9 = ptr_add i32 %t1, 4
+    %t10 = load i32 %t9
+    store %t8, %t10
+    %t11 = ptr_add i32 %t1, 8
+    %t12 = load i32 %t8
+    %t13 = const i32 5
+    %t14 = + i32 %t12, %t13
+    store %t11, %t14
+    ret
+}

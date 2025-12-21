@@ -106,12 +106,13 @@ func TestFixedArrayBoundsChecking(t *testing.T) {
 			errorContains: "array index out of bounds",
 		},
 		{
-			name: "Runtime index - no error",
+			name: "Runtime index - error",
 			src: `fn test(i: i32) {
 				let arr: [5]i32 = [1, 2, 3, 4, 5];
 				let x := arr[i];
 			}`,
-			expectError: false,
+			expectError:   true,
+			errorContains: "compile-time constant",
 		},
 		{
 			name: "Dynamic array - no bounds checking",

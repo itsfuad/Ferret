@@ -4,7 +4,7 @@ package phase
 //
 // Phase progression must be sequential and respect dependencies:
 // - NotStarted -> Lexed -> Parsed (currently implemented)
-// - Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> CodeGen
+// - Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> MIRGenerated -> CodeGen
 //
 // Phase transitions are validated using AdvanceModulePhase() which checks
 // that prerequisites are satisfied via the phasePrerequisites map.
@@ -24,6 +24,7 @@ const (
 	PhaseHIRGenerated                    // HIR generation complete
 	PhaseCFGAnalyzed                     // Control flow analysis complete
 	PhaseHIRLowered                      // HIR lowering complete
+	PhaseMIRGenerated                    // MIR generation complete
 	PhaseCodeGen                         // Code generation complete
 )
 
@@ -38,7 +39,8 @@ var PhasePrerequisites = map[ModulePhase]ModulePhase{
 	PhaseHIRGenerated: PhaseTypeChecked,
 	PhaseCFGAnalyzed:  PhaseHIRGenerated,
 	PhaseHIRLowered:   PhaseCFGAnalyzed,
-	PhaseCodeGen:      PhaseHIRLowered,
+	PhaseMIRGenerated: PhaseHIRLowered,
+	PhaseCodeGen:      PhaseMIRGenerated,
 }
 
 func (p ModulePhase) String() string {
@@ -61,6 +63,8 @@ func (p ModulePhase) String() string {
 		return "CFGAnalyzed"
 	case PhaseHIRLowered:
 		return "HIRLowered"
+	case PhaseMIRGenerated:
+		return "MIRGenerated"
 	case PhaseCodeGen:
 		return "CodeGen"
 	default:

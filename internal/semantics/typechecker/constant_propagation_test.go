@@ -71,13 +71,14 @@ func TestConstantPropagationArrayBounds(t *testing.T) {
 			errorContains: "array index out of bounds",
 		},
 		{
-			name: "Non-constant variable - no error",
+			name: "Non-constant variable - error",
 			src: `fn test(n: i32) {
 				let arr: [5]i32 = [1, 2, 3, 4, 5];
 				let i := n;
 				let x := arr[i];
 			}`,
-			expectError: false,
+			expectError:   true,
+			errorContains: "compile-time constant",
 		},
 		{
 			name: "Constant multiplication",

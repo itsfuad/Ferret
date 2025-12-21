@@ -60,7 +60,7 @@ func TestPipelineBasic(t *testing.T) {
 // - Issue 1: No double parsing (each file parsed exactly once)
 // - Issue 2: Thread-safe diagnostics (stable across runs)
 // - Issue 3: No duplicate error messages
-// - Phase invariants: All modules advance through the full pipeline (Lexed -> Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered)
+// - Phase invariants: All modules advance through the full pipeline (Lexed -> Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> MIRGenerated)
 func TestPipelineInvariants(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
@@ -355,7 +355,7 @@ const B := 2;`
 }
 
 // TestPhasePrerequisites validates phase ordering.
-// All modules should advance through: Lexed -> Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered
+// All modules should advance through: Lexed -> Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> MIRGenerated
 func TestPhasePrerequisites(t *testing.T) {
 	tmpDir := t.TempDir()
 

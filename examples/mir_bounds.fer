@@ -1,0 +1,10 @@
+// MIR bounds check smoke test for fixed arrays
+import "std/io";
+
+fn main() {
+    let arr: [3]i32 = [1, 2, 3];
+    let a := arr[-1];
+    arr[1] = a + 4;
+
+    io::Println(a);
+}

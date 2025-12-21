@@ -1,0 +1,11 @@
+// MIR smoke test for match lowering
+fn main() {
+    let v: i32 = 2;
+    let out: i32 = 0;
+
+    match v {
+        1 => { out = 10; }
+        2 => { out = 20; }
+        _ => { out = 30; }
+    }
+}

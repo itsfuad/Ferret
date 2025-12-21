@@ -2619,9 +2619,9 @@ func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	}
 }
 
-// checkArrayBounds validates array indexing for compile-time bounds checking
-// For fixed-size arrays with constant indices, reports errors for out-of-bounds access
-// For dynamic arrays or runtime indices, skips validation (runtime check)
+// checkArrayBounds validates array indexing for compile-time bounds checking.
+// Fixed-size arrays require compile-time constant indices and must be in range.
+// Dynamic arrays are not checked here.
 func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, indexExpr *ast.IndexExpr) {
 	// Get the type of the array being indexed
 	arrayType := inferExprType(ctx, mod, indexExpr.X)
@@ -2631,7 +2631,6 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 	arrType, ok := arrayType.(*types.ArrayType)
 	if !ok || arrType.Length < 0 {
 		// Not an array, or dynamic array - skip bounds checking
-		// Dynamic arrays grow automatically, negative indices access from end
 		return
 	}
 
@@ -2639,7 +2638,12 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 	// This handles not just literals like `arr[10]`, but also variables with known values like `let i := 10; arr[i]`
 	indexValue, isConstant := consteval.EvaluateAsInt(ctx, mod, indexExpr.Index)
 	if !isConstant {
-		// Runtime value - cannot check at compile time
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("fixed array index must be a compile-time constant").
+				WithCode(diagnostics.ErrArrayIndexNotConst).
+				WithPrimaryLabel(indexExpr.Index.Loc(), "non-constant index").
+				WithHelp("use a constant index or switch to a dynamic array []T for runtime indexing"),
+		)
 		return
 	}
 

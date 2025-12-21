@@ -1,0 +1,28 @@
+module examples/mir_map_index
+
+fn use_map(m: map[str]i32) -> i32? {
+  block b1 entry:
+    %t2 = alloca i32?
+    %t3 = alloca map[str]i32
+    store %t3, %t1
+    %t4 = load map[str]i32 %t3
+    %t5 = const str alice
+    %t6 = map_get i32? %t4, %t5
+    store %t2, %t6
+    %t7 = load i32? %t2
+    ret %t7
+}
+
+fn set_map(m: map[str]i32, value: i32) -> void {
+  block b2 entry:
+    %t10 = alloca map[str]i32
+    store %t10, %t8
+    %t11 = load map[str]i32 %t10
+    %t12 = const str bob
+    %t13 = alloca i32?
+    store %t13, %t9
+    %t14 = load i32? %t13
+    %t15 = optional_some i32? %t14
+    map_set %t11, %t12, %t15
+    ret
+}

@@ -62,6 +62,7 @@ func Compile(opts *Options) Result {
 
 		entryDir := filepath.Dir(absPath)
 		projectName = filepath.Base(entryDir)
+		projectRoot = entryDir
 	}
 
 	execPath, _ := os.Executable()
