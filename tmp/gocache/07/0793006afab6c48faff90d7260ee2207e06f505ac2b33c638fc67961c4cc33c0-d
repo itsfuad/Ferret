@@ -1,4 +1,0 @@
-./compatibility.go
-./inference.go
-./narrowing.go
-./typechecker.go

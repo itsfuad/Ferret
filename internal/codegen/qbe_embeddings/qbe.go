@@ -79,7 +79,8 @@ func (g *Generator) emitFunction(fn *mir.Function) {
 	g.buf.WriteString(" $" + fnName + "(")
 
 	for i, param := range fn.Params {
-		paramType, err := g.qbeType(param.Type)
+		paramSem := normalizeLargeValueType(param.Type)
+		paramType, err := g.qbeType(paramSem)
 		if err != nil {
 			g.reportError(err.Error(), &param.Location)
 			paramType = "w"
@@ -88,7 +89,7 @@ func (g *Generator) emitFunction(fn *mir.Function) {
 			g.buf.WriteString(", ")
 		}
 		g.buf.WriteString(paramType + " " + g.valueName(param.ID))
-		g.valueTypes[param.ID] = param.Type
+		g.valueTypes[param.ID] = paramSem
 	}
 
 	g.buf.WriteString(") {\n")

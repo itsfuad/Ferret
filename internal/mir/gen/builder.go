@@ -3,6 +3,7 @@ package gen
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"compiler/internal/hir"
 	"compiler/internal/hir/consteval"
@@ -11,6 +12,7 @@ import (
 	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
+	"compiler/internal/utils/numeric"
 )
 
 type functionBuilder struct {
@@ -21,6 +23,8 @@ type functionBuilder struct {
 	slots        map[*symbols.Symbol]mir.ValueID
 	ptrElem      map[mir.ValueID]types.SemType
 	loopStack    []loopTargets
+	retParam     mir.ValueID
+	retType      types.SemType
 }
 
 func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
@@ -31,6 +35,7 @@ func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
 		slots:        make(map[*symbols.Symbol]mir.ValueID),
 		ptrElem:      make(map[mir.ValueID]types.SemType),
 		loopStack:    nil,
+		retParam:     mir.InvalidValue,
 	}
 }
 
@@ -42,6 +47,15 @@ func (b *functionBuilder) buildFuncBody(body *hir.Block) {
 		if param.Name != "" {
 			b.paramsByName[param.Name] = param.ID
 		}
+	}
+	if len(b.fn.Params) > 0 && b.fn.Params[0].Name == "__ret" {
+		b.retParam = b.fn.Params[0].ID
+		if ref, ok := types.UnwrapType(b.fn.Params[0].Type).(*types.ReferenceType); ok {
+			b.retType = ref.Inner
+		} else {
+			b.retType = b.fn.Params[0].Type
+		}
+		b.ptrElem[b.retParam] = b.retType
 	}
 
 	if body != nil {
@@ -229,6 +243,13 @@ func (b *functionBuilder) lowerReturn(stmt *hir.ReturnStmt) {
 		b.current.Term = &mir.Unreachable{Location: stmt.Location}
 		return
 	}
+
+	if b.retParam != mir.InvalidValue {
+		b.emitStore(b.retParam, val, stmt.Location)
+		b.current.Term = &mir.Return{HasValue: false, Location: stmt.Location}
+		return
+	}
+
 	b.current.Term = &mir.Return{HasValue: true, Value: val, Location: stmt.Location}
 }
 
@@ -411,6 +432,9 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 
 	switch e := expr.(type) {
 	case *hir.Literal:
+		if isLargePrimitiveType(e.Type) {
+			return b.emitLargeConst(e.Type, e.Value, e.Location)
+		}
 		return b.emitConst(e.Type, e.Value, e.Location)
 	case *hir.Ident:
 		return b.loadIdent(e)
@@ -534,6 +558,12 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		if left == mir.InvalidValue || right == mir.InvalidValue {
 			return mir.InvalidValue
 		}
+		if isLargePrimitiveType(b.exprType(e.X)) {
+			if isCompareOp(e.Op.Kind) {
+				return b.emitLargeCompare(e.Op.Kind, left, right, b.exprType(e.X), e.Location)
+			}
+			return b.emitLargeBinary(e.Op.Kind, left, right, b.exprType(e.X), e.Location)
+		}
 		return b.emitBinary(e.Op.Kind, left, right, e.Type, e.Location)
 	case *hir.UnaryExpr:
 		operand := b.lowerExpr(e.X)
@@ -556,7 +586,7 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		if value == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		return b.emitCast(value, e.Type, e.Location)
+		return b.castValue(value, b.exprType(e.X), e.Type, e.Location)
 	case *hir.CoalescingExpr:
 		cond := b.lowerExpr(e.Cond)
 		if cond == mir.InvalidValue {
@@ -618,12 +648,18 @@ func (b *functionBuilder) lowerPrefix(expr *hir.PrefixExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	one := b.emitConst(b.exprType(expr.X), "1", expr.Location)
+	typ := b.exprType(expr.X)
+	one := mir.InvalidValue
+	if isLargePrimitiveType(typ) {
+		one = b.emitLargeConst(typ, "1", expr.Location)
+	} else {
+		one = b.emitConst(typ, "1", expr.Location)
+	}
 	op := tokens.PLUS_TOKEN
 	if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
 		op = tokens.MINUS_TOKEN
 	}
-	next := b.emitBinary(op, cur, one, b.exprType(expr.X), expr.Location)
+	next := b.emitBinary(op, cur, one, typ, expr.Location)
 	b.emitStore(addr, next, expr.Location)
 	return next
 }
@@ -651,12 +687,18 @@ func (b *functionBuilder) lowerPostfix(expr *hir.PostfixExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	one := b.emitConst(b.exprType(expr.X), "1", expr.Location)
+	typ := b.exprType(expr.X)
+	one := mir.InvalidValue
+	if isLargePrimitiveType(typ) {
+		one = b.emitLargeConst(typ, "1", expr.Location)
+	} else {
+		one = b.emitConst(typ, "1", expr.Location)
+	}
 	op := tokens.PLUS_TOKEN
 	if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
 		op = tokens.MINUS_TOKEN
 	}
-	next := b.emitBinary(op, cur, one, b.exprType(expr.X), expr.Location)
+	next := b.emitBinary(op, cur, one, typ, expr.Location)
 	b.emitStore(addr, next, expr.Location)
 	return cur
 }
@@ -682,6 +724,22 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 	}
 
 	retType := expr.Type
+	if isLargePrimitiveType(retType) {
+		out := b.emitAlloca(retType, expr.Location)
+		callArgs := append([]mir.ValueID{out}, args...)
+		b.emitInstr(&mir.Call{
+			Result:   mir.InvalidValue,
+			Target:   target,
+			Args:     callArgs,
+			Type:     types.TypeVoid,
+			Location: expr.Location,
+		})
+		if expr.Catch != nil {
+			b.reportUnsupported("catch clause", &expr.Location)
+		}
+		return out
+	}
+
 	result := mir.InvalidValue
 	if retType != nil && !retType.Equals(types.TypeVoid) {
 		result = b.gen.nextValueID()
@@ -1250,7 +1308,215 @@ func (b *functionBuilder) emitConst(typ types.SemType, value string, loc source.
 	return id
 }
 
+func (b *functionBuilder) emitMemcpy(dst, src mir.ValueID, typ types.SemType, loc source.Location) {
+	if typ == nil || typ.Size() <= 0 {
+		b.reportUnsupported("memcpy size", &loc)
+		return
+	}
+	size := strconv.FormatInt(int64(typ.Size()), 10)
+	sizeVal := b.emitConst(types.TypeU64, size, loc)
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   "ferret_memcpy",
+		Args:     []mir.ValueID{dst, src, sizeVal},
+		Type:     types.TypeVoid,
+		Location: loc,
+	})
+}
+
+func (b *functionBuilder) emitLargeConst(typ types.SemType, value string, loc source.Location) mir.ValueID {
+	typeName, ok := largePrimitiveName(typ)
+	if !ok {
+		b.reportUnsupported("large const", &loc)
+		return mir.InvalidValue
+	}
+	if isLargeIntName(typeName) {
+		clean := strings.TrimSpace(value)
+		sign := ""
+		if strings.HasPrefix(clean, "-") {
+			sign = "-"
+			clean = strings.TrimPrefix(clean, "-")
+		}
+		if bigInt, err := numeric.StringToBigInt(clean); err == nil {
+			if sign == "-" {
+				bigInt.Neg(bigInt)
+			}
+			value = bigInt.String()
+		} else {
+			value = strings.ReplaceAll(value, "_", "")
+		}
+	} else {
+		value = strings.ReplaceAll(value, "_", "")
+	}
+	out := b.emitAlloca(typ, loc)
+	lit := b.emitConst(types.TypeString, value, loc)
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   "ferret_" + typeName + "_from_string_ptr",
+		Args:     []mir.ValueID{lit, out},
+		Type:     types.TypeVoid,
+		Location: loc,
+	})
+	return out
+}
+
+func (b *functionBuilder) emitLargeBinary(op tokens.TOKEN, left, right mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	typeName, ok := largePrimitiveName(typ)
+	if !ok {
+		b.reportUnsupported("large binary", &loc)
+		return mir.InvalidValue
+	}
+	fn, ok := largeBinaryFunc(op, typeName)
+	if !ok {
+		b.reportUnsupported(fmt.Sprintf("binary op %s", op), &loc)
+		return mir.InvalidValue
+	}
+	out := b.emitAlloca(typ, loc)
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   fn,
+		Args:     []mir.ValueID{left, right, out},
+		Type:     types.TypeVoid,
+		Location: loc,
+	})
+	return out
+}
+
+func (b *functionBuilder) emitLargeCompare(op tokens.TOKEN, left, right mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	typeName, ok := largePrimitiveName(typ)
+	if !ok {
+		b.reportUnsupported("large compare", &loc)
+		return mir.InvalidValue
+	}
+
+	switch op {
+	case tokens.DOUBLE_EQUAL_TOKEN:
+		return b.emitLargeCompareCall(typeName, "eq", left, right, loc)
+	case tokens.NOT_EQUAL_TOKEN:
+		eq := b.emitLargeCompareCall(typeName, "eq", left, right, loc)
+		return b.emitUnary(tokens.NOT_TOKEN, eq, types.TypeBool, loc)
+	case tokens.LESS_TOKEN:
+		return b.emitLargeCompareCall(typeName, "lt", left, right, loc)
+	case tokens.GREATER_TOKEN:
+		return b.emitLargeCompareCall(typeName, "gt", left, right, loc)
+	case tokens.LESS_EQUAL_TOKEN:
+		lt := b.emitLargeCompareCall(typeName, "lt", left, right, loc)
+		eq := b.emitLargeCompareCall(typeName, "eq", left, right, loc)
+		return b.emitBinary(tokens.OR_TOKEN, lt, eq, types.TypeBool, loc)
+	case tokens.GREATER_EQUAL_TOKEN:
+		gt := b.emitLargeCompareCall(typeName, "gt", left, right, loc)
+		eq := b.emitLargeCompareCall(typeName, "eq", left, right, loc)
+		return b.emitBinary(tokens.OR_TOKEN, gt, eq, types.TypeBool, loc)
+	default:
+		b.reportUnsupported(fmt.Sprintf("compare op %s", op), &loc)
+		return mir.InvalidValue
+	}
+}
+
+func (b *functionBuilder) emitLargeCompareCall(typeName, op string, left, right mir.ValueID, loc source.Location) mir.ValueID {
+	id := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   id,
+		Target:   "ferret_" + typeName + "_" + op + "_ptr",
+		Args:     []mir.ValueID{left, right},
+		Type:     types.TypeBool,
+		Location: loc,
+	})
+	return id
+}
+
+func (b *functionBuilder) emitLargeUnary(op tokens.TOKEN, value mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	switch op {
+	case tokens.PLUS_TOKEN:
+		return value
+	case tokens.MINUS_TOKEN:
+		zero := b.emitLargeConst(typ, "0", loc)
+		return b.emitLargeBinary(tokens.MINUS_TOKEN, zero, value, typ, loc)
+	default:
+		b.reportUnsupported(fmt.Sprintf("unary op %s", op), &loc)
+		return mir.InvalidValue
+	}
+}
+
+func (b *functionBuilder) emitLargeCast(value mir.ValueID, from, to types.SemType, loc source.Location) mir.ValueID {
+	fromName, fromLarge := largePrimitiveName(from)
+	toName, toLarge := largePrimitiveName(to)
+
+	if fromLarge && toLarge {
+		if fromName == toName {
+			return value
+		}
+		out := b.emitAlloca(to, loc)
+		str := b.emitLargeToString(fromName, value, loc)
+		b.emitInstr(&mir.Call{
+			Result:   mir.InvalidValue,
+			Target:   "ferret_" + toName + "_from_string_ptr",
+			Args:     []mir.ValueID{str, out},
+			Type:     types.TypeVoid,
+			Location: loc,
+		})
+		return out
+	}
+
+	if toLarge && !fromLarge {
+		fn, argType, ok := largeFromSmallFunc(toName, from)
+		if !ok {
+			b.reportUnsupported("cast to large type", &loc)
+			return mir.InvalidValue
+		}
+		if argType != nil && !argType.Equals(from) {
+			value = b.castValue(value, from, argType, loc)
+		}
+		out := b.emitAlloca(to, loc)
+		b.emitInstr(&mir.Call{
+			Result:   mir.InvalidValue,
+			Target:   fn,
+			Args:     []mir.ValueID{value, out},
+			Type:     types.TypeVoid,
+			Location: loc,
+		})
+		return out
+	}
+
+	if fromLarge && !toLarge {
+		fn, retType, ok := largeToSmallFunc(fromName, to)
+		if !ok {
+			b.reportUnsupported("cast from large type", &loc)
+			return mir.InvalidValue
+		}
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.Call{
+			Result:   id,
+			Target:   fn,
+			Args:     []mir.ValueID{value},
+			Type:     retType,
+			Location: loc,
+		})
+		if retType == nil || to == nil || retType.Equals(to) {
+			return id
+		}
+		return b.emitCast(id, to, loc)
+	}
+
+	return b.emitCast(value, to, loc)
+}
+
+func (b *functionBuilder) emitLargeToString(typeName string, value mir.ValueID, loc source.Location) mir.ValueID {
+	id := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   id,
+		Target:   "ferret_" + typeName + "_to_string_ptr",
+		Args:     []mir.ValueID{value},
+		Type:     types.TypeString,
+		Location: loc,
+	})
+	return id
+}
+
 func (b *functionBuilder) emitBinary(op tokens.TOKEN, left, right mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	if isLargePrimitiveType(typ) {
+		return b.emitLargeBinary(op, left, right, typ, loc)
+	}
 	id := b.gen.nextValueID()
 	b.emitInstr(&mir.Binary{
 		Result:   id,
@@ -1264,6 +1530,9 @@ func (b *functionBuilder) emitBinary(op tokens.TOKEN, left, right mir.ValueID, t
 }
 
 func (b *functionBuilder) emitUnary(op tokens.TOKEN, value mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	if isLargePrimitiveType(typ) {
+		return b.emitLargeUnary(op, value, typ, loc)
+	}
 	id := b.gen.nextValueID()
 	b.emitInstr(&mir.Unary{
 		Result:   id,
@@ -1298,6 +1567,9 @@ func (b *functionBuilder) emitAlloca(typ types.SemType, loc source.Location) mir
 }
 
 func (b *functionBuilder) emitLoad(addr mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	if isLargePrimitiveType(typ) {
+		return addr
+	}
 	id := b.gen.nextValueID()
 	b.emitInstr(&mir.Load{
 		Result:   id,
@@ -1312,6 +1584,10 @@ func (b *functionBuilder) emitLoad(addr mir.ValueID, typ types.SemType, loc sour
 }
 
 func (b *functionBuilder) emitStore(addr, value mir.ValueID, loc source.Location) {
+	if elem, ok := b.ptrElem[addr]; ok && isLargePrimitiveType(elem) {
+		b.emitMemcpy(addr, value, elem, loc)
+		return
+	}
 	b.emitInstr(&mir.Store{
 		Addr:     addr,
 		Value:    value,
@@ -1495,6 +1771,9 @@ func (b *functionBuilder) castValue(value mir.ValueID, from, to types.SemType, l
 	if from.Equals(to) {
 		return value
 	}
+	if isLargePrimitiveType(from) || isLargePrimitiveType(to) {
+		return b.emitLargeCast(value, from, to, loc)
+	}
 	return b.emitCast(value, to, loc)
 }
 
@@ -1522,4 +1801,93 @@ func assignTokenToBinary(token tokens.TOKEN) tokens.TOKEN {
 	default:
 		return ""
 	}
+}
+
+func isCompareOp(op tokens.TOKEN) bool {
+	switch op {
+	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN,
+		tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
+		return true
+	default:
+		return false
+	}
+}
+
+func largeBinaryFunc(op tokens.TOKEN, typeName string) (string, bool) {
+	switch op {
+	case tokens.PLUS_TOKEN:
+		return "ferret_" + typeName + "_add_ptr", true
+	case tokens.MINUS_TOKEN:
+		return "ferret_" + typeName + "_sub_ptr", true
+	case tokens.MUL_TOKEN:
+		return "ferret_" + typeName + "_mul_ptr", true
+	case tokens.DIV_TOKEN:
+		return "ferret_" + typeName + "_div_ptr", true
+	case tokens.MOD_TOKEN:
+		if isLargeIntName(typeName) {
+			return "ferret_" + typeName + "_mod_ptr", true
+		}
+	case tokens.BIT_AND_TOKEN:
+		if isLargeIntName(typeName) {
+			return "ferret_" + typeName + "_and_ptr", true
+		}
+	case tokens.BIT_OR_TOKEN:
+		if isLargeIntName(typeName) {
+			return "ferret_" + typeName + "_or_ptr", true
+		}
+	case tokens.BIT_XOR_TOKEN:
+		if isLargeIntName(typeName) {
+			return "ferret_" + typeName + "_xor_ptr", true
+		}
+	}
+	return "", false
+}
+
+func largeFromSmallFunc(toName string, from types.SemType) (string, types.SemType, bool) {
+	if from == nil {
+		return "", nil, false
+	}
+	from = types.UnwrapType(from)
+	if prim, ok := from.(*types.PrimitiveType); ok {
+		if !types.IsNumericTypeName(prim.GetName()) {
+			return "", nil, false
+		}
+		switch toName {
+		case string(types.TYPE_I128), string(types.TYPE_I256):
+			return "ferret_" + toName + "_from_i64_ptr", types.TypeI64, true
+		case string(types.TYPE_U128), string(types.TYPE_U256):
+			return "ferret_" + toName + "_from_u64_ptr", types.TypeU64, true
+		case string(types.TYPE_F128), string(types.TYPE_F256):
+			return "ferret_" + toName + "_from_f64_ptr", types.TypeF64, true
+		}
+	}
+	return "", nil, false
+}
+
+func largeToSmallFunc(fromName string, to types.SemType) (string, types.SemType, bool) {
+	if to == nil {
+		return "", nil, false
+	}
+	to = types.UnwrapType(to)
+	prim, ok := to.(*types.PrimitiveType)
+	if !ok {
+		return "", nil, false
+	}
+	if isLargeFloatName(fromName) {
+		if types.IsFloatTypeName(prim.GetName()) || types.IsIntegerTypeName(prim.GetName()) {
+			return "ferret_" + fromName + "_to_f64_ptr", types.TypeF64, true
+		}
+	}
+	if isLargeIntName(fromName) {
+		suffix := "i64"
+		retType := types.TypeI64
+		if fromName == string(types.TYPE_U128) || fromName == string(types.TYPE_U256) {
+			suffix = "u64"
+			retType = types.TypeU64
+		}
+		if types.IsIntegerTypeName(prim.GetName()) || types.IsFloatTypeName(prim.GetName()) {
+			return "ferret_" + fromName + "_to_" + suffix + "_ptr", retType, true
+		}
+	}
+	return "", nil, false
 }

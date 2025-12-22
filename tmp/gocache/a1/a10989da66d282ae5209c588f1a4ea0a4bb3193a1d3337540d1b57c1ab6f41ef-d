@@ -1,6 +1,0 @@
-./bag.go
-./builders.go
-./codes.go
-./diagnostic.go
-./emitter.go
-./syntax_highlighter.go

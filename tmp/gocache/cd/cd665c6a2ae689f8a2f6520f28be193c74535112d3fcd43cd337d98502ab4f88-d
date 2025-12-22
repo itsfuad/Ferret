@@ -1,6 +1,0 @@
-./emit.go
-./qbe.go
-./run.go
-_cgo_gotypes.go
-qbe_embed.cgo1.go
-_cgo_import.go

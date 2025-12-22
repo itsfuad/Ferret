@@ -62,13 +62,15 @@ func (g *Generator) lowerFuncDecl(decl *hir.FuncDecl) *mir.Function {
 		return nil
 	}
 
+	retType := g.returnType(decl.Type)
 	fn := &mir.Function{
 		Name:     decl.Name.Name,
-		Return:   g.returnType(decl.Type),
+		Return:   retType,
 		Location: decl.Location,
 	}
 
 	fn.Params = g.lowerParams(decl.Type)
+	g.applyLargeReturnABI(fn, retType, decl.Location)
 	builder := newFunctionBuilder(g, fn)
 	builder.buildFuncBody(decl.Body)
 
@@ -80,19 +82,25 @@ func (g *Generator) lowerMethodDecl(decl *hir.MethodDecl) *mir.Function {
 		return nil
 	}
 
+	retType := g.returnType(decl.Type)
 	fn := &mir.Function{
 		Name:     decl.Name.Name,
-		Return:   g.returnType(decl.Type),
+		Return:   retType,
 		Location: decl.Location,
 	}
 
 	if decl.Receiver != nil {
-		recv := g.newParam(decl.Receiver.Name, decl.Receiver.Type, decl.Receiver.Location)
+		recvType := decl.Receiver.Type
+		if isLargePrimitiveType(recvType) {
+			recvType = types.NewReference(recvType)
+		}
+		recv := g.newParam(decl.Receiver.Name, recvType, decl.Receiver.Location)
 		fn.Receiver = &recv
 		fn.Params = append(fn.Params, recv)
 	}
 
 	fn.Params = append(fn.Params, g.lowerParams(decl.Type)...)
+	g.applyLargeReturnABI(fn, retType, decl.Location)
 	builder := newFunctionBuilder(g, fn)
 	builder.buildFuncBody(decl.Body)
 
@@ -106,7 +114,11 @@ func (g *Generator) lowerParams(fnType *types.FunctionType) []mir.Param {
 
 	params := make([]mir.Param, 0, len(fnType.Params))
 	for _, param := range fnType.Params {
-		params = append(params, g.newParam(param.Name, param.Type, source.Location{}))
+		paramType := param.Type
+		if isLargePrimitiveType(paramType) {
+			paramType = types.NewReference(paramType)
+		}
+		params = append(params, g.newParam(param.Name, paramType, source.Location{}))
 	}
 	return params
 }
@@ -116,6 +128,15 @@ func (g *Generator) returnType(fnType *types.FunctionType) types.SemType {
 		return types.TypeVoid
 	}
 	return fnType.Return
+}
+
+func (g *Generator) applyLargeReturnABI(fn *mir.Function, retType types.SemType, loc source.Location) {
+	if fn == nil || !isLargePrimitiveType(retType) {
+		return
+	}
+	outParam := g.newParam("__ret", types.NewReference(retType), loc)
+	fn.Params = append([]mir.Param{outParam}, fn.Params...)
+	fn.Return = types.TypeVoid
 }
 
 func (g *Generator) newParam(name string, typ types.SemType, loc source.Location) mir.Param {

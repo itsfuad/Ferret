@@ -1,6 +1,0 @@
-./artifacts.go
-./format.go
-./instructions.go
-./ir.go
-./layout.go
-./terminators.go

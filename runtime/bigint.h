@@ -232,4 +232,101 @@ ferret_u256 ferret_u256_from_string(const char* str);
 ferret_f128 ferret_f128_from_string(const char* str);
 ferret_f256 ferret_f256_from_string(const char* str);
 
+// Pointer-based helpers (for MIR/QBE lowering)
+void ferret_memcpy(void* dst, const void* src, uint64_t size);
+
+void ferret_i128_add_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+void ferret_i128_sub_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+void ferret_i128_mul_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+void ferret_i128_div_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+void ferret_i128_mod_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+bool ferret_i128_eq_ptr(const ferret_i128* a, const ferret_i128* b);
+bool ferret_i128_lt_ptr(const ferret_i128* a, const ferret_i128* b);
+bool ferret_i128_gt_ptr(const ferret_i128* a, const ferret_i128* b);
+void ferret_i128_and_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+void ferret_i128_or_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+void ferret_i128_xor_ptr(const ferret_i128* a, const ferret_i128* b, ferret_i128* out);
+
+void ferret_u128_add_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+void ferret_u128_sub_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+void ferret_u128_mul_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+void ferret_u128_div_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+void ferret_u128_mod_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+bool ferret_u128_eq_ptr(const ferret_u128* a, const ferret_u128* b);
+bool ferret_u128_lt_ptr(const ferret_u128* a, const ferret_u128* b);
+bool ferret_u128_gt_ptr(const ferret_u128* a, const ferret_u128* b);
+void ferret_u128_and_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+void ferret_u128_or_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+void ferret_u128_xor_ptr(const ferret_u128* a, const ferret_u128* b, ferret_u128* out);
+
+void ferret_i256_add_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_sub_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_mul_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_div_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_mod_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+bool ferret_i256_eq_ptr(const ferret_i256* a, const ferret_i256* b);
+bool ferret_i256_lt_ptr(const ferret_i256* a, const ferret_i256* b);
+bool ferret_i256_gt_ptr(const ferret_i256* a, const ferret_i256* b);
+void ferret_i256_and_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_or_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_xor_ptr(const ferret_i256* a, const ferret_i256* b, ferret_i256* out);
+void ferret_i256_not_ptr(const ferret_i256* a, ferret_i256* out);
+
+void ferret_u256_add_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_sub_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_mul_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_div_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_mod_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+bool ferret_u256_eq_ptr(const ferret_u256* a, const ferret_u256* b);
+bool ferret_u256_lt_ptr(const ferret_u256* a, const ferret_u256* b);
+bool ferret_u256_gt_ptr(const ferret_u256* a, const ferret_u256* b);
+void ferret_u256_and_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_or_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_xor_ptr(const ferret_u256* a, const ferret_u256* b, ferret_u256* out);
+void ferret_u256_not_ptr(const ferret_u256* a, ferret_u256* out);
+
+void ferret_f128_add_ptr(const ferret_f128* a, const ferret_f128* b, ferret_f128* out);
+void ferret_f128_sub_ptr(const ferret_f128* a, const ferret_f128* b, ferret_f128* out);
+void ferret_f128_mul_ptr(const ferret_f128* a, const ferret_f128* b, ferret_f128* out);
+void ferret_f128_div_ptr(const ferret_f128* a, const ferret_f128* b, ferret_f128* out);
+bool ferret_f128_eq_ptr(const ferret_f128* a, const ferret_f128* b);
+bool ferret_f128_lt_ptr(const ferret_f128* a, const ferret_f128* b);
+bool ferret_f128_gt_ptr(const ferret_f128* a, const ferret_f128* b);
+
+void ferret_f256_add_ptr(const ferret_f256* a, const ferret_f256* b, ferret_f256* out);
+void ferret_f256_sub_ptr(const ferret_f256* a, const ferret_f256* b, ferret_f256* out);
+void ferret_f256_mul_ptr(const ferret_f256* a, const ferret_f256* b, ferret_f256* out);
+void ferret_f256_div_ptr(const ferret_f256* a, const ferret_f256* b, ferret_f256* out);
+bool ferret_f256_eq_ptr(const ferret_f256* a, const ferret_f256* b);
+bool ferret_f256_lt_ptr(const ferret_f256* a, const ferret_f256* b);
+bool ferret_f256_gt_ptr(const ferret_f256* a, const ferret_f256* b);
+
+void ferret_i128_from_i64_ptr(int64_t val, ferret_i128* out);
+void ferret_u128_from_u64_ptr(uint64_t val, ferret_u128* out);
+void ferret_i256_from_i64_ptr(int64_t val, ferret_i256* out);
+void ferret_u256_from_u64_ptr(uint64_t val, ferret_u256* out);
+void ferret_f128_from_f64_ptr(double val, ferret_f128* out);
+void ferret_f256_from_f64_ptr(double val, ferret_f256* out);
+
+int64_t ferret_i128_to_i64_ptr(const ferret_i128* val);
+uint64_t ferret_u128_to_u64_ptr(const ferret_u128* val);
+int64_t ferret_i256_to_i64_ptr(const ferret_i256* val);
+uint64_t ferret_u256_to_u64_ptr(const ferret_u256* val);
+double ferret_f128_to_f64_ptr(const ferret_f128* val);
+double ferret_f256_to_f64_ptr(const ferret_f256* val);
+
+char* ferret_i128_to_string_ptr(const ferret_i128* val);
+char* ferret_u128_to_string_ptr(const ferret_u128* val);
+char* ferret_i256_to_string_ptr(const ferret_i256* val);
+char* ferret_u256_to_string_ptr(const ferret_u256* val);
+char* ferret_f128_to_string_ptr(const ferret_f128* val);
+char* ferret_f256_to_string_ptr(const ferret_f256* val);
+
+void ferret_i128_from_string_ptr(const char* str, ferret_i128* out);
+void ferret_u128_from_string_ptr(const char* str, ferret_u128* out);
+void ferret_i256_from_string_ptr(const char* str, ferret_i256* out);
+void ferret_u256_from_string_ptr(const char* str, ferret_u256* out);
+void ferret_f128_from_string_ptr(const char* str, ferret_f128* out);
+void ferret_f256_from_string_ptr(const char* str, ferret_f256* out);
+
 #endif // FERRET_BIGINT_H

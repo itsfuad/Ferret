@@ -299,7 +299,8 @@ func (g *Generator) emitCall(c *mir.Call) {
 			g.reportUnsupported("call arg type", &c.Location)
 			return
 		}
-		qbeType, err := g.qbeType(semType)
+		qbeSem := normalizeLargeValueType(semType)
+		qbeType, err := g.qbeType(qbeSem)
 		if err != nil {
 			g.reportError(err.Error(), &c.Location)
 			return
@@ -336,7 +337,8 @@ func (g *Generator) emitPhi(p *mir.Phi) {
 	if p == nil {
 		return
 	}
-	qbeType, err := g.qbeType(p.Type)
+	phiType := normalizeLargeValueType(p.Type)
+	qbeType, err := g.qbeType(phiType)
 	if err != nil {
 		g.reportError(err.Error(), &p.Location)
 		return
@@ -348,7 +350,7 @@ func (g *Generator) emitPhi(p *mir.Phi) {
 	}
 
 	g.emitLine(fmt.Sprintf("%s =%s phi %s", g.valueName(p.Result), qbeType, strings.Join(parts, ", ")))
-	g.valueTypes[p.Result] = p.Type
+	g.valueTypes[p.Result] = phiType
 }
 
 func (g *Generator) emitLine(line string) {
@@ -679,6 +681,10 @@ func (g *Generator) qbeReturnType(name string, typ types.SemType) (string, bool)
 	if typ == nil || typ.Equals(types.TypeVoid) || typ.Equals(types.TypeNone) {
 		return "", false
 	}
+	if isLargePrimitiveType(typ) {
+		g.reportError("qbe: large return types must be lowered to out parameters", nil)
+		return "", false
+	}
 	retType, err := g.qbeType(typ)
 	if err != nil {
 		g.reportError(err.Error(), nil)
@@ -845,4 +851,29 @@ func (g *Generator) isInteger(typ types.SemType) bool {
 
 func (g *Generator) isFloat(typ types.SemType) bool {
 	return types.IsFloat(types.UnwrapType(typ))
+}
+
+func isLargePrimitiveType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	prim, ok := typ.(*types.PrimitiveType)
+	if !ok {
+		return false
+	}
+	switch prim.GetName() {
+	case types.TYPE_I128, types.TYPE_U128, types.TYPE_I256, types.TYPE_U256,
+		types.TYPE_F128, types.TYPE_F256:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeLargeValueType(typ types.SemType) types.SemType {
+	if isLargePrimitiveType(typ) {
+		return types.NewReference(typ)
+	}
+	return typ
 }

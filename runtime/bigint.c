@@ -1343,3 +1343,218 @@ ferret_f256 ferret_f256_from_string(const char* str) {
     double val = strtod(str, NULL);
     return ferret_f256_from_f64(val);
 }
+
+void ferret_memcpy(void* dst, const void* src, uint64_t size) {
+    if (!dst || !src || size == 0) {
+        return;
+    }
+    memcpy(dst, src, (size_t)size);
+}
+
+#define FERRET_PTR_BIN_OP(type, func) \
+    void func##_ptr(const type* a, const type* b, type* out) { \
+        if (!out || !a || !b) return; \
+        *out = func(*a, *b); \
+    }
+
+#define FERRET_PTR_CMP_OP(type, func) \
+    bool func##_ptr(const type* a, const type* b) { \
+        if (!a || !b) return false; \
+        return func(*a, *b); \
+    }
+
+#define FERRET_PTR_UNARY_OP(type, func) \
+    void func##_ptr(const type* a, type* out) { \
+        if (!out || !a) return; \
+        *out = func(*a); \
+    }
+
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_add)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_sub)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_mul)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_div)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_mod)
+FERRET_PTR_CMP_OP(ferret_i128, ferret_i128_eq)
+FERRET_PTR_CMP_OP(ferret_i128, ferret_i128_lt)
+FERRET_PTR_CMP_OP(ferret_i128, ferret_i128_gt)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_and)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_or)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_xor)
+
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_add)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_sub)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_mul)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_div)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_mod)
+FERRET_PTR_CMP_OP(ferret_u128, ferret_u128_eq)
+FERRET_PTR_CMP_OP(ferret_u128, ferret_u128_lt)
+FERRET_PTR_CMP_OP(ferret_u128, ferret_u128_gt)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_and)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_or)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_xor)
+
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_add)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_sub)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_mul)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_div)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_mod)
+FERRET_PTR_CMP_OP(ferret_i256, ferret_i256_eq)
+FERRET_PTR_CMP_OP(ferret_i256, ferret_i256_lt)
+FERRET_PTR_CMP_OP(ferret_i256, ferret_i256_gt)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_and)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_or)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_xor)
+FERRET_PTR_UNARY_OP(ferret_i256, ferret_i256_not)
+
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_add)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_sub)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_mul)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_div)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_mod)
+FERRET_PTR_CMP_OP(ferret_u256, ferret_u256_eq)
+FERRET_PTR_CMP_OP(ferret_u256, ferret_u256_lt)
+FERRET_PTR_CMP_OP(ferret_u256, ferret_u256_gt)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_and)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_or)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_xor)
+FERRET_PTR_UNARY_OP(ferret_u256, ferret_u256_not)
+
+FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_add)
+FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_sub)
+FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_mul)
+FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_div)
+FERRET_PTR_CMP_OP(ferret_f128, ferret_f128_eq)
+FERRET_PTR_CMP_OP(ferret_f128, ferret_f128_lt)
+FERRET_PTR_CMP_OP(ferret_f128, ferret_f128_gt)
+
+FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_add)
+FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_sub)
+FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_mul)
+FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_div)
+FERRET_PTR_CMP_OP(ferret_f256, ferret_f256_eq)
+FERRET_PTR_CMP_OP(ferret_f256, ferret_f256_lt)
+FERRET_PTR_CMP_OP(ferret_f256, ferret_f256_gt)
+
+void ferret_i128_from_i64_ptr(int64_t val, ferret_i128* out) {
+    if (!out) return;
+    *out = ferret_i128_from_i64(val);
+}
+
+void ferret_u128_from_u64_ptr(uint64_t val, ferret_u128* out) {
+    if (!out) return;
+    *out = ferret_u128_from_u64(val);
+}
+
+void ferret_i256_from_i64_ptr(int64_t val, ferret_i256* out) {
+    if (!out) return;
+    *out = ferret_i256_from_i64(val);
+}
+
+void ferret_u256_from_u64_ptr(uint64_t val, ferret_u256* out) {
+    if (!out) return;
+    *out = ferret_u256_from_u64(val);
+}
+
+void ferret_f128_from_f64_ptr(double val, ferret_f128* out) {
+    if (!out) return;
+    *out = ferret_f128_from_f64(val);
+}
+
+void ferret_f256_from_f64_ptr(double val, ferret_f256* out) {
+    if (!out) return;
+    *out = ferret_f256_from_f64(val);
+}
+
+int64_t ferret_i128_to_i64_ptr(const ferret_i128* val) {
+    if (!val) return 0;
+    return ferret_i128_to_i64(*val);
+}
+
+uint64_t ferret_u128_to_u64_ptr(const ferret_u128* val) {
+    if (!val) return 0;
+    return ferret_u128_to_u64(*val);
+}
+
+int64_t ferret_i256_to_i64_ptr(const ferret_i256* val) {
+    if (!val) return 0;
+    return ferret_i256_to_i64(*val);
+}
+
+uint64_t ferret_u256_to_u64_ptr(const ferret_u256* val) {
+    if (!val) return 0;
+    return ferret_u256_to_u64(*val);
+}
+
+double ferret_f128_to_f64_ptr(const ferret_f128* val) {
+    if (!val) return 0.0;
+    return ferret_f128_to_f64(*val);
+}
+
+double ferret_f256_to_f64_ptr(const ferret_f256* val) {
+    if (!val) return 0.0;
+    return ferret_f256_to_f64(*val);
+}
+
+char* ferret_i128_to_string_ptr(const ferret_i128* val) {
+    if (!val) return NULL;
+    return ferret_i128_to_string(*val);
+}
+
+char* ferret_u128_to_string_ptr(const ferret_u128* val) {
+    if (!val) return NULL;
+    return ferret_u128_to_string(*val);
+}
+
+char* ferret_i256_to_string_ptr(const ferret_i256* val) {
+    if (!val) return NULL;
+    return ferret_i256_to_string(*val);
+}
+
+char* ferret_u256_to_string_ptr(const ferret_u256* val) {
+    if (!val) return NULL;
+    return ferret_u256_to_string(*val);
+}
+
+char* ferret_f128_to_string_ptr(const ferret_f128* val) {
+    if (!val) return NULL;
+    return ferret_f128_to_string(*val);
+}
+
+char* ferret_f256_to_string_ptr(const ferret_f256* val) {
+    if (!val) return NULL;
+    return ferret_f256_to_string(*val);
+}
+
+void ferret_i128_from_string_ptr(const char* str, ferret_i128* out) {
+    if (!out) return;
+    *out = ferret_i128_from_string(str);
+}
+
+void ferret_u128_from_string_ptr(const char* str, ferret_u128* out) {
+    if (!out) return;
+    *out = ferret_u128_from_string(str);
+}
+
+void ferret_i256_from_string_ptr(const char* str, ferret_i256* out) {
+    if (!out) return;
+    *out = ferret_i256_from_string(str);
+}
+
+void ferret_u256_from_string_ptr(const char* str, ferret_u256* out) {
+    if (!out) return;
+    *out = ferret_u256_from_string(str);
+}
+
+void ferret_f128_from_string_ptr(const char* str, ferret_f128* out) {
+    if (!out) return;
+    *out = ferret_f128_from_string(str);
+}
+
+void ferret_f256_from_string_ptr(const char* str, ferret_f256* out) {
+    if (!out) return;
+    *out = ferret_f256_from_string(str);
+}
+
+#undef FERRET_PTR_BIN_OP
+#undef FERRET_PTR_CMP_OP
+#undef FERRET_PTR_UNARY_OP
