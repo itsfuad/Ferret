@@ -7,7 +7,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/hir"
 	"compiler/internal/mir"
-	"compiler/internal/mirgen"
+	mirgen "compiler/internal/mir/gen"
 	"compiler/internal/phase"
 )
 

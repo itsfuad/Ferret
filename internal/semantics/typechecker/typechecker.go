@@ -4,7 +4,6 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/semantics/consteval"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/source"
@@ -508,22 +507,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Check the match expression
 		matchType := checkExpr(ctx, mod, n.Expr, types.TypeUnknown)
 
-		// Track if we've seen a default case
-		hasDefault := false
-
 		// Check each case clause
-		for i, caseClause := range n.Cases {
-			// Check if this is a default case
-			if caseClause.Pattern == nil {
-				if hasDefault {
-					ctx.Diagnostics.Add(
-						diagnostics.NewError("multiple default cases in match statement").
-							WithPrimaryLabel(&caseClause.Location, "duplicate default case").
-							WithNote("only one default case (_) is allowed per match statement"),
-					)
-				}
-				hasDefault = true
-			} else {
+		for _, caseClause := range n.Cases {
+			if caseClause.Pattern != nil {
 				// Check pattern type compatibility with match expression
 				patternType := checkExpr(ctx, mod, caseClause.Pattern, types.TypeUnknown)
 
@@ -552,15 +538,6 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			// Restore scope if we entered one
 			if restoreScope != nil {
 				restoreScope()
-			}
-
-			// Check for unreachable cases (cases after default)
-			if hasDefault && i < len(n.Cases)-1 {
-				ctx.Diagnostics.Add(
-					diagnostics.NewWarning("unreachable case after default case").
-						WithPrimaryLabel(&n.Cases[i+1].Location, "this case will never be reached").
-						WithNote("default case matches all remaining values"),
-				)
 			}
 		}
 	case *ast.Block:
@@ -629,11 +606,6 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			if item.Value != nil {
 				// Pass item.Type for type location in error messages
 				checkAssignLike(ctx, mod, declType, item.Type, item.Value)
-
-				// Try to evaluate the initializer as a compile-time constant
-				if constVal := consteval.EvaluateExpr(ctx, mod, item.Value); constVal != nil && constVal.IsConstant() {
-					sym.ConstValue = constVal
-				}
 			} else if isConst {
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
@@ -674,11 +646,6 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				}
 			}
 
-			// Try to evaluate the initializer as a compile-time constant
-			// This enables constant propagation for code like: let i := 10; arr[i]
-			if constVal := consteval.EvaluateExpr(ctx, mod, item.Value); constVal != nil && constVal.IsConstant() {
-				sym.ConstValue = constVal
-			}
 		} else {
 			// No type and no value - error
 			if isConst {
@@ -1563,12 +1530,6 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 			)
 			return
 		}
-		// Clear constant value since variable is being modified
-		if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-			if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-				sym.ConstValue = nil
-			}
-		}
 		return
 	}
 
@@ -1633,25 +1594,6 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
 	}
 
-	// Track constant value propagation through assignments
-	// If LHS is a simple identifier and RHS has a constant value, update the symbol
-	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-			// For compound assignments and increment/decrement, clear constant value
-			if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
-				sym.ConstValue = nil
-			} else if stmt.Rhs != nil {
-				// Try to evaluate the RHS as a constant
-				if constVal := consteval.EvaluateExpr(ctx, mod, stmt.Rhs); constVal != nil {
-					sym.ConstValue = constVal
-				} else {
-					// RHS is not constant - clear the constant value
-					sym.ConstValue = nil
-				}
-			}
-		}
-	}
-
 	// TODO: Invalidate constant values for aliasing
 	// When reference expressions (&x) are implemented, we should:
 	// 1. Clear constant value when address is taken (addressOf expression)
@@ -1681,7 +1623,6 @@ func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 				)
 				return
 			}
-			sym.ConstValue = nil
 		}
 	}
 
@@ -1759,9 +1700,6 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Check both array and index expressions
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
-
-		// Perform bounds checking for fixed-size arrays with constant indices
-		checkArrayBounds(ctx, mod, e)
 
 	case *ast.ParenExpr:
 		// Check inner expression
@@ -2616,54 +2554,6 @@ func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	default:
 		// Fallback for unexpected node types
 		checkNode(ctx, mod, elseNode)
-	}
-}
-
-// checkArrayBounds validates array indexing for compile-time bounds checking.
-// Fixed-size arrays require compile-time constant indices and must be in range.
-// Dynamic arrays are not checked here.
-func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, indexExpr *ast.IndexExpr) {
-	// Get the type of the array being indexed
-	arrayType := inferExprType(ctx, mod, indexExpr.X)
-	arrayType = types.UnwrapType(arrayType)
-
-	// Only check fixed-size arrays
-	arrType, ok := arrayType.(*types.ArrayType)
-	if !ok || arrType.Length < 0 {
-		// Not an array, or dynamic array - skip bounds checking
-		return
-	}
-
-	// Try to evaluate the index expression as a compile-time constant
-	// This handles not just literals like `arr[10]`, but also variables with known values like `let i := 10; arr[i]`
-	indexValue, isConstant := consteval.EvaluateAsInt(ctx, mod, indexExpr.Index)
-	if !isConstant {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError("fixed array index must be a compile-time constant").
-				WithCode(diagnostics.ErrArrayIndexNotConst).
-				WithPrimaryLabel(indexExpr.Index.Loc(), "non-constant index").
-				WithHelp("use a constant index or switch to a dynamic array []T for runtime indexing"),
-		)
-		return
-	}
-
-	// Store original index for better error message
-	originalIndex := indexValue
-
-	// Handle negative indices (access from end)
-	if indexValue < 0 {
-		indexValue = int64(arrType.Length) + indexValue
-	}
-
-	// Check bounds
-	if indexValue < 0 || indexValue >= int64(arrType.Length) {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", originalIndex, arrType.Length)).
-				WithCode(diagnostics.ErrArrayOutOfBounds).
-				WithPrimaryLabel(indexExpr.Index.Loc(), "index out of range").
-				WithNote(fmt.Sprintf("valid indices are 0 to %d, or -%d to -1 for reverse access", arrType.Length-1, arrType.Length)).
-				WithHelp("check the array length before accessing"),
-		)
 	}
 }
 

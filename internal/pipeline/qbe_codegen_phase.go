@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"compiler/colors"
-	"compiler/internal/codegen/qbe"
+	qbe "compiler/internal/codegen/qbe_embeddings"
 	"compiler/internal/mir"
 )
 

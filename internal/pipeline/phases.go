@@ -6,9 +6,9 @@ import (
 	"compiler/colors"
 	"compiler/internal/context_v2"
 	"compiler/internal/hir"
+	hiranalysis "compiler/internal/hir/analysis"
 	"compiler/internal/phase"
 	"compiler/internal/semantics/collector"
-	"compiler/internal/semantics/hircfganalyzer"
 	"compiler/internal/semantics/resolver"
 	"compiler/internal/semantics/typechecker"
 )
@@ -158,7 +158,7 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 			continue
 		}
 
-		hircfganalyzer.AnalyzeModule(p.ctx, module, hirMod)
+		hiranalysis.AnalyzeModule(p.ctx, module, hirMod)
 
 		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCFGAnalyzed) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCFGAnalyzed", importPath), nil)

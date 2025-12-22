@@ -13,7 +13,7 @@ type SymbolTable interface {
 }
 
 // ConstValue forward declaration to avoid import cycle
-// Actual implementation is in internal/semantics/consteval
+// Actual implementation is in internal/hir/consteval
 type ConstValue interface {
 	IsConstant() bool
 	String() string

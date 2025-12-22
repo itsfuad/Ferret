@@ -6,7 +6,7 @@ import (
 	"compiler/colors"
 	"compiler/internal/context_v2"
 	"compiler/internal/hir"
-	"compiler/internal/hirgen"
+	hirgen "compiler/internal/hir/gen"
 	"compiler/internal/phase"
 )
 
