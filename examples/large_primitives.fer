@@ -2,30 +2,24 @@
 import "std/io";
 
 fn main() {
-    let a: i128 = 1234;
-    let b := a + 1;
+    let a: i128 = 170141183460469231731687303715884105727;
+    let one: i128 = 1;
+    let b := a - one;
     let neg := -b;
+    io::Println(a);
     if neg < a {
         io::Println("i128 ok");
     }
 
-    let u: u256 = 200;
-    let v := u + 2;
-    let w := v / 2;
-    if w * 2 == v {
+    let u: u256 = 79228162514264337593543950334;
+    let two: u256 = 2;
+    let v := u + two;
+    let w := v * two;
+    u++;
+    io::Println(u);
+    io::Println(v);
+    io::Println(w);
+    if w > v {
         io::Println("u256 ok");
-    }
-
-    let f: f128 = 3.5;
-    let g := f * 2.0;
-    let h := g / 2.0;
-    if h == f {
-        io::Println("f128 ok");
-    }
-
-    let x: f256 = 1.25;
-    let y := x + 0.75;
-    if y > x {
-        io::Println("f256 ok");
     }
 }

@@ -1,0 +1,68 @@
+module examples/large_primitives
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca i128
+    %t2 = alloca i128
+    %t3 = const str 170141183460469231731687303715884105727
+    call ferret_i128_from_string_ptr(%t3, %t2) : void
+    %t4 = const u64 16
+    call ferret_memcpy(%t1, %t2, %t4) : void
+    %t5 = alloca i128
+    %t6 = alloca i128
+    %t7 = const str 1
+    call ferret_i128_from_string_ptr(%t7, %t6) : void
+    %t8 = const u64 16
+    call ferret_memcpy(%t5, %t6, %t8) : void
+    %t9 = alloca i128
+    %t10 = alloca i128
+    call ferret_i128_sub_ptr(%t1, %t5, %t10) : void
+    %t11 = const u64 16
+    call ferret_memcpy(%t9, %t10, %t11) : void
+    %t12 = alloca i128
+    %t13 = alloca i128
+    %t14 = const str 0
+    call ferret_i128_from_string_ptr(%t14, %t13) : void
+    %t15 = alloca i128
+    call ferret_i128_sub_ptr(%t13, %t9, %t15) : void
+    %t16 = const u64 16
+    call ferret_memcpy(%t12, %t15, %t16) : void
+    %t17 = call ferret_i128_lt_ptr(%t12, %t1) : bool
+    br_if %t17, b2, b3
+  block b2 if.then:
+    %t18 = const str i128 ok
+    call io::Println(%t18) : void
+    br b3
+  block b3 if.end:
+    %t19 = alloca u256
+    %t20 = alloca u256
+    %t21 = const str 79228162514264337593543950336
+    call ferret_u256_from_string_ptr(%t21, %t20) : void
+    %t22 = const u64 32
+    call ferret_memcpy(%t19, %t20, %t22) : void
+    %t23 = alloca u256
+    %t24 = alloca u256
+    %t25 = const str 2
+    call ferret_u256_from_string_ptr(%t25, %t24) : void
+    %t26 = const u64 32
+    call ferret_memcpy(%t23, %t24, %t26) : void
+    %t27 = alloca u256
+    %t28 = alloca u256
+    call ferret_u256_add_ptr(%t19, %t23, %t28) : void
+    %t29 = const u64 32
+    call ferret_memcpy(%t27, %t28, %t29) : void
+    %t30 = alloca f32
+    %t31 = alloca u256
+    call ferret_u256_div_ptr(%t27, %t23, %t31) : void
+    store %t30, %t31
+    %t32 = load f32 %t30
+    %t33 = * unknown %t32, %t23
+    %t34 = == bool %t33, %t27
+    br_if %t34, b4, b5
+  block b4 if.then:
+    %t35 = const str u256 ok
+    call io::Println(%t35) : void
+    br b5
+  block b5 if.end:
+    ret
+}

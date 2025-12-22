@@ -11,6 +11,7 @@
 1) Builtin primitive coverage (foundation)
    - Ensure full builtin type support in MIR + QBE (i8..i256/u8..u256, f32..f256, bool, str, byte).
    - Validate const/load/store coverage for those primitives.
+   - Limb-based integer runtime (i128/u128/i256/u256) with 32/64-bit limb selection.
 2) Control flow completeness (depends on 1)
    - MIR lowering for if/else (non-block else, else-if chains).
    - Ensure for/while desugar to supported MIR (range/array for first).

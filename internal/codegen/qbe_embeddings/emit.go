@@ -757,6 +757,9 @@ func (g *Generator) printFunctionName(funcName string, typ types.SemType) (strin
 	if typ == nil {
 		return "", fmt.Errorf("qbe: print requires typed argument")
 	}
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = ref.Inner
+	}
 	typ = types.UnwrapType(typ)
 
 	if prim, ok := typ.(*types.PrimitiveType); ok {
@@ -773,6 +776,10 @@ func (g *Generator) printFunctionName(funcName string, typ types.SemType) (strin
 			return "ferret_io_" + funcName + "_i32", nil
 		case types.TYPE_I64:
 			return "ferret_io_" + funcName + "_i64", nil
+		case types.TYPE_I128:
+			return "ferret_io_" + funcName + "_i128_ptr", nil
+		case types.TYPE_I256:
+			return "ferret_io_" + funcName + "_i256_ptr", nil
 		case types.TYPE_U8, types.TYPE_BYTE:
 			return "ferret_io_" + funcName + "_u8", nil
 		case types.TYPE_U16:
@@ -781,10 +788,18 @@ func (g *Generator) printFunctionName(funcName string, typ types.SemType) (strin
 			return "ferret_io_" + funcName + "_u32", nil
 		case types.TYPE_U64:
 			return "ferret_io_" + funcName + "_u64", nil
+		case types.TYPE_U128:
+			return "ferret_io_" + funcName + "_u128_ptr", nil
+		case types.TYPE_U256:
+			return "ferret_io_" + funcName + "_u256_ptr", nil
 		case types.TYPE_F32:
 			return "ferret_io_" + funcName + "_f32", nil
 		case types.TYPE_F64:
 			return "ferret_io_" + funcName + "_f64", nil
+		case types.TYPE_F128:
+			return "ferret_io_" + funcName + "_f128_ptr", nil
+		case types.TYPE_F256:
+			return "ferret_io_" + funcName + "_f256_ptr", nil
 		}
 	}
 	return "", fmt.Errorf("qbe: unsupported print arg type %s", typ.String())

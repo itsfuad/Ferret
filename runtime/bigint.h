@@ -5,12 +5,28 @@
 #include <stdbool.h>
 #include <math.h>
 
-// Feature detection for 128-bit integer support
-#if defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)
-    #ifndef FERRET_HAS_INT128
-        #define FERRET_HAS_INT128 1
+// Limb size detection for big integers (default to 32-bit if unknown)
+#if defined(__SIZEOF_INT128__)
+    #ifndef FERRET_HAS_WIDE128
+        #define FERRET_HAS_WIDE128 1
     #endif
 #endif
+
+#if defined(UINTPTR_MAX) && UINTPTR_MAX >= 0xffffffffffffffffULL && defined(FERRET_HAS_WIDE128)
+    #define FERRET_LIMB_BITS 64
+#else
+    #define FERRET_LIMB_BITS 32
+#endif
+
+#if FERRET_LIMB_BITS == 64
+    typedef uint64_t ferret_limb_t;
+#else
+    typedef uint32_t ferret_limb_t;
+#endif
+
+#define FERRET_U128_LIMBS (128 / FERRET_LIMB_BITS)
+#define FERRET_U256_LIMBS (256 / FERRET_LIMB_BITS)
+#define FERRET_LIMB_MAX ((ferret_limb_t)~(ferret_limb_t)0)
 
 // Feature detection for 128-bit floating point support
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__) || defined(__powerpc__) || defined(__powerpc64__))
@@ -19,73 +35,42 @@
     #endif
 #endif
 
-// 128-bit integer types
-#ifdef FERRET_HAS_INT128
-    typedef __int128 ferret_i128;
-    typedef unsigned __int128 ferret_u128;
-#else
-    // Fallback: struct-based 128-bit integer (two 64-bit words)
-    typedef struct {
-        uint64_t lo;  // Low 64 bits
-        int64_t hi;   // High 64 bits (signed for i128)
-    } ferret_i128;
-    
-    typedef struct {
-        uint64_t lo;  // Low 64 bits
-        uint64_t hi;  // High 64 bits (unsigned for u128)
-    } ferret_u128;
-#endif
-
-// 256-bit integer types (always struct-based)
+// 128-bit integer types (limb-based)
 typedef struct {
-    uint64_t words[4];  // Little-endian: words[0] is least significant
+    ferret_limb_t words[FERRET_U128_LIMBS];  // Little-endian limbs
+} ferret_u128;
+
+typedef struct {
+    ferret_limb_t words[FERRET_U128_LIMBS];  // Two's complement
+} ferret_i128;
+
+// 256-bit integer types (limb-based)
+typedef struct {
+    ferret_limb_t words[FERRET_U256_LIMBS];  // Little-endian limbs
 } ferret_u256;
 
 typedef struct {
-    uint64_t words[4];  // Little-endian: words[0] is least significant
-    // Sign is stored in the most significant bit of words[3]
+    ferret_limb_t words[FERRET_U256_LIMBS];  // Two's complement
 } ferret_i256;
 
-// 128-bit integer operations
-#ifdef FERRET_HAS_INT128
-    // Native operations - compiler handles these
-    #define ferret_i128_add(a, b) ((a) + (b))
-    #define ferret_i128_sub(a, b) ((a) - (b))
-    #define ferret_i128_mul(a, b) ((a) * (b))
-    #define ferret_i128_div(a, b) ((a) / (b))
-    #define ferret_i128_mod(a, b) ((a) % (b))
-    #define ferret_i128_eq(a, b) ((a) == (b))
-    #define ferret_i128_lt(a, b) ((a) < (b))
-    #define ferret_i128_gt(a, b) ((a) > (b))
-    
-    #define ferret_u128_add(a, b) ((a) + (b))
-    #define ferret_u128_sub(a, b) ((a) - (b))
-    #define ferret_u128_mul(a, b) ((a) * (b))
-    #define ferret_u128_div(a, b) ((a) / (b))
-    #define ferret_u128_mod(a, b) ((a) % (b))
-    #define ferret_u128_eq(a, b) ((a) == (b))
-    #define ferret_u128_lt(a, b) ((a) < (b))
-    #define ferret_u128_gt(a, b) ((a) > (b))
-#else
-    // Struct-based operations - implemented in bigint.c
-    ferret_i128 ferret_i128_add(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_sub(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_mul(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_div(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_mod(ferret_i128 a, ferret_i128 b);
-    bool ferret_i128_eq(ferret_i128 a, ferret_i128 b);
-    bool ferret_i128_lt(ferret_i128 a, ferret_i128 b);
-    bool ferret_i128_gt(ferret_i128 a, ferret_i128 b);
-    
-    ferret_u128 ferret_u128_add(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_sub(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_mul(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_div(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_mod(ferret_u128 a, ferret_u128 b);
-    bool ferret_u128_eq(ferret_u128 a, ferret_u128 b);
-    bool ferret_u128_lt(ferret_u128 a, ferret_u128 b);
-    bool ferret_u128_gt(ferret_u128 a, ferret_u128 b);
-#endif
+// 128-bit integer operations (always limb-based)
+ferret_i128 ferret_i128_add(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_sub(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_mul(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_div(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_mod(ferret_i128 a, ferret_i128 b);
+bool ferret_i128_eq(ferret_i128 a, ferret_i128 b);
+bool ferret_i128_lt(ferret_i128 a, ferret_i128 b);
+bool ferret_i128_gt(ferret_i128 a, ferret_i128 b);
+
+ferret_u128 ferret_u128_add(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_sub(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_mul(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_div(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_mod(ferret_u128 a, ferret_u128 b);
+bool ferret_u128_eq(ferret_u128 a, ferret_u128 b);
+bool ferret_u128_lt(ferret_u128 a, ferret_u128 b);
+bool ferret_u128_gt(ferret_u128 a, ferret_u128 b);
 
 // 256-bit integer operations (always implemented in bigint.c)
 ferret_i256 ferret_i256_add(ferret_i256 a, ferret_i256 b);
@@ -173,35 +158,19 @@ double ferret_f128_to_f64(ferret_f128 val);
 double ferret_f256_to_f64(ferret_f256 val);
 
 // Bitwise operations for integers
-#ifdef FERRET_HAS_INT128
-    #define ferret_i128_and(a, b) ((a) & (b))
-    #define ferret_i128_or(a, b) ((a) | (b))
-    #define ferret_i128_xor(a, b) ((a) ^ (b))
-    #define ferret_i128_not(a) (~(a))
-    #define ferret_i128_shl(a, n) ((a) << (n))
-    #define ferret_i128_shr(a, n) ((a) >> (n))
-    
-    #define ferret_u128_and(a, b) ((a) & (b))
-    #define ferret_u128_or(a, b) ((a) | (b))
-    #define ferret_u128_xor(a, b) ((a) ^ (b))
-    #define ferret_u128_not(a) (~(a))
-    #define ferret_u128_shl(a, n) ((a) << (n))
-    #define ferret_u128_shr(a, n) ((a) >> (n))
-#else
-    ferret_i128 ferret_i128_and(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_or(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_xor(ferret_i128 a, ferret_i128 b);
-    ferret_i128 ferret_i128_not(ferret_i128 a);
-    ferret_i128 ferret_i128_shl(ferret_i128 a, int n);
-    ferret_i128 ferret_i128_shr(ferret_i128 a, int n);
-    
-    ferret_u128 ferret_u128_and(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_or(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_xor(ferret_u128 a, ferret_u128 b);
-    ferret_u128 ferret_u128_not(ferret_u128 a);
-    ferret_u128 ferret_u128_shl(ferret_u128 a, int n);
-    ferret_u128 ferret_u128_shr(ferret_u128 a, int n);
-#endif
+ferret_i128 ferret_i128_and(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_or(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_xor(ferret_i128 a, ferret_i128 b);
+ferret_i128 ferret_i128_not(ferret_i128 a);
+ferret_i128 ferret_i128_shl(ferret_i128 a, int n);
+ferret_i128 ferret_i128_shr(ferret_i128 a, int n);
+
+ferret_u128 ferret_u128_and(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_or(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_xor(ferret_u128 a, ferret_u128 b);
+ferret_u128 ferret_u128_not(ferret_u128 a);
+ferret_u128 ferret_u128_shl(ferret_u128 a, int n);
+ferret_u128 ferret_u128_shr(ferret_u128 a, int n);
 
 ferret_i256 ferret_i256_and(ferret_i256 a, ferret_i256 b);
 ferret_i256 ferret_i256_or(ferret_i256 a, ferret_i256 b);

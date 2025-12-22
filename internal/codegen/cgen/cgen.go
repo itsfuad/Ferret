@@ -2239,6 +2239,51 @@ func (g *Generator) isIntegerType(typ types.SemType) bool {
 	return false
 }
 
+func (g *Generator) isLargePrimitiveType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	unwrapped := types.UnwrapType(typ)
+	prim, ok := unwrapped.(*types.PrimitiveType)
+	if !ok {
+		return false
+	}
+	switch prim.GetName() {
+	case types.TYPE_I128, types.TYPE_U128, types.TYPE_I256, types.TYPE_U256,
+		types.TYPE_F128, types.TYPE_F256:
+		return true
+	default:
+		return false
+	}
+}
+
+func (g *Generator) largeToStringFuncName(typ types.SemType) string {
+	if typ == nil {
+		return ""
+	}
+	unwrapped := types.UnwrapType(typ)
+	prim, ok := unwrapped.(*types.PrimitiveType)
+	if !ok {
+		return ""
+	}
+	switch prim.GetName() {
+	case types.TYPE_I128:
+		return "ferret_i128_to_string"
+	case types.TYPE_U128:
+		return "ferret_u128_to_string"
+	case types.TYPE_I256:
+		return "ferret_i256_to_string"
+	case types.TYPE_U256:
+		return "ferret_u256_to_string"
+	case types.TYPE_F128:
+		return "ferret_f128_to_string"
+	case types.TYPE_F256:
+		return "ferret_f256_to_string"
+	default:
+		return ""
+	}
+}
+
 func (g *Generator) generateUnaryExpr(expr *ast.UnaryExpr) {
 	g.write("%s", expr.Op.Value)
 	g.generateExpr(expr.X)
@@ -3475,6 +3520,10 @@ func (g *Generator) getPrintFunctionNameForType(funcName string, argType types.S
 			return fmt.Sprintf("ferret_io_%s_i32", baseName)
 		case types.TYPE_I64:
 			return fmt.Sprintf("ferret_io_%s_i64", baseName)
+		case types.TYPE_I128:
+			return fmt.Sprintf("ferret_io_%s_i128", baseName)
+		case types.TYPE_I256:
+			return fmt.Sprintf("ferret_io_%s_i256", baseName)
 		case types.TYPE_U8:
 			return fmt.Sprintf("ferret_io_%s_u8", baseName)
 		case types.TYPE_U16:
@@ -3483,14 +3532,24 @@ func (g *Generator) getPrintFunctionNameForType(funcName string, argType types.S
 			return fmt.Sprintf("ferret_io_%s_u32", baseName)
 		case types.TYPE_U64:
 			return fmt.Sprintf("ferret_io_%s_u64", baseName)
+		case types.TYPE_U128:
+			return fmt.Sprintf("ferret_io_%s_u128", baseName)
+		case types.TYPE_U256:
+			return fmt.Sprintf("ferret_io_%s_u256", baseName)
 		case types.TYPE_F32:
 			return fmt.Sprintf("ferret_io_%s_f32", baseName)
 		case types.TYPE_F64:
 			return fmt.Sprintf("ferret_io_%s_f64", baseName)
+		case types.TYPE_F128:
+			return fmt.Sprintf("ferret_io_%s_f128", baseName)
+		case types.TYPE_F256:
+			return fmt.Sprintf("ferret_io_%s_f256", baseName)
 		case types.TYPE_BOOL:
 			return fmt.Sprintf("ferret_io_%s_bool", baseName)
 		case types.TYPE_STRING:
 			return fmt.Sprintf("ferret_io_%s", baseName)
+		case types.TYPE_BYTE:
+			return fmt.Sprintf("ferret_io_%s_u8", baseName)
 		}
 	case *types.NamedType:
 		// Unwrap to underlying type
@@ -3570,6 +3629,10 @@ func (g *Generator) getPrintFunctionName(funcName string, arg ast.Expression) st
 			return fmt.Sprintf("ferret_io_%s_i32", baseName)
 		case types.TYPE_I64:
 			return fmt.Sprintf("ferret_io_%s_i64", baseName)
+		case types.TYPE_I128:
+			return fmt.Sprintf("ferret_io_%s_i128", baseName)
+		case types.TYPE_I256:
+			return fmt.Sprintf("ferret_io_%s_i256", baseName)
 		case types.TYPE_U8:
 			return fmt.Sprintf("ferret_io_%s_u8", baseName)
 		case types.TYPE_U16:
@@ -3578,14 +3641,24 @@ func (g *Generator) getPrintFunctionName(funcName string, arg ast.Expression) st
 			return fmt.Sprintf("ferret_io_%s_u32", baseName)
 		case types.TYPE_U64:
 			return fmt.Sprintf("ferret_io_%s_u64", baseName)
+		case types.TYPE_U128:
+			return fmt.Sprintf("ferret_io_%s_u128", baseName)
+		case types.TYPE_U256:
+			return fmt.Sprintf("ferret_io_%s_u256", baseName)
 		case types.TYPE_F32:
 			return fmt.Sprintf("ferret_io_%s_f32", baseName)
 		case types.TYPE_F64:
 			return fmt.Sprintf("ferret_io_%s_f64", baseName)
+		case types.TYPE_F128:
+			return fmt.Sprintf("ferret_io_%s_f128", baseName)
+		case types.TYPE_F256:
+			return fmt.Sprintf("ferret_io_%s_f256", baseName)
 		case types.TYPE_BOOL:
 			return fmt.Sprintf("ferret_io_%s_bool", baseName)
 		case types.TYPE_STRING:
 			return fmt.Sprintf("ferret_io_%s", baseName)
+		case types.TYPE_BYTE:
+			return fmt.Sprintf("ferret_io_%s_u8", baseName)
 		}
 	}
 
@@ -3606,8 +3679,9 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 
 	// Build format string
 	formatParts := []string{}
+	largeArgIndices := make(map[int]bool)
 
-	for _, arg := range args {
+	for i, arg := range args {
 		// Use semantic analyzer's type inference which is comprehensive and handles
 		// all expression types including literals, identifiers, function calls, etc.
 		argType := g.inferExprType(arg)
@@ -3659,18 +3733,29 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 					formatParts = append(formatParts, "%d")
 				case types.TYPE_I64:
 					formatParts = append(formatParts, "%ld")
+				case types.TYPE_I128, types.TYPE_I256:
+					formatParts = append(formatParts, "%s")
+					largeArgIndices[i] = true
 				case types.TYPE_U8, types.TYPE_U16, types.TYPE_U32:
 					formatParts = append(formatParts, "%u")
 				case types.TYPE_U64:
 					formatParts = append(formatParts, "%lu")
+				case types.TYPE_U128, types.TYPE_U256:
+					formatParts = append(formatParts, "%s")
+					largeArgIndices[i] = true
 				case types.TYPE_F32:
 					formatParts = append(formatParts, "%.6g")
 				case types.TYPE_F64:
 					formatParts = append(formatParts, "%.15g")
+				case types.TYPE_F128, types.TYPE_F256:
+					formatParts = append(formatParts, "%s")
+					largeArgIndices[i] = true
 				case types.TYPE_BOOL:
 					formatParts = append(formatParts, "%s") // Will format as "true"/"false"
 				case types.TYPE_STRING:
 					formatParts = append(formatParts, "%s")
+				case types.TYPE_BYTE:
+					formatParts = append(formatParts, "%u")
 				default:
 					// Unknown primitive type - report error but use safe fallback
 					g.ctx.ReportError(fmt.Sprintf("codegen: unsupported primitive type for printing: %s", prim.GetName()), nil)
@@ -3690,6 +3775,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 	// Generate temp buffers for optional values BEFORE snprintf
 	// We need to format optional values that have a value, using the same logic as their inner type T
 	optionalTempBuffers := make(map[int]string) // map from arg index to temp buffer name
+	ownedTemps := []string{}
 
 	for i, arg := range args {
 		argType := g.inferExprType(arg)
@@ -3715,6 +3801,30 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 			// We need a temp buffer for this optional - format it before the main snprintf
 			tempBuf := fmt.Sprintf("__opt_val_%d_%d", g.counter, i)
 			optionalTempBuffers[i] = tempBuf
+			if g.isLargePrimitiveType(innerType) {
+				ownedTemps = append(ownedTemps, tempBuf)
+				g.writeIndent()
+				g.write("char* %s = NULL;\n", tempBuf)
+				g.writeIndent()
+				g.write("if (")
+				g.generateExpr(arg)
+				g.write(".is_some) {\n")
+				g.indent++
+				g.writeIndent()
+				g.write("%s = %s(", tempBuf, g.largeToStringFuncName(innerType))
+				g.generateExpr(arg)
+				g.write(".value);\n")
+				g.indent--
+				g.writeIndent()
+				g.write("} else {\n")
+				g.indent++
+				g.writeIndent()
+				g.write("%s = strdup(\"none\");\n", tempBuf)
+				g.indent--
+				g.writeIndent()
+				g.write("}\n")
+				continue
+			}
 			g.writeIndent()
 			g.write("char %s[64];\n", tempBuf)
 
@@ -3790,6 +3900,34 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		}
 	}
 
+	largeTempBuffers := make(map[int]string)
+	for i, arg := range args {
+		if !largeArgIndices[i] {
+			continue
+		}
+		if _, hasTemp := optionalTempBuffers[i]; hasTemp {
+			continue
+		}
+		argType := g.inferExprType(arg)
+		if argType == nil || argType.Equals(types.TypeUnknown) {
+			if ident, ok := arg.(*ast.IdentifierExpr); ok {
+				if sym, found := g.mod.CurrentScope.Lookup(ident.Name); found && sym != nil && sym.Type != nil {
+					argType = sym.Type
+				}
+			}
+		}
+		if !g.isLargePrimitiveType(argType) {
+			continue
+		}
+		tempBuf := fmt.Sprintf("__large_val_%d_%d", g.counter, i)
+		largeTempBuffers[i] = tempBuf
+		ownedTemps = append(ownedTemps, tempBuf)
+		g.writeIndent()
+		g.write("char* %s = %s(", tempBuf, g.largeToStringFuncName(argType))
+		g.generateExpr(arg)
+		g.write(");\n")
+	}
+
 	formatStr := strings.Join(formatParts, "")
 
 	// Generate: snprintf(bufName, sizeof(bufName), format, args...);
@@ -3814,6 +3952,9 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		// Check if we have a temp buffer for this optional
 		if tempBuf, hasTempBuf := optionalTempBuffers[i]; hasTempBuf {
 			// Use the pre-formatted temp buffer
+			g.write("%s", tempBuf)
+		} else if tempBuf, hasTempBuf := largeTempBuffers[i]; hasTempBuf {
+			// Use pre-formatted large primitive string
 			g.write("%s", tempBuf)
 		} else if argType != nil && argType.Equals(types.TypeNone) {
 			// Handle none type - print as string
@@ -3853,6 +3994,11 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 	} else {
 		g.writeIndent()
 		g.write("ferret_io_Print(%s);\n", bufName)
+	}
+
+	for _, temp := range ownedTemps {
+		g.writeIndent()
+		g.write("free(%s);\n", temp)
 	}
 }
 

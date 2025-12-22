@@ -14,24 +14,18 @@ We need a solution that:
 
 ### For 128-bit Integers (`i128`, `u128`)
 
-**Primary Strategy**: Use compiler extensions when available
-- GCC and Clang support `__int128` and `unsigned __int128`
-- These provide native performance (same speed as `int64_t`)
-- Operations compile to native CPU instructions
-
-**Fallback Strategy**: Struct-based representation
-- When `__int128` is not available (e.g., MSVC)
-- Uses a struct with two 64-bit words: `{uint64_t lo, int64_t hi}`
-- All operations implemented in software
-- ~2-3x slower than native, but fully portable
+**Primary Strategy**: Limb-based representation
+- Uses a fixed array of limbs with selectable limb size (32-bit or 64-bit).
+- 64-bit limbs are used when the platform is 64-bit and `__uint128_t` is available.
+- 32-bit limbs are used as a safe default when detection is unavailable.
+- All operations implemented in software on limbs for portability.
 
 ### For 256-bit Integers (`i256`, `u256`)
 
-**Always Struct-based**: 
-- Uses a struct with four 64-bit words: `{uint64_t words[4]}`
-- All operations implemented in software
-- ~4-5x slower than native, but necessary for 256-bit support
-- Portable across all compilers
+**Always Limb-based**:
+- Uses a fixed array of limbs with selectable limb size (32-bit or 64-bit).
+- All operations implemented in software.
+- Portable across all compilers.
 
 ### For 128-bit Floats (`f128`)
 
@@ -61,75 +55,63 @@ We need a solution that:
 
 1. **Feature Detection**:
    ```c
-   #if defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)
-       #define FERRET_HAS_INT128 1
+   #if defined(__SIZEOF_INT128__)
+       #define FERRET_HAS_WIDE128 1
+   #endif
+
+   #if defined(UINTPTR_MAX) && UINTPTR_MAX >= 0xffffffffffffffffULL && defined(FERRET_HAS_WIDE128)
+       #define FERRET_LIMB_BITS 64
+   #else
+       #define FERRET_LIMB_BITS 32
    #endif
    ```
 
 2. **Type Definitions**:
-   - With `__int128`: `typedef __int128 ferret_i128;`
-   - Without `__int128`: Struct-based fallback
-   - 256-bit: Always struct-based
+   - Limb-based: `typedef struct { ferret_limb_t words[FERRET_U128_LIMBS]; } ferret_u128;`
+   - Same layout for signed types (two's complement in limbs).
+   - 256-bit uses `FERRET_U256_LIMBS`.
 
 3. **Operations**:
-   - With native support: Macros that expand to native operations
-   - Without native support: Function calls to implementations in `bigint.c`
+   - Always function calls implemented in `bigint.c` using limb helpers.
 
 ### Implementation File (`bigint.c`)
 
-**128-bit Operations (fallback)**:
-- Addition/Subtraction: Straightforward with carry/borrow
-- Multiplication: Split into 32-bit parts, multiply, combine
-- Division/Modulo: Simplified (full implementation would use long division)
-- Comparisons: Compare high word first, then low word
-
-**256-bit Operations**:
-- Addition/Subtraction: Iterate through 4 words with carry/borrow
-- Multiplication: Simplified (full implementation would use Karatsuba algorithm)
-- Division/Modulo: Simplified (full implementation would use binary long division)
-- Comparisons: Compare from most significant word to least
+**Integer Operations**:
+- Addition/Subtraction: Per-limb carry/borrow.
+- Multiplication: Long multiplication (truncated to target width).
+- Division/Modulo: Binary long division on limbs.
+- Comparisons: Unsigned and signed limb comparisons.
 
 ## Performance Characteristics
 
 | Type | Native Support | Fallback | Notes |
 |------|---------------|----------|-------|
-| `i128`/`u128` | ✅ Native speed | ~2-3x slower | Native on GCC/Clang |
-| `i256`/`u256` | N/A | ~4-5x slower | Always struct-based |
+| `i128`/`u128` | N/A | ~2-3x slower | Limb-based |
+| `i256`/`u256` | N/A | ~4-5x slower | Limb-based |
 | `f128` | ✅ Native speed | ~2-3x slower | Native on GCC (x86_64, PowerPC) |
 | `f256` | N/A | ~4-5x slower | Always struct-based |
 
 ## Current Limitations
 
-1. **Simplified Operations**: 
-   - 256-bit multiplication and division are placeholder implementations
-   - 128-bit division (fallback) is simplified
-   - For production use, consider integrating GMP (GNU Multiple Precision Library)
+1. **Performance**:
+   - Limb-based math is slower than native integer instructions.
+   - For heavy big-int workloads, consider GMP/MPIR integration.
 
 2. **No Overflow Detection**:
    - Operations don't check for overflow
    - Could add overflow flags if needed
 
-3. **No Bitwise Operations**:
-   - Currently only arithmetic operations
-   - Bitwise ops (AND, OR, XOR, shifts) can be added
+3. **Floating Precision**:
+   - f128/f256 are still simplified via double conversion in fallback paths.
 
 ## Future Improvements
 
-1. **Full 256-bit Implementation**:
-   - Implement Karatsuba multiplication for 256-bit
-   - Implement binary long division for 256-bit
-   - Optimize for common cases
-
-2. **GMP Integration** (Optional):
+1. **GMP Integration** (Optional):
    - For maximum performance on 256-bit operations
    - Would require linking against libgmp
    - Best for applications that heavily use 256-bit integers
 
-3. **Bitwise Operations**:
-   - Add AND, OR, XOR, NOT, shifts
-   - Straightforward to implement for struct-based types
-
-4. **Conversion Helpers**:
+2. **Conversion Helpers**:
    - String conversion (to/from decimal/hex)
    - More conversion functions between types
 
@@ -138,8 +120,7 @@ We need a solution that:
 The codegen automatically:
 1. Includes `bigint.h` in generated C code
 2. Uses `ferret_i128`, `ferret_u128`, `ferret_i256`, `ferret_u256` types
-3. Uses native operations when available (via macros)
-4. Calls runtime functions when using struct-based fallback
+3. Calls runtime functions implemented on limb helpers
 
 **Example Ferret code**:
 ```ferret
@@ -158,11 +139,11 @@ let product: f128 = a * b;  // Automatically uses native or fallback operations
 
 | Compiler | 128-bit Int | 128-bit Float | 256-bit Types |
 |----------|-------------|---------------|---------------|
-| GCC 4.6+ (x86_64) | ✅ Native (`__int128`) | ✅ Native (`__float128`) | ✅ Struct-based |
-| GCC 4.6+ (PowerPC) | ✅ Native (`__int128`) | ✅ Native (`__float128`) | ✅ Struct-based |
-| Clang 3.0+ | ✅ Native (`__int128`) | ❌ Fallback (struct) | ✅ Struct-based |
-| MSVC | ❌ Fallback (struct) | ❌ Fallback (struct) | ✅ Struct-based |
-| Other | ❌ Fallback (struct) | ❌ Fallback (struct) | ✅ Struct-based |
+| GCC 4.6+ (x86_64) | ✅ Limb-based | ✅ Native (`__float128`) | ✅ Limb-based |
+| GCC 4.6+ (PowerPC) | ✅ Limb-based | ✅ Native (`__float128`) | ✅ Limb-based |
+| Clang 3.0+ | ✅ Limb-based | ❌ Fallback (struct) | ✅ Limb-based |
+| MSVC | ✅ Limb-based | ❌ Fallback (struct) | ✅ Limb-based |
+| Other | ✅ Limb-based | ❌ Fallback (struct) | ✅ Limb-based |
 
 ## Testing
 
