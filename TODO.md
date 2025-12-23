@@ -5,6 +5,7 @@
 - Large primitive runtime + MIR/QBE pointer ABI implemented (i128/u128/i256/u256/f128/f256).
 - Fixed array indexing requires compile-time constants (negative const indices allowed). Non-const index -> T0028.
 - Dynamic arrays still use runtime bounds checks.
+- Blank identifier '_' is reserved for for-loop iterators; invalid elsewhere.
 
 ## Next Work Items
 ### Incremental plan (easy -> hard, dependency-ordered)

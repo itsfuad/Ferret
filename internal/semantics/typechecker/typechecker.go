@@ -278,14 +278,14 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
-						if compatibility == Incompatible {
+						if !isImplicitlyCompatible(compatibility) {
 							returnedDesc := resolveType(returnedType, resultType.Err)
-							ctx.Diagnostics.Add(
-								diagnostics.NewError("error return type mismatch").
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(n.Result.Loc(),
-										fmt.Sprintf("expected error type %s, found %s", resultType.Err.String(), returnedDesc)),
-							)
+							diag := diagnostics.NewError("error return type mismatch").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithPrimaryLabel(n.Result.Loc(),
+									fmt.Sprintf("expected error type %s, found %s", resultType.Err.String(), returnedDesc))
+							diag = addExplicitCastHint(ctx, diag, returnedType, resultType.Err, compatibility, n.Result)
+							ctx.Diagnostics.Add(diag)
 						}
 					}
 				} else {
@@ -303,13 +303,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, resultType.Ok)
-						if compatibility == Incompatible {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError("return type mismatch").
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(n.Result.Loc(),
-										fmt.Sprintf("expected %s, found %s", resultType.Ok.String(), returnedType.String())),
-							)
+						if !isImplicitlyCompatible(compatibility) {
+							diag := diagnostics.NewError("return type mismatch").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithPrimaryLabel(n.Result.Loc(),
+									fmt.Sprintf("expected %s, found %s", resultType.Ok.String(), returnedType.String()))
+							diag = addExplicitCastHint(ctx, diag, returnedType, resultType.Ok, compatibility, n.Result)
+							ctx.Diagnostics.Add(diag)
 						}
 					}
 				}
@@ -325,13 +325,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
 					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
-						if compatibility == Incompatible {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError("type mismatch in return statement").
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(n.Result.Loc(),
-										fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
-							)
+						if !isImplicitlyCompatible(compatibility) {
+							diag := diagnostics.NewError("type mismatch in return statement").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithPrimaryLabel(n.Result.Loc(),
+									fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String()))
+							diag = addExplicitCastHint(ctx, diag, returnedType, expectedReturnType, compatibility, n.Result)
+							ctx.Diagnostics.Add(diag)
 						}
 					}
 				}
@@ -517,13 +517,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 				if !matchType.Equals(types.TypeUnknown) && !patternType.Equals(types.TypeUnknown) {
 					// Check if types are compatible (exact match or compatible types)
 					compat := checkTypeCompatibility(patternType, matchType)
-					if compat == Incompatible {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError(fmt.Sprintf("pattern type '%s' does not match match expression type '%s'", patternType.String(), matchType.String())).
-								WithPrimaryLabel(caseClause.Pattern.Loc(), "incompatible pattern type").
-								WithCode(diagnostics.ErrTypeMismatch).
-								WithNote(fmt.Sprintf("match expression has type '%s'", matchType.String())),
-						)
+					if !isImplicitlyCompatible(compat) {
+						diag := diagnostics.NewError(fmt.Sprintf("pattern type '%s' does not match match expression type '%s'", patternType.String(), matchType.String())).
+							WithPrimaryLabel(caseClause.Pattern.Loc(), "incompatible pattern type").
+							WithCode(diagnostics.ErrTypeMismatch).
+							WithNote(fmt.Sprintf("match expression has type '%s'", matchType.String()))
+						diag = addExplicitCastHint(ctx, diag, patternType, matchType, compat, caseClause.Pattern)
+						ctx.Diagnostics.Add(diag)
 					}
 				}
 			}
@@ -564,6 +564,25 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 	for _, item := range declItems {
 		name := item.Name.Name
+
+		if name == "_" {
+			if item.Value != nil {
+				expectedType := types.TypeUnknown
+				if item.Type != nil {
+					expectedType = TypeFromTypeNodeWithContext(ctx, mod, item.Type)
+					checkAssignLike(ctx, mod, expectedType, item.Type, item.Value)
+				} else {
+					checkExpr(ctx, mod, item.Value, expectedType)
+				}
+			} else if isConst {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("constant '_' must be initialized").
+						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer").
+						WithHelp("provide a value: const _ := 42"),
+				)
+			}
+			continue
+		}
 
 		// Get or create the symbol (module-level or local)
 		sym, ok := mod.CurrentScope.GetSymbol(name)
@@ -1102,14 +1121,14 @@ func validateArrayLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	for _, elem := range lit.Elts {
 		if _, isKV := elem.(*ast.KeyValueExpr); !isKV {
 			elemType := checkExpr(ctx, mod, elem, arrayType.Element)
-			if compat := checkTypeCompatibility(elemType, arrayType.Element); compat == Incompatible {
+			if compat := checkTypeCompatibility(elemType, arrayType.Element); !isImplicitlyCompatible(compat) {
 				elemTypeStr := resolveType(elemType, types.TypeUnknown)
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
-						WithCode(diagnostics.ErrTypeMismatch).
-						WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
-						WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String())),
-				)
+				diag := diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
+					WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String()))
+				diag = addExplicitCastHint(ctx, diag, elemType, arrayType.Element, compat, elem)
+				ctx.Diagnostics.Add(diag)
 			}
 		}
 	}
@@ -1128,26 +1147,26 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 
 		// Check key type compatibility - with contextualization
 		keyType := checkExpr(ctx, mod, kv.Key, mapType.Key)
-		if compat := checkTypeCompatibility(keyType, mapType.Key); compat == Incompatible {
+		if compat := checkTypeCompatibility(keyType, mapType.Key); !isImplicitlyCompatible(compat) {
 			keyTypeStr := resolveType(keyType, types.TypeUnknown)
-			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("map keys must all be same type, expected %s but found %s", mapType.Key.String(), keyTypeStr)).
-					WithCode(diagnostics.ErrTypeMismatch).
-					WithPrimaryLabel(kv.Key.Loc(), fmt.Sprintf("type %s", keyTypeStr)).
-					WithHelp(fmt.Sprintf("all map keys must be %s", mapType.Key.String())),
-			)
+			diag := diagnostics.NewError(fmt.Sprintf("map keys must all be same type, expected %s but found %s", mapType.Key.String(), keyTypeStr)).
+				WithCode(diagnostics.ErrTypeMismatch).
+				WithPrimaryLabel(kv.Key.Loc(), fmt.Sprintf("type %s", keyTypeStr)).
+				WithHelp(fmt.Sprintf("all map keys must be %s", mapType.Key.String()))
+			diag = addExplicitCastHint(ctx, diag, keyType, mapType.Key, compat, kv.Key)
+			ctx.Diagnostics.Add(diag)
 		}
 
 		// Check value type compatibility - with contextualization
 		valueType := checkExpr(ctx, mod, kv.Value, mapType.Value)
-		if compat := checkTypeCompatibility(valueType, mapType.Value); compat == Incompatible {
+		if compat := checkTypeCompatibility(valueType, mapType.Value); !isImplicitlyCompatible(compat) {
 			valueTypeStr := resolveType(valueType, types.TypeUnknown)
-			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("map values must all be same type, expected %s but found %s", mapType.Value.String(), valueTypeStr)).
-					WithCode(diagnostics.ErrTypeMismatch).
-					WithPrimaryLabel(kv.Value.Loc(), fmt.Sprintf("type %s", valueTypeStr)).
-					WithHelp(fmt.Sprintf("all map values must be %s", mapType.Value.String())),
-			)
+			diag := diagnostics.NewError(fmt.Sprintf("map values must all be same type, expected %s but found %s", mapType.Value.String(), valueTypeStr)).
+				WithCode(diagnostics.ErrTypeMismatch).
+				WithPrimaryLabel(kv.Value.Loc(), fmt.Sprintf("type %s", valueTypeStr)).
+				WithHelp(fmt.Sprintf("all map values must be %s", mapType.Value.String()))
+			diag = addExplicitCastHint(ctx, diag, valueType, mapType.Value, compat, kv.Value)
+			ctx.Diagnostics.Add(diag)
 		}
 	}
 }
@@ -1175,7 +1194,7 @@ func analyzeStructCompatibility(src, dst *types.StructType) (missingFields []str
 				}
 				// Allow untyped literals to match concrete types
 				compatibility := checkTypeCompatibility(srcField.Type, dstField.Type)
-				if compatibility == Incompatible {
+				if !isImplicitlyCompatible(compatibility) {
 					// Type mismatch
 					mismatchedFields = append(mismatchedFields,
 						fmt.Sprintf("%s (expected %s, found %s)", dstField.Name, dstField.Type.String(), srcField.Type.String()))
@@ -1470,6 +1489,12 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.AssignStmt) {
 	// Check if we're trying to reassign a constant
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
+		if ident.Name == "_" {
+			if stmt.Rhs != nil {
+				checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+			}
+			return
+		}
 		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
 			if sym.Kind == symbols.SymbolConstant {
 				ctx.Diagnostics.Add(
@@ -1859,7 +1884,6 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 
 	case ExplicitCastable:
 		// Requires explicit cast - use centralized hint system
-		exprText := rightNode.Loc().GetText(ctx.Diagnostics.GetSourceCache())
 		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility))
 
 		// Add dual labels if we have type node location
@@ -1870,10 +1894,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion not allowed")
 		}
 
-		hint := getConversionHint(rhsType, leftType, compatibility, exprText)
-		if hint != "" {
-			diag = diag.WithHelp(hint)
-		}
+		diag = addExplicitCastHint(ctx, diag, rhsType, leftType, compatibility, rightNode)
 		ctx.Diagnostics.Add(diag)
 
 	case Incompatible:
@@ -1935,6 +1956,24 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 
 		ctx.Diagnostics.Add(diag)
 	}
+}
+
+func addExplicitCastHint(ctx *context_v2.CompilerContext, diag *diagnostics.Diagnostic, source, target types.SemType, compatibility TypeCompatibility, expr ast.Expression) *diagnostics.Diagnostic {
+	if diag == nil || compatibility != ExplicitCastable {
+		return diag
+	}
+	exprText := ""
+	if expr != nil {
+		exprText = expr.Loc().GetText(ctx.Diagnostics.GetSourceCache())
+	}
+	hint := getConversionHint(source, target, compatibility, exprText)
+	if hint == "" {
+		return diag
+	}
+	if diag.Help != "" {
+		hint = fmt.Sprintf("%s; %s", diag.Help, hint)
+	}
+	return diag.WithHelp(hint)
 }
 
 // formatValueDescription formats a user-friendly description for a value in error messages.
@@ -2334,18 +2373,18 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 		// Check compatibility (use WithContext to handle interfaces properly)
 		compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, param.Type)
 
-		if compatibility == Incompatible {
+		if !isImplicitlyCompatible(compatibility) {
 			// Format the argument type in a user-friendly way
 			argTypeDesc := resolveType(argType, param.Type)
-			ctx.Diagnostics.Add(
-				diagnostics.ArgumentTypeMismatch(
-					mod.FilePath,
-					arg.Loc(),
-					param.Name,
-					param.Type.String(),
-					argTypeDesc.String(),
-				),
+			diag := diagnostics.ArgumentTypeMismatch(
+				mod.FilePath,
+				arg.Loc(),
+				param.Name,
+				param.Type.String(),
+				argTypeDesc.String(),
 			)
+			diag = addExplicitCastHint(ctx, diag, argType, param.Type, compatibility, arg)
+			ctx.Diagnostics.Add(diag)
 		}
 	}
 
@@ -2372,18 +2411,18 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)
 			compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, variadicElemType)
 
-			if compatibility == Incompatible {
+			if !isImplicitlyCompatible(compatibility) {
 				// Format the argument type in a user-friendly way
 				argTypeDesc := resolveType(argType, variadicElemType)
-				ctx.Diagnostics.Add(
-					diagnostics.ArgumentTypeMismatch(
-						mod.FilePath,
-						arg.Loc(),
-						variadicParam.Name,
-						variadicElemType.String(),
-						argTypeDesc.String(),
-					),
+				diag := diagnostics.ArgumentTypeMismatch(
+					mod.FilePath,
+					arg.Loc(),
+					variadicParam.Name,
+					variadicElemType.String(),
+					argTypeDesc.String(),
 				)
+				diag = addExplicitCastHint(ctx, diag, argType, variadicElemType, compatibility, arg)
+				ctx.Diagnostics.Add(diag)
 			}
 		}
 	}

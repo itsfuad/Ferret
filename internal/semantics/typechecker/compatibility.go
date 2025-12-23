@@ -40,6 +40,10 @@ func (tc TypeCompatibility) String() string {
 	}
 }
 
+func isImplicitlyCompatible(compatibility TypeCompatibility) bool {
+	return compatibility == Identical || compatibility == ImplicitCastable
+}
+
 // methodSignaturesMatch checks if two function types match
 // This is used to compare method signatures with interface method signatures
 // Note: Methods don't include the receiver in their FuncType - the receiver is separate

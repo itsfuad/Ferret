@@ -189,6 +189,14 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	case *ast.IdentifierExpr:
 		// Check if the identifier is declared
 		name := e.Name
+		if name == "_" {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("invalid use of '_' identifier").
+					WithPrimaryLabel(&e.Location, "blank identifier is only allowed in for loop iterators").
+					WithHelp("use a real variable name"),
+			)
+			return
+		}
 		if _, ok := mod.CurrentScope.Lookup(name); !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found", name)).

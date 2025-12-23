@@ -547,12 +547,15 @@ func collectMethodDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2
 	}
 
 	// Create method scope and declare parameters, but do NOT collect body
-	receiverSym := &symbols.Symbol{
-		Name:     decl.Receiver.Name.Name,
-		Kind:     symbols.SymbolReceiver,
-		Type:     types.TypeUnknown, // Filled during type checking
-		Exported: utils.IsExported(decl.Receiver.Name.Name),
-		Decl:     decl.Receiver,
+	var receiverSym *symbols.Symbol
+	if decl.Receiver.Name != nil && decl.Receiver.Name.Name != "_" {
+		receiverSym = &symbols.Symbol{
+			Name:     decl.Receiver.Name.Name,
+			Kind:     symbols.SymbolReceiver,
+			Type:     types.TypeUnknown, // Filled during type checking
+			Exported: utils.IsExported(decl.Receiver.Name.Name),
+			Decl:     decl.Receiver,
+		}
 	}
 
 	collectFunctionSignatureOnly(ctx, mod, decl.Type, &decl.Scope, receiverSym)
@@ -627,6 +630,9 @@ func validateParams(ctx *context_v2.CompilerContext, _ *context_v2.Module, param
 	for _, param := range params {
 		if param.Name != nil {
 			name := param.Name.Name
+			if name == "_" {
+				continue
+			}
 			if existing, ok := paramNames[name]; ok {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("duplicate parameter name '%s'", name)).
@@ -1030,6 +1036,9 @@ func collectFunctionSignatureOnly(ctx *context_v2.CompilerContext, mod *context_
 		validateParams(ctx, mod, funcType.Params)
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
+			if param.Name == nil || param.Name.Name == "_" {
+				continue
+			}
 			psym := &symbols.Symbol{
 				Name:     param.Name.Name,
 				Kind:     symbols.SymbolParameter,
@@ -1082,6 +1091,9 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 		validateParams(ctx, mod, funcType.Params)
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
+			if param.Name == nil || param.Name.Name == "_" {
+				continue
+			}
 			psym := &symbols.Symbol{
 				Name:     param.Name.Name,
 				Kind:     symbols.SymbolParameter,
