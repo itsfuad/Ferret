@@ -28,6 +28,30 @@ func isLargePrimitiveType(typ types.SemType) bool {
 	return ok
 }
 
+func isStructType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	_, ok := typ.(*types.StructType)
+	return ok
+}
+
+func isFixedArrayType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if arr, ok := typ.(*types.ArrayType); ok {
+		return arr.Length >= 0
+	}
+	return false
+}
+
+func needsByRefType(typ types.SemType) bool {
+	return isLargePrimitiveType(typ) || isStructType(typ) || isFixedArrayType(typ)
+}
+
 func isLargeIntName(name string) bool {
 	switch name {
 	case string(types.TYPE_I128), string(types.TYPE_U128),

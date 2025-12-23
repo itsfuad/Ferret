@@ -434,6 +434,13 @@ func (g *Generator) constValue(typ types.SemType, value string) (string, error) 
 			return val, nil
 		}
 	}
+	if _, ok := typ.(*types.EnumType); ok {
+		val, err := g.normalizeInt(value)
+		if err != nil {
+			return "", err
+		}
+		return val, nil
+	}
 
 	if _, ok := typ.(*types.ReferenceType); ok {
 		val, err := g.normalizeInt(value)
@@ -597,6 +604,9 @@ func (g *Generator) loadOp(typ types.SemType) (string, error) {
 			return "loadl", nil
 		}
 	}
+	if _, ok := typ.(*types.EnumType); ok {
+		return "loadw", nil
+	}
 	if _, ok := typ.(*types.ReferenceType); ok {
 		return "loadl", nil
 	}
@@ -622,6 +632,9 @@ func (g *Generator) storeOp(typ types.SemType) (string, error) {
 		case types.TYPE_STRING:
 			return "storel", nil
 		}
+	}
+	if _, ok := typ.(*types.EnumType); ok {
+		return "storew", nil
 	}
 	if _, ok := typ.(*types.ReferenceType); ok {
 		return "storel", nil
@@ -656,11 +669,13 @@ func (g *Generator) qbeType(typ types.SemType) (string, error) {
 		}
 	}
 
-	switch typ.(type) {
+	switch typ := typ.(type) {
 	case *types.ReferenceType:
 		return "l", nil
+	case *types.EnumType:
+		return "w", nil
 	case *types.ArrayType:
-		arr := typ.(*types.ArrayType)
+		arr := typ
 		if arr.Length < 0 {
 			return "l", nil
 		}

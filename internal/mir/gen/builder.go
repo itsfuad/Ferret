@@ -176,6 +176,10 @@ func (b *functionBuilder) lowerDeclItem(item hir.DeclItem) {
 
 	if item.Value != nil {
 		if lit, ok := item.Value.(*hir.CompositeLit); ok {
+			if structType, ok := types.UnwrapType(typ).(*types.StructType); ok {
+				b.lowerStructLiteralInto(addr, structType, lit)
+				return
+			}
 			if arrType, ok := types.UnwrapType(typ).(*types.ArrayType); ok && arrType.Length >= 0 {
 				b.lowerArrayLiteralInto(addr, arrType, lit)
 				return
@@ -389,9 +393,9 @@ func (b *functionBuilder) lowerMatch(stmt *hir.MatchStmt) {
 			continue
 		}
 
-		if lit, ok := clause.Pattern.(*hir.Literal); ok {
+		if value, ok := b.matchCaseValue(clause.Pattern); ok {
 			cases = append(cases, mir.SwitchCase{
-				Value:  lit.Value,
+				Value:  value,
 				Target: block.ID,
 			})
 			continue
@@ -600,6 +604,8 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			Location:   e.Location,
 		})
 		return id
+	case *hir.CompositeLit:
+		return b.lowerCompositeLit(e)
 	case *hir.ArrayLenExpr:
 		arrVal := b.lowerExpr(e.X)
 		if arrVal == mir.InvalidValue {
@@ -718,7 +724,7 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 	}
 
 	retType := expr.Type
-	if isLargePrimitiveType(retType) {
+	if needsByRefType(retType) {
 		out := b.emitAlloca(retType, expr.Location)
 		callArgs := append([]mir.ValueID{out}, args...)
 		b.emitInstr(&mir.Call{
@@ -759,12 +765,20 @@ func (b *functionBuilder) lowerQualifiedValue(expr *hir.ScopeResolutionExpr) mir
 		return mir.InvalidValue
 	}
 
-	if name, ok := b.qualifiedName(expr); ok {
-		b.reportUnsupported(fmt.Sprintf("qualified value %s", name), &expr.Location)
+	name, ok := b.qualifiedName(expr)
+	if !ok {
+		b.reportUnsupported("qualified value", &expr.Location)
 		return mir.InvalidValue
 	}
 
-	b.reportUnsupported("qualified value", &expr.Location)
+	if value, ok := b.lookupQualifiedConst(name); ok {
+		if isLargePrimitiveType(expr.Type) {
+			return b.emitLargeConst(expr.Type, value, expr.Location)
+		}
+		return b.emitConst(expr.Type, value, expr.Location)
+	}
+
+	b.reportUnsupported(fmt.Sprintf("qualified value %s", name), &expr.Location)
 	return mir.InvalidValue
 }
 
@@ -845,23 +859,35 @@ func (b *functionBuilder) lowerFieldAddr(expr *hir.SelectorExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	baseIdent, ok := expr.X.(*hir.Ident)
-	if !ok || baseIdent == nil {
+	baseType := b.exprType(expr.X)
+	if baseType == nil {
 		b.reportUnsupported("selector base", expr.Loc())
 		return mir.InvalidValue
 	}
 
-	baseAddr := b.addrForIdent(baseIdent)
-	if baseAddr == mir.InvalidValue {
-		return mir.InvalidValue
-	}
-
-	baseType := types.UnwrapType(baseIdent.Type)
-	basePtr := baseAddr
-	if ref, ok := baseType.(*types.ReferenceType); ok {
-		basePtr = b.emitLoad(baseAddr, baseIdent.Type, baseIdent.Location)
-		baseType = types.UnwrapType(ref.Inner)
-		b.ptrElem[basePtr] = ref.Inner
+	baseType = types.UnwrapType(baseType)
+	basePtr := mir.InvalidValue
+	if isAddressableExpr(expr.X) {
+		baseAddr := b.lowerLValue(expr.X)
+		if baseAddr == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		if ref, ok := baseType.(*types.ReferenceType); ok {
+			basePtr = b.emitLoad(baseAddr, baseType, expr.Location)
+			baseType = types.UnwrapType(ref.Inner)
+			b.ptrElem[basePtr] = ref.Inner
+		} else {
+			basePtr = baseAddr
+		}
+	} else {
+		basePtr = b.lowerExpr(expr.X)
+		if basePtr == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		if ref, ok := baseType.(*types.ReferenceType); ok {
+			baseType = types.UnwrapType(ref.Inner)
+			b.ptrElem[basePtr] = ref.Inner
+		}
 	}
 
 	structType, ok := baseType.(*types.StructType)
@@ -878,6 +904,84 @@ func (b *functionBuilder) lowerFieldAddr(expr *hir.SelectorExpr) mir.ValueID {
 	}
 
 	return b.emitPtrAdd(basePtr, offset, expr.Type, expr.Location)
+}
+
+func (b *functionBuilder) lowerCompositeLit(expr *hir.CompositeLit) mir.ValueID {
+	if expr == nil {
+		return mir.InvalidValue
+	}
+	if expr.Type == nil {
+		b.reportUnsupported("composite literal type", expr.Loc())
+		return mir.InvalidValue
+	}
+	switch typ := types.UnwrapType(expr.Type).(type) {
+	case *types.StructType:
+		out := b.emitAlloca(expr.Type, expr.Location)
+		b.lowerStructLiteralInto(out, typ, expr)
+		return out
+	case *types.ArrayType:
+		if typ.Length < 0 {
+			b.reportUnsupported("dynamic array literal", expr.Loc())
+			return mir.InvalidValue
+		}
+		out := b.emitAlloca(expr.Type, expr.Location)
+		b.lowerArrayLiteralInto(out, typ, expr)
+		return out
+	case *types.MapType:
+		b.reportUnsupported("map literal", expr.Loc())
+		return mir.InvalidValue
+	default:
+		b.reportUnsupported("composite literal", expr.Loc())
+		return mir.InvalidValue
+	}
+}
+
+func (b *functionBuilder) lowerStructLiteralInto(addr mir.ValueID, structType *types.StructType, lit *hir.CompositeLit) {
+	if structType == nil || lit == nil {
+		return
+	}
+
+	layout := b.gen.layout.StructLayout(structType)
+	for _, elt := range lit.Elts {
+		kv, ok := elt.(*hir.KeyValueExpr)
+		if !ok || kv == nil {
+			b.reportUnsupported("struct literal element", elt.Loc())
+			return
+		}
+		keyIdent, ok := kv.Key.(*hir.Ident)
+		if !ok || keyIdent == nil {
+			b.reportUnsupported("struct literal key", kv.Loc())
+			return
+		}
+		fieldType, ok := structFieldType(structType, keyIdent.Name)
+		if !ok {
+			b.reportUnsupported("struct literal field", kv.Loc())
+			return
+		}
+		offset, ok := layout.FieldOffset(keyIdent.Name)
+		if !ok {
+			b.reportUnsupported("struct literal field offset", kv.Loc())
+			return
+		}
+		value := b.lowerExpr(kv.Value)
+		if value == mir.InvalidValue {
+			return
+		}
+		fieldAddr := b.emitPtrAdd(addr, offset, fieldType, lit.Location)
+		b.emitStore(fieldAddr, value, lit.Location)
+	}
+}
+
+func structFieldType(structType *types.StructType, name string) (types.SemType, bool) {
+	if structType == nil {
+		return nil, false
+	}
+	for _, field := range structType.Fields {
+		if field.Name == name {
+			return field.Type, true
+		}
+	}
+	return nil, false
 }
 
 func (b *functionBuilder) lowerArrayLiteralInto(addr mir.ValueID, arrType *types.ArrayType, lit *hir.CompositeLit) {
@@ -946,23 +1050,39 @@ func (b *functionBuilder) lowerIndexAddr(expr *hir.IndexExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	baseIdent, ok := expr.X.(*hir.Ident)
-	if !ok || baseIdent == nil {
+	baseType := b.exprType(expr.X)
+	if baseType == nil {
 		b.reportUnsupported("index base", expr.Loc())
 		return mir.InvalidValue
 	}
 
-	baseAddr := b.addrForIdent(baseIdent)
-	if baseAddr == mir.InvalidValue {
-		return mir.InvalidValue
-	}
-
-	baseType := types.UnwrapType(baseIdent.Type)
-	basePtr := baseAddr
-	if ref, ok := baseType.(*types.ReferenceType); ok {
-		basePtr = b.emitLoad(baseAddr, baseIdent.Type, baseIdent.Location)
-		baseType = types.UnwrapType(ref.Inner)
-		b.ptrElem[basePtr] = ref.Inner
+	baseType = types.UnwrapType(baseType)
+	basePtr := mir.InvalidValue
+	if isAddressableExpr(expr.X) {
+		baseAddr := b.lowerLValue(expr.X)
+		if baseAddr == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		if ref, ok := baseType.(*types.ReferenceType); ok {
+			basePtr = b.emitLoad(baseAddr, baseType, expr.Location)
+			baseType = types.UnwrapType(ref.Inner)
+			b.ptrElem[basePtr] = ref.Inner
+		} else {
+			basePtr = baseAddr
+		}
+	} else {
+		if _, ok := baseType.(*types.ReferenceType); !ok && !needsByRefType(baseType) {
+			b.reportUnsupported("index base", expr.Loc())
+			return mir.InvalidValue
+		}
+		basePtr = b.lowerExpr(expr.X)
+		if basePtr == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		if ref, ok := baseType.(*types.ReferenceType); ok {
+			baseType = types.UnwrapType(ref.Inner)
+			b.ptrElem[basePtr] = ref.Inner
+		}
 	}
 
 	elemSize := b.gen.layout.SizeOf(arrType.Element)
@@ -1262,6 +1382,70 @@ func (b *functionBuilder) qualifiedName(expr hir.Expr) (string, bool) {
 	}
 }
 
+func (b *functionBuilder) lookupQualifiedConst(name string) (string, bool) {
+	if b.gen == nil || b.gen.mod == nil {
+		return "", false
+	}
+
+	mod := b.gen.mod
+	if mod.ImportAliasMap != nil {
+		parts := strings.Split(name, "::")
+		if len(parts) > 1 {
+			if importPath, ok := mod.ImportAliasMap[parts[0]]; ok {
+				if b.gen.ctx == nil {
+					return "", false
+				}
+				imported, ok := b.gen.ctx.GetModule(importPath)
+				if !ok || imported == nil || imported.ModuleScope == nil {
+					return "", false
+				}
+				symName := strings.Join(parts[1:], "::")
+				if sym, ok := imported.ModuleScope.GetSymbol(symName); ok && sym.ConstValue != nil && sym.ConstValue.IsConstant() {
+					return sym.ConstValue.String(), true
+				}
+				return "", false
+			}
+		}
+	}
+
+	if mod.ModuleScope == nil {
+		return "", false
+	}
+	if sym, ok := mod.ModuleScope.GetSymbol(name); ok && sym.ConstValue != nil && sym.ConstValue.IsConstant() {
+		return sym.ConstValue.String(), true
+	}
+	return "", false
+}
+
+func (b *functionBuilder) matchCaseValue(pattern hir.Expr) (string, bool) {
+	if pattern == nil {
+		return "", false
+	}
+
+	switch p := pattern.(type) {
+	case *hir.Literal:
+		return p.Value, true
+	case *hir.Ident:
+		if p.Symbol != nil && p.Symbol.ConstValue != nil && p.Symbol.ConstValue.IsConstant() {
+			return p.Symbol.ConstValue.String(), true
+		}
+	case *hir.ScopeResolutionExpr:
+		if name, ok := b.qualifiedName(p); ok {
+			if value, ok := b.lookupQualifiedConst(name); ok {
+				return value, true
+			}
+		}
+	}
+
+	if b.gen != nil && b.gen.ctx != nil && b.gen.mod != nil {
+		if value := consteval.EvaluateHIRExpr(b.gen.ctx, b.gen.mod, pattern); value != nil && value.IsConstant() {
+			return value.String(), true
+		}
+	}
+
+	return "", false
+}
+
 func (b *functionBuilder) exprType(expr hir.Expr) types.SemType {
 	switch e := expr.(type) {
 	case *hir.Literal:
@@ -1291,6 +1475,15 @@ func (b *functionBuilder) exprType(expr hir.Expr) types.SemType {
 	}
 }
 
+func isAddressableExpr(expr hir.Expr) bool {
+	switch expr.(type) {
+	case *hir.Ident, *hir.SelectorExpr, *hir.IndexExpr:
+		return true
+	default:
+		return false
+	}
+}
+
 func (b *functionBuilder) emitConst(typ types.SemType, value string, loc source.Location) mir.ValueID {
 	id := b.gen.nextValueID()
 	b.emitInstr(&mir.Const{
@@ -1303,12 +1496,20 @@ func (b *functionBuilder) emitConst(typ types.SemType, value string, loc source.
 }
 
 func (b *functionBuilder) emitMemcpy(dst, src mir.ValueID, typ types.SemType, loc source.Location) {
-	if typ == nil || typ.Size() <= 0 {
+	if typ == nil {
 		b.reportUnsupported("memcpy size", &loc)
 		return
 	}
-	size := strconv.FormatInt(int64(typ.Size()), 10)
-	sizeVal := b.emitConst(types.TypeU64, size, loc)
+	size := 0
+	if b.gen != nil && b.gen.layout != nil {
+		size = b.gen.layout.SizeOf(typ)
+	}
+	if size <= 0 {
+		b.reportUnsupported("memcpy size", &loc)
+		return
+	}
+	sizeStr := strconv.FormatInt(int64(size), 10)
+	sizeVal := b.emitConst(types.TypeU64, sizeStr, loc)
 	b.emitInstr(&mir.Call{
 		Result:   mir.InvalidValue,
 		Target:   "ferret_memcpy",
@@ -1561,7 +1762,7 @@ func (b *functionBuilder) emitAlloca(typ types.SemType, loc source.Location) mir
 }
 
 func (b *functionBuilder) emitLoad(addr mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
-	if isLargePrimitiveType(typ) {
+	if needsByRefType(typ) {
 		return addr
 	}
 	id := b.gen.nextValueID()
@@ -1578,7 +1779,7 @@ func (b *functionBuilder) emitLoad(addr mir.ValueID, typ types.SemType, loc sour
 }
 
 func (b *functionBuilder) emitStore(addr, value mir.ValueID, loc source.Location) {
-	if elem, ok := b.ptrElem[addr]; ok && isLargePrimitiveType(elem) {
+	if elem, ok := b.ptrElem[addr]; ok && needsByRefType(elem) {
 		b.emitMemcpy(addr, value, elem, loc)
 		return
 	}

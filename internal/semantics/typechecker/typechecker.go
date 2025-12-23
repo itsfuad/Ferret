@@ -4,6 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/hir/consteval"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/source"
@@ -13,7 +14,6 @@ import (
 	str "compiler/internal/utils/strings"
 
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -1407,71 +1407,9 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 			variantName := variant.Name.Name
 			qualifiedName := typeName + "::" + variantName
 
-			// Compute variant value
 			if variant.Value != nil {
-				// Explicit value provided
-				switch val := variant.Value.(type) {
-				case *ast.BasicLit:
-					if val.Kind == ast.INT {
-						// Parse the integer literal
-						parsedValue, err := strconv.ParseInt(val.Value, 0, 64)
-						if err != nil {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
-									WithPrimaryLabel(val.Loc(), "cannot parse as integer").
-									WithHelp("use a valid integer literal"),
-							)
-							continue
-						}
-						currentValue = parsedValue
-					} else {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
-								WithPrimaryLabel(val.Loc(), "expected integer literal").
-								WithHelp("use an integer literal (e.g., 42)"),
-						)
-						continue
-					}
-				case *ast.UnaryExpr:
-					// Handle negative literals like -1
-					if val.Op.Kind == tokens.MINUS_TOKEN {
-						if lit, ok := val.X.(*ast.BasicLit); ok && lit.Kind == ast.INT {
-							parsedValue, err := strconv.ParseInt(lit.Value, 0, 64)
-							if err != nil {
-								ctx.Diagnostics.Add(
-									diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
-										WithPrimaryLabel(lit.Loc(), "cannot parse as integer").
-										WithHelp("use a valid integer literal"),
-								)
-								continue
-							}
-							currentValue = -parsedValue
-						} else {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
-									WithPrimaryLabel(val.Loc(), "expected integer literal").
-									WithHelp("use an integer literal (e.g., -42)"),
-							)
-							continue
-						}
-					} else {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
-								WithPrimaryLabel(val.Loc(), "unexpected expression").
-								WithHelp("use an integer literal"),
-						)
-						continue
-					}
-				default:
-					ctx.Diagnostics.Add(
-						diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have constant integer value", variantName)).
-							WithPrimaryLabel(variant.Value.Loc(), "expected integer literal").
-							WithHelp("use an integer literal (e.g., 42)"),
-					)
-					continue
-				}
+				reportExplicitEnumValue(ctx, variantName, variant.Value.Loc())
 			}
-			// else: use currentValue as is (sequential numbering)
 
 			// Look up the variant symbol (created during collection phase)
 			variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedName)
@@ -1482,8 +1420,9 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 			// Update the variant symbol's type to the named enum type
 			variantSym.Type = namedType
+			variantSym.ConstValue = consteval.NewIntValue(currentValue, namedType)
 
-			// Increment for next variant (if no explicit value provided)
+			// Increment for next variant (sequential numbering)
 			currentValue++
 		}
 	}
@@ -1602,6 +1541,26 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// For now, method calls with reference receivers handle invalidation separately
 }
 
+func reportExplicitEnumValue(ctx *context_v2.CompilerContext, name string, loc *source.Location) {
+	if ctx == nil || loc == nil {
+		return
+	}
+	label := "explicit enum values are not supported"
+	if name != "" {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("enum variant '%s' cannot have an explicit value", name)).
+				WithPrimaryLabel(loc, label).
+				WithHelp("remove the '= value' and rely on auto-assigned tags"),
+		)
+		return
+	}
+	ctx.Diagnostics.Add(
+		diagnostics.NewError("enum variants cannot have explicit values").
+			WithPrimaryLabel(loc, label).
+			WithHelp("remove the '= value' and rely on auto-assigned tags"),
+	)
+}
+
 func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression, targetType types.SemType, op tokens.Token) {
 	if ident, ok := target.(*ast.IdentifierExpr); ok {
 		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
@@ -1665,6 +1624,16 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
 		checkModuleScopeUseBeforeDecl(ctx, mod, e)
+	case *ast.EnumType:
+		for _, variant := range e.Variants {
+			if variant.Value != nil {
+				name := ""
+				if variant.Name != nil {
+					name = variant.Name.Name
+				}
+				reportExplicitEnumValue(ctx, name, variant.Value.Loc())
+			}
+		}
 	case *ast.CallExpr:
 		checkCallExpr(ctx, mod, e)
 		// Validate catch clause if present
@@ -1676,6 +1645,9 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Validate base expression first
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkSelectorExpr(ctx, mod, e)
+
+	case *ast.ScopeResolutionExpr:
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 
 	case *ast.BinaryExpr:
 		// Recursively check operands
@@ -2137,6 +2109,22 @@ func TypeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		// Propagate the ID from AST to semantic type for identity tracking
 		structType.ID = t.ID
 		return structType
+	case *ast.EnumType:
+		variants := make([]types.EnumVariant, len(t.Variants))
+		for i, v := range t.Variants {
+			name := ""
+			if v.Name != nil {
+				name = v.Name.Name
+			}
+			variants[i] = types.EnumVariant{
+				Name:  name,
+				Value: int64(i),
+				Type:  nil,
+			}
+		}
+		enumType := types.NewEnum("", variants)
+		enumType.ID = t.ID
+		return enumType
 
 	case *ast.FuncType:
 		// Function type: fn(T1, T2) -> R

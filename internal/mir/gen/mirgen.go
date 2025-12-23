@@ -91,7 +91,7 @@ func (g *Generator) lowerMethodDecl(decl *hir.MethodDecl) *mir.Function {
 
 	if decl.Receiver != nil {
 		recvType := decl.Receiver.Type
-		if isLargePrimitiveType(recvType) {
+		if needsByRefType(recvType) {
 			recvType = types.NewReference(recvType)
 		}
 		recv := g.newParam(decl.Receiver.Name, recvType, decl.Receiver.Location)
@@ -115,7 +115,7 @@ func (g *Generator) lowerParams(fnType *types.FunctionType) []mir.Param {
 	params := make([]mir.Param, 0, len(fnType.Params))
 	for _, param := range fnType.Params {
 		paramType := param.Type
-		if isLargePrimitiveType(paramType) {
+		if needsByRefType(paramType) {
 			paramType = types.NewReference(paramType)
 		}
 		params = append(params, g.newParam(param.Name, paramType, source.Location{}))
@@ -131,7 +131,7 @@ func (g *Generator) returnType(fnType *types.FunctionType) types.SemType {
 }
 
 func (g *Generator) applyLargeReturnABI(fn *mir.Function, retType types.SemType, loc source.Location) {
-	if fn == nil || !isLargePrimitiveType(retType) {
+	if fn == nil || !needsByRefType(retType) {
 		return
 	}
 	outParam := g.newParam("__ret", types.NewReference(retType), loc)

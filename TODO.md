@@ -16,9 +16,10 @@
   - [x] MIR lowering for if/else (non-block else, else-if chains).
   - [x] Ensure for/while desugar to supported MIR (range/array for first).
 - [ ] Structs + enums end-to-end (depends on large primitive support)
-  - [ ] Solidify data layout for structs/enums and pointer/reference handling.
-  - [ ] MIR lowering for struct literals/field access/assignment.
-  - [ ] MIR lowering for enum variants and pattern usage.
+  - [x] Solidify data layout for structs/enums and pointer/reference handling.
+  - [x] MIR lowering for struct literals/field access/assignment.
+  - [x] MIR lowering for enum variants (const values).
+  - [ ] MIR lowering for enum pattern usage (match/switch codegen still blocked).
 - [ ] Methods on named types + cross-module usability (depends on structs/enums)
   - [ ] Receiver lowering + name mangling across modules.
   - [ ] Cross-module symbol resolution in MIR/QBE (imports + qualified names).
