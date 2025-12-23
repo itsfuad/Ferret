@@ -1352,6 +1352,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 	}
 
 	receiverType := TypeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+	receiverTypeRaw := receiverType
 
 	// Only process valid named types
 	if receiverType.Equals(types.TypeUnknown) {
@@ -1390,6 +1391,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		typeSym.Methods[decl.Name.Name] = &symbols.MethodInfo{
 			Name:     decl.Name.Name,
 			FuncType: funcType,
+			Receiver: receiverTypeRaw,
 			Exported: utils.IsExported(decl.Name.Name),
 		}
 	}
@@ -1517,6 +1519,8 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		}
 	}
 
+	warnValueReceiverMutation(ctx, mod, stmt.Lhs)
+
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
 
@@ -1604,6 +1608,52 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// For now, method calls with reference receivers handle invalidation separately
 }
 
+func receiverSymbolFromExpr(mod *context_v2.Module, expr ast.Expression) *symbols.Symbol {
+	if mod == nil || mod.CurrentScope == nil || expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		if sym, found := mod.CurrentScope.Lookup(e.Name); found && sym.Kind == symbols.SymbolReceiver {
+			return sym
+		}
+	case *ast.SelectorExpr:
+		return receiverSymbolFromExpr(mod, e.X)
+	case *ast.IndexExpr:
+		return receiverSymbolFromExpr(mod, e.X)
+	case *ast.ParenExpr:
+		return receiverSymbolFromExpr(mod, e.X)
+	}
+	return nil
+}
+
+func warnValueReceiverMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) {
+	if ctx == nil || mod == nil || target == nil {
+		return
+	}
+	sym := receiverSymbolFromExpr(mod, target)
+	if sym == nil || sym.Kind != symbols.SymbolReceiver || sym.Type == nil {
+		return
+	}
+	if _, ok := sym.Type.(*types.ReferenceType); ok {
+		return
+	}
+
+	var declLoc *source.Location
+	if sym.Decl != nil {
+		declLoc = sym.Decl.Loc()
+	}
+
+	diag := diagnostics.NewWarning(fmt.Sprintf("modifying value receiver '%s' does not affect the caller", sym.Name)).
+		WithCode(diagnostics.WarnValueReceiverMutation).
+		WithPrimaryLabel(target.Loc(), "value receiver is a copy").
+		WithHelp("use a '&' receiver to mutate the original value")
+	if declLoc != nil {
+		diag = diag.WithSecondaryLabel(declLoc, "receiver declared here")
+	}
+	ctx.Diagnostics.Add(diag)
+}
+
 func reportExplicitEnumValue(ctx *context_v2.CompilerContext, name string, loc *source.Location) {
 	if ctx == nil || loc == nil {
 		return
@@ -1647,6 +1697,8 @@ func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 			}
 		}
 	}
+
+	warnValueReceiverMutation(ctx, mod, target)
 
 	if !types.IsNumeric(targetType) {
 		ctx.Diagnostics.Add(

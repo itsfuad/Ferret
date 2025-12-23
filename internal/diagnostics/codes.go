@@ -70,4 +70,5 @@ const (
 	WarnConstantConditionTrue  = "W0002"
 	WarnConstantConditionFalse = "W0003"
 	WarnDeadCode               = "W0004"
+	WarnValueReceiverMutation  = "W0005"
 )

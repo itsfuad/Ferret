@@ -6,6 +6,7 @@
 - Fixed array indexing requires compile-time constants (negative const indices allowed). Non-const index -> T0028.
 - Dynamic arrays still use runtime bounds checks.
 - Blank identifier '_' is reserved for for-loop iterators; invalid elsewhere.
+- Value receiver mutations warn (W0005) and do not affect callers (copy semantics).
 
 ## Next Work Items
 ### Incremental plan (easy -> hard, dependency-ordered)
@@ -21,9 +22,9 @@
   - [x] MIR lowering for struct literals/field access/assignment.
   - [x] MIR lowering for enum variants (const values).
   - [x] MIR lowering for enum pattern usage (match on enum variants).
-- [ ] Methods on named types + cross-module usability (depends on structs/enums)
-  - [ ] Receiver lowering + name mangling across modules.
-  - [ ] Cross-module symbol resolution in MIR/QBE (imports + qualified names).
+- [x] Methods on named types + cross-module usability (depends on structs/enums)
+  - [x] Receiver lowering + name mangling across modules.
+  - [x] Cross-module symbol resolution in MIR/QBE (imports + qualified names).
 - [ ] Collections and loops over them (depends on structs/enums)
   - [ ] MIR lowering for map literals.
   - [ ] MIR lowering for map iteration (MapIterInit/MapIterNext) and map for-loops.

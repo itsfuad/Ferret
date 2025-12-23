@@ -749,6 +749,25 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
+	if selector, ok := expr.Fun.(*hir.SelectorExpr); ok {
+		if target, method, ok := b.methodCallTarget(selector); ok {
+			recv := b.methodReceiverArg(selector, method)
+			if recv == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+			args := make([]mir.ValueID, 0, len(expr.Args)+1)
+			args = append(args, recv)
+			for _, arg := range expr.Args {
+				val := b.lowerExpr(arg)
+				if val == mir.InvalidValue {
+					return mir.InvalidValue
+				}
+				args = append(args, val)
+			}
+			return b.emitCall(target, args, expr)
+		}
+	}
+
 	target, ok := b.callTarget(expr.Fun)
 	if !ok {
 		b.reportUnsupported("call target", &expr.Location)
@@ -764,6 +783,10 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		args = append(args, val)
 	}
 
+	return b.emitCall(target, args, expr)
+}
+
+func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {
 	retType := expr.Type
 	if needsByRefType(retType) {
 		out := b.emitAlloca(retType, expr.Location)
@@ -1406,6 +1429,151 @@ func (b *functionBuilder) callTarget(expr hir.Expr) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func (b *functionBuilder) methodCallTarget(expr *hir.SelectorExpr) (string, *symbols.MethodInfo, bool) {
+	if expr == nil || expr.Field == nil || expr.Field.Name == "" {
+		return "", nil, false
+	}
+
+	baseType := b.exprType(expr.X)
+	if baseType == nil {
+		return "", nil, false
+	}
+
+	baseType = dereferenceType(baseType)
+	named, ok := baseType.(*types.NamedType)
+	if !ok || named.Name == "" {
+		return "", nil, false
+	}
+
+	if structType, ok := types.UnwrapType(named).(*types.StructType); ok {
+		for _, field := range structType.Fields {
+			if field.Name == expr.Field.Name {
+				return "", nil, false
+			}
+		}
+	}
+
+	typeSym, alias, ok := b.lookupTypeSymbol(named.Name)
+	if !ok || typeSym == nil || typeSym.Methods == nil {
+		return "", nil, false
+	}
+
+	method, ok := typeSym.Methods[expr.Field.Name]
+	if !ok || method == nil {
+		return "", nil, false
+	}
+
+	target := named.Name + "_" + expr.Field.Name
+	if alias != "" {
+		target = alias + "::" + target
+	}
+	return target, method, true
+}
+
+func (b *functionBuilder) methodReceiverArg(expr *hir.SelectorExpr, method *symbols.MethodInfo) mir.ValueID {
+	if expr == nil || method == nil {
+		return mir.InvalidValue
+	}
+
+	recvType := method.Receiver
+	if recvType == nil {
+		return b.lowerExpr(expr.X)
+	}
+
+	recvInner := recvType
+	receiverIsRef := false
+	if ref, ok := recvType.(*types.ReferenceType); ok {
+		receiverIsRef = true
+		recvInner = ref.Inner
+	}
+
+	if receiverIsRef {
+		return b.methodReceiverRef(expr, recvInner)
+	}
+
+	if needsByRefType(recvInner) {
+		return b.methodReceiverCopy(expr, recvInner)
+	}
+
+	return b.methodReceiverValue(expr)
+}
+
+func (b *functionBuilder) methodReceiverRef(expr *hir.SelectorExpr, recvInner types.SemType) mir.ValueID {
+	exprType := b.exprType(expr.X)
+	if exprType != nil {
+		if _, ok := types.UnwrapType(exprType).(*types.ReferenceType); ok || needsByRefType(exprType) {
+			return b.lowerExpr(expr.X)
+		}
+	}
+
+	if isAddressableExpr(expr.X) {
+		return b.lowerLValue(expr.X)
+	}
+
+	val := b.lowerExpr(expr.X)
+	if val == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	tmp := b.emitAlloca(recvInner, expr.Location)
+	b.emitStore(tmp, val, expr.Location)
+	return tmp
+}
+
+func (b *functionBuilder) methodReceiverCopy(expr *hir.SelectorExpr, recvInner types.SemType) mir.ValueID {
+	val := b.lowerExpr(expr.X)
+	if val == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	tmp := b.emitAlloca(recvInner, expr.Location)
+	b.emitStore(tmp, val, expr.Location)
+	return tmp
+}
+
+func (b *functionBuilder) methodReceiverValue(expr *hir.SelectorExpr) mir.ValueID {
+	exprType := b.exprType(expr.X)
+	val := b.lowerExpr(expr.X)
+	if val == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	if exprType != nil {
+		if ref, ok := types.UnwrapType(exprType).(*types.ReferenceType); ok {
+			return b.emitLoad(val, ref.Inner, expr.Location)
+		}
+	}
+	return val
+}
+
+func (b *functionBuilder) lookupTypeSymbol(name string) (*symbols.Symbol, string, bool) {
+	if b.gen == nil || b.gen.mod == nil || b.gen.mod.ModuleScope == nil {
+		return nil, "", false
+	}
+
+	if sym, ok := b.gen.mod.ModuleScope.GetSymbol(name); ok && sym.Kind == symbols.SymbolType {
+		return sym, "", true
+	}
+
+	if b.gen.ctx == nil || b.gen.mod.ImportAliasMap == nil {
+		return nil, "", false
+	}
+
+	for alias, importPath := range b.gen.mod.ImportAliasMap {
+		if imported, ok := b.gen.ctx.GetModule(importPath); ok && imported.ModuleScope != nil {
+			if sym, ok := imported.ModuleScope.GetSymbol(name); ok && sym.Kind == symbols.SymbolType {
+				return sym, alias, true
+			}
+		}
+	}
+
+	return nil, "", false
+}
+
+func dereferenceType(typ types.SemType) types.SemType {
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		return ref.Inner
+	}
+	return typ
 }
 
 func (b *functionBuilder) qualifiedName(expr hir.Expr) (string, bool) {

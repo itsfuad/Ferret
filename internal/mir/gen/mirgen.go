@@ -84,7 +84,7 @@ func (g *Generator) lowerMethodDecl(decl *hir.MethodDecl) *mir.Function {
 
 	retType := g.returnType(decl.Type)
 	fn := &mir.Function{
-		Name:     decl.Name.Name,
+		Name:     g.methodName(decl),
 		Return:   retType,
 		Location: decl.Location,
 	}
@@ -105,6 +105,31 @@ func (g *Generator) lowerMethodDecl(decl *hir.MethodDecl) *mir.Function {
 	builder.buildFuncBody(decl.Body)
 
 	return fn
+}
+
+func (g *Generator) methodName(decl *hir.MethodDecl) string {
+	if decl == nil || decl.Name == nil {
+		return ""
+	}
+	recvName := g.receiverTypeName(decl.Receiver)
+	if recvName == "" {
+		return decl.Name.Name
+	}
+	return recvName + "_" + decl.Name.Name
+}
+
+func (g *Generator) receiverTypeName(recv *hir.Param) string {
+	if recv == nil || recv.Type == nil {
+		return ""
+	}
+	recvType := recv.Type
+	if ref, ok := recvType.(*types.ReferenceType); ok {
+		recvType = ref.Inner
+	}
+	if named, ok := recvType.(*types.NamedType); ok {
+		return named.Name
+	}
+	return ""
 }
 
 func (g *Generator) lowerParams(fnType *types.FunctionType) []mir.Param {

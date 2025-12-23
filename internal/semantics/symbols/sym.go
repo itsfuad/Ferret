@@ -41,6 +41,7 @@ type Symbol struct {
 type MethodInfo struct {
 	Name     string
 	FuncType *types.FunctionType
+	Receiver types.SemType
 	Exported bool // Whether method is accessible from other modules
 }
 
