@@ -1,0 +1,26 @@
+// MIR smoke test covering ops, calls, and control flow
+import "std/io";
+
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+fn dec(a: i32) -> i32 {
+    return a - 1;
+}
+
+fn main() {
+    let x: i32 = 5;
+    let y := add(x, 7);
+    y += 3;
+    y++;
+    let z := dec(y);
+
+    if z > 10 {
+        io::Println("big");
+    } else {
+        io::Println("small");
+    }
+
+    io::Println(z);
+}

@@ -547,12 +547,15 @@ func collectMethodDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2
 	}
 
 	// Create method scope and declare parameters, but do NOT collect body
-	receiverSym := &symbols.Symbol{
-		Name:     decl.Receiver.Name.Name,
-		Kind:     symbols.SymbolReceiver,
-		Type:     types.TypeUnknown, // Filled during type checking
-		Exported: utils.IsExported(decl.Receiver.Name.Name),
-		Decl:     decl.Receiver,
+	var receiverSym *symbols.Symbol
+	if decl.Receiver.Name != nil && decl.Receiver.Name.Name != "_" {
+		receiverSym = &symbols.Symbol{
+			Name:     decl.Receiver.Name.Name,
+			Kind:     symbols.SymbolReceiver,
+			Type:     types.TypeUnknown, // Filled during type checking
+			Exported: utils.IsExported(decl.Receiver.Name.Name),
+			Decl:     decl.Receiver,
+		}
 	}
 
 	collectFunctionSignatureOnly(ctx, mod, decl.Type, &decl.Scope, receiverSym)
@@ -627,6 +630,9 @@ func validateParams(ctx *context_v2.CompilerContext, _ *context_v2.Module, param
 	for _, param := range params {
 		if param.Name != nil {
 			name := param.Name.Name
+			if name == "_" {
+				continue
+			}
 			if existing, ok := paramNames[name]; ok {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError(fmt.Sprintf("duplicate parameter name '%s'", name)).
@@ -801,15 +807,70 @@ func collectForStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stm
 	defer mod.EnterScope(forScope)()
 
 	// Collect iterator (VarDecl or IdentifierExpr)
-	// If it's a VarDecl, it will be declared in the for scope
-	// If it's an IdentifierExpr, it references an existing variable
 	if stmt.Iterator != nil {
+		if varDecl, ok := stmt.Iterator.(*ast.VarDecl); ok {
+			checkForIteratorShadowing(ctx, mod, varDecl)
+		}
 		collectNode(ctx, mod, stmt.Iterator)
+		markForIteratorIndexReadOnly(mod, stmt.Iterator)
 	}
 
 	// Collect symbols in the for body
 	if stmt.Body != nil {
 		collectNode(ctx, mod, stmt.Body)
+	}
+}
+
+func checkForIteratorShadowing(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.VarDecl) {
+	if decl == nil || mod.CurrentScope == nil {
+		return
+	}
+
+	parent := mod.CurrentScope.Parent()
+	if parent == nil {
+		return
+	}
+
+	for _, item := range decl.Decls {
+		if item.Name == nil || item.Name.Name == "_" {
+			continue
+		}
+
+		if existing, ok := parent.Lookup(item.Name.Name); ok && isValueSymbol(existing.Kind) {
+			diag := diagnostics.NewWarning(fmt.Sprintf("loop variable '%s' shadows an outer declaration", item.Name.Name)).
+				WithCode(diagnostics.ErrRedeclaredSymbol).
+				WithPrimaryLabel(&item.Name.Location, fmt.Sprintf("'%s' already declared in an outer scope", item.Name.Name)).
+				WithHelp("use a different loop variable name")
+			if existing.Decl != nil {
+				diag = diag.WithSecondaryLabel(existing.Decl.Loc(), "previous declaration here")
+			}
+			ctx.Diagnostics.Add(diag)
+		}
+	}
+}
+
+func isValueSymbol(kind symbols.SymbolKind) bool {
+	switch kind {
+	case symbols.SymbolVariable, symbols.SymbolConstant, symbols.SymbolParameter, symbols.SymbolReceiver:
+		return true
+	default:
+		return false
+	}
+}
+
+func markForIteratorIndexReadOnly(mod *context_v2.Module, iterator ast.Node) {
+	varDecl, ok := iterator.(*ast.VarDecl)
+	if !ok || varDecl == nil || len(varDecl.Decls) < 2 {
+		return
+	}
+
+	first := varDecl.Decls[0]
+	if first.Name == nil || first.Name.Name == "_" {
+		return
+	}
+
+	if sym, ok := mod.CurrentScope.GetSymbol(first.Name.Name); ok {
+		sym.IsReadonly = true
 	}
 }
 
@@ -885,11 +946,12 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 			if e.Catch.ErrIdent != nil {
 				// catch identifier is new on handler scope, so parent variable wont used if same name
 				mod.CurrentScope.Declare(e.Catch.ErrIdent.Name, &symbols.Symbol{
-					Name:     e.Catch.ErrIdent.Name,
-					Kind:     symbols.SymbolVariable,
-					Type:     types.TypeUnknown,
-					Decl:     e.Catch.ErrIdent,
-					Exported: false, // catch identifier is not exported
+					Name:       e.Catch.ErrIdent.Name,
+					Kind:       symbols.SymbolVariable,
+					Type:       types.TypeUnknown,
+					Decl:       e.Catch.ErrIdent,
+					Exported:   false, // catch identifier is not exported
+					IsReadonly: true,
 				})
 			}
 
@@ -898,7 +960,7 @@ func collectExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 				collectNode(ctx, mod, n)
 			}
 		}
-		// Collect fallback expression if present (in original scope, not handler scope)
+		// Collect fallback expression if present (in handler scope if one exists)
 		if e.Catch != nil && e.Catch.Fallback != nil {
 			collectExpr(ctx, mod, e.Catch.Fallback)
 		}
@@ -974,6 +1036,9 @@ func collectFunctionSignatureOnly(ctx *context_v2.CompilerContext, mod *context_
 		validateParams(ctx, mod, funcType.Params)
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
+			if param.Name == nil || param.Name.Name == "_" {
+				continue
+			}
 			psym := &symbols.Symbol{
 				Name:     param.Name.Name,
 				Kind:     symbols.SymbolParameter,
@@ -1026,6 +1091,9 @@ func collectFunctionScope(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 		validateParams(ctx, mod, funcType.Params)
 		// Declare parameters in function scope
 		for _, param := range funcType.Params {
+			if param.Name == nil || param.Name.Name == "_" {
+				continue
+			}
 			psym := &symbols.Symbol{
 				Name:     param.Name.Name,
 				Kind:     symbols.SymbolParameter,

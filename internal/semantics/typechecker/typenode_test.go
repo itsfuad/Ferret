@@ -38,3 +38,28 @@ func TestTypeFromTypeNodeLargeIntegers(t *testing.T) {
 		})
 	}
 }
+
+func TestTypeFromTypeNodeEnum(t *testing.T) {
+	enumNode := &ast.EnumType{
+		Variants: []ast.Field{
+			{Name: &ast.IdentifierExpr{Name: "Red", Location: source.Location{}}},
+			{Name: &ast.IdentifierExpr{Name: "Green", Location: source.Location{}}},
+		},
+		ID: "enum1",
+	}
+
+	typ := TypeFromTypeNodeWithContext(nil, nil, enumNode)
+	enumType, ok := typ.(*types.EnumType)
+	if !ok {
+		t.Fatalf("TypeFromTypeNodeWithContext(enum) returned %T, want *types.EnumType", typ)
+	}
+	if enumType.ID != "enum1" {
+		t.Fatalf("enum ID = %q, want %q", enumType.ID, "enum1")
+	}
+	if len(enumType.Variants) != 2 {
+		t.Fatalf("enum variants = %d, want 2", len(enumType.Variants))
+	}
+	if enumType.Variants[0].Name != "Red" || enumType.Variants[1].Name != "Green" {
+		t.Fatalf("enum variant names = %q, %q", enumType.Variants[0].Name, enumType.Variants[1].Name)
+	}
+}

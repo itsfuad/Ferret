@@ -5,8 +5,9 @@ import (
 
 	"compiler/colors"
 	"compiler/internal/context_v2"
+	"compiler/internal/hir"
+	hiranalysis "compiler/internal/hir/analysis"
 	"compiler/internal/phase"
-	"compiler/internal/semantics/cfganalyzer"
 	"compiler/internal/semantics/collector"
 	"compiler/internal/semantics/resolver"
 	"compiler/internal/semantics/typechecker"
@@ -81,7 +82,7 @@ func (p *Pipeline) runResolverPhase() error {
 }
 
 func (p *Pipeline) runTypeCheckerPhase() error {
-	runMethodSignatureTypeCheckPhase(p)
+	runTopLevelSignatureTypeCheckPhase(p)
 
 	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
@@ -117,8 +118,9 @@ func (p *Pipeline) runTypeCheckerPhase() error {
 	return nil
 }
 
-// runMethodSignatureTypeCheckPhase type checks only method signatures (attaches methods to types)
-func runMethodSignatureTypeCheckPhase(p *Pipeline) error {
+// runTopLevelSignatureTypeCheckPhase resolves top-level types, methods, and function signatures
+// so forward references at module scope type check correctly.
+func runTopLevelSignatureTypeCheckPhase(p *Pipeline) error {
 	for _, importPath := range p.ctx.GetModuleNames() {
 		module, exists := p.ctx.GetModule(importPath)
 		if !exists {
@@ -129,7 +131,7 @@ func runMethodSignatureTypeCheckPhase(p *Pipeline) error {
 			continue
 		}
 
-		typechecker.TypeCheckMethodSignatures(p.ctx, module)
+		typechecker.TypeCheckTopLevelSignatures(p.ctx, module)
 
 		if p.ctx.Config.Debug {
 			colors.PURPLE.Printf("  ✓ %s\n", importPath)
@@ -146,11 +148,17 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 			continue
 		}
 
-		if p.ctx.GetModulePhase(importPath) < phase.PhaseTypeChecked {
+		if p.ctx.GetModulePhase(importPath) < phase.PhaseHIRGenerated {
 			continue
 		}
 
-		cfganalyzer.AnalyzeModule(p.ctx, module)
+		hirMod := hir.ModuleFromModule(module)
+		if hirMod == nil {
+			p.ctx.ReportError(fmt.Sprintf("HIR module missing for %s during CFG analysis", importPath), nil)
+			continue
+		}
+
+		hiranalysis.AnalyzeModule(p.ctx, module, hirMod)
 
 		if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCFGAnalyzed) {
 			p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseCFGAnalyzed", importPath), nil)

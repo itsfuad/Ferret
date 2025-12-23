@@ -40,6 +40,10 @@ func (tc TypeCompatibility) String() string {
 	}
 }
 
+func isImplicitlyCompatible(compatibility TypeCompatibility) bool {
+	return compatibility == Identical || compatibility == ImplicitCastable
+}
+
 // methodSignaturesMatch checks if two function types match
 // This is used to compare method signatures with interface method signatures
 // Note: Methods don't include the receiver in their FuncType - the receiver is separate
@@ -150,6 +154,13 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 			return ImplicitCastable
 		}
 		return Incompatible
+	}
+
+	if isEnumType(source) && isIntegerType(target) {
+		return ExplicitCastable
+	}
+	if isBoolType(source) && isIntegerType(target) {
+		return ExplicitCastable
 	}
 
 	// Check numeric conversions
@@ -279,6 +290,13 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 			return ImplicitCastable
 		}
 		return Incompatible
+	}
+
+	if isEnumType(source) && isIntegerType(target) {
+		return ExplicitCastable
+	}
+	if isBoolType(source) && isIntegerType(target) {
+		return ExplicitCastable
 	}
 
 	// Check numeric conversions

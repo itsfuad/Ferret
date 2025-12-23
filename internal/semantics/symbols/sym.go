@@ -13,7 +13,7 @@ type SymbolTable interface {
 }
 
 // ConstValue forward declaration to avoid import cycle
-// Actual implementation is in internal/semantics/consteval
+// Actual implementation is in internal/hir/consteval
 type ConstValue interface {
 	IsConstant() bool
 	String() string
@@ -30,6 +30,7 @@ type Symbol struct {
 	DeclaredScope SymbolTable            // Scope where this symbol was declared
 	Methods       map[string]*MethodInfo // Methods attached to this named type (only for SymbolType)
 	ConstValue    ConstValue             // Compile-time known value (for constants and const variables)
+	IsReadonly    bool                   // True for read-only variables (loop index, catch error, etc.)
 
 	// Native function support (for builtin functions implemented in Go/C)
 	IsNative   bool   // true if this function is implemented in native code (Go/C)
@@ -40,6 +41,7 @@ type Symbol struct {
 type MethodInfo struct {
 	Name     string
 	FuncType *types.FunctionType
+	Receiver types.SemType
 	Exported bool // Whether method is accessible from other modules
 }
 

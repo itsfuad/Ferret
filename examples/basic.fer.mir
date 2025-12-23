@@ -1,0 +1,49 @@
+module examples/basic
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca i32
+    %t2 = const i32 10
+    store %t1, %t2
+    %t3 = alloca i32
+    %t4 = const i32 20
+    store %t3, %t4
+    %t5 = alloca i32
+    %t6 = load i32 %t1
+    %t7 = load i32 %t3
+    %t8 = + i32 %t6, %t7
+    store %t5, %t8
+    %t9 = alloca i32
+    %t10 = load i32 %t1
+    %t11 = load i32 %t3
+    %t12 = - i32 %t10, %t11
+    store %t9, %t12
+    %t13 = alloca i32
+    %t14 = load i32 %t1
+    %t15 = load i32 %t3
+    %t16 = * i32 %t14, %t15
+    store %t13, %t16
+    %t17 = load i32 %t5
+    %t18 = const i32 25
+    %t19 = > bool %t17, %t18
+    br_if %t19, b2, b4
+  block b2 if.then:
+    %t20 = const str Sum is greater than 25
+    call io::Println(%t20) : void
+    br b3
+  block b3 if.end:
+    %t22 = load i32 %t5
+    call print_result(%t22) : void
+    ret
+  block b4 if.else:
+    %t21 = const str Sum is 25 or less
+    call io::Println(%t21) : void
+    br b3
+}
+
+fn print_result(value: i32) -> void {
+  block b5 entry:
+    %t24 = const str Result calculated
+    call io::Println(%t24) : void
+    ret
+}

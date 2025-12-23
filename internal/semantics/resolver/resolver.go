@@ -189,6 +189,14 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 	case *ast.IdentifierExpr:
 		// Check if the identifier is declared
 		name := e.Name
+		if name == "_" {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("invalid use of '_' identifier").
+					WithPrimaryLabel(&e.Location, "blank identifier is only allowed in for loop iterators").
+					WithHelp("use a real variable name"),
+			)
+			return
+		}
 		if _, ok := mod.CurrentScope.Lookup(name); !ok {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("symbol '%s' not found", name)).
@@ -209,18 +217,20 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		for _, arg := range e.Args {
 			resolveExpr(ctx, mod, arg)
 		}
-		if e.Catch != nil && e.Catch.Handler != nil {
-			// get the scope of the catch block
-			scope := e.Catch.Handler.Scope.(*table.SymbolTable)
-
-			defer mod.EnterScope(scope)()
-
-			// resolve the catch block
+		if e.Catch != nil {
 			if e.Catch.Handler != nil {
+				// get the scope of the catch block
+				scope := e.Catch.Handler.Scope.(*table.SymbolTable)
+
+				defer mod.EnterScope(scope)()
+
+				// resolve the catch block
 				resolveBlock(ctx, mod, e.Catch.Handler)
-			}
-			// resolve the fallback expression in catch handler scope (defaultVal is also in catch block scope)
-			if e.Catch.Fallback != nil {
+				// resolve the fallback expression in catch handler scope (defaultVal is also in catch block scope)
+				if e.Catch.Fallback != nil {
+					resolveExpr(ctx, mod, e.Catch.Fallback)
+				}
+			} else if e.Catch.Fallback != nil {
 				resolveExpr(ctx, mod, e.Catch.Fallback)
 			}
 		}

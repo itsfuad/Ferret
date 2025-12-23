@@ -155,81 +155,16 @@ func InferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 }
 
 // ResolvedExprType returns the most accurate type for an expression by using any
-// type information already stored on the AST (populated during semantic
+// type information stored on the module side table (populated during semantic
 // analysis) before falling back to inference.
 func ResolvedExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) types.SemType {
 	if expr == nil {
 		return types.TypeUnknown
 	}
 
-	switch e := expr.(type) {
-	case *ast.BasicLit:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.IdentifierExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.BinaryExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.UnaryExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.PostfixExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.PrefixExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.CallExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.SelectorExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.IndexExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.CastExpr:
-		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
-			return e.TypeInfo
-		}
-	case *ast.ParenExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.ScopeResolutionExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.RangeExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.CoalescingExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.ForkExpr:
-		if e.Type != nil && !e.Type.Equals(types.TypeUnknown) {
-			return e.Type
-		}
-	case *ast.FuncLit:
-		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
-			return e.TypeInfo
-		}
-	case *ast.CompositeLit:
-		if e.TypeInfo != nil && !e.TypeInfo.Equals(types.TypeUnknown) {
-			return e.TypeInfo
+	if mod != nil {
+		if typ, ok := mod.ExprType(expr); ok && typ != nil && !typ.Equals(types.TypeUnknown) {
+			return typ
 		}
 	}
 
@@ -288,6 +223,10 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 
 	case *ast.CoalescingExpr:
 		return inferCoalescingExprType(ctx, mod, e)
+
+	case *ast.PrefixExpr:
+		// Prefix operators (++, --) return the type of the operand
+		return inferExprType(ctx, mod, e.X)
 
 	case *ast.PostfixExpr:
 		// Postfix operators (++, --) return the type of the operand
@@ -355,20 +294,23 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 		// Arithmetic: result is the wider of the two types
 		return widerType(lhsType, rhsType)
 	case tokens.DIV_TOKEN:
-		{
-			// division always produces float but preserves wider type. like i32 / i32 -> f32, f32 / f64 -> f64, f64 / f64 -> f64
-			// get the bit width of the wider type
-			wider := widerType(lhsType, rhsType)
-			bitWidth := 0
-			if primType, ok := wider.(*types.PrimitiveType); ok {
-				bitWidth = primType.Size()
-			}
-			if bitWidth <= 32 {
+		// For floats, preserve the wider float type (f32..f256).
+		if types.IsFloat(lhsType) || types.IsFloat(rhsType) {
+			return widerType(lhsType, rhsType)
+		}
+		// Large integer division stays in the large integer domain.
+		if isLargeIntType(lhsType) || isLargeIntType(rhsType) {
+			return widerType(lhsType, rhsType)
+		}
+		// Small integer division produces float: i32/i32 -> f32, i64/i64 -> f64.
+		wider := widerType(lhsType, rhsType)
+		if primType, ok := wider.(*types.PrimitiveType); ok {
+			bitWidth := types.GetNumberBitSize(primType.GetName())
+			if bitWidth > 0 && bitWidth <= 32 {
 				return types.TypeF32
-			} else {
-				return types.TypeF64
 			}
 		}
+		return types.TypeF64
 	case tokens.EXP_TOKEN:
 		// Power operator **: returns double (f64)
 		// Always returns f64 for accuracy (can be cast to int if needed)
@@ -784,16 +726,22 @@ func widerType(a, b types.SemType) types.SemType {
 
 	// Order of widening: i8 < i16 < i32 < i64, u8 < u16 < u32 < u64, f32 < f64
 	typeRank := map[types.TYPE_NAME]int{
-		types.TYPE_I8:  1,
-		types.TYPE_I16: 2,
-		types.TYPE_I32: 3,
-		types.TYPE_I64: 4,
-		types.TYPE_U8:  1,
-		types.TYPE_U16: 2,
-		types.TYPE_U32: 3,
-		types.TYPE_U64: 4,
-		types.TYPE_F32: 5,
-		types.TYPE_F64: 6,
+		types.TYPE_I8:   1,
+		types.TYPE_I16:  2,
+		types.TYPE_I32:  3,
+		types.TYPE_I64:  4,
+		types.TYPE_I128: 5,
+		types.TYPE_I256: 6,
+		types.TYPE_U8:   1,
+		types.TYPE_U16:  2,
+		types.TYPE_U32:  3,
+		types.TYPE_U64:  4,
+		types.TYPE_U128: 5,
+		types.TYPE_U256: 6,
+		types.TYPE_F32:  7,
+		types.TYPE_F64:  8,
+		types.TYPE_F128: 9,
+		types.TYPE_F256: 10,
 	}
 
 	rankA, okA := typeRank[aName]
@@ -808,6 +756,23 @@ func widerType(a, b types.SemType) types.SemType {
 		return a
 	}
 	return b
+}
+
+func isLargeIntType(t types.SemType) bool {
+	if t == nil {
+		return false
+	}
+	t = types.UnwrapType(t)
+	prim, ok := t.(*types.PrimitiveType)
+	if !ok {
+		return false
+	}
+	switch prim.GetName() {
+	case types.TYPE_I128, types.TYPE_U128, types.TYPE_I256, types.TYPE_U256:
+		return true
+	default:
+		return false
+	}
 }
 
 // resolveType resolves an untyped type to a concrete type.

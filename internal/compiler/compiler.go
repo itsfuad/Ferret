@@ -36,6 +36,9 @@ type Options struct {
 
 	// Skip codegen (stop after type checking)
 	SkipCodegen bool
+
+	// Codegen backend ("none", "qbe")
+	CodegenBackend string
 }
 
 // Result of compilation
@@ -62,6 +65,7 @@ func Compile(opts *Options) Result {
 
 		entryDir := filepath.Dir(absPath)
 		projectName = filepath.Base(entryDir)
+		projectRoot = entryDir
 	}
 
 	execPath, _ := os.Executable()
@@ -85,6 +89,7 @@ func Compile(opts *Options) Result {
 		OutputPath:         outputPath,
 		KeepCFile:          opts.KeepCFile,
 		SkipCodegen:        opts.SkipCodegen,
+		CodegenBackend:     opts.CodegenBackend,
 	}
 
 	ctx := context_v2.New(config, opts.Debug)

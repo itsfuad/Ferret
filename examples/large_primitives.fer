@@ -1,0 +1,25 @@
+// Large primitive smoke test for QBE path
+import "std/io";
+
+fn main() {
+    let a: i128 = 170141183460469231731687303715884105727;
+    let one: i128 = 1;
+    let b := a - one;
+    let neg := -b;
+    io::Println(a);
+    if neg < a {
+        io::Println("i128 ok");
+    }
+
+    let u: u256 = 79228162514264337593543950334;
+    let two: u256 = 2;
+    let v := u + two;
+    let w := v * two;
+    u++;
+    io::Println(u);
+    io::Println(v);
+    io::Println(w);
+    if w > v {
+        io::Println("u256 ok");
+    }
+}

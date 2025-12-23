@@ -78,9 +78,9 @@ type Module struct {
 	// Type checking context
 	CurrentFunctionReturnType types.SemType // Expected return type for current function being checked
 
-	Imports        map[string]*Import // Resolved imports
-	ImportAliasMap map[string]string  // alias/name -> import path mapping for module access
-	//ExprTypes map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
+	Imports        map[string]*Import               // Resolved imports
+	ImportAliasMap map[string]string                // alias/name -> import path mapping for module access
+	ExprTypes      map[ast.Expression]types.SemType // Type of each expression (filled during type checking)
 
 	// Source metadata
 	Content string // Raw source code (for diagnostics)
@@ -102,6 +102,46 @@ func (mod *Module) EnterScope(newScope *table.SymbolTable) func() {
 	return func() {
 		mod.CurrentScope = oldScope
 	}
+}
+
+// SetExprType records the resolved type for an expression.
+func (mod *Module) SetExprType(expr ast.Expression, typ types.SemType) {
+	if mod == nil || expr == nil {
+		return
+	}
+	if typ == nil {
+		typ = types.TypeUnknown
+	}
+
+	mod.Mu.Lock()
+	defer mod.Mu.Unlock()
+
+	if mod.ExprTypes == nil {
+		mod.ExprTypes = make(map[ast.Expression]types.SemType)
+	}
+
+	mod.ExprTypes[expr] = typ
+}
+
+// ExprType returns the resolved type for an expression, if any.
+func (mod *Module) ExprType(expr ast.Expression) (types.SemType, bool) {
+	if mod == nil || expr == nil {
+		return types.TypeUnknown, false
+	}
+
+	mod.Mu.Lock()
+	defer mod.Mu.Unlock()
+
+	if mod.ExprTypes == nil {
+		return types.TypeUnknown, false
+	}
+
+	typ, ok := mod.ExprTypes[expr]
+	if !ok || typ == nil {
+		return types.TypeUnknown, ok
+	}
+
+	return typ, ok
 }
 
 // Import represents a resolved import statement
@@ -143,17 +183,20 @@ type CompilerContext struct {
 // Config holds compiler configuration
 type Config struct {
 	SkipCodegen bool // If true, skip code generation phase
+	// Codegen backend to use ("none", "qbe")
+	CodegenBackend string
 	// Project information
 	ProjectName string // Name of the project
 	ProjectRoot string // Root directory of the project
 
 	// Build configuration
-	OutputPath string // Where to write compiled output
-	Extension  string // Source file extension (default: ".fer")
-	KeepCFile  bool   // Keep generated C file after compilation
-	FormatC    bool   // Format generated C files when keeping them
-	Debug      bool   // Debug mode
-	SaveAST    bool   // Save AST to file
+	OutputPath  string // Where to write compiled output
+	Extension   string // Source file extension (default: ".fer")
+	KeepCFile   bool   // Keep generated C file after compilation
+	FormatC     bool   // Format generated C files when keeping them
+	Debug       bool   // Debug mode
+	SaveAST     bool   // Save AST to file
+	PointerSize int    // Target pointer size in bytes (0 = default)
 
 	// Module resolution
 	BuiltinModulesPath string            // Path to standard library
@@ -171,6 +214,7 @@ func New(config *Config, debug bool) *CompilerContext {
 			Extension: ".fer",
 		}
 	}
+	config.Debug = debug
 
 	// Set up remote cache path if not specified
 	if config.RemoteCachePath == "" && config.ProjectRoot != "" {

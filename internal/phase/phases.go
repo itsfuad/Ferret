@@ -4,7 +4,7 @@ package phase
 //
 // Phase progression must be sequential and respect dependencies:
 // - NotStarted -> Lexed -> Parsed (currently implemented)
-// - Parsed -> Collected -> Resolved -> TypeChecked -> CodeGen (future)
+// - Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> MIRGenerated -> CodeGen
 //
 // Phase transitions are validated using AdvanceModulePhase() which checks
 // that prerequisites are satisfied via the phasePrerequisites map.
@@ -15,26 +15,32 @@ package phase
 type ModulePhase int
 
 const (
-	PhaseNotStarted  ModulePhase = iota // Module discovered but not processed
-	PhaseLexed                          // Tokens generated
-	PhaseParsed                         // AST built
-	PhaseCollected                      // Symbols collected (first pass)
-	PhaseResolved                       // Imports and symbols resolved
-	PhaseTypeChecked                    // Type checking complete
-	PhaseCFGAnalyzed                    // Control flow analysis complete
-	PhaseCodeGen                        // Code generation complete
+	PhaseNotStarted   ModulePhase = iota // Module discovered but not processed
+	PhaseLexed                           // Tokens generated
+	PhaseParsed                          // AST built
+	PhaseCollected                       // Symbols collected (first pass)
+	PhaseResolved                        // Imports and symbols resolved
+	PhaseTypeChecked                     // Type checking complete
+	PhaseHIRGenerated                    // HIR generation complete
+	PhaseCFGAnalyzed                     // Control flow analysis complete
+	PhaseHIRLowered                      // HIR lowering complete
+	PhaseMIRGenerated                    // MIR generation complete
+	PhaseCodeGen                         // Code generation complete
 )
 
 // PhasePrerequisites maps each phase to its required predecessor phase
 // This explicit mapping is safer than arithmetic and allows for non-linear phase progressions
 var PhasePrerequisites = map[ModulePhase]ModulePhase{
-	PhaseLexed:       PhaseNotStarted,
-	PhaseParsed:      PhaseLexed,
-	PhaseCollected:   PhaseParsed,
-	PhaseResolved:    PhaseCollected,
-	PhaseTypeChecked: PhaseResolved,
-	PhaseCFGAnalyzed: PhaseTypeChecked,
-	PhaseCodeGen:     PhaseCFGAnalyzed,
+	PhaseLexed:        PhaseNotStarted,
+	PhaseParsed:       PhaseLexed,
+	PhaseCollected:    PhaseParsed,
+	PhaseResolved:     PhaseCollected,
+	PhaseTypeChecked:  PhaseResolved,
+	PhaseHIRGenerated: PhaseTypeChecked,
+	PhaseCFGAnalyzed:  PhaseHIRGenerated,
+	PhaseHIRLowered:   PhaseCFGAnalyzed,
+	PhaseMIRGenerated: PhaseHIRLowered,
+	PhaseCodeGen:      PhaseMIRGenerated,
 }
 
 func (p ModulePhase) String() string {
@@ -51,8 +57,14 @@ func (p ModulePhase) String() string {
 		return "Resolved"
 	case PhaseTypeChecked:
 		return "TypeChecked"
+	case PhaseHIRGenerated:
+		return "HIRGenerated"
 	case PhaseCFGAnalyzed:
 		return "CFGAnalyzed"
+	case PhaseHIRLowered:
+		return "HIRLowered"
+	case PhaseMIRGenerated:
+		return "MIRGenerated"
 	case PhaseCodeGen:
 		return "CodeGen"
 	default:

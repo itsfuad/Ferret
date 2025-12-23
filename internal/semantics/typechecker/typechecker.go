@@ -4,30 +4,28 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
-	"compiler/internal/semantics/consteval"
-
-	//"compiler/internal/semantics/controlflow"
+	"compiler/internal/hir/consteval"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
+	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
 	"compiler/internal/utils"
 	str "compiler/internal/utils/strings"
 
 	"fmt"
-	"strconv"
 	"strings"
 )
 
-// TypeCheckMethodSignatures only processes method signatures to attach methods to types
-// This must run before CheckModule so all methods are available
-func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+// TypeCheckTopLevelSignatures resolves types, method signatures, and function signatures.
+// This must run before CheckModule so forward references to functions work at module scope.
+func TypeCheckTopLevelSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	if mod.AST == nil {
 		return
 	}
 
 	if ctx.Config.Debug {
-		fmt.Printf("    [TypeCheckMethodSignatures for %s]\n", mod.ImportPath)
+		fmt.Printf("    [TypeCheckTopLevelSignatures for %s]\n", mod.ImportPath)
 	}
 
 	// Reset CurrentScope to ModuleScope
@@ -52,13 +50,165 @@ func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.
 		}
 	}
 
+	// Resolve top-level function signatures
+	for _, node := range mod.AST.Nodes {
+		if funcDecl, ok := node.(*ast.FuncDecl); ok {
+			checkFuncSignatureOnly(ctx, mod, funcDecl)
+		}
+	}
+
 	if ctx.Config.Debug {
 		fmt.Printf("    [Processed %d methods]\n", methodCount)
 	}
 }
 
+// TypeCheckMethodSignatures is kept for compatibility; it now runs the full top-level signature pass.
+func TypeCheckMethodSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
+	TypeCheckTopLevelSignatures(ctx, mod)
+}
+
+func checkFuncSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl *ast.FuncDecl) {
+	if decl == nil || decl.Name == nil || decl.Type == nil {
+		return
+	}
+
+	funcType := TypeFromTypeNodeWithContext(ctx, mod, decl.Type)
+	if !isFuncLikeType(funcType) {
+		return
+	}
+
+	if sym, ok := mod.CurrentScope.Lookup(decl.Name.Name); ok {
+		sym.Type = funcType
+	}
+}
+
+func isFuncLikeType(t types.SemType) bool {
+	if t == nil {
+		return false
+	}
+	_, ok := types.UnwrapType(t).(*types.FunctionType)
+	return ok
+}
+
+func checkModuleScopeUseBeforeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, ident *ast.IdentifierExpr) {
+	if ctx == nil || mod == nil || ident == nil {
+		return
+	}
+
+	sym, ok := mod.CurrentScope.Lookup(ident.Name)
+	if !ok || sym == nil {
+		return
+	}
+	if sym.DeclaredScope != mod.ModuleScope {
+		return
+	}
+
+	if sym.Kind == symbols.SymbolFunction || sym.Kind == symbols.SymbolType {
+		return
+	}
+	if sym.Decl == nil {
+		return
+	}
+	declLoc := sym.Decl.Loc()
+	useLoc := ident.Loc()
+	if declLoc == nil || useLoc == nil || declLoc.Start == nil || useLoc.Start == nil {
+		return
+	}
+	if declLoc.Filename != nil && useLoc.Filename != nil && *declLoc.Filename != *useLoc.Filename {
+		return
+	}
+	if useLoc.Start.Index >= declLoc.Start.Index {
+		return
+	}
+
+	ctx.Diagnostics.Add(
+		diagnostics.NewError(fmt.Sprintf("'%s' used before declaration", ident.Name)).
+			WithCode(diagnostics.ErrUseBeforeDecl).
+			WithPrimaryLabel(useLoc, "used before declaration").
+			WithSecondaryLabel(declLoc, "declared here"),
+	)
+}
+
+func referencesIdentOutsideFuncLit(expr ast.Expression, name string) bool {
+	if expr == nil || name == "" {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		return e.Name == name
+	case *ast.BasicLit:
+		return false
+	case *ast.FuncLit:
+		return false
+	case *ast.BinaryExpr:
+		return referencesIdentOutsideFuncLit(e.X, name) || referencesIdentOutsideFuncLit(e.Y, name)
+	case *ast.UnaryExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.PrefixExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.PostfixExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.CallExpr:
+		if referencesIdentOutsideFuncLit(e.Fun, name) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if referencesIdentOutsideFuncLit(arg, name) {
+				return true
+			}
+		}
+		if e.Catch != nil && referencesIdentOutsideFuncLit(e.Catch.Fallback, name) {
+			return true
+		}
+		return false
+	case *ast.IndexExpr:
+		return referencesIdentOutsideFuncLit(e.X, name) || referencesIdentOutsideFuncLit(e.Index, name)
+	case *ast.SelectorExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.ScopeResolutionExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.CastExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.ParenExpr:
+		return referencesIdentOutsideFuncLit(e.X, name)
+	case *ast.CompositeLit:
+		for _, elem := range e.Elts {
+			if kv, ok := elem.(*ast.KeyValueExpr); ok {
+				if referencesIdentOutsideFuncLit(kv.Value, name) {
+					return true
+				}
+				continue
+			}
+			if referencesIdentOutsideFuncLit(elem, name) {
+				return true
+			}
+		}
+		return false
+	case *ast.KeyValueExpr:
+		return referencesIdentOutsideFuncLit(e.Value, name)
+	case *ast.CoalescingExpr:
+		return referencesIdentOutsideFuncLit(e.Cond, name) || referencesIdentOutsideFuncLit(e.Default, name)
+	case *ast.RangeExpr:
+		if referencesIdentOutsideFuncLit(e.Start, name) {
+			return true
+		}
+		if referencesIdentOutsideFuncLit(e.End, name) {
+			return true
+		}
+		if referencesIdentOutsideFuncLit(e.Incr, name) {
+			return true
+		}
+		return false
+	case *ast.ForkExpr:
+		return referencesIdentOutsideFuncLit(e.Call, name)
+	default:
+		return false
+	}
+}
+
 // CheckModule performs type checking on a module.
-// Type declarations and method signatures are already checked in phase 4a.
+// Type declarations, method signatures, and top-level function signatures are already checked in phase 4a.
 // This phase checks function bodies, variables, and method bodies.
 func CheckModule(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 
@@ -128,14 +278,14 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
-						if compatibility == Incompatible {
+						if !isImplicitlyCompatible(compatibility) {
 							returnedDesc := resolveType(returnedType, resultType.Err)
-							ctx.Diagnostics.Add(
-								diagnostics.NewError("error return type mismatch").
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(n.Result.Loc(),
-										fmt.Sprintf("expected error type %s, found %s", resultType.Err.String(), returnedDesc)),
-							)
+							diag := diagnostics.NewError("error return type mismatch").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithPrimaryLabel(n.Result.Loc(),
+									fmt.Sprintf("expected error type %s, found %s", resultType.Err.String(), returnedDesc))
+							diag = addExplicitCastHint(ctx, diag, returnedType, resultType.Err, compatibility, n.Result)
+							ctx.Diagnostics.Add(diag)
 						}
 					}
 				} else {
@@ -153,13 +303,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, resultType.Ok)
-						if compatibility == Incompatible {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError("return type mismatch").
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(n.Result.Loc(),
-										fmt.Sprintf("expected %s, found %s", resultType.Ok.String(), returnedType.String())),
-							)
+						if !isImplicitlyCompatible(compatibility) {
+							diag := diagnostics.NewError("return type mismatch").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithPrimaryLabel(n.Result.Loc(),
+									fmt.Sprintf("expected %s, found %s", resultType.Ok.String(), returnedType.String()))
+							diag = addExplicitCastHint(ctx, diag, returnedType, resultType.Ok, compatibility, n.Result)
+							ctx.Diagnostics.Add(diag)
 						}
 					}
 				}
@@ -175,13 +325,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
 					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
-						if compatibility == Incompatible {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError("type mismatch in return statement").
-									WithCode(diagnostics.ErrTypeMismatch).
-									WithPrimaryLabel(n.Result.Loc(),
-										fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String())),
-							)
+						if !isImplicitlyCompatible(compatibility) {
+							diag := diagnostics.NewError("type mismatch in return statement").
+								WithCode(diagnostics.ErrTypeMismatch).
+								WithPrimaryLabel(n.Result.Loc(),
+									fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String()))
+							diag = addExplicitCastHint(ctx, diag, returnedType, expectedReturnType, compatibility, n.Result)
+							ctx.Diagnostics.Add(diag)
 						}
 					}
 				}
@@ -219,13 +369,15 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Check range expression first to infer element type
 		var rangeElemType types.SemType = types.TypeUnknown
 		var rangeType types.SemType = types.TypeUnknown
+		isIterable := true
 		if n.Range != nil {
 			// Skip empty array checks for RangeExpr (e.g., 10..=15) - they're not arrays
 			_, isRangeExpr := n.Range.(*ast.RangeExpr)
 
 			rangeType = checkExpr(ctx, mod, n.Range, types.TypeUnknown)
-			// Extract element type from array - for integer ranges this will be i32
-			if arrayType, ok := rangeType.(*types.ArrayType); ok {
+			unwrappedRange := types.UnwrapType(rangeType)
+			// Extract element type from array/map - for integer ranges this will be i32
+			if arrayType, ok := unwrappedRange.(*types.ArrayType); ok {
 				rangeElemType = arrayType.Element
 
 				// Check for empty arrays - error: loop will never execute
@@ -235,6 +387,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 						WithPrimaryLabel(n.Range.Loc(), "this array is empty").
 						WithNote("Remove this loop or use a non-empty array"))
 				}
+			} else if _, ok := unwrappedRange.(*types.MapType); !ok {
+				isIterable = false
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("type '%s' is not iterable", unwrappedRange.String())).
+						WithCode(diagnostics.ErrInvalidType).
+						WithPrimaryLabel(n.Range.Loc(), "for loop expects an iterable value"),
+				)
 			}
 
 			// Check for empty array literals (not range expressions)
@@ -261,7 +420,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 
 		// Check iterator
 		if n.Iterator != nil {
-			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok {
+			if varDecl, ok := n.Iterator.(*ast.VarDecl); ok && isIterable {
 				// For VarDecl iterator: apply types and validate structure
 				// For array iteration with two variables: first is index (i32), second is value (element type)
 				// For single variable or range iteration: variable gets range element type
@@ -286,8 +445,18 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					} else {
 						// Infer type based on position and range type
 						var inferredType types.SemType
-						// Check if range is an array (not a numeric range)
-						if _, ok := rangeType.(*types.ArrayType); ok {
+						// Check if range is a map
+						if mapType, ok := types.UnwrapType(rangeType).(*types.MapType); ok {
+							// Map iteration: key first, value second
+							if len(varDecl.Decls) == 1 {
+								inferredType = mapType.Key
+							} else if idx == 0 {
+								inferredType = mapType.Key
+							} else {
+								inferredType = mapType.Value
+							}
+						} else if _, ok := types.UnwrapType(rangeType).(*types.ArrayType); ok {
+							// Check if range is an array (not a numeric range)
 							// Array iteration
 							if len(varDecl.Decls) == 2 && idx == 0 {
 								// First variable in dual-iterator: index is always i32
@@ -318,6 +487,15 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			defer mod.EnterScope(n.Scope.(*table.SymbolTable))()
 		}
 
+		if n.Cond == nil {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("expected condition after 'while'").
+					WithPrimaryLabel(source.NewLocation(n.Filename, n.Body.Start, n.Body.Start), "add a condition value here"),
+			)
+			checkBlock(ctx, mod, n.Body)
+			return
+		}
+
 		checkExpr(ctx, mod, n.Cond, types.TypeBool)
 
 		// Dead code detection (constant conditions) is done in control flow analysis phase
@@ -329,22 +507,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Check the match expression
 		matchType := checkExpr(ctx, mod, n.Expr, types.TypeUnknown)
 
-		// Track if we've seen a default case
-		hasDefault := false
-
 		// Check each case clause
-		for i, caseClause := range n.Cases {
-			// Check if this is a default case
-			if caseClause.Pattern == nil {
-				if hasDefault {
-					ctx.Diagnostics.Add(
-						diagnostics.NewError("multiple default cases in match statement").
-							WithPrimaryLabel(&caseClause.Location, "duplicate default case").
-							WithNote("only one default case (_) is allowed per match statement"),
-					)
-				}
-				hasDefault = true
-			} else {
+		for _, caseClause := range n.Cases {
+			if caseClause.Pattern != nil {
 				// Check pattern type compatibility with match expression
 				patternType := checkExpr(ctx, mod, caseClause.Pattern, types.TypeUnknown)
 
@@ -352,13 +517,13 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 				if !matchType.Equals(types.TypeUnknown) && !patternType.Equals(types.TypeUnknown) {
 					// Check if types are compatible (exact match or compatible types)
 					compat := checkTypeCompatibility(patternType, matchType)
-					if compat == Incompatible {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError(fmt.Sprintf("pattern type '%s' does not match match expression type '%s'", patternType.String(), matchType.String())).
-								WithPrimaryLabel(caseClause.Pattern.Loc(), "incompatible pattern type").
-								WithCode(diagnostics.ErrTypeMismatch).
-								WithNote(fmt.Sprintf("match expression has type '%s'", matchType.String())),
-						)
+					if !isImplicitlyCompatible(compat) {
+						diag := diagnostics.NewError(fmt.Sprintf("pattern type '%s' does not match match expression type '%s'", patternType.String(), matchType.String())).
+							WithPrimaryLabel(caseClause.Pattern.Loc(), "incompatible pattern type").
+							WithCode(diagnostics.ErrTypeMismatch).
+							WithNote(fmt.Sprintf("match expression has type '%s'", matchType.String()))
+						diag = addExplicitCastHint(ctx, diag, patternType, matchType, compat, caseClause.Pattern)
+						ctx.Diagnostics.Add(diag)
 					}
 				}
 			}
@@ -373,15 +538,6 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 			// Restore scope if we entered one
 			if restoreScope != nil {
 				restoreScope()
-			}
-
-			// Check for unreachable cases (cases after default)
-			if hasDefault && i < len(n.Cases)-1 {
-				ctx.Diagnostics.Add(
-					diagnostics.NewWarning("unreachable case after default case").
-						WithPrimaryLabel(&n.Cases[i+1].Location, "this case will never be reached").
-						WithNote("default case matches all remaining values"),
-				)
 			}
 		}
 	case *ast.Block:
@@ -409,10 +565,38 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 	for _, item := range declItems {
 		name := item.Name.Name
 
+		if name == "_" {
+			if item.Value != nil {
+				expectedType := types.TypeUnknown
+				if item.Type != nil {
+					expectedType = TypeFromTypeNodeWithContext(ctx, mod, item.Type)
+					checkAssignLike(ctx, mod, expectedType, item.Type, item.Value)
+				} else {
+					checkExpr(ctx, mod, item.Value, expectedType)
+				}
+			} else if isConst {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("constant '_' must be initialized").
+						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer").
+						WithHelp("provide a value: const _ := 42"),
+				)
+			}
+			continue
+		}
+
 		// Get or create the symbol (module-level or local)
 		sym, ok := mod.CurrentScope.GetSymbol(name)
 		if !ok {
 			continue
+		}
+
+		if item.Value != nil && referencesIdentOutsideFuncLit(item.Value, name) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("'%s' references itself in its initializer", name)).
+					WithCode(diagnostics.ErrCircularDependency).
+					WithPrimaryLabel(item.Value.Loc(), "self reference here").
+					WithSecondaryLabel(item.Name.Loc(), "declared here"),
+			)
 		}
 
 		// Determine the type
@@ -441,11 +625,6 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			if item.Value != nil {
 				// Pass item.Type for type location in error messages
 				checkAssignLike(ctx, mod, declType, item.Type, item.Value)
-
-				// Try to evaluate the initializer as a compile-time constant
-				if constVal := consteval.EvaluateExpr(ctx, mod, item.Value); constVal != nil && constVal.IsConstant() {
-					sym.ConstValue = constVal
-				}
 			} else if isConst {
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
@@ -486,11 +665,6 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				}
 			}
 
-			// Try to evaluate the initializer as a compile-time constant
-			// This enables constant propagation for code like: let i := 10; arr[i]
-			if constVal := consteval.EvaluateExpr(ctx, mod, item.Value); constVal != nil && constVal.IsConstant() {
-				sym.ConstValue = constVal
-			}
 		} else {
 			// No type and no value - error
 			if isConst {
@@ -791,6 +965,13 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		}
 	}
 
+	if isEnumType(sourceType) && isIntegerType(targetType) {
+		return
+	}
+	if isBoolType(sourceType) && isIntegerType(targetType) {
+		return
+	}
+
 	// Allow explicit casts between numeric types
 	if types.IsNumericType(sourceType) && types.IsNumericType(targetType) {
 		return
@@ -821,6 +1002,37 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 				WithPrimaryLabel(expr.Loc(), "invalid cast"),
 		)
 	}
+}
+
+func isEnumType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	_, ok := typ.(*types.EnumType)
+	return ok
+}
+
+func isIntegerType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		return types.IsIntegerTypeName(prim.GetName())
+	}
+	return false
+}
+
+func isBoolType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		return prim.GetName() == types.TYPE_BOOL
+	}
+	return false
 }
 
 // checkCompositeLit validates that a composite literal matches its target type
@@ -909,14 +1121,14 @@ func validateArrayLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	for _, elem := range lit.Elts {
 		if _, isKV := elem.(*ast.KeyValueExpr); !isKV {
 			elemType := checkExpr(ctx, mod, elem, arrayType.Element)
-			if compat := checkTypeCompatibility(elemType, arrayType.Element); compat == Incompatible {
+			if compat := checkTypeCompatibility(elemType, arrayType.Element); !isImplicitlyCompatible(compat) {
 				elemTypeStr := resolveType(elemType, types.TypeUnknown)
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
-						WithCode(diagnostics.ErrTypeMismatch).
-						WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
-						WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String())),
-				)
+				diag := diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
+					WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String()))
+				diag = addExplicitCastHint(ctx, diag, elemType, arrayType.Element, compat, elem)
+				ctx.Diagnostics.Add(diag)
 			}
 		}
 	}
@@ -935,26 +1147,26 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 
 		// Check key type compatibility - with contextualization
 		keyType := checkExpr(ctx, mod, kv.Key, mapType.Key)
-		if compat := checkTypeCompatibility(keyType, mapType.Key); compat == Incompatible {
+		if compat := checkTypeCompatibility(keyType, mapType.Key); !isImplicitlyCompatible(compat) {
 			keyTypeStr := resolveType(keyType, types.TypeUnknown)
-			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("map keys must all be same type, expected %s but found %s", mapType.Key.String(), keyTypeStr)).
-					WithCode(diagnostics.ErrTypeMismatch).
-					WithPrimaryLabel(kv.Key.Loc(), fmt.Sprintf("type %s", keyTypeStr)).
-					WithHelp(fmt.Sprintf("all map keys must be %s", mapType.Key.String())),
-			)
+			diag := diagnostics.NewError(fmt.Sprintf("map keys must all be same type, expected %s but found %s", mapType.Key.String(), keyTypeStr)).
+				WithCode(diagnostics.ErrTypeMismatch).
+				WithPrimaryLabel(kv.Key.Loc(), fmt.Sprintf("type %s", keyTypeStr)).
+				WithHelp(fmt.Sprintf("all map keys must be %s", mapType.Key.String()))
+			diag = addExplicitCastHint(ctx, diag, keyType, mapType.Key, compat, kv.Key)
+			ctx.Diagnostics.Add(diag)
 		}
 
 		// Check value type compatibility - with contextualization
 		valueType := checkExpr(ctx, mod, kv.Value, mapType.Value)
-		if compat := checkTypeCompatibility(valueType, mapType.Value); compat == Incompatible {
+		if compat := checkTypeCompatibility(valueType, mapType.Value); !isImplicitlyCompatible(compat) {
 			valueTypeStr := resolveType(valueType, types.TypeUnknown)
-			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("map values must all be same type, expected %s but found %s", mapType.Value.String(), valueTypeStr)).
-					WithCode(diagnostics.ErrTypeMismatch).
-					WithPrimaryLabel(kv.Value.Loc(), fmt.Sprintf("type %s", valueTypeStr)).
-					WithHelp(fmt.Sprintf("all map values must be %s", mapType.Value.String())),
-			)
+			diag := diagnostics.NewError(fmt.Sprintf("map values must all be same type, expected %s but found %s", mapType.Value.String(), valueTypeStr)).
+				WithCode(diagnostics.ErrTypeMismatch).
+				WithPrimaryLabel(kv.Value.Loc(), fmt.Sprintf("type %s", valueTypeStr)).
+				WithHelp(fmt.Sprintf("all map values must be %s", mapType.Value.String()))
+			diag = addExplicitCastHint(ctx, diag, valueType, mapType.Value, compat, kv.Value)
+			ctx.Diagnostics.Add(diag)
 		}
 	}
 }
@@ -982,7 +1194,7 @@ func analyzeStructCompatibility(src, dst *types.StructType) (missingFields []str
 				}
 				// Allow untyped literals to match concrete types
 				compatibility := checkTypeCompatibility(srcField.Type, dstField.Type)
-				if compatibility == Incompatible {
+				if !isImplicitlyCompatible(compatibility) {
 					// Type mismatch
 					mismatchedFields = append(mismatchedFields,
 						fmt.Sprintf("%s (expected %s, found %s)", dstField.Name, dstField.Type.String(), srcField.Type.String()))
@@ -1140,6 +1352,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 	}
 
 	receiverType := TypeFromTypeNodeWithContext(ctx, mod, decl.Receiver.Type)
+	receiverTypeRaw := receiverType
 
 	// Only process valid named types
 	if receiverType.Equals(types.TypeUnknown) {
@@ -1178,6 +1391,7 @@ func checkMethodSignatureOnly(ctx *context_v2.CompilerContext, mod *context_v2.M
 		typeSym.Methods[decl.Name.Name] = &symbols.MethodInfo{
 			Name:     decl.Name.Name,
 			FuncType: funcType,
+			Receiver: receiverTypeRaw,
 			Exported: utils.IsExported(decl.Name.Name),
 		}
 	}
@@ -1252,71 +1466,9 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 			variantName := variant.Name.Name
 			qualifiedName := typeName + "::" + variantName
 
-			// Compute variant value
 			if variant.Value != nil {
-				// Explicit value provided
-				switch val := variant.Value.(type) {
-				case *ast.BasicLit:
-					if val.Kind == ast.INT {
-						// Parse the integer literal
-						parsedValue, err := strconv.ParseInt(val.Value, 0, 64)
-						if err != nil {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
-									WithPrimaryLabel(val.Loc(), "cannot parse as integer").
-									WithHelp("use a valid integer literal"),
-							)
-							continue
-						}
-						currentValue = parsedValue
-					} else {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
-								WithPrimaryLabel(val.Loc(), "expected integer literal").
-								WithHelp("use an integer literal (e.g., 42)"),
-						)
-						continue
-					}
-				case *ast.UnaryExpr:
-					// Handle negative literals like -1
-					if val.Op.Kind == tokens.MINUS_TOKEN {
-						if lit, ok := val.X.(*ast.BasicLit); ok && lit.Kind == ast.INT {
-							parsedValue, err := strconv.ParseInt(lit.Value, 0, 64)
-							if err != nil {
-								ctx.Diagnostics.Add(
-									diagnostics.NewError(fmt.Sprintf("invalid integer value for enum variant '%s'", variantName)).
-										WithPrimaryLabel(lit.Loc(), "cannot parse as integer").
-										WithHelp("use a valid integer literal"),
-								)
-								continue
-							}
-							currentValue = -parsedValue
-						} else {
-							ctx.Diagnostics.Add(
-								diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
-									WithPrimaryLabel(val.Loc(), "expected integer literal").
-									WithHelp("use an integer literal (e.g., -42)"),
-							)
-							continue
-						}
-					} else {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have integer value", variantName)).
-								WithPrimaryLabel(val.Loc(), "unexpected expression").
-								WithHelp("use an integer literal"),
-						)
-						continue
-					}
-				default:
-					ctx.Diagnostics.Add(
-						diagnostics.NewError(fmt.Sprintf("enum variant '%s' must have constant integer value", variantName)).
-							WithPrimaryLabel(variant.Value.Loc(), "expected integer literal").
-							WithHelp("use an integer literal (e.g., 42)"),
-					)
-					continue
-				}
+				reportExplicitEnumValue(ctx, variantName, variant.Value.Loc())
 			}
-			// else: use currentValue as is (sequential numbering)
 
 			// Look up the variant symbol (created during collection phase)
 			variantSym, ok := mod.ModuleScope.GetSymbol(qualifiedName)
@@ -1327,8 +1479,9 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 			// Update the variant symbol's type to the named enum type
 			variantSym.Type = namedType
+			variantSym.ConstValue = consteval.NewIntValue(currentValue, namedType)
 
-			// Increment for next variant (if no explicit value provided)
+			// Increment for next variant (sequential numbering)
 			currentValue++
 		}
 	}
@@ -1338,6 +1491,12 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.AssignStmt) {
 	// Check if we're trying to reassign a constant
 	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
+		if ident.Name == "_" {
+			if stmt.Rhs != nil {
+				checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+			}
+			return
+		}
 		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
 			if sym.Kind == symbols.SymbolConstant {
 				ctx.Diagnostics.Add(
@@ -1348,8 +1507,19 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 				)
 				return
 			}
+			if sym.IsReadonly {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot modify read-only variable '%s'", ident.Name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(stmt.Lhs.Loc(), "read-only variable").
+						WithNote("loop indices and catch errors are read-only"),
+				)
+				return
+			}
 		}
 	}
+
+	warnValueReceiverMutation(ctx, mod, stmt.Lhs)
 
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
@@ -1365,12 +1535,6 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 					WithHelp("increment/decrement operators only work on numeric types"),
 			)
 			return
-		}
-		// Clear constant value since variable is being modified
-		if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-			if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-				sym.ConstValue = nil
-			}
 		}
 		return
 	}
@@ -1436,31 +1600,113 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
 	}
 
-	// Track constant value propagation through assignments
-	// If LHS is a simple identifier and RHS has a constant value, update the symbol
-	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-			// For compound assignments and increment/decrement, clear constant value
-			if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
-				sym.ConstValue = nil
-			} else if stmt.Rhs != nil {
-				// Try to evaluate the RHS as a constant
-				if constVal := consteval.EvaluateExpr(ctx, mod, stmt.Rhs); constVal != nil {
-					sym.ConstValue = constVal
-				} else {
-					// RHS is not constant - clear the constant value
-					sym.ConstValue = nil
-				}
-			}
-		}
-	}
-
 	// TODO: Invalidate constant values for aliasing
 	// When reference expressions (&x) are implemented, we should:
 	// 1. Clear constant value when address is taken (addressOf expression)
 	// 2. Clear all potentially aliased variables on reference assignment
 	// 3. Consider inter-procedural effects (function calls with &params)
 	// For now, method calls with reference receivers handle invalidation separately
+}
+
+func receiverSymbolFromExpr(mod *context_v2.Module, expr ast.Expression) *symbols.Symbol {
+	if mod == nil || mod.CurrentScope == nil || expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		if sym, found := mod.CurrentScope.Lookup(e.Name); found && sym.Kind == symbols.SymbolReceiver {
+			return sym
+		}
+	case *ast.SelectorExpr:
+		return receiverSymbolFromExpr(mod, e.X)
+	case *ast.IndexExpr:
+		return receiverSymbolFromExpr(mod, e.X)
+	case *ast.ParenExpr:
+		return receiverSymbolFromExpr(mod, e.X)
+	}
+	return nil
+}
+
+func warnValueReceiverMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) {
+	if ctx == nil || mod == nil || target == nil {
+		return
+	}
+	sym := receiverSymbolFromExpr(mod, target)
+	if sym == nil || sym.Kind != symbols.SymbolReceiver || sym.Type == nil {
+		return
+	}
+	if _, ok := sym.Type.(*types.ReferenceType); ok {
+		return
+	}
+
+	var declLoc *source.Location
+	if sym.Decl != nil {
+		declLoc = sym.Decl.Loc()
+	}
+
+	diag := diagnostics.NewWarning(fmt.Sprintf("modifying value receiver '%s' does not affect the caller", sym.Name)).
+		WithCode(diagnostics.WarnValueReceiverMutation).
+		WithPrimaryLabel(target.Loc(), "value receiver is a copy").
+		WithHelp("use a '&' receiver to mutate the original value")
+	if declLoc != nil {
+		diag = diag.WithSecondaryLabel(declLoc, "receiver declared here")
+	}
+	ctx.Diagnostics.Add(diag)
+}
+
+func reportExplicitEnumValue(ctx *context_v2.CompilerContext, name string, loc *source.Location) {
+	if ctx == nil || loc == nil {
+		return
+	}
+	label := "explicit enum values are not supported"
+	if name != "" {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("enum variant '%s' cannot have an explicit value", name)).
+				WithPrimaryLabel(loc, label).
+				WithHelp("remove the '= value' and rely on auto-assigned tags"),
+		)
+		return
+	}
+	ctx.Diagnostics.Add(
+		diagnostics.NewError("enum variants cannot have explicit values").
+			WithPrimaryLabel(loc, label).
+			WithHelp("remove the '= value' and rely on auto-assigned tags"),
+	)
+}
+
+func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression, targetType types.SemType, op tokens.Token) {
+	if ident, ok := target.(*ast.IdentifierExpr); ok {
+		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+			if sym.Kind == symbols.SymbolConstant {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
+						WithPrimaryLabel(target.Loc(), "cannot modify constant").
+						WithSecondaryLabel(sym.Decl.Loc(), "declared as constant here").
+						WithHelp("constants are immutable; use 'let' for mutable variables"),
+				)
+				return
+			}
+			if sym.IsReadonly {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot modify read-only variable '%s'", ident.Name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(target.Loc(), "read-only variable").
+						WithNote("loop indices and catch errors are read-only"),
+				)
+				return
+			}
+		}
+	}
+
+	warnValueReceiverMutation(ctx, mod, target)
+
+	if !types.IsNumeric(targetType) {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("cannot use %s operator on non-numeric type '%s'", op.Value, targetType.String())).
+				WithPrimaryLabel(target.Loc(), "expected numeric type").
+				WithHelp("increment/decrement operators only work on numeric types"),
+		)
+	}
 }
 
 // checkBlock type checks a block of statements
@@ -1491,10 +1737,22 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	// Recursively validate subexpressions before type inference
 	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		checkModuleScopeUseBeforeDecl(ctx, mod, e)
+	case *ast.EnumType:
+		for _, variant := range e.Variants {
+			if variant.Value != nil {
+				name := ""
+				if variant.Name != nil {
+					name = variant.Name.Name
+				}
+				reportExplicitEnumValue(ctx, name, variant.Value.Loc())
+			}
+		}
 	case *ast.CallExpr:
 		checkCallExpr(ctx, mod, e)
 		// Validate catch clause if present
-		if e.Catch != nil && e.Catch.Handler != nil {
+		if e.Catch != nil {
 			checkCatchClause(ctx, mod, e)
 		}
 
@@ -1502,6 +1760,9 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Validate base expression first
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkSelectorExpr(ctx, mod, e)
+
+	case *ast.ScopeResolutionExpr:
+		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 
 	case *ast.BinaryExpr:
 		// Recursively check operands
@@ -1513,18 +1774,27 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.UnaryExpr:
 		// Recursively check operand
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+	case *ast.PrefixExpr:
+		// Validate ++/-- target and operand type
+		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
+	case *ast.PostfixExpr:
+		// Validate ++/-- target and operand type
+		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
 
 	case *ast.IndexExpr:
 		// Check both array and index expressions
 		checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
 
-		// Perform bounds checking for fixed-size arrays with constant indices
-		checkArrayBounds(ctx, mod, e)
-
 	case *ast.ParenExpr:
 		// Check inner expression
-		return checkExpr(ctx, mod, e.X, expected)
+		innerType := checkExpr(ctx, mod, e.X, expected)
+		if mod != nil {
+			mod.SetExprType(expr, innerType)
+		}
+		return innerType
 
 	case *ast.CastExpr:
 		// Check expression being cast and validate cast compatibility
@@ -1612,14 +1882,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 					if areStructsCompatible(inferredStruct, expectedStruct) {
 						// Use the expected type (preserves named type)
 						resultType = expected
-						compLit.TypeInfo = resultType // Update stored type
 					}
 				}
 			} else if _, ok := expectedUnwrapped.(*types.ArrayType); ok {
 				// For array literals without explicit type, adopt the expected array type
 				// This allows [1, 2, 3] to adopt type [3]i32 when that's expected
 				resultType = expected
-				compLit.TypeInfo = resultType // Update stored type
 				// Validate the composite literal against the expected array type
 				checkCompositeLit(ctx, mod, compLit, expected)
 			}
@@ -1640,42 +1908,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	// Keep untyped literals untyped for better error messages
 	// They will be resolved in specific contexts that need concrete types
 
-	// Store the final resultType in the AST node (update if it changed)
-	switch e := expr.(type) {
-	case *ast.BasicLit:
-		e.Type = resultType
-	case *ast.IdentifierExpr:
-		e.Type = resultType
-	case *ast.BinaryExpr:
-		e.Type = resultType
-	case *ast.UnaryExpr:
-		e.Type = resultType
-	case *ast.PostfixExpr:
-		e.Type = resultType
-	case *ast.PrefixExpr:
-		e.Type = resultType
-	case *ast.CallExpr:
-		e.Type = resultType
-	case *ast.SelectorExpr:
-		e.Type = resultType
-	case *ast.IndexExpr:
-		e.Type = resultType
-	case *ast.CastExpr:
-		e.TypeInfo = resultType
-	case *ast.ParenExpr:
-		e.Type = resultType
-	case *ast.ScopeResolutionExpr:
-		e.Type = resultType
-	case *ast.RangeExpr:
-		e.Type = resultType
-	case *ast.CoalescingExpr:
-		e.Type = resultType
-	case *ast.ForkExpr:
-		e.Type = resultType
-	case *ast.FuncLit:
-		e.TypeInfo = resultType
-	case *ast.CompositeLit:
-		e.TypeInfo = resultType
+	if mod != nil {
+		mod.SetExprType(expr, resultType)
 	}
 
 	return resultType
@@ -1702,7 +1936,6 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 
 	case ExplicitCastable:
 		// Requires explicit cast - use centralized hint system
-		exprText := rightNode.Loc().GetText(ctx.Diagnostics.GetSourceCache())
 		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility))
 
 		// Add dual labels if we have type node location
@@ -1713,10 +1946,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion not allowed")
 		}
 
-		hint := getConversionHint(rhsType, leftType, compatibility, exprText)
-		if hint != "" {
-			diag = diag.WithHelp(hint)
-		}
+		diag = addExplicitCastHint(ctx, diag, rhsType, leftType, compatibility, rightNode)
 		ctx.Diagnostics.Add(diag)
 
 	case Incompatible:
@@ -1778,6 +2008,24 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 
 		ctx.Diagnostics.Add(diag)
 	}
+}
+
+func addExplicitCastHint(ctx *context_v2.CompilerContext, diag *diagnostics.Diagnostic, source, target types.SemType, compatibility TypeCompatibility, expr ast.Expression) *diagnostics.Diagnostic {
+	if diag == nil || compatibility != ExplicitCastable {
+		return diag
+	}
+	exprText := ""
+	if expr != nil {
+		exprText = expr.Loc().GetText(ctx.Diagnostics.GetSourceCache())
+	}
+	hint := getConversionHint(source, target, compatibility, exprText)
+	if hint == "" {
+		return diag
+	}
+	if diag.Help != "" {
+		hint = fmt.Sprintf("%s; %s", diag.Help, hint)
+	}
+	return diag.WithHelp(hint)
 }
 
 // formatValueDescription formats a user-friendly description for a value in error messages.
@@ -1990,6 +2238,22 @@ func TypeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		// Propagate the ID from AST to semantic type for identity tracking
 		structType.ID = t.ID
 		return structType
+	case *ast.EnumType:
+		variants := make([]types.EnumVariant, len(t.Variants))
+		for i, v := range t.Variants {
+			name := ""
+			if v.Name != nil {
+				name = v.Name.Name
+			}
+			variants[i] = types.EnumVariant{
+				Name:  name,
+				Value: int64(i),
+				Type:  nil,
+			}
+		}
+		enumType := types.NewEnum("", variants)
+		enumType.ID = t.ID
+		return enumType
 
 	case *ast.FuncType:
 		// Function type: fn(T1, T2) -> R
@@ -2065,11 +2329,8 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 // - Checking argument count (regular and variadic functions)
 // - Validating argument types against parameter types
 func checkCallExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) {
-	// 0. If the function being called is a selector (method call), validate it first
-	if selector, ok := expr.Fun.(*ast.SelectorExpr); ok {
-		checkExpr(ctx, mod, selector.X, types.TypeUnknown)
-		checkSelectorExpr(ctx, mod, selector)
-	}
+	// 0. Validate the callee expression (ordering rules, selectors, nested calls, etc.)
+	checkExpr(ctx, mod, expr.Fun, types.TypeUnknown)
 
 	// 1. Infer the type of the expression being called
 	funType := inferExprType(ctx, mod, expr.Fun)
@@ -2164,18 +2425,18 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 		// Check compatibility (use WithContext to handle interfaces properly)
 		compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, param.Type)
 
-		if compatibility == Incompatible {
+		if !isImplicitlyCompatible(compatibility) {
 			// Format the argument type in a user-friendly way
 			argTypeDesc := resolveType(argType, param.Type)
-			ctx.Diagnostics.Add(
-				diagnostics.ArgumentTypeMismatch(
-					mod.FilePath,
-					arg.Loc(),
-					param.Name,
-					param.Type.String(),
-					argTypeDesc.String(),
-				),
+			diag := diagnostics.ArgumentTypeMismatch(
+				mod.FilePath,
+				arg.Loc(),
+				param.Name,
+				param.Type.String(),
+				argTypeDesc.String(),
 			)
+			diag = addExplicitCastHint(ctx, diag, argType, param.Type, compatibility, arg)
+			ctx.Diagnostics.Add(diag)
 		}
 	}
 
@@ -2202,18 +2463,18 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)
 			compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, variadicElemType)
 
-			if compatibility == Incompatible {
+			if !isImplicitlyCompatible(compatibility) {
 				// Format the argument type in a user-friendly way
 				argTypeDesc := resolveType(argType, variadicElemType)
-				ctx.Diagnostics.Add(
-					diagnostics.ArgumentTypeMismatch(
-						mod.FilePath,
-						arg.Loc(),
-						variadicParam.Name,
-						variadicElemType.String(),
-						argTypeDesc.String(),
-					),
+				diag := diagnostics.ArgumentTypeMismatch(
+					mod.FilePath,
+					arg.Loc(),
+					variadicParam.Name,
+					variadicElemType.String(),
+					argTypeDesc.String(),
 				)
+				diag = addExplicitCastHint(ctx, diag, argType, variadicElemType, compatibility, arg)
+				ctx.Diagnostics.Add(diag)
 			}
 		}
 	}
@@ -2278,18 +2539,19 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 		return // Error already reported in validateResultTypeHandling
 	}
 
-	// get the scope of the catch block
-	scope := catch.Handler.Scope.(*table.SymbolTable)
-	defer mod.EnterScope(scope)()
-	// check catch block
-	// set the catch error identifier type to the error type
-	if catch.ErrIdent != nil {
-		if sym, ok := mod.CurrentScope.Lookup(catch.ErrIdent.Name); ok {
-			sym.Type = resultType.Err
+	if catch.Handler != nil {
+		// get the scope of the catch block
+		scope := catch.Handler.Scope.(*table.SymbolTable)
+		defer mod.EnterScope(scope)()
+		// set the catch error identifier type to the error type
+		if catch.ErrIdent != nil {
+			if sym, ok := mod.CurrentScope.Lookup(catch.ErrIdent.Name); ok {
+				sym.Type = resultType.Err
+			}
 		}
+		// check the catch block
+		checkBlock(ctx, mod, catch.Handler)
 	}
-	// check the catch block
-	checkBlock(ctx, mod, catch.Handler)
 	// check the fallback expression - must match the OK type of the result
 	if catch.Fallback != nil {
 		// Use checkAssignLike to validate type compatibility and report errors
@@ -2409,50 +2671,6 @@ func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	default:
 		// Fallback for unexpected node types
 		checkNode(ctx, mod, elseNode)
-	}
-}
-
-// checkArrayBounds validates array indexing for compile-time bounds checking
-// For fixed-size arrays with constant indices, reports errors for out-of-bounds access
-// For dynamic arrays or runtime indices, skips validation (runtime check)
-func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, indexExpr *ast.IndexExpr) {
-	// Get the type of the array being indexed
-	arrayType := inferExprType(ctx, mod, indexExpr.X)
-	arrayType = types.UnwrapType(arrayType)
-
-	// Only check fixed-size arrays
-	arrType, ok := arrayType.(*types.ArrayType)
-	if !ok || arrType.Length < 0 {
-		// Not an array, or dynamic array - skip bounds checking
-		// Dynamic arrays grow automatically, negative indices access from end
-		return
-	}
-
-	// Try to evaluate the index expression as a compile-time constant
-	// This handles not just literals like `arr[10]`, but also variables with known values like `let i := 10; arr[i]`
-	indexValue, isConstant := consteval.EvaluateAsInt(ctx, mod, indexExpr.Index)
-	if !isConstant {
-		// Runtime value - cannot check at compile time
-		return
-	}
-
-	// Store original index for better error message
-	originalIndex := indexValue
-
-	// Handle negative indices (access from end)
-	if indexValue < 0 {
-		indexValue = int64(arrType.Length) + indexValue
-	}
-
-	// Check bounds
-	if indexValue < 0 || indexValue >= int64(arrType.Length) {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", originalIndex, arrType.Length)).
-				WithCode(diagnostics.ErrArrayOutOfBounds).
-				WithPrimaryLabel(indexExpr.Index.Loc(), "index out of range").
-				WithNote(fmt.Sprintf("valid indices are 0 to %d, or -%d to -1 for reverse access", arrType.Length-1, arrType.Length)).
-				WithHelp("check the array length before accessing"),
-		)
 	}
 }
 

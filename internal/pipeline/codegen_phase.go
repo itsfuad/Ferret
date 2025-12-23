@@ -15,8 +15,12 @@ import (
 	ustrings "compiler/internal/utils/strings"
 )
 
-// runCodegenPhase runs code generation on all type-checked modules
+// runCodegenPhase runs code generation on all MIR-generated modules.
 func (p *Pipeline) runCodegenPhase() error {
+	if p.ctx.HasErrors() {
+		return fmt.Errorf("skipping codegen due to previous errors")
+	}
+
 	outputPath := p.ctx.Config.OutputPath
 	outputDir := filepath.Dir(outputPath)
 
@@ -90,7 +94,7 @@ func (p *Pipeline) collectModulesForCodegen() []string {
 		}
 
 		modulePhase := p.ctx.GetModulePhase(importPath)
-		if modulePhase >= phase.PhaseTypeChecked && module.Type == context_v2.ModuleLocal {
+		if modulePhase >= phase.PhaseMIRGenerated && module.Type == context_v2.ModuleLocal {
 			modulesToGenerate = append(modulesToGenerate, importPath)
 			if p.ctx.Config.Debug {
 				colors.CYAN.Printf("  Including module: %s (phase: %s, type: %s)\n", importPath, modulePhase, module.Type)

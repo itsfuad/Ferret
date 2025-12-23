@@ -60,7 +60,7 @@ func TestPipelineBasic(t *testing.T) {
 // - Issue 1: No double parsing (each file parsed exactly once)
 // - Issue 2: Thread-safe diagnostics (stable across runs)
 // - Issue 3: No duplicate error messages
-// - Phase invariants: All modules advance through the full pipeline (Lexed -> Parsed -> Collected -> Resolved -> TypeChecked)
+// - Phase invariants: All modules advance through the full pipeline (Lexed -> Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> MIRGenerated)
 func TestPipelineInvariants(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
@@ -140,7 +140,7 @@ fn square(x: f64) -> f64 {
 				moduleNames = append(moduleNames[:i], moduleNames[i+1:]...)
 			}
 		}
-		
+
 		if len(moduleNames) != 3 {
 			t.Errorf("Run %d: Expected 3 modules (main, utils, helper), got %d", run, len(moduleNames))
 		}
@@ -153,7 +153,7 @@ fn square(x: f64) -> f64 {
 			}
 
 			// Verify phase is at least PhaseParsed (pipeline runs through all phases)
-			// With syntax errors, modules may stop at PhaseParsed, otherwise they reach PhaseTypeChecked
+			// With syntax errors, modules may stop at PhaseParsed, otherwise they reach later phases
 			if module.Phase < phase.PhaseParsed {
 				t.Errorf("Run %d: Module %q phase = %v, want at least PhaseParsed", run, moduleName, module.Phase)
 			}
@@ -331,8 +331,6 @@ const B := 2;`
 		}
 	}
 
-	
-
 	// Verify diamond dependency structure
 	expectedDeps := map[string]int{
 		"test_project/main": 2, // imports a, b
@@ -357,7 +355,7 @@ const B := 2;`
 }
 
 // TestPhasePrerequisites validates phase ordering.
-// All modules should advance through: Lexed -> Parsed -> Collected -> Resolved -> TypeChecked
+// All modules should advance through: Lexed -> Parsed -> Collected -> Resolved -> TypeChecked -> HIRGenerated -> CFGAnalyzed -> HIRLowered -> MIRGenerated
 func TestPhasePrerequisites(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -529,7 +527,7 @@ func TestImportPathNormalization(t *testing.T) {
 						order = append(order[:i], order[i+1:]...)
 					}
 				}
-				
+
 				if len(order) != 2 {
 					t.Errorf("%s: Expected 2 modules (main + utils), got %d", tc.description, len(order))
 				}

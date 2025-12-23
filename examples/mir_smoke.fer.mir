@@ -1,0 +1,63 @@
+module examples/mir_smoke
+
+fn add(a: i32, b: i32) -> i32 {
+  block b1 entry:
+    %t3 = alloca i32
+    store %t3, %t1
+    %t4 = load i32 %t3
+    %t5 = alloca i32
+    store %t5, %t2
+    %t6 = load i32 %t5
+    %t7 = + i32 %t4, %t6
+    ret %t7
+}
+
+fn dec(a: i32) -> i32 {
+  block b2 entry:
+    %t9 = alloca i32
+    store %t9, %t8
+    %t10 = load i32 %t9
+    %t11 = const i32 1
+    %t12 = - i32 %t10, %t11
+    ret %t12
+}
+
+fn main() -> void {
+  block b3 entry:
+    %t13 = alloca i32
+    %t14 = const i32 5
+    store %t13, %t14
+    %t15 = alloca i32
+    %t16 = load i32 %t13
+    %t17 = const i32 7
+    %t18 = call add(%t16, %t17) : i32
+    store %t15, %t18
+    %t19 = load i32 %t15
+    %t20 = const i32 3
+    %t21 = + i32 %t19, %t20
+    store %t15, %t21
+    %t22 = load i32 %t15
+    %t23 = const i32 1
+    %t24 = + i32 %t22, %t23
+    store %t15, %t24
+    %t25 = alloca i32
+    %t26 = load i32 %t15
+    %t27 = call dec(%t26) : i32
+    store %t25, %t27
+    %t28 = load i32 %t25
+    %t29 = const i32 10
+    %t30 = > bool %t28, %t29
+    br_if %t30, b4, b6
+  block b4 if.then:
+    %t31 = const str big
+    call io::Println(%t31) : void
+    br b5
+  block b5 if.end:
+    %t33 = load i32 %t25
+    call io::Println(%t33) : void
+    ret
+  block b6 if.else:
+    %t32 = const str small
+    call io::Println(%t32) : void
+    br b5
+}

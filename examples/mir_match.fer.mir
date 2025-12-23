@@ -1,0 +1,27 @@
+module examples/mir_match
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca i32
+    %t2 = const i32 2
+    store %t1, %t2
+    %t3 = alloca i32
+    %t4 = const i32 0
+    store %t3, %t4
+    %t5 = load i32 %t1
+    switch %t5 [1: b3, 2: b4] default b5
+  block b2 match.end:
+    ret
+  block b3 match.case:
+    %t6 = const i32 10
+    store %t3, %t6
+    br b2
+  block b4 match.case:
+    %t7 = const i32 20
+    store %t3, %t7
+    br b2
+  block b5 match.case:
+    %t8 = const i32 30
+    store %t3, %t8
+    br b2
+}

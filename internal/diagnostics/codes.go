@@ -51,6 +51,8 @@ const (
 	ErrInvalidCatch            = "T0024"
 	ErrInvalidErrorReturn      = "T0025"
 	ErrMissingCatch            = "T0026"
+	ErrUseBeforeDecl           = "T0027"
+	ErrArrayIndexNotConst      = "T0028"
 
 	// Module/Import errors (M prefix)
 	ErrModuleNotFound    = "M0001"
@@ -68,4 +70,5 @@ const (
 	WarnConstantConditionTrue  = "W0002"
 	WarnConstantConditionFalse = "W0003"
 	WarnDeadCode               = "W0004"
+	WarnValueReceiverMutation  = "W0005"
 )

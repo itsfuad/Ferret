@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"compiler/colors"
@@ -54,10 +55,34 @@ func (p *Pipeline) Run() error {
 	}
 
 	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 5] Control Flow Analysis\n")
+		colors.CYAN.Printf("\n[Phase 5] HIR Generation\n")
 	}
-	
+
+	if err := p.runHIRGenerationPhase(); err != nil {
+		return err
+	}
+
+	if p.ctx.Config.Debug {
+		colors.CYAN.Printf("\n[Phase 6] Control Flow Analysis (HIR)\n")
+	}
+
 	if err := p.runCFGAnalysisPhase(); err != nil {
+		return err
+	}
+
+	if p.ctx.Config.Debug {
+		colors.CYAN.Printf("\n[Phase 7] HIR Lowering\n")
+	}
+
+	if err := p.runHIRLoweringPhase(); err != nil {
+		return err
+	}
+
+	if p.ctx.Config.Debug {
+		colors.CYAN.Printf("\n[Phase 8] MIR Generation\n")
+	}
+
+	if err := p.runMIRGenerationPhase(); err != nil {
 		return err
 	}
 
@@ -67,21 +92,24 @@ func (p *Pipeline) Run() error {
 		}
 		return fmt.Errorf("compilation failed with errors")
 	}
-	
-	if p.ctx.Config.SkipCodegen {
+
+	backend := strings.ToLower(strings.TrimSpace(p.ctx.Config.CodegenBackend))
+	if p.ctx.Config.SkipCodegen || backend == "" || backend == "none" {
+		if p.ctx.Config.Debug {
+			colors.YELLOW.Printf("\n[Skipping Code Generation] Codegen disabled (backend=%q)\n", backend)
+			colors.GREEN.Printf("\n✓ Compilation successful! (%d modules)\n", p.ctx.ModuleCount())
+		}
 		return nil
 	}
 
-	if p.ctx.Config.Debug {
-		colors.CYAN.Printf("\n[Phase 6] Code Generation\n")
-	}
-	
-	if err := p.runCodegenPhase(); err != nil {
-		return err
-	}
-
-	if p.ctx.HasErrors() {
-		return fmt.Errorf("compilation failed with errors")
+	switch backend {
+	case "qbe":
+		if err := p.runQBECodegenPhase(); err != nil {
+			return err
+		}
+	default:
+		p.ctx.ReportError(fmt.Sprintf("unknown codegen backend: %s", backend), nil)
+		return fmt.Errorf("unknown codegen backend: %s", backend)
 	}
 
 	if p.ctx.Config.Debug {

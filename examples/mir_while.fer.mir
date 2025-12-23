@@ -1,0 +1,43 @@
+module examples/mir_while
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca i32
+    %t2 = const i32 0
+    store %t1, %t2
+    %t3 = alloca i32
+    %t4 = const i32 0
+    store %t3, %t4
+    br b2
+  block b2 while.cond:
+    %t5 = load i32 %t1
+    %t6 = const i32 10
+    %t7 = < bool %t5, %t6
+    br_if %t7, b3, b4
+  block b3 while.body:
+    %t8 = load i32 %t1
+    %t9 = const i32 1
+    %t10 = + i32 %t8, %t9
+    store %t1, %t10
+    %t11 = load i32 %t1
+    %t12 = const i32 5
+    %t13 = == bool %t11, %t12
+    br_if %t13, b5, b6
+  block b4 while.end:
+    ret
+  block b5 if.then:
+    br b2
+  block b6 if.end:
+    %t14 = load i32 %t1
+    %t15 = const i32 9
+    %t16 = == bool %t14, %t15
+    br_if %t16, b7, b8
+  block b7 if.then:
+    br b4
+  block b8 if.end:
+    %t17 = load i32 %t3
+    %t18 = load i32 %t1
+    %t19 = + i32 %t17, %t18
+    store %t3, %t19
+    br b2
+}

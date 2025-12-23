@@ -1,6 +1,17 @@
 // Working example - demonstrates all supported features
 import "std/io";
 
+
+fn greet() {
+    io::Println("Hello from Ferret!");
+}
+
+fn calculate(a: i32, b: i32) -> i32 {
+    let result := a * b;
+    return result;
+}
+
+
 fn main() {
     // Variables with type inference
     let x := 10;
@@ -19,13 +30,14 @@ fn main() {
     // Function calls
     greet();
     calculate(5, 3);
+    afterDecl("hi", "w");
+    constFn("Fuad");
 }
 
-fn greet() {
-    io::Println("Hello from Ferret!");
+fn afterDecl(a: str) {
+    // do nothing
 }
 
-fn calculate(a: i32, b: i32) -> i32 {
-    let result := a * b;
-    return result;
-}
+const constFn := fn(name: str, age: i32) {
+    
+};

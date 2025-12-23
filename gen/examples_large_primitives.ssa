@@ -1,0 +1,74 @@
+data $str1 = { b "170141183460469231731687303715884105727", b 0 }
+data $str2 = { b "1", b 0 }
+data $str3 = { b "0", b 0 }
+data $str4 = { b "i128 ok", b 0 }
+data $str5 = { b "79228162514264337593543950336", b 0 }
+data $str6 = { b "2", b 0 }
+data $str7 = { b "u256 ok", b 0 }
+
+export function w $main() {
+@b1
+	%t1 =l alloc8 16
+	%t2 =l alloc8 16
+	%t3 =l copy $str1
+	call $ferret_i128_from_string_ptr(l %t3, l %t2)
+	%t4 =l copy 16
+	call $ferret_memcpy(l %t1, l %t2, l %t4)
+	%t5 =l alloc8 16
+	%t6 =l alloc8 16
+	%t7 =l copy $str2
+	call $ferret_i128_from_string_ptr(l %t7, l %t6)
+	%t8 =l copy 16
+	call $ferret_memcpy(l %t5, l %t6, l %t8)
+	%t9 =l alloc8 16
+	%t10 =l alloc8 16
+	call $ferret_i128_sub_ptr(l %t1, l %t5, l %t10)
+	%t11 =l copy 16
+	call $ferret_memcpy(l %t9, l %t10, l %t11)
+	%t12 =l alloc8 16
+	%t13 =l alloc8 16
+	%t14 =l copy $str3
+	call $ferret_i128_from_string_ptr(l %t14, l %t13)
+	%t15 =l alloc8 16
+	call $ferret_i128_sub_ptr(l %t13, l %t9, l %t15)
+	%t16 =l copy 16
+	call $ferret_memcpy(l %t12, l %t15, l %t16)
+	%t17 =w call $ferret_i128_lt_ptr(l %t12, l %t1)
+	jnz %t17, @b2, @b3
+@b2
+	%t18 =l copy $str4
+	call $ferret_io_Println(l %t18)
+	jmp @b3
+@b3
+	%t19 =l alloc8 32
+	%t20 =l alloc8 32
+	%t21 =l copy $str5
+	call $ferret_u256_from_string_ptr(l %t21, l %t20)
+	%t22 =l copy 32
+	call $ferret_memcpy(l %t19, l %t20, l %t22)
+	%t23 =l alloc8 32
+	%t24 =l alloc8 32
+	%t25 =l copy $str6
+	call $ferret_u256_from_string_ptr(l %t25, l %t24)
+	%t26 =l copy 32
+	call $ferret_memcpy(l %t23, l %t24, l %t26)
+	%t27 =l alloc8 32
+	%t28 =l alloc8 32
+	call $ferret_u256_add_ptr(l %t19, l %t23, l %t28)
+	%t29 =l copy 32
+	call $ferret_memcpy(l %t27, l %t28, l %t29)
+	%t30 =l alloc8 32
+	%t31 =l alloc8 32
+	call $ferret_u256_mul_ptr(l %t27, l %t23, l %t31)
+	%t32 =l copy 32
+	call $ferret_memcpy(l %t30, l %t31, l %t32)
+	%t33 =w call $ferret_u256_gt_ptr(l %t30, l %t27)
+	jnz %t33, @b4, @b5
+@b4
+	%t34 =l copy $str7
+	call $ferret_io_Println(l %t34)
+	jmp @b5
+@b5
+	ret 0
+}
+

@@ -613,6 +613,7 @@ func (p *Parser) parseCallExpr(fun ast.Expression) *ast.CallExpr {
 // Examples:
 //   - catch 0                    -> just fallback
 //   - catch err { ... } 0        -> error handler + fallback
+//   - catch { ... } 0            -> handler + fallback
 //   - catch err { return 0; }    -> error handler only
 func (p *Parser) parseCatchClause() *ast.CatchClause {
 
@@ -622,8 +623,8 @@ func (p *Parser) parseCatchClause() *ast.CatchClause {
 	var handler *ast.Block
 	var fallback ast.Expression
 
-	// Check if we have an error identifier
-	if p.match(tokens.IDENTIFIER_TOKEN) {
+	// Check if we have an error identifier (only when a handler block follows)
+	if p.match(tokens.IDENTIFIER_TOKEN) && p.next().Kind == tokens.OPEN_CURLY {
 		errIdent = p.parseIdentifier()
 	}
 
@@ -1132,11 +1133,11 @@ func (p *Parser) parseRangeExpr() ast.Expression {
 	return p.parseExpr()
 }
 
-// parseWhileStmt parses: while [cond] { }
+// parseWhileStmt parses: while cond { }
 func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 	start := p.expect(tokens.WHILE_TOKEN).Start
 
-	// Parse condition (optional - nil means infinite loop)
+	// Parse condition (required, but allow nil for error recovery).
 	var cond ast.Expression
 	if !p.match(tokens.OPEN_CURLY) {
 		cond = p.parseExpr()

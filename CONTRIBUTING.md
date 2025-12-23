@@ -16,7 +16,7 @@ Ferret is a statically typed, modern programming language designed for clarity, 
 ### 2. Compilation Pipeline
 The compiler follows a multi-stage pipeline:
 ```
-Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: CodeGen)
+Source Code → Lexer → Parser → AST → Semantic Analysis → HIR Gen → HIR CFG/Analysis → HIR Lowering → MIR Gen
 ```
 
 **Current Architecture (`internal/`):**
@@ -27,19 +27,34 @@ Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: Code
 - `ast/`: Abstract syntax tree node definitions (Complete)
 
 **Supporting Systems**
-- `context/`: Compiler context and state management (Complete)
+- `context_v2/`: Compiler context and state management (Complete)
 - `diagnostics/`: Error reporting and diagnostics system (Complete)
 - `source/`: Source file management and position tracking (Complete)
 - `types/`: Built-in type definitions (Complete)
 - `utils/`: Utility functions and helpers (Complete)
 
 **Semantic Analysis (`internal/semantics/`)**
-- Symbol table management (🚧 In Progress)
-- Type checking and validation (🚧 In Progress)
-- Semantic analysis (🚧 In Progress)
+- Symbol table management (Implemented, evolving)
+- Resolution and scope validation (Implemented, evolving)
+- Type checking and inference (Implemented, evolving)
+- Const evaluation (Implemented, limited)
+- HIR control-flow analysis (Implemented)
 
-**Backend (🔮 Future Focus)**
-- Code generation (Planned)
+**HIR Pipeline**
+- `hir/`: HIR node definitions
+- `hirgen/`: AST → HIR generation
+- `hirlower/`: HIR canonicalization/lowering for later stages
+
+**MIR Pipeline**
+- `mir/`: MIR node definitions
+- `mirgen/`: HIR → MIR generation (scaffold)
+
+**Pipeline**
+- `pipeline/`: Orchestrates phases across modules
+
+**Backend**
+- `codegen/`: C code generation (AST-based, present but detached from pipeline)
+- MIR-native/WASM backends (In Progress)
 - Optimization passes (Planned)
 
 ### 3. Error Handling Strategy
@@ -84,13 +99,13 @@ Source Code → Lexer → Parser → AST → Semantic Analysis → (Future: Code
 - Variadic parameters (`...T`)
 
 **🚧 In Progress**
-- Semantic analysis
-- Symbol resolution
-- Type checking
+- MIR lowering and backend integration
+- MIR-native/WASM backends
+- Optimization passes
 
 **🔮 Future Features**
 - Generics
-- Code generation
+- MIR-based backends
 - Advanced optimizations
 - Multiple backend targets
 - `defer` statements
@@ -553,11 +568,12 @@ fn test() {
 }
 ```
 
-**Semantic Level (Future):**
+**Semantic Level:**
 1. Update symbol collection
-2. Implement type checking rules
-3. Add semantic validation
-4. Comprehensive error cases
+2. Update resolution rules
+3. Update type checking rules
+4. Add semantic validation
+5. Comprehensive error cases
 
 ### Extending Error Reporting
 ```go
@@ -581,11 +597,8 @@ p.ctx.Diagnostics.Report(diagnostics.Diagnostic{
 // - Hint: Suggestion for improvement
 ```
 
-### Working with Symbol Tables (Future)
+### Working with Symbol Tables
 ```go
-// Symbol table implementation is in progress
-// Design will follow this pattern:
-
 // Declare symbols during collection phase
 symbol := &Symbol{
     Name: identifier,
@@ -615,13 +628,20 @@ Ferret/
 │   └── ferret.exe
 ├── colors/                 # Terminal color output utilities
 ├── internal/               # Internal compiler packages
-│   ├── context/           # Compiler context and state
+│   ├── context_v2/        # Compiler context and state
+│   ├── codegen/           # Code generation (C backend)
 │   ├── diagnostics/       # Error reporting system
 │   ├── frontend/          # Frontend (lexer, parser, AST)
 │   │   ├── ast/          # AST node definitions
 │   │   ├── lexer/        # Tokenization
 │   │   └── parser/       # Syntax parsing
-│   ├── semantics/        # Semantic analysis (in progress)
+│   ├── hir/              # HIR node definitions
+│   ├── hirgen/           # AST → HIR lowering
+│   ├── hirlower/         # HIR canonicalization/lowering
+│   ├── mir/              # MIR node definitions
+│   ├── mirgen/           # HIR → MIR generation
+│   ├── pipeline/         # Compilation pipeline
+│   ├── semantics/        # Semantic analysis (implemented, evolving)
 │   ├── source/           # Source file management
 │   ├── types/            # Type system definitions
 │   └── utils/            # Utility functions
@@ -649,14 +669,19 @@ Ferret/
 - **Error Handling**: `E ! T` syntax with `catch` expressions
 - **Advanced Features**: Variadic parameters, method receivers, scope resolution
 
-### 🚧 In Progress (Semantic Analysis)
-- Symbol table management
+### ✅ Implemented (Semantic Analysis)
+- Symbol collection and resolution
 - Type checking and inference
 - Semantic validation
-- Scope resolution
+- Const evaluation (limited)
+- HIR control-flow analysis
+
+### 🚧 In Progress (Backend)
+- C code generation completeness
+- HIR → MIR lowering
+- MIR backends (native/WASM)
 
 ### 🔮 Planned (Backend)
-- Code generation
 - Optimization passes
 - Multiple backend targets
 - Runtime system

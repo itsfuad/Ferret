@@ -16,41 +16,24 @@ Ferret provides two range operators for loops:
 
 ```ferret
 // Exclusive: iterates 0 to 9 (10 iterations)
-for let i in 0..10 {
+for i in 0..10 {
     print(i);  // Prints: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 }
 
 // Inclusive: iterates 0 to 10 (11 iterations)
-for let i in 0..=10 {
+for i in 0..=10 {
     print(i);  // Prints: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 }
 ```
 
-The `let` keyword declares a new loop variable `i` that's scoped to the loop body.
-
-**Using existing variables:**
-```ferret
-let i := 0;  // Pre-declared variable
-for i in 0..5 {
-    print(i);  // Uses the existing 'i' variable
-}
-// i is now 4 (last value from the loop with exclusive end)
-
-let j := 0;
-for j in 0..=5 {
-    print(j);  // Uses the existing 'j' variable
-}
-// j is now 5 (last value from the loop with inclusive end)
-```
-
-Without `let`, the loop uses an existing variable. This is useful when you need to access the loop variable after the loop ends.
+Loop variables are always declared and scoped to the loop body.
 
 The range operators generate arrays, so this is equivalent to:
 ```ferret
 let numbers := 0..10;   // [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 let numbers_inc := 0..=10;  // [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-for let i in numbers {
+for i in numbers {
     print(i);
 }
 ```
@@ -58,12 +41,12 @@ for let i in numbers {
 You can specify the step/increment with both operators:
 ```ferret
 // Exclusive with step
-for let i in 0..10:2 {
+for i in 0..10:2 {
     print(i);  // Prints: 0, 2, 4, 6, 8
 }
 
 // Inclusive with step
-for let i in 0..=10:2 {
+for i in 0..=10:2 {
     print(i);  // Prints: 0, 2, 4, 6, 8, 10
 }
 ```
@@ -72,12 +55,12 @@ for let i in 0..=10:2 {
 
 ```ferret
 let arr := [10, 20, 30];
-for let i, val in arr {
+for i, val in arr {
     print(i, val);  // Prints: 0 10, 1 20, 2 30
 }
 ```
 
-**Note:** Loop variables require `let` to declare new variables. You cannot use `const` because loop variables must be mutable.
+**Note:** The index variable (first in a `for i, val in ...` loop) is read-only. Loop variables are always mutable otherwise, and you cannot use `const` for loop iterators.
 
 ## While Loops
 

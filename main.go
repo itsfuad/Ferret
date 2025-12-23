@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"compiler/internal/compiler"
 )
@@ -21,6 +22,7 @@ func main() {
 	outputPath := flag.String("o", "", "Output executable path")
 	keepCFile := flag.Bool("c", false, "Keep generated C files")
 	typecheckOnly := flag.Bool("t", false, "Stop after type checking (skip codegen)")
+	target := flag.String("target", "native", "Compilation target: native | wasm")
 	flag.BoolVar(debug, "debug", false, "Enable debug output")
 	flag.BoolVar(showVersion, "version", false, "Show version")
 	flag.BoolVar(help, "help", false, "Show help")
@@ -67,6 +69,17 @@ func main() {
 
 	entryFile := args[0]
 
+	targetValue := strings.ToLower(strings.TrimSpace(*target))
+	switch targetValue {
+	case "native":
+	case "wasm":
+		fmt.Fprintln(os.Stderr, "WASM target not yet available")
+		os.Exit(1)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown target: %s (expected native or wasm)\n", *target)
+		os.Exit(1)
+	}
+
 	// Compile
 	result := compiler.Compile(&compiler.Options{
 		EntryFile:        entryFile,
@@ -76,6 +89,7 @@ func main() {
 		OutputExecutable: *outputPath,
 		KeepCFile:        *keepCFile,
 		SkipCodegen:      *typecheckOnly,
+		CodegenBackend:   "qbe",
 	})
 
 	// Exit code
