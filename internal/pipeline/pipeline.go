@@ -103,10 +103,6 @@ func (p *Pipeline) Run() error {
 	}
 
 	switch backend {
-	case "c":
-		if err := p.runCodegenPhase(); err != nil {
-			return err
-		}
 	case "qbe":
 		if err := p.runQBECodegenPhase(); err != nil {
 			return err

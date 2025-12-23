@@ -737,9 +737,7 @@ func IsNumericType(t SemType) bool {
 	if p, ok := t.(*PrimitiveType); ok {
 		name := p.name
 		// Check if it's a typed numeric type
-		isTypedNumeric := name == TYPE_I8 || name == TYPE_I16 || name == TYPE_I32 || name == TYPE_I64 || name == TYPE_I128 || name == TYPE_I256 ||
-			name == TYPE_U8 || name == TYPE_U16 || name == TYPE_U32 || name == TYPE_U64 || name == TYPE_U128 || name == TYPE_U256 ||
-			name == TYPE_F32 || name == TYPE_F64
+		isTypedNumeric := IsNumericTypeName(name)
 
 		// Check if it's an untyped numeric literal
 		isUntypedNumeric := name == TYPE_UNTYPED && (p.untypedKind == UntypedInt || p.untypedKind == UntypedFloat)

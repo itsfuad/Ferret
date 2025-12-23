@@ -15,7 +15,7 @@ ctx: {
   topo: "Topological order"
   diagnostics: "Diagnostics"
   universe: "Universe scope\n(builtins)"
-  config: "Config\n(project + runtime + backend)"
+  config: "Config\n(project + runtime + codegen)"
 
   entry -> modules
   config -> modules
@@ -91,26 +91,21 @@ phases.mirgen -> ctx.diagnostics
 
 codegen: {
   label: "Phase 9: Codegen + Link"
-  select: "Backend select\nnone | c | qbe"
+  select: "Backend select\nnone | qbe"
   skip: "Skip codegen\n(-t, backend=none, or errors)"
-  cgen: "C backend\n(AST + symbols -> .h/.c)"
   qbe: "QBE backend\n(MIR -> .ssa -> .s)"
   temp: "Temp dir\n<output>/gen"
   link_step: "Link\nclang/gcc + runtime"
   output: "Binary / exe"
 
   select -> skip: {style.opacity: 0.6}
-  select -> cgen
   select -> qbe
-  cgen -> temp -> link_step -> output
   qbe -> temp -> link_step -> output
 }
 
 phases.mirgen -> codegen.select
 ctx.config -> codegen.select
 ctx.diagnostics -> codegen.skip: "HasErrors"
-module_state.ast -> codegen.cgen
-module_state.scopes -> codegen.cgen
 module_state.mir -> codegen.qbe
 
 runtime: "runtime/\n(io.c, interface.c, map.c, bigint.c, array.c, string_builder.c)"

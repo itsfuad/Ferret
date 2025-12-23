@@ -37,7 +37,7 @@ type Options struct {
 	// Skip codegen (stop after type checking)
 	SkipCodegen bool
 
-	// Codegen backend ("none", "c", "qbe")
+	// Codegen backend ("none", "qbe")
 	CodegenBackend string
 }
 

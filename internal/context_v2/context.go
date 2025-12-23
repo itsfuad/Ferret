@@ -183,7 +183,7 @@ type CompilerContext struct {
 // Config holds compiler configuration
 type Config struct {
 	SkipCodegen bool // If true, skip code generation phase
-	// Codegen backend to use ("none", "c", "qbe")
+	// Codegen backend to use ("none", "qbe")
 	CodegenBackend string
 	// Project information
 	ProjectName string // Name of the project

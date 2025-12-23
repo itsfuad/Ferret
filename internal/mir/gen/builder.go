@@ -292,14 +292,8 @@ func (b *functionBuilder) lowerIf(stmt *hir.IfStmt) {
 
 	if elseBlock != nil {
 		b.setBlock(elseBlock)
-		switch e := stmt.Else.(type) {
-		case *hir.Block:
-			b.lowerBlock(e)
-			b.branchIfNoTerm(mergeBlock.ID, stmt.Location)
-		default:
-			b.reportUnsupported("else branch", &stmt.Location)
-			b.branchIfNoTerm(mergeBlock.ID, stmt.Location)
-		}
+		b.lowerNode(stmt.Else)
+		b.branchIfNoTerm(mergeBlock.ID, stmt.Location)
 	}
 
 	b.setBlock(mergeBlock)
