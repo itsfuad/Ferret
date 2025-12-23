@@ -946,6 +946,13 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 		}
 	}
 
+	if isEnumType(sourceType) && isIntegerType(targetType) {
+		return
+	}
+	if isBoolType(sourceType) && isIntegerType(targetType) {
+		return
+	}
+
 	// Allow explicit casts between numeric types
 	if types.IsNumericType(sourceType) && types.IsNumericType(targetType) {
 		return
@@ -976,6 +983,37 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 				WithPrimaryLabel(expr.Loc(), "invalid cast"),
 		)
 	}
+}
+
+func isEnumType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	_, ok := typ.(*types.EnumType)
+	return ok
+}
+
+func isIntegerType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		return types.IsIntegerTypeName(prim.GetName())
+	}
+	return false
+}
+
+func isBoolType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		return prim.GetName() == types.TYPE_BOOL
+	}
+	return false
 }
 
 // checkCompositeLit validates that a composite literal matches its target type

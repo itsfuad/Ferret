@@ -18,10 +18,13 @@ type Generator struct {
 	data strings.Builder
 	buf  strings.Builder
 
-	valueTypes map[mir.ValueID]types.SemType
-	stringLits map[string]string
-	tempID     int
-	stringID   int
+	valueTypes  map[mir.ValueID]types.SemType
+	stringLits  map[string]string
+	enumTables  map[string]string
+	enumCounts  map[string]int
+	tempID      int
+	stringID    int
+	enumTableID int
 }
 
 func New(ctx *context_v2.CompilerContext, mod *context_v2.Module, mirMod *mir.Module) *Generator {
@@ -36,6 +39,8 @@ func New(ctx *context_v2.CompilerContext, mod *context_v2.Module, mirMod *mir.Mo
 		layout:     mir.NewDataLayout(pointerSize),
 		valueTypes: make(map[mir.ValueID]types.SemType),
 		stringLits: make(map[string]string),
+		enumTables: make(map[string]string),
+		enumCounts: make(map[string]int),
 	}
 }
 

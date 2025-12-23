@@ -152,6 +152,13 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Incompatible
 	}
 
+	if isEnumType(source) && isIntegerType(target) {
+		return ExplicitCastable
+	}
+	if isBoolType(source) && isIntegerType(target) {
+		return ExplicitCastable
+	}
+
 	// Check numeric conversions
 	if types.IsNumeric(source) && types.IsNumeric(target) {
 		// Special case: byte and u8 are internally the same size but require explicit cast
@@ -279,6 +286,13 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 			return ImplicitCastable
 		}
 		return Incompatible
+	}
+
+	if isEnumType(source) && isIntegerType(target) {
+		return ExplicitCastable
+	}
+	if isBoolType(source) && isIntegerType(target) {
+		return ExplicitCastable
 	}
 
 	// Check numeric conversions

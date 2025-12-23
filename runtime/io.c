@@ -41,6 +41,18 @@ void ferret_io_Print(const char* msg) {
     }
 }
 
+static const char* ferret_enum_invalid = "<invalid enum>";
+
+const char* ferret_enum_to_string(const char* const* table, uint32_t count, int32_t tag) {
+    if (table == NULL || count == 0) {
+        return ferret_enum_invalid;
+    }
+    if (tag < 0 || (uint32_t)tag >= count) {
+        return ferret_enum_invalid;
+    }
+    return table[tag];
+}
+
 // Integer versions
 void ferret_io_Println_i8(int8_t value) {
     printf("%d\n", (int)value);

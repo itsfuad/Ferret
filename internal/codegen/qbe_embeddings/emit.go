@@ -314,6 +314,17 @@ func (g *Generator) emitCall(c *mir.Call) {
 		return
 	}
 
+	if len(args) == 1 && isEnumType(args[0].sem) && isPrintFunc(target) {
+		table, count, err := g.enumStringTable(args[0].sem)
+		if err != nil {
+			g.reportError(err.Error(), &c.Location)
+			return
+		}
+		tmp := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l call $ferret_enum_to_string(l %s, w %d, w %s)", tmp, table, count, args[0].name))
+		args[0] = callArg{name: tmp, typ: "l", sem: types.TypeString}
+	}
+
 	var argParts []string
 	for _, arg := range args {
 		argParts = append(argParts, fmt.Sprintf("%s %s", arg.typ, arg.name))
@@ -480,6 +491,75 @@ func (g *Generator) normalizeFloat(value string) (string, error) {
 		return "", fmt.Errorf("qbe: invalid float literal %q", value)
 	}
 	return num.String(), nil
+}
+
+func isPrintFunc(target string) bool {
+	return target == "ferret_io_Print" || target == "ferret_io_Println"
+}
+
+func isEnumType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	_, ok := typ.(*types.EnumType)
+	return ok
+}
+
+func (g *Generator) enumStringTable(typ types.SemType) (string, int, error) {
+	enumType, key, err := enumTypeKey(typ)
+	if err != nil {
+		return "", 0, err
+	}
+	if table, ok := g.enumTables[key]; ok {
+		return table, g.enumCounts[key], nil
+	}
+
+	g.enumTableID++
+	tableName := fmt.Sprintf("$enumtbl%d", g.enumTableID)
+
+	entries := make([]string, 0, len(enumType.Variants))
+	for _, variant := range enumType.Variants {
+		entries = append(entries, fmt.Sprintf("l %s", g.stringSymbol(variant.Name)))
+	}
+
+	g.data.WriteString(fmt.Sprintf("data %s = { %s }\n", tableName, strings.Join(entries, ", ")))
+	g.enumTables[key] = tableName
+	g.enumCounts[key] = len(enumType.Variants)
+	return tableName, len(enumType.Variants), nil
+}
+
+func enumTypeKey(typ types.SemType) (*types.EnumType, string, error) {
+	if typ == nil {
+		return nil, "", fmt.Errorf("qbe: missing enum type")
+	}
+
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = ref.Inner
+	}
+
+	if named, ok := typ.(*types.NamedType); ok {
+		if enumType, ok := named.Underlying.(*types.EnumType); ok {
+			key := named.Name
+			if key == "" && enumType.ID != "" {
+				key = enumType.ID
+			}
+			if key == "" {
+				key = fmt.Sprintf("anon_%p", enumType)
+			}
+			return enumType, key, nil
+		}
+	}
+
+	typ = types.UnwrapType(typ)
+	if enumType, ok := typ.(*types.EnumType); ok {
+		if enumType.ID != "" {
+			return enumType, enumType.ID, nil
+		}
+		return enumType, fmt.Sprintf("anon_%p", enumType), nil
+	}
+
+	return nil, "", fmt.Errorf("qbe: expected enum type, got %s", typ.String())
 }
 
 func escapeString(s string) string {
@@ -817,6 +897,9 @@ func (g *Generator) printFunctionName(funcName string, typ types.SemType) (strin
 			return "ferret_io_" + funcName + "_f256_ptr", nil
 		}
 	}
+	if _, ok := typ.(*types.EnumType); ok {
+		return "ferret_io_" + funcName, nil
+	}
 	return "", fmt.Errorf("qbe: unsupported print arg type %s", typ.String())
 }
 
@@ -862,21 +945,42 @@ func (g *Generator) reportUnsupported(what string, loc *source.Location) {
 }
 
 func (g *Generator) isSigned(typ types.SemType) bool {
-	if prim, ok := types.UnwrapType(typ).(*types.PrimitiveType); ok {
+	typ = types.UnwrapType(typ)
+	if _, ok := typ.(*types.EnumType); ok {
+		return true
+	}
+	if prim, ok := typ.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
+		return false
+	}
+	if prim, ok := typ.(*types.PrimitiveType); ok {
 		return types.IsSigned(prim.GetName())
 	}
 	return true
 }
 
 func (g *Generator) isUnsigned(typ types.SemType) bool {
-	if prim, ok := types.UnwrapType(typ).(*types.PrimitiveType); ok {
+	typ = types.UnwrapType(typ)
+	if _, ok := typ.(*types.EnumType); ok {
+		return false
+	}
+	if prim, ok := typ.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
+		return true
+	}
+	if prim, ok := typ.(*types.PrimitiveType); ok {
 		return types.IsUnsigned(prim.GetName())
 	}
 	return false
 }
 
 func (g *Generator) isInteger(typ types.SemType) bool {
-	return types.IsInteger(types.UnwrapType(typ))
+	typ = types.UnwrapType(typ)
+	if _, ok := typ.(*types.EnumType); ok {
+		return true
+	}
+	if prim, ok := typ.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_BOOL {
+		return true
+	}
+	return types.IsInteger(typ)
 }
 
 func (g *Generator) isFloat(typ types.SemType) bool {

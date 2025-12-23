@@ -71,6 +71,9 @@ void ferret_io_Print_u256_ptr(const ferret_u256* value);
 void ferret_io_Print_f128_ptr(const ferret_f128* value);
 void ferret_io_Print_f256_ptr(const ferret_f256* value);
 
+// Enum helper (tag -> variant name)
+const char* ferret_enum_to_string(const char* const* table, uint32_t count, int32_t tag);
+
 // Input functions
 int32_t ferret_io_ReadInt(char** error);
 double ferret_io_ReadFloat(char** error);
