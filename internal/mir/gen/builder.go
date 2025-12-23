@@ -379,12 +379,23 @@ func (b *functionBuilder) lowerMatch(stmt *hir.MatchStmt) {
 		return
 	}
 
+	matchType := b.exprType(stmt.Expr)
+	if matchType == nil || matchType.Equals(types.TypeUnknown) {
+		matchType = b.exprType(stmt.Expr)
+	}
+
 	mergeBlock := b.newBlock("match.end", stmt.Location)
 	defaultBlock := mergeBlock
-	cases := make([]mir.SwitchCase, 0, len(stmt.Cases))
 
 	caseBlocks := make([]*mir.Block, 0, len(stmt.Cases))
-	for _, clause := range stmt.Cases {
+	type matchCase struct {
+		block *mir.Block
+		value mir.ValueID
+		loc   source.Location
+	}
+	patternCases := make([]matchCase, 0, len(stmt.Cases))
+	for idx := range stmt.Cases {
+		clause := &stmt.Cases[idx]
 		block := b.newBlock("match.case", clause.Location)
 		caseBlocks = append(caseBlocks, block)
 
@@ -393,22 +404,52 @@ func (b *functionBuilder) lowerMatch(stmt *hir.MatchStmt) {
 			continue
 		}
 
-		if value, ok := b.matchCaseValue(clause.Pattern); ok {
-			cases = append(cases, mir.SwitchCase{
-				Value:  value,
-				Target: block.ID,
-			})
+		value, ok := b.matchCaseConstValue(clause.Pattern, matchType)
+		if !ok {
+			b.reportUnsupported("match pattern", clause.Pattern.Loc())
 			continue
 		}
 
-		b.reportUnsupported("match pattern", clause.Pattern.Loc())
+		patternCases = append(patternCases, matchCase{
+			block: block,
+			value: value,
+			loc:   clause.Location,
+		})
 	}
 
-	b.current.Term = &mir.Switch{
-		Cond:     cond,
-		Cases:    cases,
-		Default:  defaultBlock.ID,
-		Location: stmt.Location,
+	if len(patternCases) == 0 {
+		b.branchIfNoTerm(defaultBlock.ID, stmt.Location)
+	} else {
+		current := b.current
+		for idx, entry := range patternCases {
+			var elseTarget mir.BlockID
+			var elseBlock *mir.Block
+			if idx < len(patternCases)-1 {
+				elseBlock = b.newBlock("match.check", entry.loc)
+				elseTarget = elseBlock.ID
+			} else {
+				elseTarget = defaultBlock.ID
+			}
+
+			var cmp mir.ValueID
+			if isLargePrimitiveType(matchType) {
+				cmp = b.emitLargeCompare(tokens.DOUBLE_EQUAL_TOKEN, cond, entry.value, matchType, entry.loc)
+			} else {
+				cmp = b.emitBinary(tokens.DOUBLE_EQUAL_TOKEN, cond, entry.value, matchType, entry.loc)
+			}
+
+			current.Term = &mir.CondBr{
+				Cond:     cmp,
+				Then:     entry.block.ID,
+				Else:     elseTarget,
+				Location: stmt.Location,
+			}
+
+			if elseBlock != nil {
+				b.setBlock(elseBlock)
+				current = elseBlock
+			}
+		}
 	}
 
 	for idx, clause := range stmt.Cases {
@@ -1444,6 +1485,33 @@ func (b *functionBuilder) matchCaseValue(pattern hir.Expr) (string, bool) {
 	}
 
 	return "", false
+}
+
+func (b *functionBuilder) matchCaseConstValue(pattern hir.Expr, matchType types.SemType) (mir.ValueID, bool) {
+	if pattern == nil {
+		return mir.InvalidValue, false
+	}
+
+	value, ok := b.matchCaseValue(pattern)
+	if !ok {
+		return mir.InvalidValue, false
+	}
+
+	if matchType == nil || matchType.Equals(types.TypeUnknown) {
+		matchType = b.exprType(pattern)
+	}
+	if matchType == nil || matchType.Equals(types.TypeUnknown) {
+		return mir.InvalidValue, false
+	}
+
+	loc := pattern.Loc()
+	if loc == nil {
+		loc = &source.Location{}
+	}
+	if isLargePrimitiveType(matchType) {
+		return b.emitLargeConst(matchType, value, *loc), true
+	}
+	return b.emitConst(matchType, value, *loc), true
 }
 
 func (b *functionBuilder) exprType(expr hir.Expr) types.SemType {
