@@ -29,7 +29,7 @@ type Options struct {
 	SaveAST bool
 	// Output format: "ansi" or "html"
 	LogFormat FORMAT
-	// Output executable path (if empty, uses default: <projectRoot>/bin/<projectName>)
+	// Output executable path (if empty, uses default: <entryDir>/<projectName>)
 	OutputExecutable string
 	// Keep generated C file after compilation
 	KeepCFile bool
@@ -74,10 +74,9 @@ func Compile(opts *Options) Result {
 	runtimePath := filepath.Join(execDir, "../runtime")
 
 	// Determine output path
-	outputPath := "bin"
-	if opts.OutputExecutable != "" {
-		// Use user-specified path
-		outputPath = opts.OutputExecutable
+	outputPath := opts.OutputExecutable
+	if outputPath == "" {
+		outputPath = filepath.Join(projectRoot, projectName)
 	}
 
 	config := &context_v2.Config{

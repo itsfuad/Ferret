@@ -52,7 +52,7 @@ func (p *Pipeline) runQBECodegenPhase() error {
 
 	execPath := p.ctx.Config.OutputPath
 	if runtime.GOOS == "windows" && !strings.HasSuffix(execPath, ".exe") {
-		defaultPattern := filepath.Join(p.ctx.Config.ProjectRoot, "bin", p.ctx.Config.ProjectName)
+		defaultPattern := filepath.Join(p.ctx.Config.ProjectRoot, p.ctx.Config.ProjectName)
 		if execPath == defaultPattern {
 			execPath += ".exe"
 		}

@@ -31,7 +31,7 @@ func DefaultBuildOptions() *BuildOptions {
 
 	return &BuildOptions{
 		CC:          cc,
-		CFlags:      []string{"-std=c11", "-w", "-Os", "-flto", "-s"}, // -Os: optimize for size, -flto: link-time optimization, -s: strip symbols
+		CFlags:      []string{"-std=c99", "-w", "-Os", "-flto", "-s"}, // -Os: optimize for size, -flto: link-time optimization, -s: strip symbols
 		RuntimePath: "runtime",
 		Debug:       false,
 	}
