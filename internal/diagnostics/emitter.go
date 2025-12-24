@@ -111,6 +111,7 @@ type labelContext struct {
 	startCol     int
 	endCol       int
 	label        Label
+	codeHint     *CodeHint
 	lineNumWidth int
 	severity     Severity
 }
@@ -163,6 +164,14 @@ func (e *Emitter) printBlankGutter() {
 
 func (e *Emitter) printBlankGutterWithColor(color colors.COLOR) {
 	color.Fprintf(e.writer, GUTTER_BLANK, e.currentLineNumWidth, "")
+}
+
+// printAddedGutter prints a gutter with a green "+" to indicate added code.
+func (e *Emitter) printAddedGutter(color colors.COLOR) {
+	if color == "" {
+		color = colors.GREEN
+	}
+	color.Fprintf(e.writer, GUTTER_BLANK, e.currentLineNumWidth, "+")
 }
 
 // printPipeOnly prints a separator line aligned under the gutter.
@@ -275,7 +284,7 @@ func (e *Emitter) Emit(diag *Diagnostic) {
 
 			if primaryCount == 0 {
 				for _, label := range labels {
-					e.printLabel(filepath, label, diag.Severity)
+					e.printLabel(filepath, label, diag.Severity, nil)
 				}
 			} else if primaryCount > 1 {
 				labelStrs := []string{}
@@ -285,16 +294,16 @@ func (e *Emitter) Emit(diag *Diagnostic) {
 				panic("INTERNAL COMPILER ERROR: Multiple primary labels in diagnostic!: " + strings.Join(labelStrs, ", "))
 			} else {
 				if len(secondaryLabels) == 0 {
-					e.printLabel(filepath, primaryLabel, diag.Severity)
+					e.printLabel(filepath, primaryLabel, diag.Severity, diag.CodeHint)
 				} else if len(secondaryLabels) == 1 &&
 					primaryLabel.Location != nil &&
 					primaryLabel.Location.Start != nil &&
 					secondaryLabels[0].Location != nil &&
 					secondaryLabels[0].Location.Start != nil &&
 					primaryLabel.Location.Start.Line == secondaryLabels[0].Location.Start.Line {
-					e.printCompactDualLabel(filepath, primaryLabel, secondaryLabels[0], diag.Severity)
+					e.printCompactDualLabel(filepath, primaryLabel, secondaryLabels[0], diag.Severity, diag.CodeHint)
 				} else {
-					e.printRoutedLabels(filepath, primaryLabel, secondaryLabels, diag.Severity)
+					e.printRoutedLabels(filepath, primaryLabel, secondaryLabels, diag.Severity, diag.CodeHint)
 				}
 			}
 		}
@@ -420,7 +429,7 @@ func (e *Emitter) printFileLocationHeader(filepath string, labels []Label) {
 	)
 }
 
-func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
+func (e *Emitter) printLabel(filepath string, label Label, severity Severity, codeHint *CodeHint) {
 	if label.Location == nil || label.Location.Start == nil {
 		return
 	}
@@ -438,6 +447,7 @@ func (e *Emitter) printLabel(filepath string, label Label, severity Severity) {
 		startCol:     start.Column,
 		endCol:       end.Column,
 		label:        label,
+		codeHint:     codeHint,
 		lineNumWidth: e.currentLineNumWidth,
 		severity:     severity,
 	}
@@ -478,6 +488,12 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 	e.printCurrentGutter(ctx.line)
 	e.highlighter.HighlightWithColor(sourceLine, e.writer)
 	fmt.Fprintln(e.writer)
+
+	if ctx.codeHint != nil && ctx.codeHint.Code != "" {
+		e.printCodeHint(ctx)
+		e.printPipeOnly()
+		return
+	}
 
 	// Underline leader
 	e.printBlankGutter()
@@ -524,6 +540,77 @@ func (e *Emitter) printSingleLineLabel(ctx labelContext) {
 
 	// Closing separator
 	e.printPipeOnly()
+}
+
+func (e *Emitter) printCodeHint(ctx labelContext) {
+	hint := ctx.codeHint
+	if hint == nil || hint.Code == "" {
+		return
+	}
+
+	e.printBlankGutter()
+	fmt.Fprintln(e.writer)
+
+	lines := strings.Split(hint.Code, "\n")
+	labelsByLine := make(map[int][]CodeHintLabel)
+	for _, label := range hint.Labels {
+		if label.Line <= 0 {
+			continue
+		}
+		labelsByLine[label.Line] = append(labelsByLine[label.Line], label)
+	}
+
+	for i, line := range lines {
+		e.printAddedGutter(hint.GutterColor)
+		if hint.BaseColor != "" {
+			e.highlighter.HighlightWithBaseColor(line, e.writer, hint.BaseColor)
+		} else {
+			e.highlighter.HighlightWithColor(line, e.writer)
+		}
+		fmt.Fprintln(e.writer)
+
+		if labels := labelsByLine[i+1]; len(labels) > 0 {
+			for _, label := range labels {
+				e.printCodeHintLabelLine(label, ctx.severity)
+			}
+		}
+	}
+}
+
+func (e *Emitter) printCodeHintLabelLine(label CodeHintLabel, severity Severity) {
+	if label.Column <= 0 {
+		return
+	}
+
+	length := label.Length
+	if length <= 0 {
+		length = 1
+	}
+
+	padding := label.Column - 1
+	e.printBlankGutter()
+	fmt.Fprint(e.writer, strings.Repeat(" ", padding))
+
+	var color colors.COLOR
+	var underlineChar string
+
+	if label.Style == Primary {
+		color = e.getSeverityColor(severity)
+		if length == 1 {
+			underlineChar = "^"
+		} else {
+			underlineChar = "~"
+		}
+	} else {
+		color = colors.BLUE
+		underlineChar = "-"
+	}
+
+	color.Fprint(e.writer, strings.Repeat(underlineChar, length))
+	if label.Message != "" {
+		color.Fprintf(e.writer, " %s", label.Message)
+	}
+	fmt.Fprintln(e.writer)
 }
 
 func (e *Emitter) printMultiLineLabel(ctx labelContext) {
@@ -625,7 +712,7 @@ func (e *Emitter) printHelp(help string) {
 }
 
 // printCompactDualLabel prints two labels on same line (Rust-style)
-func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondary Label, severity Severity) {
+func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondary Label, severity Severity, codeHint *CodeHint) {
 	if primary.Location == nil || primary.Location.Start == nil {
 		return
 	}
@@ -746,11 +833,15 @@ func (e *Emitter) printCompactDualLabel(filepath string, primary Label, secondar
 	}
 	fmt.Fprintln(e.writer)
 
+	if codeHint != nil && codeHint.Code != "" {
+		e.printCodeHint(labelContext{codeHint: codeHint, severity: severity})
+	}
+
 	e.printPipeOnly()
 }
 
 // printRoutedLabels prints primary + multiple secondaries with routing (Rust-style)
-func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries []Label, severity Severity) {
+func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries []Label, severity Severity, codeHint *CodeHint) {
 	if primary.Location == nil || primary.Location.Start == nil {
 		return
 	}
@@ -876,6 +967,10 @@ func (e *Emitter) printRoutedLabels(filepath string, primary Label, secondaries 
 				}
 			}
 		}
+	}
+
+	if codeHint != nil && codeHint.Code != "" {
+		e.printCodeHint(labelContext{codeHint: codeHint, severity: severity})
 	}
 
 	e.printPipeOnly()
