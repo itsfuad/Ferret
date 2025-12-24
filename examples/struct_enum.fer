@@ -1,0 +1,36 @@
+import "std/io";
+
+type Color enum { Red, Green, Blue };
+
+type Point struct {
+    .X: i32,
+    .Y: i32,
+    .Shade: Color,
+    .Data: [3]i32
+};
+
+fn main() {
+    let data: [3]i32 = [10, 20, 30];
+    let p: Point = { .X = 1, .Y = 2, .Shade = Color::Green, .Data = data };
+    io::Println(p.X);
+    io::Println(p.Y);
+
+    if p.Shade == Color::Green {
+        io::Println("shade ok");
+    }
+
+    io::Println(p.Shade);
+    io::Println(p.Shade as i32);
+
+
+    p.X = p.X + 4;
+    p.Data[1] = p.Data[0] + 5;
+
+    io::Println(p.X);
+    io::Println(p.Data[1]);
+
+    let c := Color::Blue;
+    if c != Color::Red {
+        io::Println("enum ok");
+    }
+}

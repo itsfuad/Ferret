@@ -1,0 +1,6 @@
+import "std/io";
+
+let a := 12;
+
+io::Println("22");
+

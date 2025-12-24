@@ -1,0 +1,21 @@
+type Color enum { Red, Green };
+
+fn takes_i32(value: i32) {
+}
+
+fn returns_i32() -> i32 {
+    let c: Color = Color::Red;
+    return c;
+}
+
+fn main() {
+    let c: Color = Color::Green;
+    let i: i32 = c;
+
+    let b: bool = 1 < 2;
+    let j: i32 = b;
+
+    takes_i32(c);
+
+    let arr: [2]i32 = [c, 2];
+}

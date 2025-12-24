@@ -1,0 +1,54 @@
+// 256-bit primitive smoke test for QBE path
+import "std/io";
+
+fn main() {
+    let a: i256 = 10000000000000000000000000000000000000000;
+    let b: i256 = -123456789012345678901234567890123456789;
+    let three_i: i256 = 3;
+    let seven_i: i256 = 7;
+
+    let sum := a + b;
+    let diff := a - b;
+    let prod := b * three_i;
+    let quot := a / seven_i;
+    let rem := a % seven_i;
+
+    io::Println(a);
+    io::Println(b);
+    io::Println(sum);
+    io::Println(diff);
+    io::Println(prod);
+    io::Println(quot);
+    io::Println(rem);
+
+    let u: u256 = 1234567890123456789012345678901234567890;
+    let two_u: u256 = 2;
+    let three_u: u256 = 3;
+    let five_u: u256 = 5;
+
+    let u2 := u + two_u;
+    let u3 := u2 * five_u;
+    let u4 := u3 / three_u;
+    let urem := u3 % three_u;
+
+    io::Println(u);
+    io::Println(u2);
+    io::Println(u3);
+    io::Println(u4);
+    io::Println(urem);
+
+    let f: f256 = 1.5;
+    let g: f256 = 2.25;
+    let two_f: f256 = 2.0;
+    let three_f: f256 = 3.0;
+
+    let h := f + g;
+    let k := h * three_f;
+    let m := k / two_f;
+
+    io::Println(f);
+    io::Println(g);
+    io::Println(h);
+    io::Println(k);
+    io::Println(m);
+}

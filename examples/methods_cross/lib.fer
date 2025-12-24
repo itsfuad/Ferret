@@ -1,0 +1,15 @@
+type Counter struct {
+    .Value: i32
+};
+
+fn (c: &Counter) Inc() {
+    c.Value++;
+}
+
+fn (c: Counter) Get() -> i32 {
+    return c.Value;
+}
+
+fn NewCounter() -> Counter {
+    return { .Value = 0 } as Counter;
+}
