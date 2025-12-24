@@ -25,14 +25,14 @@ const (
 )
 
 var colorMap = map[keytype]colors.COLOR{
-	STRING: colors.LIGHT_GREEN,
-	CHAR:   colors.LIGHT_ORANGE,
-	NUMBER: colors.LIGHT_ORANGE,
+	STRING:  colors.LIGHT_GREEN,
+	CHAR:    colors.LIGHT_ORANGE,
+	NUMBER:  colors.LIGHT_ORANGE,
 	KEYWORD: colors.PURPLE,
-	TEXT: colors.WHITE,
-	OP: colors.WHITE,
+	TEXT:    colors.WHITE,
+	OP:      colors.WHITE,
 	COMMENT: colors.GREY,
-	TYPE: colors.CYAN,
+	TYPE:    colors.CYAN,
 }
 
 // SyntaxHighlighter provides syntax highlighting for Ferret code snippets
@@ -196,6 +196,28 @@ func (sh *SyntaxHighlighter) HighlightWithColor(line string, writer io.Writer) {
 	tokens := sh.Highlight(line)
 	for _, token := range tokens {
 		token.Color.Fprint(writer, token.Text)
+	}
+}
+
+// HighlightWithBaseColor applies syntax highlighting with a base color override.
+// Tokens that are normally white inherit the base color.
+func (sh *SyntaxHighlighter) HighlightWithBaseColor(line string, writer io.Writer, base colors.COLOR) {
+	if !sh.enabled {
+		if base != "" {
+			base.Fprint(writer, line)
+		} else {
+			fmt.Fprint(writer, line)
+		}
+		return
+	}
+
+	tokens := sh.Highlight(line)
+	for _, token := range tokens {
+		color := token.Color
+		if base != "" && color == colors.WHITE {
+			color = base
+		}
+		color.Fprint(writer, token.Text)
 	}
 }
 

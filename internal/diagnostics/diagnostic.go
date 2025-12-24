@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"compiler/colors"
 	"compiler/internal/source"
 )
 
@@ -57,6 +58,24 @@ type Diagnostic struct {
 	Labels   []Label
 	Notes    []Note
 	Help     string // Suggestion for fixing the error
+	CodeHint *CodeHint
+}
+
+// CodeHint renders extra lines after the primary label.
+type CodeHint struct {
+	Code        string
+	Labels      []CodeHintLabel
+	BaseColor   colors.COLOR
+	GutterColor colors.COLOR
+}
+
+// CodeHintLabel represents a label within a code hint snippet.
+type CodeHintLabel struct {
+	Line    int
+	Column  int
+	Length  int
+	Message string
+	Style   LabelStyle
 }
 
 // NewError creates a new error diagnostic
@@ -156,6 +175,20 @@ func (d *Diagnostic) WithSecondaryLabel(loc *source.Location, message string) *D
 	return d.WithLabel(loc, message, Secondary)
 }
 
+// WithCodeHint adds a primary label and attaches a code hint to display.
+func (d *Diagnostic) WithCodeHint(loc *source.Location, code string, labels ...CodeHintLabel) *Diagnostic {
+	if loc == nil {
+		return d
+	}
+
+	d.WithPrimaryLabel(loc, "")
+	d.CodeHint = &CodeHint{
+		Code:        code,
+		Labels:      labels,
+		GutterColor: colors.GREEN,
+	}
+	return d
+}
 // WithNote adds a note to the diagnostic
 func (d *Diagnostic) WithNote(message string) *Diagnostic {
 	d.Notes = append(d.Notes, Note{Message: message})

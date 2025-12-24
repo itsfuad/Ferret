@@ -20,6 +20,9 @@ func (p *Pipeline) runCodegenPhase() error {
 	if p.ctx.HasErrors() {
 		return fmt.Errorf("skipping codegen due to previous errors")
 	}
+	if err := p.ensureEntryMain(); err != nil {
+		return err
+	}
 
 	outputPath := p.ctx.Config.OutputPath
 	outputDir := filepath.Dir(outputPath)
