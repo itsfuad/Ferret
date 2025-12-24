@@ -1,0 +1,9 @@
+import "std/io";
+import "methods_cross/lib" as lib;
+
+fn main() {
+    let c := lib::NewCounter();
+    c.Inc();
+    c.Inc();
+    io::Println(c.Get());
+}

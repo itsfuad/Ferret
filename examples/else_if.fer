@@ -1,0 +1,12 @@
+import "std/io";
+
+fn main() {
+    let x := 2;
+    if x == 0 {
+        io::Println("zero");
+    } else if x == 1 {
+        io::Println("one");
+    } else {
+        io::Println("other");
+    }
+}
