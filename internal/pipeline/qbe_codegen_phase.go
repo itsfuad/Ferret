@@ -14,6 +14,10 @@ import (
 
 // runQBECodegenPhase runs QBE-based code generation on all MIR-generated modules.
 func (p *Pipeline) runQBECodegenPhase() error {
+	if err := p.ensureEntryMain(); err != nil {
+		return err
+	}
+
 	outputPath := p.ctx.Config.OutputPath
 	outputDir := filepath.Dir(outputPath)
 
