@@ -11,7 +11,7 @@ import (
 	"compiler/internal/compiler"
 )
 
-const version = "0.0.2-alpha"
+const version = "0.0.3-alpha"
 
 func main() {
 	// Define flags
@@ -20,13 +20,13 @@ func main() {
 	saveAST := flag.Bool("ast", false, "Save AST")
 	help := flag.Bool("h", false, "Show help")
 	outputPath := flag.String("o", "", "Output executable path")
-	keepCFile := flag.Bool("c", false, "Keep generated C files")
+	keepGenFiles := flag.Bool("keep-gen", false, "Keep generated files")
 	typecheckOnly := flag.Bool("t", false, "Stop after type checking (skip codegen)")
 	target := flag.String("target", "native", "Compilation target: native | wasm")
 	flag.BoolVar(debug, "debug", false, "Enable debug output")
 	flag.BoolVar(showVersion, "version", false, "Show version")
 	flag.BoolVar(help, "help", false, "Show help")
-	flag.BoolVar(keepCFile, "keep-c", false, "Keep generated C files")
+	flag.BoolVar(keepGenFiles, "k", false, "Keep generated files")
 	flag.BoolVar(typecheckOnly, "typecheck", false, "Stop after type checking (skip codegen)")
 
 	flag.Parse()
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	// Check if there are any arguments that look like flags after the file
-	// This helps catch common mistakes like: ferret file.fer -c
+	// This helps catch common mistakes like: ferret file.fer -k
 	if len(args) > 1 {
 		for _, arg := range args[1:] {
 			if len(arg) > 0 && arg[0] == '-' {
@@ -68,6 +68,8 @@ func main() {
 	}
 
 	entryFile := args[0]
+
+	codegenBackend := "qbe"
 
 	targetValue := strings.ToLower(strings.TrimSpace(*target))
 	switch targetValue {
@@ -87,9 +89,9 @@ func main() {
 		SaveAST:          *saveAST,
 		LogFormat:        compiler.ANSI,
 		OutputExecutable: *outputPath,
-		KeepCFile:        *keepCFile,
+		KeepGenFiles:     *keepGenFiles,
 		SkipCodegen:      *typecheckOnly,
-		CodegenBackend:   "qbe",
+		CodegenBackend:   codegenBackend,
 	})
 
 	// Exit code

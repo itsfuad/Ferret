@@ -2,6 +2,7 @@ package qbe
 
 import (
 	"fmt"
+	"runtime"
 
 	"compiler/internal/context_v2"
 )
@@ -15,7 +16,11 @@ func Run(ctx *context_v2.CompilerContext, inputPath, outputPath string) error {
 		return fmt.Errorf("qbe: missing output path")
 	}
 
-	args := []string{"qbe", "-o", outputPath, inputPath}
+	args := []string{"qbe"}
+	if runtime.GOOS == "windows" {
+		args = append(args, "-t", "amd64_win64")
+	}
+	args = append(args, "-o", outputPath, inputPath)
 	code, err := runQBE(args)
 	if err != nil {
 		return err

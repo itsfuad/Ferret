@@ -6,7 +6,9 @@
 #define Deftgt T_amd64_sysv
 #else
 #define Defasm Gaself
-#if defined(__aarch64__)
+#if defined(_WIN32)
+#define Deftgt T_amd64_win64
+#elif defined(__aarch64__)
 #define Deftgt T_arm64
 #else
 #define Deftgt T_amd64_sysv

@@ -63,6 +63,14 @@ bits amd64_sysv_retregs(Ref, int[2]);
 bits amd64_sysv_argregs(Ref, int[2]);
 void amd64_sysv_abi(Fn *);
 
+/* win64.c (abi) */
+extern int amd64_win64_rsave[];
+extern int amd64_win64_rclob[];
+bits amd64_win64_retregs(Ref, int[2]);
+bits amd64_win64_argregs(Ref, int[2]);
+void amd64_win64_abi(Fn *);
+void amd64_win64_emitfn(Fn *, FILE *);
+
 /* isel.c */
 void amd64_isel(Fn *);
 

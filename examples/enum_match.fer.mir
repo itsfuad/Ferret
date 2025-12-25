@@ -1,0 +1,46 @@
+module examples/enum_match
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca Status
+    %t2 = const Status 1
+    store %t1, %t2
+    %t3 = load Status %t1
+    %t4 = const Status 0
+    %t5 = const Status 1
+    %t6 = == Status %t3, %t4
+    br_if %t6, b3, b6
+  block b2 match.end:
+    %t11 = alloca i32
+    %t12 = const i32 102
+    store %t11, %t12
+    %t13 = load i32 %t11
+    %t14 = const i32 10
+    %t15 = == i32 %t13, %t14
+    br_if %t15, b8, b9
+  block b3 match.case:
+    %t8 = const str Pending
+    call io::Println(%t8) : void
+    br b2
+  block b4 match.case:
+    %t9 = const str Active
+    call io::Println(%t9) : void
+    br b2
+  block b5 match.case:
+    %t10 = const str Other
+    call io::Println(%t10) : void
+    br b2
+  block b6 match.check:
+    %t7 = == Status %t3, %t5
+    br_if %t7, b4, b5
+  block b7 match.end:
+    ret
+  block b8 match.case:
+    %t16 = const str Value is ten
+    call io::Println(%t16) : void
+    br b7
+  block b9 match.case:
+    %t17 = const str Value is not ten
+    call io::Println(%t17) : void
+    br b7
+}

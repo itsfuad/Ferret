@@ -28,3 +28,20 @@ Target T_amd64_sysv = {
 	.isel = amd64_isel,
 	.emitfn = amd64_emitfn,
 };
+
+Target T_amd64_win64 = {
+	.gpr0 = RAX,
+	.ngpr = NGPR,
+	.fpr0 = XMM0,
+	.nfpr = NFPR,
+	.rglob = BIT(RBP) | BIT(RSP),
+	.nrglob = 2,
+	.rsave = amd64_win64_rsave,
+	.nrsave = {NGPS, NFPS},
+	.retregs = amd64_win64_retregs,
+	.argregs = amd64_win64_argregs,
+	.memargs = amd64_memargs,
+	.abi = amd64_win64_abi,
+	.isel = amd64_isel,
+	.emitfn = amd64_win64_emitfn,
+};

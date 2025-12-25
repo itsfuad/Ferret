@@ -190,13 +190,13 @@ type Config struct {
 	ProjectRoot string // Root directory of the project
 
 	// Build configuration
-	OutputPath  string // Where to write compiled output
-	Extension   string // Source file extension (default: ".fer")
-	KeepCFile   bool   // Keep generated C file after compilation
-	FormatC     bool   // Format generated C files when keeping them
-	Debug       bool   // Debug mode
-	SaveAST     bool   // Save AST to file
-	PointerSize int    // Target pointer size in bytes (0 = default)
+	OutputPath   string // Where to write compiled output
+	Extension    string // Source file extension (default: ".fer")
+	KeepGenFiles bool   // Keep generated files after compilation
+	FormatC      bool   // Format generated C files when keeping them
+	Debug        bool   // Debug mode
+	SaveAST      bool   // Save AST to file
+	PointerSize  int    // Target pointer size in bytes (0 = default)
 
 	// Module resolution
 	BuiltinModulesPath string            // Path to standard library

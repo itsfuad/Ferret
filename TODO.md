@@ -7,6 +7,8 @@
 - Dynamic arrays still use runtime bounds checks.
 - Blank identifier '_' is reserved for for-loop iterators; invalid elsewhere.
 - Value receiver mutations warn (W0005) and do not affect callers (copy semantics).
+- QBE Win64 ABI + emitter available; embedded QBE selects amd64_win64 on Windows.
+
 
 ## Next Work Items
 ### Incremental plan (easy -> hard, dependency-ordered)
@@ -36,5 +38,6 @@
 - [ ] Error flow (depends on large primitive support)
   - [ ] MIR lowering for result/catch paths.
 - [ ] Backend targets
+  - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).
   - [ ] MIR -> target IR/codegen (native + wasm).
   - [ ] Decide runtime behavior for dynamic array OOB (trap vs panic).

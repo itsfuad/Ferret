@@ -31,8 +31,8 @@ type Options struct {
 	LogFormat FORMAT
 	// Output executable path (if empty, uses default: <entryDir>/<projectName>)
 	OutputExecutable string
-	// Keep generated C file after compilation
-	KeepCFile bool
+	// Keep generated files after compilation
+	KeepGenFiles bool
 
 	// Skip codegen (stop after type checking)
 	SkipCodegen bool
@@ -86,7 +86,7 @@ func Compile(opts *Options) Result {
 		BuiltinModulesPath: builtinPath,
 		RuntimePath:        runtimePath, // Runtime path relative to executable
 		OutputPath:         outputPath,
-		KeepCFile:          opts.KeepCFile,
+		KeepGenFiles:       opts.KeepGenFiles,
 		SkipCodegen:        opts.SkipCodegen,
 		CodegenBackend:     opts.CodegenBackend,
 	}

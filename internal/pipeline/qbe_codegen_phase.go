@@ -63,7 +63,7 @@ func (p *Pipeline) runQBECodegenPhase() error {
 		return err
 	}
 
-	if !p.ctx.Config.KeepCFile {
+	if !p.ctx.Config.KeepGenFiles {
 		if err := os.RemoveAll(tempDir); err != nil {
 			if p.ctx.Config.Debug {
 				colors.YELLOW.Printf("  ⚠ Could not remove temp directory: %v\n", err)

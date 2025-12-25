@@ -6,7 +6,7 @@ fn main() -> void {
     %t2 = const i32 10
     store %t1, %t2
     %t3 = alloca i32
-    %t4 = const i32 20
+    %t4 = const i32 10
     store %t3, %t4
     %t5 = alloca i32
     %t6 = load i32 %t1
