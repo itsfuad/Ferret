@@ -1279,10 +1279,7 @@ func (b *functionBuilder) addrForIdent(ident *hir.Ident) mir.ValueID {
 		if b.captures != nil {
 			if cap, ok := b.captures[ident.Symbol]; ok && b.closureEnv != mir.InvalidValue {
 				fieldAddr := b.emitPtrAdd(b.closureEnv, cap.offset, cap.typ, ident.Location)
-				if cap.byRef {
-					return b.emitLoad(fieldAddr, cap.typ, ident.Location)
-				}
-				return fieldAddr
+				return b.emitLoad(fieldAddr, cap.typ, ident.Location)
 			}
 		}
 		if addr, ok := b.slots[ident.Symbol]; ok {
@@ -2222,19 +2219,11 @@ func (b *functionBuilder) makeClosureValue(name string, fnType types.SemType, en
 			continue
 		}
 		fieldAddr := b.emitPtrAdd(env, cap.offset, cap.typ, loc)
-		if cap.byRef {
-			addr := b.boxCapturedIdent(cap.ident)
-			if addr == mir.InvalidValue {
-				return mir.InvalidValue
-			}
-			b.emitStore(fieldAddr, addr, loc)
-			continue
-		}
-		val := b.loadIdent(cap.ident)
-		if val == mir.InvalidValue {
+		addr := b.boxCapturedIdent(cap.ident)
+		if addr == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		b.emitStore(fieldAddr, val, loc)
+		b.emitStore(fieldAddr, addr, loc)
 	}
 
 	return env

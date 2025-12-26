@@ -15,7 +15,6 @@ type captureInfo struct {
 	ident  *hir.Ident
 	offset int
 	typ    types.SemType
-	byRef  bool
 }
 
 type closureInfo struct {
@@ -35,15 +34,7 @@ type Generator struct {
 	extraFns  []*mir.Function
 	funcWraps map[string]string
 	wrapID    int
-	capture   captureMode
 }
-
-type captureMode int
-
-const (
-	captureByValue captureMode = iota
-	captureByRef
-)
 
 // New creates a new MIR generator for a module.
 func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
@@ -57,21 +48,7 @@ func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
 		layout:    mir.NewDataLayout(pointerSize),
 		funcLits:  make(map[string]*closureInfo),
 		funcWraps: make(map[string]string),
-		capture:   captureByValue,
 	}
-}
-
-func (g *Generator) shouldCaptureByRef(ident *hir.Ident) bool {
-	if g == nil || g.capture != captureByRef {
-		return false
-	}
-	if ident == nil || ident.Symbol == nil {
-		return false
-	}
-	if ident.Symbol.Kind == symbols.SymbolConstant {
-		return false
-	}
-	return true
 }
 
 // GenerateModule lowers a lowered HIR module into MIR.
@@ -224,17 +201,12 @@ func (g *Generator) closureForFuncLit(lit *hir.FuncLit) *closureInfo {
 	}
 
 	fields := []types.StructField{{Name: "__fn", Type: types.TypeU64}}
-	fieldTypes := make([]types.SemType, len(captureIdents))
 	captures := make([]captureInfo, 0, len(captureIdents))
 	for i, ident := range captureIdents {
 		if ident == nil {
 			continue
 		}
-		fieldType := ident.Type
-		if g.shouldCaptureByRef(ident) {
-			fieldType = types.NewReference(fieldType)
-		}
-		fieldTypes[i] = fieldType
+		fieldType := types.NewReference(ident.Type)
 		fields = append(fields, types.StructField{
 			Name: fmt.Sprintf("__cap%d", i),
 			Type: fieldType,
@@ -247,8 +219,7 @@ func (g *Generator) closureForFuncLit(lit *hir.FuncLit) *closureInfo {
 		if ident == nil {
 			continue
 		}
-		fieldType := fieldTypes[i]
-		byRef := g.shouldCaptureByRef(ident)
+		fieldType := types.NewReference(ident.Type)
 		name := fmt.Sprintf("__cap%d", i)
 		offset, ok := layout.FieldOffset(name)
 		if !ok {
@@ -258,7 +229,6 @@ func (g *Generator) closureForFuncLit(lit *hir.FuncLit) *closureInfo {
 			ident:  ident,
 			offset: offset,
 			typ:    fieldType,
-			byRef:  byRef,
 		})
 	}
 
