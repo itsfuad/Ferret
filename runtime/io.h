@@ -30,12 +30,14 @@ void ferret_io_Println_u32(uint32_t value);
 void ferret_io_Println_u64(uint64_t value);
 void ferret_io_Println_u128(ferret_u128 value);
 void ferret_io_Println_u256(ferret_u256 value);
+void ferret_io_Println_byte(uint8_t value);
 void ferret_io_Print_u8(uint8_t value);
 void ferret_io_Print_u16(uint16_t value);
 void ferret_io_Print_u32(uint32_t value);
 void ferret_io_Print_u64(uint64_t value);
 void ferret_io_Print_u128(ferret_u128 value);
 void ferret_io_Print_u256(ferret_u256 value);
+void ferret_io_Print_byte(uint8_t value);
 
 // Signed large integer versions
 void ferret_io_Println_i128(ferret_i128 value);

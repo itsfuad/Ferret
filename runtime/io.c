@@ -111,6 +111,10 @@ void ferret_io_Println_u256(ferret_u256 value) {
     ferret_io_Println_u256_ptr(&value);
 }
 
+void ferret_io_Println_byte(uint8_t value) {
+    printf("%c\n", (unsigned char)value);
+}
+
 void ferret_io_Print_u8(uint8_t value) {
     printf("%u", (unsigned int)value);
 }
@@ -133,6 +137,10 @@ void ferret_io_Print_u128(ferret_u128 value) {
 
 void ferret_io_Print_u256(ferret_u256 value) {
     ferret_io_Print_u256_ptr(&value);
+}
+
+void ferret_io_Print_byte(uint8_t value) {
+    printf("%c", (unsigned char)value);
 }
 
 void ferret_io_Println_i128(ferret_i128 value) {

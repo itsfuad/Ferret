@@ -71,14 +71,18 @@ func checkBuiltinLen(ctx *context_v2.CompilerContext, mod *context_v2.Module, ex
 	argType := checkExpr(ctx, mod, expr.Args[0], types.TypeUnknown)
 	baseType := builtinArgBaseType(argType)
 	if baseType != nil && !baseType.Equals(types.TypeUnknown) {
-		if _, ok := baseType.(*types.ArrayType); !ok {
-			if _, ok := baseType.(*types.MapType); !ok {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError("len expects an array or map").
-						WithCode(diagnostics.ErrInvalidType).
-						WithPrimaryLabel(expr.Args[0].Loc(), fmt.Sprintf("found %s", baseType.String())),
-				)
-			}
+		if _, ok := baseType.(*types.ArrayType); ok {
+			// ok
+		} else if _, ok := baseType.(*types.MapType); ok {
+			// ok
+		} else if prim, ok := types.UnwrapType(baseType).(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+			// ok
+		} else {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("len expects an array, map, or string").
+					WithCode(diagnostics.ErrInvalidType).
+					WithPrimaryLabel(expr.Args[0].Loc(), fmt.Sprintf("found %s", baseType.String())),
+			)
 		}
 	}
 

@@ -879,6 +879,18 @@ func (b *functionBuilder) lowerBuiltinLenCall(expr *hir.CallExpr) mir.ValueID {
 		return result
 	}
 
+	if b.isStringType(argExpr) {
+		result := b.gen.nextValueID()
+		b.emitInstr(&mir.Call{
+			Result:   result,
+			Target:   "ferret_string_len",
+			Args:     []mir.ValueID{argVal},
+			Type:     types.TypeI32,
+			Location: expr.Location,
+		})
+		return result
+	}
+
 	b.reportUnsupported("len target", expr.Loc())
 	return mir.InvalidValue
 }
@@ -1356,6 +1368,10 @@ func (b *functionBuilder) lowerIndexValue(expr *hir.IndexExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
+	if b.isStringType(expr.X) {
+		return b.lowerStringIndexValue(expr)
+	}
+
 	if mapType := b.mapTypeOf(expr.X); mapType != nil {
 		return b.lowerMapIndexValue(expr, mapType)
 	}
@@ -1446,6 +1462,11 @@ func (b *functionBuilder) lowerIndexAssign(expr *hir.IndexExpr, rhs hir.Expr, op
 		return
 	}
 
+	if b.isStringType(expr.X) {
+		b.reportUnsupported("string index assignment", &loc)
+		return
+	}
+
 	if mapType := b.mapTypeOf(expr.X); mapType != nil {
 		b.lowerMapIndexAssign(expr, rhs, op, loc, mapType)
 		return
@@ -1488,6 +1509,37 @@ func (b *functionBuilder) lowerIndexAssign(expr *hir.IndexExpr, rhs hir.Expr, op
 		return
 	}
 	b.emitStore(addr, rhsVal, loc)
+}
+
+func (b *functionBuilder) lowerStringIndexValue(expr *hir.IndexExpr) mir.ValueID {
+	if expr == nil {
+		return mir.InvalidValue
+	}
+	base := b.lowerExpr(expr.X)
+	if base == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	indexVal := b.lowerExpr(expr.Index)
+	if indexVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	indexVal = b.castValue(indexVal, b.exprType(expr.Index), types.TypeI32, expr.Location)
+	lenVal := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   lenVal,
+		Target:   "ferret_string_len",
+		Args:     []mir.ValueID{base},
+		Type:     types.TypeI32,
+		Location: expr.Location,
+	})
+	indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, expr.Location)
+	if indexVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	elemPtr := b.emitPtrOffset(base, indexVal, types.TypeByte, expr.Location)
+	return b.emitLoad(elemPtr, types.TypeByte, expr.Location)
 }
 
 func (b *functionBuilder) lowerDynamicIndexValue(expr *hir.IndexExpr, arrType *types.ArrayType) mir.ValueID {
@@ -1670,6 +1722,24 @@ func (b *functionBuilder) arrayTypeOf(expr hir.Expr) *types.ArrayType {
 
 	arrType, _ := baseType.(*types.ArrayType)
 	return arrType
+}
+
+func (b *functionBuilder) isStringType(expr hir.Expr) bool {
+	if expr == nil {
+		return false
+	}
+	baseType := b.exprType(expr)
+	if baseType == nil {
+		return false
+	}
+	baseType = types.UnwrapType(baseType)
+	if ref, ok := baseType.(*types.ReferenceType); ok {
+		baseType = types.UnwrapType(ref.Inner)
+	}
+	if prim, ok := baseType.(*types.PrimitiveType); ok {
+		return prim.GetName() == types.TYPE_STRING
+	}
+	return false
 }
 
 func (b *functionBuilder) mapTypeOf(expr hir.Expr) *types.MapType {
@@ -2503,7 +2573,7 @@ func (b *functionBuilder) emitBoundsCheckedIndex(indexVal, lenVal mir.ValueID, i
 	}
 
 	zero := b.emitConst(indexType, "0", loc)
-	condNeg := b.emitBinary(tokens.LESS_TOKEN, indexVal, zero, types.TypeBool, loc)
+	condNeg := b.emitBinary(tokens.LESS_TOKEN, indexVal, zero, indexType, loc)
 
 	negBlock := b.newBlock("index.neg", loc)
 	posBlock := b.newBlock("index.pos", loc)
@@ -2538,8 +2608,8 @@ func (b *functionBuilder) emitBoundsCheckedIndex(indexVal, lenVal mir.ValueID, i
 		Location: loc,
 	})
 
-	condLow := b.emitBinary(tokens.LESS_TOKEN, idxAdj, zero, types.TypeBool, loc)
-	condHigh := b.emitBinary(tokens.GREATER_EQUAL_TOKEN, idxAdj, lenVal, types.TypeBool, loc)
+	condLow := b.emitBinary(tokens.LESS_TOKEN, idxAdj, zero, indexType, loc)
+	condHigh := b.emitBinary(tokens.GREATER_EQUAL_TOKEN, idxAdj, lenVal, indexType, loc)
 	condOOB := b.emitBinary(tokens.OR_TOKEN, condLow, condHigh, types.TypeBool, loc)
 	mergeBlock.Term = &mir.CondBr{
 		Cond:     condOOB,

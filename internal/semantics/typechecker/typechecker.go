@@ -973,7 +973,7 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	}
 
 	// Allow explicit casts between numeric types
-	if types.IsNumericType(sourceType) && types.IsNumericType(targetType) {
+	if isNumericOrBool(sourceType) && isNumericOrBool(targetType) {
 		return
 	}
 
@@ -984,7 +984,7 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	// Note: srcUnwrapped and dstUnwrapped are already declared above
 
 	// Check if underlying types are compatible (allows named type casts)
-	if types.IsNumeric(srcUnwrapped) && types.IsNumeric(dstUnwrapped) {
+	if isNumericOrBool(srcUnwrapped) && isNumericOrBool(dstUnwrapped) {
 		// Allow cast if underlying types are compatible (all numeric types can cast to each other)
 		return
 	}
@@ -1033,6 +1033,71 @@ func isBoolType(typ types.SemType) bool {
 		return prim.GetName() == types.TYPE_BOOL
 	}
 	return false
+}
+
+func isNumericOrBool(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		if prim.GetName() == types.TYPE_BOOL {
+			return true
+		}
+	}
+	return types.IsNumericType(typ)
+}
+
+func checkIndexExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.IndexExpr, baseType, indexType types.SemType) {
+	if ctx == nil || expr == nil {
+		return
+	}
+	if baseType.Equals(types.TypeUnknown) {
+		return
+	}
+	if indexType.Equals(types.TypeUnknown) {
+		return
+	}
+	baseType = dereferenceType(types.UnwrapType(baseType))
+	indexType = types.UnwrapType(indexType)
+
+	if arrType, ok := baseType.(*types.ArrayType); ok {
+		if !types.IsInteger(indexType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("array index must be an integer").
+					WithCode(diagnostics.ErrInvalidOperation).
+					WithPrimaryLabel(expr.Index.Loc(), "expected integer index"),
+			)
+		}
+		_ = arrType
+		return
+	}
+	if mapType, ok := baseType.(*types.MapType); ok {
+		if checkTypeCompatibility(mapType.Key, indexType) == Incompatible {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("map index must be %s", mapType.Key.String())).
+					WithCode(diagnostics.ErrInvalidOperation).
+					WithPrimaryLabel(expr.Index.Loc(), "incompatible map key type"),
+			)
+		}
+		return
+	}
+	if prim, ok := baseType.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+		if !types.IsInteger(indexType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("string index must be an integer").
+					WithCode(diagnostics.ErrInvalidOperation).
+					WithPrimaryLabel(expr.Index.Loc(), "expected integer index"),
+			)
+		}
+		return
+	}
+
+	ctx.Diagnostics.Add(
+		diagnostics.NewError(fmt.Sprintf("type %s is not indexable", baseType.String())).
+			WithCode(diagnostics.ErrNotIndexable).
+			WithPrimaryLabel(expr.Loc(), "not indexable"),
+	)
 }
 
 // checkCompositeLit validates that a composite literal matches its target type
@@ -1796,8 +1861,9 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	case *ast.IndexExpr:
 		// Check both array and index expressions
-		checkExpr(ctx, mod, e.X, types.TypeUnknown)
-		checkExpr(ctx, mod, e.Index, types.TypeUnknown)
+		baseType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		indexType := checkExpr(ctx, mod, e.Index, types.TypeUnknown)
+		checkIndexExpr(ctx, mod, e, baseType, indexType)
 
 	case *ast.ParenExpr:
 		// Check inner expression

@@ -85,6 +85,15 @@ World";
 
 Strings are one of the most common types you'll work with. They're perfect for storing names, messages, file paths, and any other text data.
 
+Strings are indexable. Indexing returns a `byte` (not a `str`), is byte-based (not Unicode code points), and uses runtime bounds checks. Negative indices count from the end (`-1` is last byte):
+
+```ferret
+let s: str = "Hello";
+let first: byte = s[0];
+let last: byte = s[-1]; // last byte
+let n: i32 = len(s);
+```
+
 ### Boolean Type
 
 Booleans represent yes/no, on/off, or true/false values. There are only two possible values: `true` and `false`.
@@ -111,6 +120,8 @@ let newline: byte = '\n';  // Special characters use backslash
 ```
 
 Think of a `byte` as a single building block, while a `str` (string) is like a sequence of these blocks.
+
+When printing, `byte` displays as a character while `u8` prints as a number.
 
 ## Compound Types
 

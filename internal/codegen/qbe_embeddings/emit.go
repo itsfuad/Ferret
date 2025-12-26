@@ -129,6 +129,29 @@ func (g *Generator) emitCast(c *mir.Cast) {
 		return
 	}
 
+	if isBoolType(toType) {
+		op, err := g.compareOp(tokens.NOT_EQUAL_TOKEN, fromType)
+		if err != nil {
+			g.reportError(err.Error(), &c.Location)
+			return
+		}
+		zero := "0"
+		if g.isFloat(fromType) {
+			if fromQ, err := g.qbeType(fromType); err == nil {
+				if fromQ == "s" {
+					zero = "s_0"
+				} else if fromQ == "d" {
+					zero = "d_0"
+				}
+			}
+		}
+		resultName := g.valueName(c.Result)
+		operand := g.valueName(c.X)
+		g.emitLine(fmt.Sprintf("%s =w %s %s, %s", resultName, op, operand, zero))
+		g.valueTypes[c.Result] = toType
+		return
+	}
+
 	fromQ, err := g.qbeType(fromType)
 	if err != nil {
 		g.reportError(err.Error(), &c.Location)
@@ -143,6 +166,12 @@ func (g *Generator) emitCast(c *mir.Cast) {
 	operand := g.valueName(c.X)
 
 	if fromQ == toQ {
+		if g.isInteger(fromType) && g.isInteger(toType) {
+			if g.handleIntegerCast(resultName, operand, fromQ, fromType, toQ, toType) {
+				g.valueTypes[c.Result] = toType
+				return
+			}
+		}
 		g.emitLine(fmt.Sprintf("%s =%s copy %s", resultName, toQ, operand))
 		g.valueTypes[c.Result] = toType
 		return
@@ -159,22 +188,29 @@ func (g *Generator) emitCast(c *mir.Cast) {
 	}
 
 	if g.isInteger(fromType) && g.isInteger(toType) {
-		if fromQ == "w" && toQ == "l" {
-			op := "extsw"
-			if g.isUnsigned(fromType) {
-				op = "extuw"
-			}
-			g.emitLine(fmt.Sprintf("%s =l %s %s", resultName, op, operand))
-		} else {
-			g.emitLine(fmt.Sprintf("%s =%s copy %s", resultName, toQ, operand))
+		if g.handleIntegerCast(resultName, operand, fromQ, fromType, toQ, toType) {
+			g.valueTypes[c.Result] = toType
+			return
 		}
+		g.emitLine(fmt.Sprintf("%s =%s copy %s", resultName, toQ, operand))
 		g.valueTypes[c.Result] = toType
 		return
 	}
 
 	if g.isInteger(fromType) && g.isFloat(toType) {
 		if g.isUnsigned(fromType) {
-			g.reportUnsupported("unsigned int to float cast", &c.Location)
+			if g.emitUnsignedIntToFloat(resultName, operand, fromType, toType, fromQ, toQ) {
+				g.valueTypes[c.Result] = toType
+				return
+			}
+		}
+		if isBoolType(fromType) {
+			op := "swtof"
+			if fromQ == "l" {
+				op = "sltof"
+			}
+			g.emitLine(fmt.Sprintf("%s =%s %s %s", resultName, toQ, op, operand))
+			g.valueTypes[c.Result] = toType
 			return
 		}
 		op := "swtof"
@@ -188,8 +224,10 @@ func (g *Generator) emitCast(c *mir.Cast) {
 
 	if g.isFloat(fromType) && g.isInteger(toType) {
 		if g.isUnsigned(toType) {
-			g.reportUnsupported("float to unsigned int cast", &c.Location)
-			return
+			if g.emitFloatToUnsigned(resultName, operand, fromType, toType, fromQ, toQ) {
+				g.valueTypes[c.Result] = toType
+				return
+			}
 		}
 		op := "stosi"
 		if fromQ == "d" {
@@ -201,6 +239,127 @@ func (g *Generator) emitCast(c *mir.Cast) {
 	}
 
 	g.reportUnsupported("cast", &c.Location)
+}
+
+func isBoolType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		return prim.GetName() == types.TYPE_BOOL
+	}
+	return false
+}
+
+func intBitSize(typ types.SemType) int {
+	if typ == nil {
+		return 0
+	}
+	typ = types.UnwrapType(typ)
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		return int(types.GetNumberBitSize(prim.GetName()))
+	}
+	return 0
+}
+
+func (g *Generator) handleIntegerCast(resultName, operand, fromQ string, fromType types.SemType, toQ string, toType types.SemType) bool {
+	toBits := intBitSize(toType)
+	if toBits > 0 && toBits < 32 {
+		opVal := operand
+		if fromQ == "l" {
+			tmp := g.newTemp()
+			g.emitLine(fmt.Sprintf("%s =w copy %s", tmp, operand))
+			opVal = tmp
+		}
+		shift := 32 - toBits
+		if g.isSigned(toType) {
+			tmp := g.newTemp()
+			g.emitLine(fmt.Sprintf("%s =w shl %s, %d", tmp, opVal, shift))
+			g.emitLine(fmt.Sprintf("%s =w sar %s, %d", resultName, tmp, shift))
+		} else {
+			mask := (1 << toBits) - 1
+			g.emitLine(fmt.Sprintf("%s =w and %s, %d", resultName, opVal, mask))
+		}
+		return true
+	}
+
+	if fromQ == "w" && toQ == "l" {
+		op := "extsw"
+		if g.isUnsigned(fromType) {
+			op = "extuw"
+		}
+		g.emitLine(fmt.Sprintf("%s =l %s %s", resultName, op, operand))
+		return true
+	}
+	return false
+}
+
+func (g *Generator) emitUnsignedIntToFloat(resultName, operand string, fromType, toType types.SemType, fromQ, toQ string) bool {
+	fromBits := intBitSize(fromType)
+	if fromBits == 0 || fromBits <= 16 {
+		return false
+	}
+
+	funcName := ""
+	switch fromBits {
+	case 32:
+		if toQ == "s" {
+			funcName = "ferret_cast_u32_to_f32"
+		} else {
+			funcName = "ferret_cast_u32_to_f64"
+		}
+	case 64:
+		if toQ == "s" {
+			funcName = "ferret_cast_u64_to_f32"
+		} else {
+			funcName = "ferret_cast_u64_to_f64"
+		}
+	default:
+		return false
+	}
+
+	g.emitLine(fmt.Sprintf("%s =%s call $%s(%s %s)", resultName, toQ, funcName, fromQ, operand))
+	return true
+}
+
+func (g *Generator) emitFloatToUnsigned(resultName, operand string, fromType, toType types.SemType, fromQ, toQ string) bool {
+	toBits := intBitSize(toType)
+	if toBits == 0 {
+		return false
+	}
+
+	if toBits >= 32 {
+		funcName := ""
+		switch toBits {
+		case 32:
+			if fromQ == "s" {
+				funcName = "ferret_cast_f32_to_u32"
+			} else {
+				funcName = "ferret_cast_f64_to_u32"
+			}
+		case 64:
+			if fromQ == "s" {
+				funcName = "ferret_cast_f32_to_u64"
+			} else {
+				funcName = "ferret_cast_f64_to_u64"
+			}
+		default:
+			return false
+		}
+		g.emitLine(fmt.Sprintf("%s =%s call $%s(%s %s)", resultName, toQ, funcName, fromQ, operand))
+		return true
+	}
+
+	op := "stosi"
+	if fromQ == "d" {
+		op = "dtosi"
+	}
+	tmp := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =w %s %s", tmp, op, operand))
+	mask := (1 << toBits) - 1
+	g.emitLine(fmt.Sprintf("%s =w and %s, %d", resultName, tmp, mask))
+	return true
 }
 
 func (g *Generator) emitAlloca(a *mir.Alloca) {
@@ -292,21 +451,11 @@ func (g *Generator) emitStore(s *mir.Store) {
 		return
 	}
 	valType := g.valueTypes[s.Value]
-	if optType, ok := g.optionalType(valType); ok {
-		size := g.layout.SizeOf(optType)
-		if size <= 0 {
-			g.reportUnsupported("optional store", &s.Location)
-			return
-		}
-		g.emitMemcpy(g.valueName(s.Addr), g.valueName(s.Value), size, &s.Location)
+	if valType == nil {
+		g.reportUnsupported("store value type", &s.Location)
 		return
 	}
-	op, err := g.storeOp(valType)
-	if err != nil {
-		g.reportError(err.Error(), &s.Location)
-		return
-	}
-	g.emitLine(fmt.Sprintf("%s %s, %s", op, g.valueName(s.Value), g.valueName(s.Addr)))
+	g.storeValueToAddr(s.Value, valType, g.valueName(s.Addr), &s.Location)
 }
 
 func (g *Generator) emitCall(c *mir.Call) {
@@ -1149,6 +1298,9 @@ func (g *Generator) printFunctionName(funcName string, typ types.SemType) (strin
 		case types.TYPE_I256:
 			return "ferret_io_" + funcName + "_i256_ptr", nil
 		case types.TYPE_U8, types.TYPE_BYTE:
+			if prim.GetName() == types.TYPE_BYTE {
+				return "ferret_io_" + funcName + "_byte", nil
+			}
 			return "ferret_io_" + funcName + "_u8", nil
 		case types.TYPE_U16:
 			return "ferret_io_" + funcName + "_u16", nil
