@@ -25,6 +25,8 @@ type Generator struct {
 	tempID      int
 	stringID    int
 	enumTableID int
+	retOutParam string
+	retOutType  types.SemType
 }
 
 func New(ctx *context_v2.CompilerContext, mod *context_v2.Module, mirMod *mir.Module) *Generator {
@@ -73,15 +75,32 @@ func (g *Generator) emitFunction(fn *mir.Function) {
 
 	g.valueTypes = make(map[mir.ValueID]types.SemType)
 	g.tempID = 0
+	g.retOutParam = ""
+	g.retOutType = nil
 
 	fnName := g.qbeFuncName(fn.Name, g.moduleImportPath())
-	retType, mainReturnsInt := g.qbeReturnType(fn.Name, fn.Return)
+	mainReturnsInt := false
+	retType := ""
+	if optType, ok := g.optionalType(fn.Return); ok {
+		g.retOutType = optType
+		g.retOutParam = "%ret"
+	} else {
+		retType, mainReturnsInt = g.qbeReturnType(fn.Name, fn.Return)
+	}
 
 	g.buf.WriteString("export function")
 	if retType != "" {
 		g.buf.WriteString(" " + retType)
 	}
 	g.buf.WriteString(" $" + fnName + "(")
+
+	if g.retOutType != nil {
+		if len(fn.Params) > 0 {
+			g.buf.WriteString("l " + g.retOutParam + ", ")
+		} else {
+			g.buf.WriteString("l " + g.retOutParam)
+		}
+	}
 
 	for i, param := range fn.Params {
 		paramSem := normalizeLargeValueType(param.Type)
@@ -169,17 +188,17 @@ func (g *Generator) emitInstr(instr mir.Instr) {
 	case *mir.ArraySet:
 		g.reportUnsupported("array_set", i.Loc())
 	case *mir.MapGet:
-		g.reportUnsupported("map_get", i.Loc())
+		g.emitMapGet(i)
 	case *mir.MapSet:
-		g.reportUnsupported("map_set", i.Loc())
+		g.emitMapSet(i)
 	case *mir.OptionalNone:
-		g.reportUnsupported("optional_none", i.Loc())
+		g.emitOptionalNone(i)
 	case *mir.OptionalSome:
-		g.reportUnsupported("optional_some", i.Loc())
+		g.emitOptionalSome(i)
 	case *mir.OptionalIsSome:
-		g.reportUnsupported("optional_is_some", i.Loc())
+		g.emitOptionalIsSome(i)
 	case *mir.OptionalUnwrap:
-		g.reportUnsupported("optional_unwrap", i.Loc())
+		g.emitOptionalUnwrap(i)
 	case *mir.ResultOk:
 		g.reportUnsupported("result_ok", i.Loc())
 	case *mir.ResultErr:
@@ -206,6 +225,13 @@ func (g *Generator) emitTerm(term mir.Term, mainReturnsInt bool) {
 
 	switch t := term.(type) {
 	case *mir.Return:
+		if g.retOutType != nil {
+			if t.HasValue {
+				g.emitOptionalCopy(g.retOutParam, g.valueName(t.Value), g.retOutType, &t.Location)
+			}
+			g.emitLine("ret")
+			return
+		}
 		if t.HasValue {
 			g.emitLine(fmt.Sprintf("ret %s", g.valueName(t.Value)))
 			return

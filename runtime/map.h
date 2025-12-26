@@ -49,6 +49,41 @@ ferret_map_t* ferret_map_from_pairs(
     bool (*equals_fn)(const void* key1, const void* key2, size_t key_size)
 );
 
+// Typed map constructors (avoid function pointer arguments in IR)
+ferret_map_t* ferret_map_new_i32(size_t key_size, size_t value_size);
+ferret_map_t* ferret_map_new_i64(size_t key_size, size_t value_size);
+ferret_map_t* ferret_map_new_str(size_t key_size, size_t value_size);
+ferret_map_t* ferret_map_new_bytes(size_t key_size, size_t value_size);
+
+ferret_map_t* ferret_map_from_pairs_i32(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+);
+ferret_map_t* ferret_map_from_pairs_i64(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+);
+ferret_map_t* ferret_map_from_pairs_str(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+);
+ferret_map_t* ferret_map_from_pairs_bytes(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+);
+
 // Get value for a key (returns pointer to value, or NULL if not found)
 // The returned pointer is valid until the map is modified
 // DEPRECATED: Use ferret_map_get_optional instead
@@ -64,6 +99,10 @@ typedef struct {
 } ferret_map_get_result_t;
 
 ferret_map_get_result_t ferret_map_get_optional(const ferret_map_t* map, const void* key);
+
+// Write optional map get result into a Ferret optional layout (value bytes + 1-byte flag).
+// out_optional must point to a buffer of size (value_size + 1 + padding).
+void ferret_map_get_optional_out(const ferret_map_t* map, const void* key, void* out_optional);
 
 // Macro to get value from map as optional type
 // Usage: FERRET_MAP_GET_OPTIONAL(map, key, optional_type_name, value_type)

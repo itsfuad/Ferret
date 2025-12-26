@@ -1523,6 +1523,17 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
+	assignType := lhsType
+	if idx, ok := stmt.Lhs.(*ast.IndexExpr); ok {
+		baseType := inferExprType(ctx, mod, idx.X)
+		baseType = types.UnwrapType(baseType)
+		if ref, ok := baseType.(*types.ReferenceType); ok {
+			baseType = types.UnwrapType(ref.Inner)
+		}
+		if mapType, ok := baseType.(*types.MapType); ok && mapType.Value != nil {
+			assignType = mapType.Value
+		}
+	}
 
 	// Handle increment/decrement operators (x++, x--)
 	if stmt.Op != nil && (stmt.Op.Kind == tokens.PLUS_PLUS_TOKEN || stmt.Op.Kind == tokens.MINUS_MINUS_TOKEN) {
@@ -1594,10 +1605,10 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 			Location: stmt.Location,
 		}
 		// Check the binary expression to validate types
-		checkBinaryExpr(ctx, mod, tempBinExpr, lhsType, rhsType)
+		checkBinaryExpr(ctx, mod, tempBinExpr, assignType, rhsType)
 	} else {
 		// Regular assignment: Check the RHS with the LHS type as context
-		checkAssignLike(ctx, mod, lhsType, stmt.Lhs, stmt.Rhs)
+		checkAssignLike(ctx, mod, assignType, stmt.Lhs, stmt.Rhs)
 	}
 
 	// TODO: Invalidate constant values for aliasing

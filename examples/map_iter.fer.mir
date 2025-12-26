@@ -1,0 +1,76 @@
+module examples/map_iter
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca map[i32]i32
+    %t2 = const i64 4
+    %t3 = const i64 4
+    %t4 = alloca [3]i32
+    %t5 = alloca [3]i32
+    %t6 = const i32 1
+    %t7 = const i32 25
+    %t8 = ptr_add i32 %t4, 0
+    %t9 = ptr_add i32 %t5, 0
+    store %t8, %t6
+    store %t9, %t7
+    %t10 = const i32 2
+    %t11 = const i32 30
+    %t12 = ptr_add i32 %t4, 4
+    %t13 = ptr_add i32 %t5, 4
+    store %t12, %t10
+    store %t13, %t11
+    %t14 = const i32 3
+    %t15 = const i32 35
+    %t16 = ptr_add i32 %t4, 8
+    %t17 = ptr_add i32 %t5, 8
+    store %t16, %t14
+    store %t17, %t15
+    %t18 = const i64 3
+    %t19 = call ferret_map_from_pairs_i32(%t2, %t3, %t4, %t5, %t18) : map[i32]i32
+    store %t1, %t19
+    %t20 = alloca &void
+    %t21 = load map[i32]i32 %t1
+    %t22 = alloca struct { .bucket_index: i64, .entry: &void }
+    call ferret_map_iter_begin(%t21, %t22) : bool
+    store %t20, %t22
+    %t23 = alloca i32
+    %t24 = alloca i32
+    %t25 = alloca i32
+    %t26 = alloca i32
+    br b2
+  block b2 while.cond:
+    %t27 = const bool true
+    br_if %t27, b3, b4
+  block b3 while.body:
+    %t28 = load map[i32]i32 %t1
+    %t29 = load &void %t20
+    %t30 = alloca &i32
+    %t31 = alloca &i32
+    %t32 = call ferret_map_iter_next(%t28, %t29, %t30, %t31) : bool
+    br_if %t32, b5, b6
+  block b4 while.end:
+    ret
+  block b5 mapiter.update:
+    %t33 = load &i32 %t30
+    %t34 = load i32 %t33
+    store %t23, %t34
+    %t35 = load &i32 %t31
+    %t36 = load i32 %t35
+    store %t24, %t36
+    br b6
+  block b6 mapiter.merge:
+    %t37 = ! bool %t32
+    br_if %t37, b7, b8
+  block b7 if.then:
+    br b4
+  block b8 if.end:
+    %t38 = load i32 %t23
+    store %t25, %t38
+    %t39 = load i32 %t24
+    store %t26, %t39
+    %t40 = load i32 %t25
+    call io::Println(%t40) : void
+    %t41 = load i32 %t26
+    call io::Println(%t41) : void
+    br b2
+}

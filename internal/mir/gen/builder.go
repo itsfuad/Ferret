@@ -21,6 +21,7 @@ type functionBuilder struct {
 	current      *mir.Block
 	paramsByName map[string]mir.ValueID
 	slots        map[*symbols.Symbol]mir.ValueID
+	tempSlots    map[*hir.Ident]mir.ValueID
 	ptrElem      map[mir.ValueID]types.SemType
 	loopStack    []loopTargets
 	retParam     mir.ValueID
@@ -33,6 +34,7 @@ func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
 		fn:           fn,
 		paramsByName: make(map[string]mir.ValueID),
 		slots:        make(map[*symbols.Symbol]mir.ValueID),
+		tempSlots:    make(map[*hir.Ident]mir.ValueID),
 		ptrElem:      make(map[mir.ValueID]types.SemType),
 		loopStack:    nil,
 		retParam:     mir.InvalidValue,
@@ -172,6 +174,8 @@ func (b *functionBuilder) lowerDeclItem(item hir.DeclItem) {
 	addr := b.emitAlloca(typ, item.Name.Location)
 	if item.Name.Symbol != nil {
 		b.slots[item.Name.Symbol] = addr
+	} else {
+		b.tempSlots[item.Name] = addr
 	}
 
 	if item.Value != nil {
@@ -698,6 +702,10 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			return b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), e.Location)
 		}
 		return b.emitArrayLen(arrVal, e.Location)
+	case *hir.MapIterInitExpr:
+		return b.lowerMapIterInit(e)
+	case *hir.MapIterNextExpr:
+		return b.lowerMapIterNext(e)
 	case *hir.SelectorExpr:
 		return b.lowerSelector(e)
 	case *hir.ScopeResolutionExpr:
@@ -1044,6 +1052,10 @@ func (b *functionBuilder) addrForIdent(ident *hir.Ident) mir.ValueID {
 		}
 	}
 
+	if addr, ok := b.tempSlots[ident]; ok {
+		return addr
+	}
+
 	return mir.InvalidValue
 }
 
@@ -1120,12 +1132,95 @@ func (b *functionBuilder) lowerCompositeLit(expr *hir.CompositeLit) mir.ValueID 
 		b.lowerArrayLiteralInto(out, typ, expr)
 		return out
 	case *types.MapType:
-		b.reportUnsupported("map literal", expr.Loc())
-		return mir.InvalidValue
+		return b.lowerMapLiteral(typ, expr)
 	default:
 		b.reportUnsupported("composite literal", expr.Loc())
 		return mir.InvalidValue
 	}
+}
+
+func (b *functionBuilder) lowerMapLiteral(mapType *types.MapType, lit *hir.CompositeLit) mir.ValueID {
+	if mapType == nil || lit == nil {
+		return mir.InvalidValue
+	}
+	if mapType.Key == nil || mapType.Value == nil {
+		b.reportUnsupported("map literal type", lit.Loc())
+		return mir.InvalidValue
+	}
+
+	keySize := b.gen.layout.SizeOf(mapType.Key)
+	valSize := b.gen.layout.SizeOf(mapType.Value)
+	if keySize <= 0 || valSize <= 0 {
+		b.reportUnsupported("map literal element size", lit.Loc())
+		return mir.InvalidValue
+	}
+
+	sizeType := types.TypeI64
+	if b.gen.layout.PointerSize <= 4 {
+		sizeType = types.TypeI32
+	}
+
+	keySizeVal := b.emitConst(sizeType, strconv.Itoa(keySize), lit.Location)
+	valSizeVal := b.emitConst(sizeType, strconv.Itoa(valSize), lit.Location)
+
+	fns := b.mapRuntimeFns(mapType.Key)
+	if len(lit.Elts) == 0 {
+		result := b.gen.nextValueID()
+		b.emitInstr(&mir.Call{
+			Result:   result,
+			Target:   fns.newFn,
+			Args:     []mir.ValueID{keySizeVal, valSizeVal},
+			Type:     lit.Type,
+			Location: lit.Location,
+		})
+		return result
+	}
+
+	keyArrType := types.NewArray(mapType.Key, len(lit.Elts))
+	valArrType := types.NewArray(mapType.Value, len(lit.Elts))
+	keysAddr := b.emitAlloca(keyArrType, lit.Location)
+	valsAddr := b.emitAlloca(valArrType, lit.Location)
+
+	for i, elt := range lit.Elts {
+		kv, ok := elt.(*hir.KeyValueExpr)
+		if !ok {
+			b.reportUnsupported("map literal element", elt.Loc())
+			return mir.InvalidValue
+		}
+		if kv.Key == nil || kv.Value == nil {
+			b.reportUnsupported("map literal key/value", elt.Loc())
+			return mir.InvalidValue
+		}
+		keyVal := b.lowerExpr(kv.Key)
+		if keyVal == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		valueVal := b.lowerExpr(kv.Value)
+		if valueVal == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+
+		keyVal = b.castValue(keyVal, b.exprType(kv.Key), mapType.Key, kv.Location)
+		valueVal = b.castValue(valueVal, b.exprType(kv.Value), mapType.Value, kv.Location)
+
+		keyOffset := i * keySize
+		valOffset := i * valSize
+		keySlot := b.emitPtrAdd(keysAddr, keyOffset, mapType.Key, kv.Location)
+		valSlot := b.emitPtrAdd(valsAddr, valOffset, mapType.Value, kv.Location)
+		b.emitStore(keySlot, keyVal, kv.Location)
+		b.emitStore(valSlot, valueVal, kv.Location)
+	}
+
+	countVal := b.emitConst(sizeType, strconv.Itoa(len(lit.Elts)), lit.Location)
+	result := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   result,
+		Target:   fns.fromPairsFn,
+		Args:     []mir.ValueID{keySizeVal, valSizeVal, keysAddr, valsAddr, countVal},
+		Type:     lit.Type,
+		Location: lit.Location,
+	})
+	return result
 }
 
 func (b *functionBuilder) lowerDynamicArrayLiteral(arrType *types.ArrayType, lit *hir.CompositeLit) mir.ValueID {
@@ -1593,6 +1688,149 @@ func (b *functionBuilder) mapTypeOf(expr hir.Expr) *types.MapType {
 
 	mapType, _ := baseType.(*types.MapType)
 	return mapType
+}
+
+type mapRuntimeFns struct {
+	newFn       string
+	fromPairsFn string
+}
+
+func (b *functionBuilder) mapRuntimeFns(keyType types.SemType) mapRuntimeFns {
+	keyType = types.UnwrapType(keyType)
+	switch kt := keyType.(type) {
+	case *types.PrimitiveType:
+		switch kt.GetName() {
+		case types.TYPE_I32:
+			return mapRuntimeFns{
+				newFn:       "ferret_map_new_i32",
+				fromPairsFn: "ferret_map_from_pairs_i32",
+			}
+		case types.TYPE_I64:
+			return mapRuntimeFns{
+				newFn:       "ferret_map_new_i64",
+				fromPairsFn: "ferret_map_from_pairs_i64",
+			}
+		case types.TYPE_STRING:
+			return mapRuntimeFns{
+				newFn:       "ferret_map_new_str",
+				fromPairsFn: "ferret_map_from_pairs_str",
+			}
+		}
+	case *types.NamedType:
+		return b.mapRuntimeFns(kt.Underlying)
+	}
+	return mapRuntimeFns{
+		newFn:       "ferret_map_new_bytes",
+		fromPairsFn: "ferret_map_from_pairs_bytes",
+	}
+}
+
+func (b *functionBuilder) mapIterStructType() *types.StructType {
+	sizeType := types.TypeI64
+	if b.gen != nil && b.gen.layout != nil && b.gen.layout.PointerSize <= 4 {
+		sizeType = types.TypeI32
+	}
+	return types.NewStruct("", []types.StructField{
+		{Name: "bucket_index", Type: sizeType},
+		{Name: "entry", Type: types.NewReference(types.TypeVoid)},
+	})
+}
+
+func (b *functionBuilder) lowerMapIterInit(expr *hir.MapIterInitExpr) mir.ValueID {
+	if expr == nil {
+		return mir.InvalidValue
+	}
+	mapVal := b.lowerExpr(expr.Map)
+	if mapVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	iterType := b.mapIterStructType()
+	iterAddr := b.emitAlloca(iterType, expr.Location)
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   "ferret_map_iter_begin",
+		Args:     []mir.ValueID{mapVal, iterAddr},
+		Type:     types.TypeBool,
+		Location: expr.Location,
+	})
+	return iterAddr
+}
+
+func (b *functionBuilder) lowerMapIterNext(expr *hir.MapIterNextExpr) mir.ValueID {
+	if expr == nil {
+		return mir.InvalidValue
+	}
+	mapVal := b.lowerExpr(expr.Map)
+	if mapVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	iterVal := b.lowerExpr(expr.Iter)
+	if iterVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	keyType := types.TypeUnknown
+	valType := types.TypeUnknown
+	if mapType := b.mapTypeOf(expr.Map); mapType != nil {
+		if mapType.Key != nil {
+			keyType = mapType.Key
+		}
+		if mapType.Value != nil {
+			valType = mapType.Value
+		}
+	}
+	if expr.Key != nil && expr.Key.Type != nil && !expr.Key.Type.Equals(types.TypeUnknown) {
+		keyType = expr.Key.Type
+	}
+	if expr.Value != nil && expr.Value.Type != nil && !expr.Value.Type.Equals(types.TypeUnknown) {
+		valType = expr.Value.Type
+	}
+
+	keyPtrSlot := b.emitAlloca(types.NewReference(keyType), expr.Location)
+	valPtrSlot := b.emitAlloca(types.NewReference(valType), expr.Location)
+
+	result := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   result,
+		Target:   "ferret_map_iter_next",
+		Args:     []mir.ValueID{mapVal, iterVal, keyPtrSlot, valPtrSlot},
+		Type:     types.TypeBool,
+		Location: expr.Location,
+	})
+
+	if b.current == nil || b.current.Term != nil {
+		return result
+	}
+
+	updateBlock := b.newBlock("mapiter.update", expr.Location)
+	mergeBlock := b.newBlock("mapiter.merge", expr.Location)
+	b.current.Term = &mir.CondBr{
+		Cond:     result,
+		Then:     updateBlock.ID,
+		Else:     mergeBlock.ID,
+		Location: expr.Location,
+	}
+
+	b.setBlock(updateBlock)
+	if expr.Key != nil {
+		keyPtr := b.emitLoad(keyPtrSlot, types.NewReference(keyType), expr.Location)
+		keyVal := b.emitLoad(keyPtr, keyType, expr.Location)
+		if keyAddr := b.addrForIdent(expr.Key); keyAddr != mir.InvalidValue {
+			b.emitStore(keyAddr, keyVal, expr.Location)
+		}
+	}
+	if expr.Value != nil {
+		valPtr := b.emitLoad(valPtrSlot, types.NewReference(valType), expr.Location)
+		valVal := b.emitLoad(valPtr, valType, expr.Location)
+		if valAddr := b.addrForIdent(expr.Value); valAddr != mir.InvalidValue {
+			b.emitStore(valAddr, valVal, expr.Location)
+		}
+	}
+	updateBlock.Term = &mir.Br{Target: mergeBlock.ID, Location: expr.Location}
+
+	b.setBlock(mergeBlock)
+	return result
 }
 
 func (b *functionBuilder) callTarget(expr hir.Expr) (string, bool) {

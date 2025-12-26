@@ -127,6 +127,62 @@ ferret_map_t* ferret_map_from_pairs(
     return map;
 }
 
+ferret_map_t* ferret_map_new_i32(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_i32, ferret_map_equals_i32);
+}
+
+ferret_map_t* ferret_map_new_i64(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_i64, ferret_map_equals_i64);
+}
+
+ferret_map_t* ferret_map_new_str(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_str, ferret_map_equals_str);
+}
+
+ferret_map_t* ferret_map_new_bytes(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_bytes, ferret_map_equals_bytes);
+}
+
+ferret_map_t* ferret_map_from_pairs_i32(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_i32, ferret_map_equals_i32);
+}
+
+ferret_map_t* ferret_map_from_pairs_i64(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_i64, ferret_map_equals_i64);
+}
+
+ferret_map_t* ferret_map_from_pairs_str(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_str, ferret_map_equals_str);
+}
+
+ferret_map_t* ferret_map_from_pairs_bytes(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_bytes, ferret_map_equals_bytes);
+}
+
 void* ferret_map_get(const ferret_map_t* map, const void* key) {
     if (map == NULL || key == NULL) {
         return NULL;
@@ -160,6 +216,28 @@ ferret_map_get_result_t ferret_map_get_optional(const ferret_map_t* map, const v
     }
     
     return result;
+}
+
+void ferret_map_get_optional_out(const ferret_map_t* map, const void* key, void* out_optional) {
+    if (out_optional == NULL) {
+        return;
+    }
+    uint8_t* out_bytes = (uint8_t*)out_optional;
+    size_t value_size = 0;
+    if (map != NULL) {
+        value_size = map->value_size;
+    }
+    uint8_t* flag_ptr = out_bytes + value_size;
+
+    ferret_map_get_result_t result = ferret_map_get_optional(map, key);
+    if (result.is_some && result.value_ptr != NULL) {
+        if (value_size > 0) {
+            memcpy(out_bytes, result.value_ptr, value_size);
+        }
+        *flag_ptr = 1;
+    } else {
+        *flag_ptr = 0;
+    }
 }
 
 bool ferret_map_set(ferret_map_t* map, const void* key, const void* value) {
@@ -361,5 +439,5 @@ bool ferret_map_iter_next(const ferret_map_t* map, ferret_map_iter_t* iter, void
 
     // End of map
     iter->entry = NULL;
-    return false;
+    return true;
 }

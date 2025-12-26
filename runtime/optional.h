@@ -30,4 +30,8 @@
 #define FERRET_OPTIONAL_NONE(type) \
     ((ferret_optional_##type){.value = 0, .is_some = 0})
 
+// Unwrap optional into out buffer using default when none.
+// Layout: value bytes followed by 1-byte is_some flag at offset val_size.
+void ferret_optional_unwrap_or(const void* opt, const void* default_val, void* out, uint64_t val_size);
+
 #endif // FERRET_OPTIONAL_H

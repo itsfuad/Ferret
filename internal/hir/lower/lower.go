@@ -224,6 +224,15 @@ func (l *Lowerer) lowerAssignStmt(stmt *hir.AssignStmt) *hir.AssignStmt {
 	expected := types.TypeUnknown
 	if stmt.Op == nil || stmt.Op.Kind == tokens.EQUALS_TOKEN {
 		expected = l.exprType(lhs)
+		if idx, ok := lhs.(*hir.IndexExpr); ok {
+			baseType := types.UnwrapType(l.exprType(idx.X))
+			if ref, ok := baseType.(*types.ReferenceType); ok {
+				baseType = types.UnwrapType(ref.Inner)
+			}
+			if mapType, ok := baseType.(*types.MapType); ok && mapType.Value != nil {
+				expected = mapType.Value
+			}
+		}
 	}
 
 	return &hir.AssignStmt{
@@ -567,13 +576,13 @@ func (l *Lowerer) lowerMapFor(stmt *hir.ForStmt, mapType *types.MapType) hir.Nod
 		rangeValue = mapIdent
 	}
 
-	iterIdent := l.newTempIdent("__map_iter_", types.TypeUnknown, loc)
+	iterIdent := l.newTempIdent("__map_iter_", types.NewReference(types.TypeVoid), loc)
 	iterInit := &hir.MapIterInitExpr{
 		Map:      rangeValue,
 		Type:     types.TypeUnknown,
 		Location: loc,
 	}
-	prelude = append(prelude, newVarDecl(iterIdent, types.TypeUnknown, iterInit, loc))
+	prelude = append(prelude, newVarDecl(iterIdent, iterIdent.Type, iterInit, loc))
 
 	keyType := types.TypeUnknown
 	valType := types.TypeUnknown

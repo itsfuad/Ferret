@@ -1,0 +1,60 @@
+module examples/map_index
+
+fn get(m: map[str]i32, key: str) -> i32? {
+  block b1 entry:
+    %t3 = alloca map[str]i32
+    store %t3, %t1
+    %t4 = load map[str]i32 %t3
+    %t5 = alloca str
+    store %t5, %t2
+    %t6 = load str %t5
+    %t7 = map_get i32? %t4, %t6
+    ret %t7
+}
+
+fn main() -> void {
+  block b2 entry:
+    %t8 = alloca map[str]i32
+    %t9 = const i64 8
+    %t10 = const i64 4
+    %t11 = alloca [2]str
+    %t12 = alloca [2]i32
+    %t13 = const str alpha
+    %t14 = const i32 1
+    %t15 = ptr_add str %t11, 0
+    %t16 = ptr_add i32 %t12, 0
+    store %t15, %t13
+    store %t16, %t14
+    %t17 = const str beta
+    %t18 = const i32 2
+    %t19 = ptr_add str %t11, 8
+    %t20 = ptr_add i32 %t12, 4
+    store %t19, %t17
+    store %t20, %t18
+    %t21 = const i64 2
+    %t22 = call ferret_map_from_pairs_str(%t9, %t10, %t11, %t12, %t21) : map[str]i32
+    store %t8, %t22
+    %t23 = load map[str]i32 %t8
+    %t24 = const str alpha
+    %t25 = call get(%t23, %t24) : i32?
+    %t26 = const i32 0
+    %t27 = optional_unwrap i32 %t25, default %t26
+    call io::Println(%t27) : void
+    %t28 = load map[str]i32 %t8
+    %t29 = const str gamma
+    %t30 = call get(%t28, %t29) : i32?
+    %t31 = const i32 9
+    %t32 = optional_unwrap i32 %t30, default %t31
+    call io::Println(%t32) : void
+    %t33 = load map[str]i32 %t8
+    %t34 = const str gamma
+    %t35 = const i32 3
+    map_set %t33, %t34, %t35
+    %t36 = load map[str]i32 %t8
+    %t37 = const str gamma
+    %t38 = call get(%t36, %t37) : i32?
+    %t39 = const i32 0
+    %t40 = optional_unwrap i32 %t38, default %t39
+    call io::Println(%t40) : void
+    ret
+}

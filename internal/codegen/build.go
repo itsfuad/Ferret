@@ -29,9 +29,21 @@ func DefaultBuildOptions() *BuildOptions {
 		cc = "clang"
 	}
 
+	cflags := []string{"-std=c99", "-w", "-Os", "-flto", "-s"}
+	switch runtime.GOOS {
+	case "linux":
+		cflags = append(cflags, "-no-pie")
+	case "darwin":
+		cflags = append(cflags, "-Wl,-no_pie")
+	case "openbsd":
+		cflags = append(cflags, "-nopie")
+	case "freebsd":
+		// FreeBSD defaults are acceptable; no PIE flag needed.
+	}
+
 	return &BuildOptions{
 		CC:          cc,
-		CFlags:      []string{"-std=c99", "-w", "-Os", "-flto", "-s"}, // -Os: optimize for size, -flto: link-time optimization, -s: strip symbols
+		CFlags:      cflags, // -Os: optimize for size, -flto: link-time optimization, -s: strip symbols
 		RuntimePath: "runtime",
 		Debug:       false,
 	}
@@ -67,6 +79,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 		filepath.Join(runtimePath, "interface.c"),
 		filepath.Join(runtimePath, "map.c"),            // Hash map library
 		filepath.Join(runtimePath, "bigint.c"),         // Big integer library (128/256-bit)
+		filepath.Join(runtimePath, "optional.c"),       // Optional helpers
 		filepath.Join(runtimePath, "array.c"),          // Dynamic array library
 		filepath.Join(runtimePath, "panic.c"),          // Panic helper
 		filepath.Join(runtimePath, "string_builder.c"), // String builder library
@@ -77,7 +90,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 		if !utilsfs.IsValidFile(runtimeFile) {
 			// Some runtime files are optional (array.c, string_builder.c)
 			// Only io.c, interface.c, and bigint.c are required
-			if strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") || strings.HasSuffix(runtimeFile, "bigint.c") {
+			if strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") || strings.HasSuffix(runtimeFile, "bigint.c") || strings.HasSuffix(runtimeFile, "optional.c") {
 				return fmt.Errorf("required runtime file not found: %s", runtimeFile)
 			}
 		}

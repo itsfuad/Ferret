@@ -29,9 +29,10 @@
   - [x] Cross-module symbol resolution in MIR/QBE (imports + qualified names).
 - [ ] Collections and loops over them (depends on structs/enums)
   - [x] Builtin `len()` for arrays/maps and `append()` for dynamic arrays.
-  - [ ] MIR lowering for map literals.
-  - [ ] MIR lowering for map iteration (MapIterInit/MapIterNext) and map for-loops.
+  - [x] MIR lowering for map literals.
+  - [x] MIR lowering for map iteration (MapIterInit/MapIterNext) and map for-loops.
   - [x] MIR lowering for dynamic array literals in expressions.
+  - [x] QBE support for map indexing/assignment (MapGet/MapSet + optionals).
 - [ ] Interfaces (depends on structs/enums + methods)
   - [ ] Interface representation (vtable layout + method dispatch).
 - [ ] Functions beyond named decls (hard; depends on structs/enums + methods)
@@ -40,5 +41,6 @@
   - [ ] MIR lowering for result/catch paths.
 - [ ] Backend targets
   - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).
-  - [ ] MIR -> target IR/codegen (native + wasm).
+  - [ ] MIR -> target IR/codegen (native; JS later).
   - [x] Decide runtime behavior for dynamic array OOB (panic via ferret_panic).
+  - [x] Add non-PIE build flags for QBE outputs (Linux/macOS/OpenBSD).
