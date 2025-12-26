@@ -1,0 +1,10 @@
+import "std/io";
+
+fn inc(x: i32) -> i32 {
+    return x + 1;
+}
+
+fn main() {
+    let f := inc;
+    io::Println(f(2));
+}

@@ -75,6 +75,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 
 	// Build runtime libraries
 	runtimeFiles := []string{
+		filepath.Join(runtimePath, "alloc.c"),
 		filepath.Join(runtimePath, "cast.c"),
 		filepath.Join(runtimePath, "io.c"),
 		filepath.Join(runtimePath, "interface.c"),
@@ -92,7 +93,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 		if !utilsfs.IsValidFile(runtimeFile) {
 			// Some runtime files are optional (array.c, string_builder.c)
 			// Only io.c, interface.c, and bigint.c are required
-			if strings.HasSuffix(runtimeFile, "cast.c") || strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") || strings.HasSuffix(runtimeFile, "bigint.c") || strings.HasSuffix(runtimeFile, "optional.c") || strings.HasSuffix(runtimeFile, "string_runtime.c") {
+			if strings.HasSuffix(runtimeFile, "alloc.c") || strings.HasSuffix(runtimeFile, "cast.c") || strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") || strings.HasSuffix(runtimeFile, "bigint.c") || strings.HasSuffix(runtimeFile, "optional.c") || strings.HasSuffix(runtimeFile, "string_runtime.c") {
 				return fmt.Errorf("required runtime file not found: %s", runtimeFile)
 			}
 		}

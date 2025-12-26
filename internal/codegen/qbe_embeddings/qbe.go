@@ -97,22 +97,30 @@ func (g *Generator) emitFunction(fn *mir.Function) {
 	}
 	g.buf.WriteString(" $" + fnName + "(")
 
-	if g.retOutType != nil {
-		if len(fn.Params) > 0 {
-			g.buf.WriteString("l " + g.retOutParam + ", ")
-		} else {
-			g.buf.WriteString("l " + g.retOutParam)
-		}
+	startIdx := 0
+	hasParams := len(fn.Params) > 0
+	if hasParams && fn.Params[0].IsEnv {
+		g.buf.WriteString("env " + g.valueName(fn.Params[0].ID))
+		g.valueTypes[fn.Params[0].ID] = fn.Params[0].Type
+		startIdx = 1
 	}
 
-	for i, param := range fn.Params {
+	if g.retOutType != nil {
+		if startIdx > 0 {
+			g.buf.WriteString(", ")
+		}
+		g.buf.WriteString("l " + g.retOutParam)
+	}
+
+	for i := startIdx; i < len(fn.Params); i++ {
+		param := fn.Params[i]
 		paramSem := normalizeLargeValueType(param.Type)
 		paramType, err := g.qbeType(paramSem)
 		if err != nil {
 			g.reportError(err.Error(), &param.Location)
 			paramType = "w"
 		}
-		if i > 0 {
+		if i > startIdx || g.retOutType != nil || startIdx > 0 {
 			g.buf.WriteString(", ")
 		}
 		g.buf.WriteString(paramType + " " + g.valueName(param.ID))
@@ -175,7 +183,7 @@ func (g *Generator) emitInstr(instr mir.Instr) {
 	case *mir.Call:
 		g.emitCall(i)
 	case *mir.CallIndirect:
-		g.reportUnsupported("call_indirect", i.Loc())
+		g.emitCallIndirect(i)
 	case *mir.Phi:
 		g.emitPhi(i)
 	case *mir.MakeStruct:

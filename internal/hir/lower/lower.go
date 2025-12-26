@@ -1051,6 +1051,7 @@ func (l *Lowerer) lowerFuncLit(lit *hir.FuncLit) *hir.FuncLit {
 	return &hir.FuncLit{
 		ID:       lit.ID,
 		Type:     lit.Type,
+		Captures: lit.Captures,
 		Body:     body,
 		Location: lit.Location,
 	}

@@ -14,6 +14,7 @@
 ### Incremental plan (easy -> hard, dependency-ordered)
 - [x] Builtin primitive coverage (foundation)
   - [x] Ensure full builtin type support in MIR + QBE (i8..i256/u8..u256, f32..f256, bool, str, byte).
+  - [ ] Show .0 in floating point numbers
   - [x] Validate const/load/store coverage for those primitives.
   - [x] Limb-based integer runtime (i128/u128/i256/u256) with 32/64-bit limb selection.
 - [x] Control flow completeness (depends on large primitive support)

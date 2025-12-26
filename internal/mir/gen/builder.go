@@ -26,6 +26,8 @@ type functionBuilder struct {
 	loopStack    []loopTargets
 	retParam     mir.ValueID
 	retType      types.SemType
+	closureEnv   mir.ValueID
+	captures     map[*symbols.Symbol]captureInfo
 }
 
 func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
@@ -38,6 +40,8 @@ func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
 		ptrElem:      make(map[mir.ValueID]types.SemType),
 		loopStack:    nil,
 		retParam:     mir.InvalidValue,
+		closureEnv:   mir.InvalidValue,
+		captures:     nil,
 	}
 }
 
@@ -49,15 +53,15 @@ func (b *functionBuilder) buildFuncBody(body *hir.Block) {
 		if param.Name != "" {
 			b.paramsByName[param.Name] = param.ID
 		}
-	}
-	if len(b.fn.Params) > 0 && b.fn.Params[0].Name == "__ret" {
-		b.retParam = b.fn.Params[0].ID
-		if ref, ok := types.UnwrapType(b.fn.Params[0].Type).(*types.ReferenceType); ok {
-			b.retType = ref.Inner
-		} else {
-			b.retType = b.fn.Params[0].Type
+		if param.Name == "__ret" {
+			b.retParam = param.ID
+			if ref, ok := types.UnwrapType(param.Type).(*types.ReferenceType); ok {
+				b.retType = ref.Inner
+			} else {
+				b.retType = param.Type
+			}
+			b.ptrElem[b.retParam] = b.retType
 		}
-		b.ptrElem[b.retParam] = b.retType
 	}
 
 	if body != nil {
@@ -66,6 +70,21 @@ func (b *functionBuilder) buildFuncBody(body *hir.Block) {
 
 	if b.current.Term == nil {
 		b.finalizeCurrent()
+	}
+}
+
+func (b *functionBuilder) setClosureEnv(env mir.ValueID, captures []captureInfo) {
+	b.closureEnv = env
+	if len(captures) == 0 {
+		b.captures = nil
+		return
+	}
+	b.captures = make(map[*symbols.Symbol]captureInfo, len(captures))
+	for _, cap := range captures {
+		if cap.ident == nil || cap.ident.Symbol == nil {
+			continue
+		}
+		b.captures[cap.ident.Symbol] = cap
 	}
 }
 
@@ -521,6 +540,8 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			return b.emitLargeConst(e.Type, e.Value, e.Location)
 		}
 		return b.emitConst(e.Type, e.Value, e.Location)
+	case *hir.FuncLit:
+		return b.lowerFuncLit(e)
 	case *hir.Ident:
 		return b.loadIdent(e)
 	case *hir.OptionalNone:
@@ -625,6 +646,19 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		right := b.lowerExpr(e.Y)
 		if left == mir.InvalidValue || right == mir.InvalidValue {
 			return mir.InvalidValue
+		}
+		if e.Type != nil && !isCompareOp(e.Op.Kind) {
+			target := types.UnwrapType(e.Type)
+			if types.IsNumeric(target) {
+				leftType := b.exprType(e.X)
+				rightType := b.exprType(e.Y)
+				if leftType != nil && types.IsNumeric(types.UnwrapType(leftType)) && !leftType.Equals(e.Type) {
+					left = b.castValue(left, leftType, e.Type, e.Location)
+				}
+				if rightType != nil && types.IsNumeric(types.UnwrapType(rightType)) && !rightType.Equals(e.Type) {
+					right = b.castValue(right, rightType, e.Type, e.Location)
+				}
+			}
 		}
 		if isLargePrimitiveType(b.exprType(e.X)) {
 			if isCompareOp(e.Op.Kind) {
@@ -953,22 +987,37 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		}
 	}
 
-	target, ok := b.callTarget(expr.Fun)
-	if !ok {
-		b.reportUnsupported("call target", &expr.Location)
-		return mir.InvalidValue
+	if target, ok := b.callTarget(expr.Fun); ok {
+		args := make([]mir.ValueID, 0, len(expr.Args))
+		for _, arg := range expr.Args {
+			val := b.lowerExpr(arg)
+			if val == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+			args = append(args, val)
+		}
+		return b.emitCall(target, args, expr)
 	}
 
-	args := make([]mir.ValueID, 0, len(expr.Args))
-	for _, arg := range expr.Args {
-		val := b.lowerExpr(arg)
-		if val == mir.InvalidValue {
+	if _, ok := types.UnwrapType(b.exprType(expr.Fun)).(*types.FunctionType); ok {
+		callee := b.lowerExpr(expr.Fun)
+		if callee == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		args = append(args, val)
+		args := make([]mir.ValueID, 0, len(expr.Args)+1)
+		args = append(args, callee)
+		for _, arg := range expr.Args {
+			val := b.lowerExpr(arg)
+			if val == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+			args = append(args, val)
+		}
+		return b.emitCallIndirect(callee, args, expr)
 	}
 
-	return b.emitCall(target, args, expr)
+	b.reportUnsupported("call target", &expr.Location)
+	return mir.InvalidValue
 }
 
 func (b *functionBuilder) lowerBuiltinLenCall(expr *hir.CallExpr) mir.ValueID {
@@ -1099,6 +1148,43 @@ func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.
 	return result
 }
 
+func (b *functionBuilder) emitCallIndirect(callee mir.ValueID, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {
+	retType := expr.Type
+	if needsByRefType(retType) {
+		out := b.emitAlloca(retType, expr.Location)
+		callArgs := append([]mir.ValueID{out}, args...)
+		b.emitInstr(&mir.CallIndirect{
+			Result:   mir.InvalidValue,
+			Callee:   callee,
+			Args:     callArgs,
+			Type:     types.TypeVoid,
+			Location: expr.Location,
+		})
+		if expr.Catch != nil {
+			b.reportUnsupported("catch clause", &expr.Location)
+		}
+		return out
+	}
+
+	result := mir.InvalidValue
+	if retType != nil && !retType.Equals(types.TypeVoid) {
+		result = b.gen.nextValueID()
+	}
+	b.emitInstr(&mir.CallIndirect{
+		Result:   result,
+		Callee:   callee,
+		Args:     args,
+		Type:     retType,
+		Location: expr.Location,
+	})
+
+	if expr.Catch != nil {
+		b.reportUnsupported("catch clause", &expr.Location)
+	}
+
+	return result
+}
+
 func (b *functionBuilder) lowerQualifiedValue(expr *hir.ScopeResolutionExpr) mir.ValueID {
 	if expr == nil {
 		return mir.InvalidValue
@@ -1115,6 +1201,9 @@ func (b *functionBuilder) lowerQualifiedValue(expr *hir.ScopeResolutionExpr) mir
 			return b.emitLargeConst(expr.Type, value, expr.Location)
 		}
 		return b.emitConst(expr.Type, value, expr.Location)
+	}
+	if _, ok := types.UnwrapType(expr.Type).(*types.FunctionType); ok {
+		return b.makeFuncValue(name, expr.Type, expr.Location)
 	}
 
 	b.reportUnsupported(fmt.Sprintf("qualified value %s", name), &expr.Location)
@@ -1157,6 +1246,10 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return b.emitLoad(addr, ident.Type, ident.Location)
 	}
 
+	if ident.Symbol != nil && ident.Symbol.Kind == symbols.SymbolFunction {
+		return b.makeFuncValue(ident.Name, ident.Type, ident.Location)
+	}
+
 	if ident.Symbol != nil && (ident.Symbol.Kind == symbols.SymbolParameter || ident.Symbol.Kind == symbols.SymbolReceiver) {
 		if val, ok := b.paramsByName[ident.Name]; ok {
 			return val
@@ -1167,7 +1260,11 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return val
 	}
 
-	b.reportUnsupported("identifier", &ident.Location)
+	if ident.Name != "" {
+		b.reportUnsupported(fmt.Sprintf("identifier %s", ident.Name), &ident.Location)
+	} else {
+		b.reportUnsupported("identifier", &ident.Location)
+	}
 	return mir.InvalidValue
 }
 
@@ -1177,6 +1274,11 @@ func (b *functionBuilder) addrForIdent(ident *hir.Ident) mir.ValueID {
 	}
 
 	if ident.Symbol != nil {
+		if b.captures != nil {
+			if cap, ok := b.captures[ident.Symbol]; ok && b.closureEnv != mir.InvalidValue {
+				return b.emitPtrAdd(b.closureEnv, cap.offset, cap.typ, ident.Location)
+			}
+		}
 		if addr, ok := b.slots[ident.Symbol]; ok {
 			return addr
 		}
@@ -2036,12 +2138,92 @@ func (b *functionBuilder) callTarget(expr hir.Expr) (string, bool) {
 
 	switch e := expr.(type) {
 	case *hir.Ident:
-		return e.Name, true
+		if e.Symbol != nil && e.Symbol.Kind == symbols.SymbolFunction {
+			return e.Name, true
+		}
+		return "", false
 	case *hir.ScopeResolutionExpr:
 		return b.qualifiedName(e)
 	default:
 		return "", false
 	}
+}
+
+func (b *functionBuilder) lowerFuncLit(lit *hir.FuncLit) mir.ValueID {
+	if lit == nil {
+		return mir.InvalidValue
+	}
+	info := b.gen.closureForFuncLit(lit)
+	if info == nil {
+		return mir.InvalidValue
+	}
+	return b.makeClosureValue(info.name, lit.Type, info.envType, info.captures, lit.Location)
+}
+
+func (b *functionBuilder) makeFuncValue(name string, fnType types.SemType, loc source.Location) mir.ValueID {
+	envType := &types.StructType{Fields: []types.StructField{{Name: "__fn", Type: types.TypeU64}}}
+	inner, ok := types.UnwrapType(fnType).(*types.FunctionType)
+	if !ok || inner == nil {
+		b.reportUnsupported("function value type", &loc)
+		return mir.InvalidValue
+	}
+	wrapper := b.gen.funcValueWrapper(name, inner, envType, loc)
+	if wrapper == "" {
+		return mir.InvalidValue
+	}
+	return b.makeClosureValue(wrapper, fnType, envType, nil, loc)
+}
+
+func (b *functionBuilder) makeClosureValue(name string, fnType types.SemType, envType *types.StructType, captures []captureInfo, loc source.Location) mir.ValueID {
+	if envType == nil {
+		b.reportUnsupported("closure env", &loc)
+		return mir.InvalidValue
+	}
+	size := b.gen.layout.SizeOf(envType)
+	if size <= 0 {
+		b.reportUnsupported("closure env size", &loc)
+		return mir.InvalidValue
+	}
+	sizeVal := b.emitConst(types.TypeU64, strconv.Itoa(size), loc)
+	resultType := fnType
+	if resultType == nil {
+		resultType = types.TypeU64
+	}
+	env := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   env,
+		Target:   "ferret_alloc",
+		Args:     []mir.ValueID{sizeVal},
+		Type:     resultType,
+		Location: loc,
+	})
+
+	layout := b.gen.layout.StructLayout(envType)
+	fnOffset, ok := layout.FieldOffset("__fn")
+	if !ok {
+		fnOffset = 0
+	}
+	fnConstType := fnType
+	if fnConstType == nil {
+		fnConstType = types.TypeU64
+	}
+	fnVal := b.emitConst(fnConstType, name, loc)
+	fnAddr := b.emitPtrAdd(env, fnOffset, types.TypeU64, loc)
+	b.emitStore(fnAddr, fnVal, loc)
+
+	for _, cap := range captures {
+		if cap.ident == nil {
+			continue
+		}
+		fieldAddr := b.emitPtrAdd(env, cap.offset, cap.typ, loc)
+		val := b.loadIdent(cap.ident)
+		if val == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		b.emitStore(fieldAddr, val, loc)
+	}
+
+	return env
 }
 
 func (b *functionBuilder) methodCallTarget(expr *hir.SelectorExpr) (string, *symbols.MethodInfo, bool) {

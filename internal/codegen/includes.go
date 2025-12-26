@@ -20,6 +20,7 @@ var (
 	// Runtime headers needed by generated code. Keep this in one place so both
 	// pipeline and cgen stay in sync as the runtime grows.
 	runtimeIncludes = []string{
+		"#include \"alloc.h\"",
 		"#include \"cast.h\"",
 		"#include \"io.h\"",
 		"#include \"interface.h\"",

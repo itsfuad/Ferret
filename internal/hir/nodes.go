@@ -409,6 +409,7 @@ func (k *KeyValueExpr) Loc() *source.Location { return &k.Location }
 type FuncLit struct {
 	ID       string
 	Type     types.SemType
+	Captures []*Ident
 	Body     *Block
 	Location source.Location
 }

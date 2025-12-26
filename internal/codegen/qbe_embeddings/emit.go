@@ -575,6 +575,96 @@ func (g *Generator) emitCall(c *mir.Call) {
 	g.emitLine(fmt.Sprintf("%scall $%s(%s)", result, target, strings.Join(argParts, ", ")))
 }
 
+func (g *Generator) emitCallIndirect(c *mir.CallIndirect) {
+	if c == nil {
+		return
+	}
+
+	args := make([]callArg, 0, len(c.Args))
+	for _, arg := range c.Args {
+		semType := g.valueTypes[arg]
+		if semType == nil {
+			g.reportUnsupported("call_indirect arg type", &c.Location)
+			return
+		}
+		qbeSem := normalizeLargeValueType(semType)
+		qbeType, err := g.qbeType(qbeSem)
+		if err != nil {
+			g.reportError(err.Error(), &c.Location)
+			return
+		}
+		args = append(args, callArg{name: g.valueName(arg), typ: qbeType, sem: semType})
+	}
+
+	fnPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l loadl %s", fnPtr, g.valueName(c.Callee)))
+
+	if optType, ok := g.optionalType(c.Type); ok {
+		size := g.layout.SizeOf(optType)
+		if size <= 0 {
+			g.reportUnsupported("optional call_indirect return", &c.Location)
+			return
+		}
+		align := g.layout.AlignOf(optType)
+		outName := ""
+		if c.Result != mir.InvalidValue {
+			outName = g.valueName(c.Result)
+			g.emitLine(fmt.Sprintf("%s =l %s %d", outName, g.allocOp(align), size))
+			g.valueTypes[c.Result] = c.Type
+		} else {
+			outName = g.stackAlloc(size, align)
+		}
+		args = append([]callArg{{name: outName, typ: "l", sem: types.NewReference(c.Type)}}, args...)
+		argParts := []string{}
+		for _, arg := range args {
+			argParts = append(argParts, fmt.Sprintf("%s %s", arg.typ, arg.name))
+		}
+		g.emitLine(fmt.Sprintf("call %s(%s)", fnPtr, strings.Join(argParts, ", ")))
+		return
+	}
+	if resType, ok := g.resultType(c.Type); ok {
+		size := g.layout.SizeOf(resType)
+		if size <= 0 {
+			g.reportUnsupported("result call_indirect return", &c.Location)
+			return
+		}
+		align := g.layout.AlignOf(resType)
+		outName := ""
+		if c.Result != mir.InvalidValue {
+			outName = g.valueName(c.Result)
+			g.emitLine(fmt.Sprintf("%s =l %s %d", outName, g.allocOp(align), size))
+			g.valueTypes[c.Result] = c.Type
+		} else {
+			outName = g.stackAlloc(size, align)
+		}
+		args = append([]callArg{{name: outName, typ: "l", sem: types.NewReference(c.Type)}}, args...)
+		argParts := []string{}
+		for _, arg := range args {
+			argParts = append(argParts, fmt.Sprintf("%s %s", arg.typ, arg.name))
+		}
+		g.emitLine(fmt.Sprintf("call %s(%s)", fnPtr, strings.Join(argParts, ", ")))
+		return
+	}
+
+	argParts := []string{}
+	for _, arg := range args {
+		argParts = append(argParts, fmt.Sprintf("%s %s", arg.typ, arg.name))
+	}
+
+	result := ""
+	if c.Result != mir.InvalidValue {
+		retType, err := g.qbeType(c.Type)
+		if err != nil {
+			g.reportError(err.Error(), &c.Location)
+			return
+		}
+		result = fmt.Sprintf("%s =%s ", g.valueName(c.Result), retType)
+		g.valueTypes[c.Result] = c.Type
+	}
+
+	g.emitLine(fmt.Sprintf("%scall %s(%s)", result, fnPtr, strings.Join(argParts, ", ")))
+}
+
 func (g *Generator) emitMapGet(m *mir.MapGet) {
 	if m == nil {
 		return
@@ -1027,6 +1117,13 @@ func (g *Generator) constValue(typ types.SemType, value string) (string, error) 
 		}
 		return val, nil
 	}
+	if fn, ok := typ.(*types.FunctionType); ok {
+		name, err := g.resolveFuncSymbol(value, fn, nil)
+		if err != nil {
+			return "", err
+		}
+		return "$" + name, nil
+	}
 
 	if _, ok := typ.(*types.ReferenceType); ok {
 		val, err := g.normalizeInt(value)
@@ -1262,6 +1359,9 @@ func (g *Generator) loadOp(typ types.SemType) (string, error) {
 	if _, ok := typ.(*types.EnumType); ok {
 		return "loadw", nil
 	}
+	if _, ok := typ.(*types.FunctionType); ok {
+		return "loadl", nil
+	}
 	if arr, ok := typ.(*types.ArrayType); ok && arr.Length < 0 {
 		return "loadl", nil
 	}
@@ -1296,6 +1396,9 @@ func (g *Generator) storeOp(typ types.SemType) (string, error) {
 	}
 	if _, ok := typ.(*types.EnumType); ok {
 		return "storew", nil
+	}
+	if _, ok := typ.(*types.FunctionType); ok {
+		return "storel", nil
 	}
 	if arr, ok := typ.(*types.ArrayType); ok && arr.Length < 0 {
 		return "storel", nil
@@ -1338,6 +1441,8 @@ func (g *Generator) qbeType(typ types.SemType) (string, error) {
 
 	switch typ := typ.(type) {
 	case *types.ReferenceType:
+		return "l", nil
+	case *types.FunctionType:
 		return "l", nil
 	case *types.EnumType:
 		return "w", nil
@@ -1416,6 +1521,62 @@ func (g *Generator) resolveCallTarget(target string, args []callArg, loc *source
 	}
 
 	return g.qbeFuncName(target, g.moduleImportPath()), args, nil
+}
+
+func (g *Generator) resolveFuncSymbol(target string, fnType *types.FunctionType, loc *source.Location) (string, error) {
+	if target == "" {
+		return "", fmt.Errorf("qbe: invalid function symbol")
+	}
+	if strings.HasPrefix(target, "ferret_") {
+		return target, nil
+	}
+
+	if strings.Contains(target, "::") {
+		parts := strings.Split(target, "::")
+		moduleAlias := strings.Join(parts[:len(parts)-1], "::")
+		funcName := parts[len(parts)-1]
+		if moduleAlias == "" || funcName == "" {
+			return "", fmt.Errorf("qbe: invalid function symbol %q", target)
+		}
+
+		importPath := ""
+		if g.mod != nil && g.mod.ImportAliasMap != nil {
+			importPath = g.mod.ImportAliasMap[moduleAlias]
+		}
+		if importPath == "" {
+			return "", fmt.Errorf("qbe: unknown module alias %q", moduleAlias)
+		}
+
+		if importPath == "std/io" && (funcName == "Print" || funcName == "Println") {
+			return g.resolvePrintFuncValue(funcName, fnType, loc)
+		}
+
+		if g.ctx != nil {
+			if imported, ok := g.ctx.GetModule(importPath); ok && imported.ModuleScope != nil {
+				if sym, ok := imported.ModuleScope.GetSymbol(funcName); ok && sym.IsNative && sym.NativeName != "" {
+					return sym.NativeName, nil
+				}
+			}
+		}
+
+		return g.qbeFuncName(funcName, importPath), nil
+	}
+
+	return g.qbeFuncName(target, g.moduleImportPath()), nil
+}
+
+func (g *Generator) resolvePrintFuncValue(funcName string, fnType *types.FunctionType, loc *source.Location) (string, error) {
+	if fnType == nil {
+		return "", fmt.Errorf("qbe: %s value requires function type", funcName)
+	}
+	if len(fnType.Params) != 1 {
+		return "", fmt.Errorf("qbe: %s value expects exactly one argument", funcName)
+	}
+	name, err := g.printFunctionName(funcName, fnType.Params[0].Type)
+	if err != nil {
+		return "", err
+	}
+	return name, nil
 }
 
 func (g *Generator) resolvePrint(funcName string, args []callArg, loc *source.Location) (string, []callArg, error) {

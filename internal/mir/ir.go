@@ -38,6 +38,7 @@ type Param struct {
 	ID       ValueID
 	Name     string
 	Type     types.SemType
+	IsEnv    bool
 	Location source.Location
 }
 

@@ -635,7 +635,218 @@ func (g *Generator) lowerFuncLit(expr *ast.FuncLit) *hir.FuncLit {
 	g.withScope(expr.Scope, func() {
 		hirLit.Body = g.lowerBlock(expr.Body)
 	})
+	hirLit.Captures = g.collectFuncLitCaptures(hirLit.Body, expr.Scope)
 	return hirLit
+}
+
+func (g *Generator) collectFuncLitCaptures(body *hir.Block, scope ast.SymbolTable) []*hir.Ident {
+	if body == nil || scope == nil {
+		return nil
+	}
+	litScope, ok := scope.(*table.SymbolTable)
+	if !ok || litScope == nil {
+		return nil
+	}
+
+	seen := make(map[*symbols.Symbol]struct{})
+	captures := make([]*hir.Ident, 0)
+
+	var visitExpr func(hir.Expr)
+	var visitNode func(hir.Node)
+
+	visitExpr = func(expr hir.Expr) {
+		if expr == nil {
+			return
+		}
+		switch e := expr.(type) {
+		case *hir.Ident:
+			if e.Symbol == nil && e.Name != "" {
+				if sym, ok := litScope.Lookup(e.Name); ok {
+					e.Symbol = sym
+				}
+			}
+			if g.shouldCaptureSymbol(e, litScope) {
+				if _, ok := seen[e.Symbol]; !ok {
+					seen[e.Symbol] = struct{}{}
+					captures = append(captures, e)
+				}
+			}
+		case *hir.FuncLit:
+			for _, cap := range e.Captures {
+				if cap == nil {
+					continue
+				}
+				if cap.Symbol == nil && cap.Name != "" {
+					if sym, ok := litScope.Lookup(cap.Name); ok {
+						cap.Symbol = sym
+					}
+				}
+				if g.shouldCaptureSymbol(cap, litScope) {
+					if _, ok := seen[cap.Symbol]; !ok {
+						seen[cap.Symbol] = struct{}{}
+						captures = append(captures, cap)
+					}
+				}
+			}
+			return
+		case *hir.BinaryExpr:
+			visitExpr(e.X)
+			visitExpr(e.Y)
+		case *hir.UnaryExpr:
+			visitExpr(e.X)
+		case *hir.PrefixExpr:
+			visitExpr(e.X)
+		case *hir.PostfixExpr:
+			visitExpr(e.X)
+		case *hir.CallExpr:
+			visitExpr(e.Fun)
+			for _, arg := range e.Args {
+				visitExpr(arg)
+			}
+			if e.Catch != nil {
+				if e.Catch.Handler != nil {
+					for _, node := range e.Catch.Handler.Nodes {
+						visitNode(node)
+					}
+				}
+				visitExpr(e.Catch.Fallback)
+			}
+		case *hir.SelectorExpr:
+			visitExpr(e.X)
+		case *hir.ScopeResolutionExpr:
+			visitExpr(e.X)
+		case *hir.IndexExpr:
+			visitExpr(e.X)
+			visitExpr(e.Index)
+		case *hir.CastExpr:
+			visitExpr(e.X)
+		case *hir.ParenExpr:
+			visitExpr(e.X)
+		case *hir.CompositeLit:
+			for _, elt := range e.Elts {
+				visitExpr(elt)
+			}
+		case *hir.KeyValueExpr:
+			visitExpr(e.Value)
+		case *hir.OptionalSome:
+			visitExpr(e.Value)
+		case *hir.OptionalIsSome:
+			visitExpr(e.Value)
+		case *hir.OptionalIsNone:
+			visitExpr(e.Value)
+		case *hir.OptionalUnwrap:
+			visitExpr(e.Value)
+			visitExpr(e.Default)
+		case *hir.ResultOk:
+			visitExpr(e.Value)
+		case *hir.ResultErr:
+			visitExpr(e.Value)
+		case *hir.ResultUnwrap:
+			visitExpr(e.Value)
+			if e.Catch != nil {
+				if e.Catch.Handler != nil {
+					for _, node := range e.Catch.Handler.Nodes {
+						visitNode(node)
+					}
+				}
+				visitExpr(e.Catch.Fallback)
+			}
+		case *hir.CoalescingExpr:
+			visitExpr(e.Cond)
+			visitExpr(e.Default)
+		case *hir.RangeExpr:
+			visitExpr(e.Start)
+			visitExpr(e.End)
+			visitExpr(e.Incr)
+		case *hir.ArrayLenExpr:
+			visitExpr(e.X)
+		case *hir.MapIterInitExpr:
+			visitExpr(e.Map)
+		case *hir.MapIterNextExpr:
+			visitExpr(e.Map)
+			visitExpr(e.Iter)
+		}
+	}
+
+	visitNode = func(node hir.Node) {
+		if node == nil {
+			return
+		}
+		switch n := node.(type) {
+		case *hir.Block:
+			for _, stmt := range n.Nodes {
+				visitNode(stmt)
+			}
+		case *hir.DeclStmt:
+			visitNode(n.Decl)
+		case *hir.VarDecl:
+			for _, item := range n.Decls {
+				visitExpr(item.Value)
+			}
+		case *hir.ConstDecl:
+			for _, item := range n.Decls {
+				visitExpr(item.Value)
+			}
+		case *hir.AssignStmt:
+			visitExpr(n.Lhs)
+			visitExpr(n.Rhs)
+		case *hir.ReturnStmt:
+			visitExpr(n.Result)
+		case *hir.ExprStmt:
+			visitExpr(n.X)
+		case *hir.IfStmt:
+			visitExpr(n.Cond)
+			visitNode(n.Body)
+			visitNode(n.Else)
+		case *hir.ForStmt:
+			visitNode(n.Iterator)
+			visitExpr(n.Range)
+			visitNode(n.Body)
+		case *hir.WhileStmt:
+			visitExpr(n.Cond)
+			visitNode(n.Body)
+		case *hir.MatchStmt:
+			visitExpr(n.Expr)
+			for _, clause := range n.Cases {
+				if clause.Pattern != nil {
+					visitExpr(clause.Pattern)
+				}
+				visitNode(clause.Body)
+			}
+		case *hir.DeferStmt:
+			visitExpr(n.Call)
+		}
+	}
+
+	visitNode(body)
+	return captures
+}
+
+func (g *Generator) shouldCaptureSymbol(ident *hir.Ident, litScope *table.SymbolTable) bool {
+	if ident == nil || ident.Symbol == nil || litScope == nil {
+		return false
+	}
+	sym := ident.Symbol
+	switch sym.Kind {
+	case symbols.SymbolFunction, symbols.SymbolType:
+		return false
+	}
+	if g.mod != nil && g.mod.ModuleScope != nil && sym.DeclaredScope == g.mod.ModuleScope {
+		return false
+	}
+	if sym.DeclaredScope == nil {
+		return false
+	}
+	declScope, ok := sym.DeclaredScope.(*table.SymbolTable)
+	if !ok || declScope == nil {
+		return false
+	}
+	for scope := declScope; scope != nil; scope = scope.Parent() {
+		if scope == litScope {
+			return false
+		}
+	}
+	return true
 }
 
 func (g *Generator) lowerIdentExpr(expr *ast.IdentifierExpr) *hir.Ident {
