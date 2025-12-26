@@ -28,6 +28,7 @@ type functionBuilder struct {
 	retType      types.SemType
 	closureEnv   mir.ValueID
 	captures     map[*symbols.Symbol]captureInfo
+	boxed        map[*symbols.Symbol]mir.ValueID
 }
 
 func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
@@ -42,6 +43,7 @@ func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
 		retParam:     mir.InvalidValue,
 		closureEnv:   mir.InvalidValue,
 		captures:     nil,
+		boxed:        make(map[*symbols.Symbol]mir.ValueID),
 	}
 }
 
@@ -1276,7 +1278,11 @@ func (b *functionBuilder) addrForIdent(ident *hir.Ident) mir.ValueID {
 	if ident.Symbol != nil {
 		if b.captures != nil {
 			if cap, ok := b.captures[ident.Symbol]; ok && b.closureEnv != mir.InvalidValue {
-				return b.emitPtrAdd(b.closureEnv, cap.offset, cap.typ, ident.Location)
+				fieldAddr := b.emitPtrAdd(b.closureEnv, cap.offset, cap.typ, ident.Location)
+				if cap.byRef {
+					return b.emitLoad(fieldAddr, cap.typ, ident.Location)
+				}
+				return fieldAddr
 			}
 		}
 		if addr, ok := b.slots[ident.Symbol]; ok {
@@ -2216,6 +2222,14 @@ func (b *functionBuilder) makeClosureValue(name string, fnType types.SemType, en
 			continue
 		}
 		fieldAddr := b.emitPtrAdd(env, cap.offset, cap.typ, loc)
+		if cap.byRef {
+			addr := b.boxCapturedIdent(cap.ident)
+			if addr == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+			b.emitStore(fieldAddr, addr, loc)
+			continue
+		}
 		val := b.loadIdent(cap.ident)
 		if val == mir.InvalidValue {
 			return mir.InvalidValue
@@ -2224,6 +2238,55 @@ func (b *functionBuilder) makeClosureValue(name string, fnType types.SemType, en
 	}
 
 	return env
+}
+
+func (b *functionBuilder) boxCapturedIdent(ident *hir.Ident) mir.ValueID {
+	if ident == nil || ident.Symbol == nil {
+		return mir.InvalidValue
+	}
+
+	if addr, ok := b.boxed[ident.Symbol]; ok {
+		return addr
+	}
+
+	typ := ident.Type
+	if typ == nil {
+		b.reportUnsupported("capture box type", &ident.Location)
+		return mir.InvalidValue
+	}
+
+	size := b.gen.layout.SizeOf(typ)
+	if size <= 0 {
+		b.reportUnsupported("capture box size", &ident.Location)
+		return mir.InvalidValue
+	}
+
+	sizeVal := b.emitConst(types.TypeU64, strconv.Itoa(size), ident.Location)
+	box := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   box,
+		Target:   "ferret_alloc",
+		Args:     []mir.ValueID{sizeVal},
+		Type:     types.NewReference(typ),
+		Location: ident.Location,
+	})
+	b.ptrElem[box] = typ
+
+	var val mir.ValueID
+	if addr, ok := b.slots[ident.Symbol]; ok {
+		val = b.emitLoad(addr, typ, ident.Location)
+	} else if ident.Symbol.Kind == symbols.SymbolParameter || ident.Symbol.Kind == symbols.SymbolReceiver {
+		if param, ok := b.paramsByName[ident.Name]; ok {
+			val = param
+		}
+	}
+	if val != mir.InvalidValue {
+		b.emitStore(box, val, ident.Location)
+	}
+
+	b.boxed[ident.Symbol] = box
+	b.slots[ident.Symbol] = box
+	return box
 }
 
 func (b *functionBuilder) methodCallTarget(expr *hir.SelectorExpr) (string, *symbols.MethodInfo, bool) {
