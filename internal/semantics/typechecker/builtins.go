@@ -16,19 +16,17 @@ func builtinCallName(mod *context_v2.Module, expr *ast.CallExpr) (string, bool) 
 	if !ok {
 		return "", false
 	}
-	if !isBuiltinCallName(ident.Name) {
+	if mod == nil || mod.CurrentScope == nil {
 		return "", false
 	}
-	if mod != nil && mod.CurrentScope != nil {
-		if _, ok := mod.CurrentScope.Lookup(ident.Name); ok {
-			return "", false
-		}
+	sym, ok := mod.CurrentScope.Lookup(ident.Name)
+	if !ok || sym == nil || !sym.IsBuiltin {
+		return "", false
+	}
+	if sym.BuiltinName != "" {
+		return sym.BuiltinName, true
 	}
 	return ident.Name, true
-}
-
-func isBuiltinCallName(name string) bool {
-	return name == "len" || name == "append"
 }
 
 func inferBuiltinCallType(name string) types.SemType {

@@ -58,6 +58,7 @@ type DeclItem struct {
 // VarDecl represents a variable declaration (let keyword)
 type VarDecl struct {
 	Decls []DeclItem
+	Doc   *CommentGroup
 	source.Location
 }
 
@@ -69,6 +70,7 @@ func (v *VarDecl) Loc() *source.Location { return &v.Location }
 // ConstDecl represents a constant declaration (const keyword)
 type ConstDecl struct {
 	Decls []DeclItem
+	Doc   *CommentGroup
 	source.Location
 }
 
@@ -93,6 +95,7 @@ func (a *AssignStmt) Loc() *source.Location { return &a.Location }
 type TypeDecl struct {
 	Name *IdentifierExpr // type name
 	Type TypeNode        // the type being defined
+	Doc  *CommentGroup
 	source.Location
 }
 

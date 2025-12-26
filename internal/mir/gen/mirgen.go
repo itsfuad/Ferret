@@ -82,7 +82,7 @@ func (g *Generator) GenerateModule(hirMod *hir.Module) *mir.Module {
 }
 
 func (g *Generator) lowerFuncDecl(decl *hir.FuncDecl) *mir.Function {
-	if decl == nil || decl.Name == nil {
+	if decl == nil || decl.Name == nil || decl.Body == nil {
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func (g *Generator) lowerFuncDecl(decl *hir.FuncDecl) *mir.Function {
 }
 
 func (g *Generator) lowerMethodDecl(decl *hir.MethodDecl) *mir.Function {
-	if decl == nil || decl.Name == nil {
+	if decl == nil || decl.Name == nil || decl.Body == nil {
 		return nil
 	}
 

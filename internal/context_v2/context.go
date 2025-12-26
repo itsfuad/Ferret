@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"compiler/internal/builtins"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/phase"
@@ -240,8 +239,7 @@ func New(config *Config, debug bool) *CompilerContext {
 		ctx.loadBuiltinModules()
 	}
 
-	// Register native builtin functions
-	ctx.registerNativeBuiltins()
+	// Native builtin modules are now declared in stdlib files via @extern.
 
 	return ctx
 }
@@ -319,12 +317,7 @@ func registerBuiltins(universe *table.SymbolTable) {
 	})
 }
 
-// registerNativeBuiltins registers native builtin modules (implemented in Go/C)
-func (ctx *CompilerContext) registerNativeBuiltins() {
-	builtins.RegisterAllBuiltins(ctx)
-}
-
-// GetUniverse returns the universe scope (implements builtins.ModuleCreator)
+// GetUniverse returns the universe scope.
 func (ctx *CompilerContext) GetUniverse() *table.SymbolTable {
 	return ctx.Universe
 }
@@ -440,7 +433,7 @@ func (ctx *CompilerContext) ImportPathToFilePath(importPath string) (string, Mod
 	// First check if it's a native module (registered in Go)
 	if ctx.HasModule(importPath) {
 		mod, _ := ctx.GetModule(importPath)
-		if mod.Type == ModuleBuiltin {
+		if mod.Type == ModuleBuiltin && importPath != GlobalModuleImport {
 			// Native module - return a virtual path
 			return "native://" + importPath, ModuleBuiltin, nil
 		}
@@ -475,9 +468,8 @@ func (ctx *CompilerContext) isRemoteImport(importPath string) bool {
 		strings.HasPrefix(importPath, "bitbucket.org/")
 }
 
-// AddModule registers a module in the context
-// Accepts any to support both *Module and *builtins.NativeModule
-func (ctx *CompilerContext) AddModule(importPath string, module any) {
+// AddModule registers a module in the context.
+func (ctx *CompilerContext) AddModule(importPath string, module *Module) {
 	if module == nil {
 		panic(fmt.Sprintf("cannot add nil module for %q", importPath))
 	}
@@ -490,26 +482,7 @@ func (ctx *CompilerContext) AddModule(importPath string, module any) {
 		return
 	}
 
-	// Convert any to *Module
-	var mod *Module
-	switch m := module.(type) {
-	case *Module:
-		mod = m
-	case *builtins.NativeModule:
-		// Convert NativeModule to Module
-		mod = &Module{
-			ImportPath:     importPath,
-			Type:           ModuleBuiltin,
-			ModuleScope:    m.ModuleScope,
-			CurrentScope:   m.CurrentScope,
-			Imports:        make(map[string]*Import),
-			ImportAliasMap: make(map[string]string),
-			Artifacts:      make(map[string]any),
-		}
-	default:
-		panic(fmt.Sprintf("unsupported module type: %T", module))
-	}
-
+	mod := module
 	if mod.Artifacts == nil {
 		mod.Artifacts = make(map[string]any)
 	}

@@ -6,6 +6,7 @@ import (
 	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"fmt"
+	"strings"
 )
 
 // The Parser builds an AST from a token stream.
@@ -14,11 +15,13 @@ import (
 // Parser holds temporary state during parsing of a single file.
 // This is created on-the-fly, not stored persistently.
 type Parser struct {
-	tokens        []tokens.Token
-	current       int // current position in tokens
-	diagnostics   *diagnostics.DiagnosticBag
-	filepath      string
-	seenNonImport bool // Track if we've seen any non-import declaration
+	tokens             []tokens.Token
+	current            int // current position in tokens
+	diagnostics        *diagnostics.DiagnosticBag
+	filepath           string
+	seenNonImport      bool // Track if we've seen any non-import declaration
+	lastNonCommentLine int
+	hasLastNonComment  bool
 }
 
 // Parse is the internal parsing function called by the pipeline.
@@ -54,6 +57,10 @@ func (p *Parser) parseModule() *ast.Module {
 
 // parseTopLevel parses a single top-level declaration
 func (p *Parser) parseTopLevel() ast.Node {
+	doc := p.takeDocComment()
+	if p.match(tokens.EOF_TOKEN) {
+		return nil
+	}
 	tok := p.peek()
 
 	switch tok.Kind {
@@ -70,13 +77,19 @@ func (p *Parser) parseTopLevel() ast.Node {
 		return imp
 	case tokens.LET_TOKEN:
 		p.seenNonImport = true
-		return p.parseVarDecl()
+		decl := p.parseVarDecl()
+		p.attachDoc(decl, doc)
+		return decl
 	case tokens.CONST_TOKEN:
 		p.seenNonImport = true
-		return p.parseConstDecl()
+		decl := p.parseConstDecl()
+		p.attachDoc(decl, doc)
+		return decl
 	case tokens.TYPE_TOKEN:
 		p.seenNonImport = true
-		return p.parseTypeDecl()
+		decl := p.parseTypeDecl()
+		p.attachDoc(decl, doc)
+		return decl
 	case tokens.IF_TOKEN:
 		p.seenNonImport = true
 		return p.parseIfStmt()
@@ -88,7 +101,9 @@ func (p *Parser) parseTopLevel() ast.Node {
 		return p.parseWhileStmt()
 	case tokens.FUNCTION_TOKEN:
 		p.seenNonImport = true
-		return p.parseFuncDecl()
+		node := p.parseFuncDecl()
+		p.attachDoc(node, doc)
+		return node
 	case tokens.IDENTIFIER_TOKEN:
 		p.seenNonImport = true
 		return p.parseExprOrAssign()
@@ -124,6 +139,70 @@ func (p *Parser) parseAnnonType() *ast.TypeDecl {
 		Name:     &ast.IdentifierExpr{Name: "<anonymous>"},
 		Type:     typ,
 		Location: *source.NewLocation(&p.filepath, typ.Loc().Start, typ.Loc().End),
+	}
+}
+
+func (p *Parser) takeDocComment() *ast.CommentGroup {
+	group := p.collectCommentGroup()
+	if group == nil {
+		return nil
+	}
+	next := p.peek()
+	if next.Kind == tokens.EOF_TOKEN {
+		return nil
+	}
+	if next.Start.Line > group.Location.End.Line+1 {
+		return nil
+	}
+	return group
+}
+
+func (p *Parser) collectCommentGroup() *ast.CommentGroup {
+	comments := make([]tokens.Token, 0, 1)
+	for p.matchRaw(tokens.COMMENT_TOKEN) {
+		tok := p.advanceRaw()
+		if len(comments) > 0 {
+			prev := comments[len(comments)-1]
+			if tok.Start.Line > prev.End.Line+1 {
+				comments = comments[:0]
+			}
+		}
+		comments = append(comments, tok)
+	}
+	if len(comments) == 0 {
+		return nil
+	}
+	if p.hasLastNonComment && comments[0].Start.Line == p.lastNonCommentLine {
+		return nil
+	}
+	text := joinCommentText(comments)
+	loc := source.NewLocation(&p.filepath, &comments[0].Start, &comments[len(comments)-1].End)
+	return &ast.CommentGroup{Text: text, Location: *loc}
+}
+
+func joinCommentText(comments []tokens.Token) string {
+	parts := make([]string, len(comments))
+	for i, comment := range comments {
+		parts[i] = comment.Value
+	}
+	return strings.Join(parts, "\n")
+}
+
+func (p *Parser) attachDoc(node ast.Node, doc *ast.CommentGroup) {
+	if doc == nil || node == nil {
+		return
+	}
+	switch n := node.(type) {
+	case *ast.VarDecl:
+		n.Doc = doc
+	case *ast.ConstDecl:
+		n.Doc = doc
+	case *ast.TypeDecl:
+		n.Doc = doc
+	case *ast.FuncDecl:
+		n.Doc = doc
+	case *ast.MethodDecl:
+		n.Doc = doc
 	}
 }
 
@@ -166,13 +245,25 @@ func (p *Parser) parseImport() *ast.ImportStmt {
 
 // parseStmt parses a statement
 func (p *Parser) parseStmt() ast.Node {
+	doc := p.takeDocComment()
+	if p.match(tokens.EOF_TOKEN) {
+		return nil
+	}
 	tok := p.peek()
 
 	switch tok.Kind {
 	case tokens.LET_TOKEN:
-		return p.parseVarDecl()
+		decl := p.parseVarDecl()
+		p.attachDoc(decl, doc)
+		return decl
 	case tokens.CONST_TOKEN:
-		return p.parseConstDecl()
+		decl := p.parseConstDecl()
+		p.attachDoc(decl, doc)
+		return decl
+	case tokens.TYPE_TOKEN:
+		decl := p.parseTypeDecl()
+		p.attachDoc(decl, doc)
+		return decl
 	case tokens.RETURN_TOKEN:
 		return p.parseReturnStmt()
 	case tokens.BREAK_TOKEN:
@@ -189,6 +280,10 @@ func (p *Parser) parseStmt() ast.Node {
 		return p.parseMatchStmt()
 	case tokens.OPEN_CURLY:
 		return p.parseBlock()
+	case tokens.FUNCTION_TOKEN:
+		node := p.parseFuncDecl()
+		p.attachDoc(node, doc)
+		return node
 	default:
 		return p.parseExprOrAssign()
 	}
@@ -953,14 +1048,19 @@ func (p *Parser) isAtEnd() bool {
 	if p.current >= len(p.tokens) {
 		return true
 	}
-	return p.tokens[p.current].Kind == tokens.EOF_TOKEN
+	idx := p.nextNonCommentIndex(p.current)
+	if idx >= len(p.tokens) {
+		return true
+	}
+	return p.tokens[idx].Kind == tokens.EOF_TOKEN
 }
 
 func (p *Parser) peek() tokens.Token {
-	if p.current >= len(p.tokens) {
+	idx := p.nextNonCommentIndex(p.current)
+	if idx >= len(p.tokens) {
 		return p.tokens[len(p.tokens)-1]
 	}
-	return p.tokens[p.current]
+	return p.tokens[idx]
 }
 
 func (p *Parser) previous() tokens.Token {
@@ -968,17 +1068,58 @@ func (p *Parser) previous() tokens.Token {
 }
 
 func (p *Parser) next() tokens.Token {
-	if p.current+1 >= len(p.tokens) {
+	idx := p.nextNonCommentIndex(p.current)
+	if idx >= len(p.tokens) {
 		return p.tokens[len(p.tokens)-1]
 	}
-	return p.tokens[p.current+1]
+	idx = p.nextNonCommentIndex(idx + 1)
+	if idx >= len(p.tokens) {
+		return p.tokens[len(p.tokens)-1]
+	}
+	return p.tokens[idx]
 }
 
 func (p *Parser) advance() tokens.Token {
-	if !p.isAtEnd() {
-		p.current++
+	idx := p.nextNonCommentIndex(p.current)
+	if idx >= len(p.tokens) {
+		return p.tokens[len(p.tokens)-1]
 	}
-	return p.previous()
+	p.current = idx + 1
+	tok := p.tokens[idx]
+	if tok.Kind != tokens.COMMENT_TOKEN {
+		p.lastNonCommentLine = tok.End.Line
+		p.hasLastNonComment = true
+	}
+	return tok
+}
+
+func (p *Parser) peekRaw() tokens.Token {
+	if p.current >= len(p.tokens) {
+		return p.tokens[len(p.tokens)-1]
+	}
+	return p.tokens[p.current]
+}
+
+func (p *Parser) advanceRaw() tokens.Token {
+	if p.current >= len(p.tokens) {
+		return p.tokens[len(p.tokens)-1]
+	}
+	p.current++
+	tok := p.tokens[p.current-1]
+	if tok.Kind != tokens.COMMENT_TOKEN {
+		p.lastNonCommentLine = tok.End.Line
+		p.hasLastNonComment = true
+	}
+	return tok
+}
+
+func (p *Parser) matchRaw(kinds ...tokens.TOKEN) bool {
+	for _, kind := range kinds {
+		if p.peekRaw().Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Parser) match(kinds ...tokens.TOKEN) bool {
@@ -1035,6 +1176,14 @@ func (p *Parser) error(msg string) {
 			WithCode(diagnostics.ErrUnexpectedToken).
 			WithPrimaryLabel(loc, ""),
 	)
+}
+
+func (p *Parser) nextNonCommentIndex(start int) int {
+	idx := start
+	for idx < len(p.tokens) && p.tokens[idx].Kind == tokens.COMMENT_TOKEN {
+		idx++
+	}
+	return idx
 }
 
 // checkTrailing checks if the current position is at a closing delimiter

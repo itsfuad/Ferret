@@ -1,3 +1,5 @@
+import "std/io";
+
 let maybeInt: i32? = 100033333333339999;
 
 let max32int := 2147483648;
@@ -11,3 +13,9 @@ let max32int := 2147483648;
 // for let i in 0..10 {
 //     sring = sring + "a";
 // }
+// 
+fn main() {
+    io::Println("Who are you?");
+    let name := io::Read() catch "";
+    io::Println("Hello " + name); 
+}

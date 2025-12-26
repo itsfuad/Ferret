@@ -12,6 +12,15 @@
 
 ## Next Work Items
 ### Incremental plan (easy -> hard, dependency-ordered)
+- [x] Symbol docs + externs via comments
+  - [x] Lexer emits comment tokens (line/block) and parser groups leading comments (Go-style) into doc blocks.
+  - [x] Attach doc blocks only to symbol declarations (let/const/type/fn/method); discard unused comments.
+  - [x] Skip non-doc comments during parsing so inline comments don't break expressions.
+  - [x] Restrict `@extern` usage to standard library (ferret_libs) and use doc blocks to mark extern symbols.
+- [ ] Standardize ferret_libs
+  - [x] Add `ferret_libs/global.fer` prelude with builtin declarations (e.g., len/append) using `@extern`.
+  - [x] Ensure global prelude loads without import and is visible to LSP/symbols.
+  - [ ] Audit stdlib declarations for extern/implementation consistency.
 - [x] Builtin primitive coverage (foundation)
   - [x] Ensure full builtin type support in MIR + QBE (i8..i256/u8..u256, f32..f256, bool, str, byte).
   - [x] Show .0 in floating point numbers
@@ -42,6 +51,6 @@
   - [x] MIR lowering for result/catch paths.
 - [ ] Backend targets
   - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).
-  - [ ] MIR -> target IR/codegen (native; JS later).
+  - [ ] MIR -> (JS later).
   - [x] Decide runtime behavior for dynamic array OOB (panic via ferret_panic).
   - [x] Add non-PIE build flags for QBE outputs (Linux/macOS/OpenBSD).

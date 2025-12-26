@@ -150,6 +150,12 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 		colors.PURPLE.Printf("  ✓ %s\n", importPath)
 	}
 
+	if importPath != context_v2.GlobalModuleImport && p.ctx.HasModule(context_v2.GlobalModuleImport) {
+		if err := p.ctx.AddDependency(importPath, context_v2.GlobalModuleImport); err != nil {
+			p.ctx.ReportError(err.Error(), requestedLocation)
+		}
+	}
+
 	imports := p.extractTopLevelImports(astModule)
 
 	for _, imp := range imports {

@@ -61,8 +61,8 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 		patterns: []regexPattern{
 			//{regexp.MustCompile(`\n`), skipHandler}, // newlines
 			{regexp.MustCompile(`\s+`), skipHandler},                                     // whitespace
-			{regexp.MustCompile(`//[^\n\r]*`), skipHandler},                              // single line comments (Unicode support)
-			{regexp.MustCompile(`(?s)/\*.*?\*/`), skipHandler},                           // multi line comments (Unicode support)
+			{regexp.MustCompile(`//[^\n\r]*`), commentHandler},                           // single line comments (Unicode support)
+			{regexp.MustCompile(`(?s)/\*.*?\*/`), commentHandler},                        // multi line comments (Unicode support)
 			{regexp.MustCompile(`"[^"]*"`), stringHandler},                               // string literals (Unicode support)
 			{regexp.MustCompile(`'(?:\\x[0-9a-fA-F]{2}|\\.|[\x00-\x7F])'`), byteHandler}, // byte literals (ASCII + escapes, 8-bit)
 			{regexp.MustCompile(numeric.NumberPattern), numberHandler},                   // numbers (hex, octal, binary, float, integer)
@@ -192,6 +192,33 @@ func byteHandler(lex *Lexer, regex *regexp.Regexp) {
 	}
 
 	lex.push(tokens.NewToken(tokens.BYTE_TOKEN, parsedValue, start, end))
+}
+
+func commentHandler(lex *Lexer, regex *regexp.Regexp) {
+	match := regex.FindString(lex.remainder())
+	start := lex.Position
+	lex.advance(match)
+	end := lex.Position
+
+	text := normalizeCommentText(match)
+	lex.push(tokens.NewToken(tokens.COMMENT_TOKEN, text, start, end))
+}
+
+func normalizeCommentText(raw string) string {
+	if len(raw) < 2 {
+		return raw
+	}
+	if raw[0] == '/' && raw[1] == '/' {
+		text := raw[2:]
+		if len(text) > 0 && text[0] == ' ' {
+			text = text[1:]
+		}
+		return text
+	}
+	if len(raw) >= 4 && raw[0] == '/' && raw[1] == '*' {
+		return raw[2 : len(raw)-2]
+	}
+	return raw
 }
 
 // parseByteEscape parses escape sequences in byte literals and returns the parsed string and numeric value

@@ -56,10 +56,6 @@ void ferret_io_Print_f64(double value);
 void ferret_io_Print_f128(ferret_f128 value);
 void ferret_io_Print_f256(ferret_f256 value);
 
-// Float formatting helpers (used by C backend for multi-arg Print/Println).
-void ferret_format_f32(char* buf, size_t size, float value);
-void ferret_format_f64(char* buf, size_t size, double value);
-
 // Bool version
 void ferret_io_Println_bool(int value);  // C uses int for bool
 void ferret_io_Print_bool(int value);
@@ -81,9 +77,10 @@ void ferret_io_Print_f256_ptr(const ferret_f256* value);
 // Enum helper (tag -> variant name)
 const char* ferret_enum_to_string(const char* const* table, uint32_t count, int32_t tag);
 
-// Input functions
-int32_t ferret_io_ReadInt(char** error);
-double ferret_io_ReadFloat(char** error);
+// Input functions (result layout out-params)
+void ferret_io_ReadInt(void* out);
+void ferret_io_ReadFloat(void* out);
+void ferret_io_Read(void* out);
 
 // String concatenation helper
 // Returns a newly allocated string (caller must free)

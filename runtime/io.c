@@ -10,6 +10,24 @@
 #include <stdbool.h>
 #include "bigint.h"
 #include "io.h"
+#include "string_builder.h"
+
+static size_t ferret_align_to_size(size_t value, size_t alignment) {
+    if (alignment <= 1) {
+        return value;
+    }
+    size_t rem = value % alignment;
+    if (rem == 0) {
+        return value;
+    }
+    return value + (alignment - rem);
+}
+
+static size_t ferret_result_tag_offset(size_t ok_size, size_t ok_align, size_t err_size, size_t err_align) {
+    size_t union_align = ok_align > err_align ? ok_align : err_align;
+    size_t union_size = ferret_align_to_size(ok_size > err_size ? ok_size : err_size, union_align);
+    return union_size;
+}
 
 static void ferret_ensure_float_decimal(char* buf, size_t size) {
     if (!buf || size == 0) {
@@ -316,34 +334,103 @@ void ferret_io_Print_f256_ptr(const ferret_f256* value) {
     ferret_io_print_owned(msg, false);
 }
 
-int32_t ferret_io_ReadInt(char** error) {
-    int32_t value;
-    if (scanf("%d", &value) == 1) {
-        if (error != NULL) {
-            *error = NULL;
-        }
-        return value;
-    } else {
-        if (error != NULL) {
-            *error = strdup("Failed to read integer");
-        }
-        return 0;
+void ferret_io_ReadInt(void* out) {
+    if (out == NULL) {
+        return;
     }
+
+    int32_t value;
+    char* err = NULL;
+    if (scanf("%d", &value) != 1) {
+        err = strdup("Failed to read integer");
+    }
+
+    size_t tag_offset = ferret_result_tag_offset(sizeof(int32_t), sizeof(int32_t), sizeof(char*), sizeof(char*));
+    if (err == NULL) {
+        memcpy(out, &value, sizeof(value));
+        ((uint8_t*)out)[tag_offset] = 1;
+        return;
+    }
+
+    memcpy(out, &err, sizeof(err));
+    ((uint8_t*)out)[tag_offset] = 0;
 }
 
-double ferret_io_ReadFloat(char** error) {
-    double value;
-    if (scanf("%lf", &value) == 1) {
-        if (error != NULL) {
-            *error = NULL;
-        }
-        return value;
-    } else {
-        if (error != NULL) {
-            *error = strdup("Failed to read float");
-        }
-        return 0.0;
+void ferret_io_ReadFloat(void* out) {
+    if (out == NULL) {
+        return;
     }
+
+    double value;
+    char* err = NULL;
+    if (scanf("%lf", &value) != 1) {
+        err = strdup("Failed to read float");
+    }
+
+    size_t tag_offset = ferret_result_tag_offset(sizeof(double), sizeof(double), sizeof(char*), sizeof(char*));
+    if (err == NULL) {
+        memcpy(out, &value, sizeof(value));
+        ((uint8_t*)out)[tag_offset] = 1;
+        return;
+    }
+
+    memcpy(out, &err, sizeof(err));
+    ((uint8_t*)out)[tag_offset] = 0;
+}
+
+void ferret_io_Read(void* out) {
+    if (out == NULL) {
+        return;
+    }
+
+    char* err = NULL;
+    char* result = NULL;
+    ferret_string_builder_t* sb = ferret_string_builder_new(64);
+    if (sb == NULL) {
+        err = strdup("Failed to read string");
+    } else {
+        char buffer[256];
+        bool read_any = false;
+        while (err == NULL && fgets(buffer, sizeof(buffer), stdin) != NULL) {
+            read_any = true;
+            if (!ferret_string_builder_append(sb, buffer)) {
+                err = strdup("Failed to read string");
+                break;
+            }
+            if (strchr(buffer, '\n') != NULL) {
+                break;
+            }
+        }
+
+        if (err == NULL && !read_any) {
+            err = strdup("Failed to read string");
+        }
+
+        if (err == NULL) {
+            result = ferret_string_builder_string(sb);
+            if (result == NULL) {
+                err = strdup("Failed to read string");
+            } else {
+                size_t len = strlen(result);
+                while (len > 0 && (result[len - 1] == '\n' || result[len - 1] == '\r')) {
+                    result[len - 1] = '\0';
+                    len--;
+                }
+            }
+        }
+
+        ferret_string_builder_destroy(sb);
+    }
+
+    size_t tag_offset = ferret_result_tag_offset(sizeof(char*), sizeof(char*), sizeof(char*), sizeof(char*));
+    if (err == NULL) {
+        memcpy(out, &result, sizeof(result));
+        ((uint8_t*)out)[tag_offset] = 1;
+        return;
+    }
+
+    memcpy(out, &err, sizeof(err));
+    ((uint8_t*)out)[tag_offset] = 0;
 }
 
 // String concatenation helper

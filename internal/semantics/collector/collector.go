@@ -12,6 +12,7 @@ import (
 	"compiler/internal/utils/fs"
 	"compiler/internal/utils/numeric"
 	"fmt"
+	"strings"
 )
 
 // checkModuleLevelRestriction checks if a node is not allowed at module level and reports an error if so
@@ -350,6 +351,37 @@ func collectFuncDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2.M
 		Exported: utils.IsExported(name),
 		Decl:     decl,
 	}
+	extern := hasExternTag(decl.Doc)
+	if decl.Body == nil {
+		if !extern {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("function declarations require a body").
+					WithCode(diagnostics.ErrInvalidDeclaration).
+					WithPrimaryLabel(decl.Loc(), "add a body or mark as @extern"),
+			)
+		}
+	}
+	if extern {
+		if mod.Type != context_v2.ModuleBuiltin {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("@extern is only allowed in standard library modules").
+					WithCode(diagnostics.ErrInvalidDeclaration).
+					WithPrimaryLabel(decl.Loc(), "remove @extern"),
+			)
+		} else if decl.Body != nil {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("@extern functions cannot have a body").
+					WithCode(diagnostics.ErrInvalidDeclaration).
+					WithPrimaryLabel(decl.Body.Loc(), "remove the body"),
+			)
+		} else if mod.ImportPath == context_v2.GlobalModuleImport {
+			sym.IsBuiltin = true
+			sym.BuiltinName = name
+		} else {
+			sym.IsNative = true
+			sym.NativeName = externNativeName(mod.ImportPath, name)
+		}
+	}
 
 	mod.CurrentScope.Declare(name, sym)
 
@@ -378,6 +410,21 @@ func collectFunctionBody(ctx *context_v2.CompilerContext, mod *context_v2.Module
 			collectNode(ctx, mod, n)
 		}
 	}
+}
+
+func hasExternTag(doc *ast.CommentGroup) bool {
+	if doc == nil {
+		return false
+	}
+	return strings.Contains(doc.Text, "@extern")
+}
+
+func externNativeName(importPath, name string) string {
+	modName := importPath
+	if idx := strings.LastIndex(importPath, "/"); idx >= 0 && idx+1 < len(importPath) {
+		modName = importPath[idx+1:]
+	}
+	return fmt.Sprintf("ferret_%s_%s", modName, name)
 }
 
 // extractReceiverTypeName extracts the type name and optional module from a receiver's TypeNode.
@@ -455,6 +502,32 @@ func collectMethodDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2
 
 	methodName := decl.Name.Name
 	receiverType := decl.Receiver.Type
+
+	extern := hasExternTag(decl.Doc)
+	if decl.Body == nil {
+		if !extern {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("method declarations require a body").
+					WithCode(diagnostics.ErrInvalidDeclaration).
+					WithPrimaryLabel(decl.Loc(), "add a body or mark as @extern"),
+			)
+		}
+	}
+	if extern {
+		if mod.Type != context_v2.ModuleBuiltin {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("@extern is only allowed in standard library modules").
+					WithCode(diagnostics.ErrInvalidDeclaration).
+					WithPrimaryLabel(decl.Loc(), "remove @extern"),
+			)
+		} else if decl.Body != nil {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("@extern methods cannot have a body").
+					WithCode(diagnostics.ErrInvalidDeclaration).
+					WithPrimaryLabel(decl.Body.Loc(), "remove the body"),
+			)
+		}
+	}
 
 	// Extract receiver type name and module (if cross-module)
 	typeName, moduleAlias, isValidReceiver := extractReceiverTypeName(ctx, receiverType, decl.Receiver)

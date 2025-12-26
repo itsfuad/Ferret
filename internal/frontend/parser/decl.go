@@ -225,15 +225,34 @@ func (p *Parser) parseNamedFuncDecl(start source.Position) *ast.FuncDecl {
 	funcType := p.parseFuncType(start)
 	// Parse body
 	var body *ast.Block
+	var endPos *source.Position
 	if p.match(tokens.OPEN_CURLY) {
 		body = p.parseBlock()
+		if body != nil {
+			endPos = body.End
+		}
+	} else if p.match(tokens.SEMICOLON_TOKEN) {
+		semi := p.advance()
+		endPos = &semi.End
+	} else {
+		tok := p.peek()
+		p.diagnostics.Add(
+			diagnostics.NewError("expected function body or ';'").
+				WithCode(diagnostics.ErrUnexpectedToken).
+				WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), "add a body or ';'"),
+		)
+		if funcType != nil && funcType.Loc() != nil {
+			endPos = funcType.Loc().End
+		} else {
+			endPos = name.End
+		}
 	}
 
 	return &ast.FuncDecl{
 		Name:     name,
 		Type:     funcType,
 		Body:     body,
-		Location: *source.NewLocation(&p.filepath, &start, body.End),
+		Location: *source.NewLocation(&p.filepath, &start, endPos),
 	}
 }
 
@@ -299,13 +318,35 @@ func (p *Parser) parseMethodDecl(start source.Position, receivers []ast.Field) *
 	funcType := p.parseFuncType(start)
 
 	// Parse body
-	body := p.parseBlock()
+	var body *ast.Block
+	var endPos *source.Position
+	if p.match(tokens.OPEN_CURLY) {
+		body = p.parseBlock()
+		if body != nil {
+			endPos = body.End
+		}
+	} else if p.match(tokens.SEMICOLON_TOKEN) {
+		semi := p.advance()
+		endPos = &semi.End
+	} else {
+		tok := p.peek()
+		p.diagnostics.Add(
+			diagnostics.NewError("expected method body or ';'").
+				WithCode(diagnostics.ErrUnexpectedToken).
+				WithPrimaryLabel(source.NewLocation(&p.filepath, &tok.Start, &tok.End), "add a body or ';'"),
+		)
+		if funcType != nil && funcType.Loc() != nil {
+			endPos = funcType.Loc().End
+		} else {
+			endPos = methodName.End
+		}
+	}
 
 	return &ast.MethodDecl{
 		Receiver: &receivers[0],
 		Name:     methodName,
 		Type:     funcType,
 		Body:     body,
-		Location: *source.NewLocation(&p.filepath, &start, body.End),
+		Location: *source.NewLocation(&p.filepath, &start, endPos),
 	}
 }

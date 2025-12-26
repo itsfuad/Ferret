@@ -38,6 +38,7 @@ const (
 	NUMBER_TOKEN    TOKEN = "numeric literal"
 	STRING_TOKEN    TOKEN = "string literal"
 	BYTE_TOKEN      TOKEN = "byte literal"
+	COMMENT_TOKEN   TOKEN = "comment"
 	STRUCT_TOKEN    TOKEN = TOKEN(types.TYPE_STRUCT)
 	FUNCTION_TOKEN  TOKEN = TOKEN(types.TYPE_FUNC)
 	INTERFACE_TOKEN TOKEN = TOKEN(types.TYPE_INTERFACE)

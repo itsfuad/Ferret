@@ -3913,29 +3913,6 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		}
 	}
 
-	floatTempBuffers := make(map[int]string)
-	for i, arg := range args {
-		kind, ok := floatArgKinds[i]
-		if !ok {
-			continue
-		}
-		if _, hasTemp := optionalTempBuffers[i]; hasTemp {
-			continue
-		}
-		tempBuf := fmt.Sprintf("__float_val_%d_%d", g.counter, i)
-		floatTempBuffers[i] = tempBuf
-		g.writeIndent()
-		g.write("char %s[64];\n", tempBuf)
-		g.writeIndent()
-		if kind == "f32" {
-			g.write("ferret_format_f32(%s, sizeof(%s), ", tempBuf, tempBuf)
-		} else {
-			g.write("ferret_format_f64(%s, sizeof(%s), ", tempBuf, tempBuf)
-		}
-		g.generateExpr(arg)
-		g.write(");\n")
-	}
-
 	largeTempBuffers := make(map[int]string)
 	for i, arg := range args {
 		if !largeArgIndices[i] {
@@ -3988,8 +3965,6 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		// Check if we have a temp buffer for this optional
 		if tempBuf, hasTempBuf := optionalTempBuffers[i]; hasTempBuf {
 			// Use the pre-formatted temp buffer
-			g.write("%s", tempBuf)
-		} else if tempBuf, hasTempBuf := floatTempBuffers[i]; hasTempBuf {
 			g.write("%s", tempBuf)
 		} else if tempBuf, hasTempBuf := largeTempBuffers[i]; hasTempBuf {
 			// Use pre-formatted large primitive string

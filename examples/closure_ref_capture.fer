@@ -1,0 +1,11 @@
+import "std/io";
+
+fn main() {
+    let x := 10;
+    let f := fn() {
+        x = 42;
+    };
+    f();
+    // Value-capture default: prints 10. Ref-capture mode: prints 42.
+    io::Println(x);
+}

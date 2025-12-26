@@ -1,0 +1,11 @@
+import "std/io";
+
+fn main() {
+    io::Println("Who are you?");
+    let name := io::Read() catch e {
+        io::Println(e);
+        return;
+    };
+    let msg := "Hello, " + name;
+    io::Println(msg);
+}

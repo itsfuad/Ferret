@@ -35,6 +35,10 @@ type Symbol struct {
 	// Native function support (for builtin functions implemented in Go/C)
 	IsNative   bool   // true if this function is implemented in native code (Go/C)
 	NativeName string // C function name for code generation (e.g., "ferret_io_Println")
+
+	// Intrinsic builtin support (compiler-handled functions like len/append)
+	IsBuiltin   bool
+	BuiltinName string // Logical builtin name (e.g., "len", "append")
 }
 
 // MethodInfo stores information about a method attached to a named type

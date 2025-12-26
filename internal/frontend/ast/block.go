@@ -21,6 +21,7 @@ type FuncDecl struct {
 	Type  *FuncType // Function signature
 	Body  *Block    // Function body
 	Scope SymbolTable
+	Doc   *CommentGroup
 	source.Location
 }
 
@@ -37,6 +38,7 @@ type MethodDecl struct {
 	Type     *FuncType       // function signature (parameters and return type)
 	Body     *Block          // method body
 	Scope    SymbolTable
+	Doc      *CommentGroup
 	source.Location
 }
 

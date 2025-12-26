@@ -28,6 +28,8 @@ func (p *Pipeline) Run() error {
 		colors.CYAN.Printf("\n[Phase 1] Lex + Parse\n")
 	}
 
+	p.ensureGlobalPrelude()
+	p.processModule(context_v2.GlobalModuleImport, nil)
 	p.processModule(p.ctx.EntryModule, nil)
 	p.wg.Wait()
 
@@ -39,6 +41,7 @@ func (p *Pipeline) Run() error {
 	if err := p.runCollectorPhase(); err != nil {
 		return err
 	}
+	p.runRuntimeAudit()
 
 	if p.ctx.Config.Debug {
 		colors.CYAN.Printf("\n[Phase 3] Resolution\n")
@@ -117,4 +120,21 @@ func (p *Pipeline) Run() error {
 	}
 
 	return nil
+}
+
+func (p *Pipeline) ensureGlobalPrelude() {
+	if p.ctx == nil {
+		return
+	}
+	if p.ctx.HasModule(context_v2.GlobalModuleImport) {
+		return
+	}
+	mod := &context_v2.Module{
+		ImportPath:   context_v2.GlobalModuleImport,
+		Type:         context_v2.ModuleBuiltin,
+		ModuleScope:  p.ctx.Universe,
+		CurrentScope: p.ctx.Universe,
+		Artifacts:    make(map[string]any),
+	}
+	p.ctx.AddModule(context_v2.GlobalModuleImport, mod)
 }

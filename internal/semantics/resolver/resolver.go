@@ -445,13 +445,12 @@ func isBuiltinCallExpr(mod *context_v2.Module, expr *ast.CallExpr) bool {
 	if !ok {
 		return false
 	}
-	if ident.Name != "len" && ident.Name != "append" {
+	if mod == nil || mod.CurrentScope == nil {
 		return false
 	}
-	if mod != nil && mod.CurrentScope != nil {
-		if _, ok := mod.CurrentScope.Lookup(ident.Name); ok {
-			return false
-		}
+	sym, ok := mod.CurrentScope.Lookup(ident.Name)
+	if !ok || sym == nil || !sym.IsBuiltin {
+		return false
 	}
 	return true
 }

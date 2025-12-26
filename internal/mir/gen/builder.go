@@ -649,6 +649,17 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		if left == mir.InvalidValue || right == mir.InvalidValue {
 			return mir.InvalidValue
 		}
+		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) && b.isStringType(e.Y) {
+			result := b.gen.nextValueID()
+			b.emitInstr(&mir.Call{
+				Result:   result,
+				Target:   "ferret_io_ConcatStrings",
+				Args:     []mir.ValueID{left, right},
+				Type:     types.TypeString,
+				Location: e.Location,
+			})
+			return result
+		}
 		if e.Type != nil && !isCompareOp(e.Op.Kind) {
 			target := types.UnwrapType(e.Type)
 			if types.IsNumeric(target) {
@@ -961,12 +972,14 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	if ident, ok := expr.Fun.(*hir.Ident); ok && ident.Symbol == nil {
-		switch ident.Name {
-		case "len":
-			return b.lowerBuiltinLenCall(expr)
-		case "append":
-			return b.lowerBuiltinAppendCall(expr)
+	if ident, ok := expr.Fun.(*hir.Ident); ok {
+		if name, ok := builtinNameFromIdent(ident); ok {
+			switch name {
+			case "len":
+				return b.lowerBuiltinLenCall(expr)
+			case "append":
+				return b.lowerBuiltinAppendCall(expr)
+			}
 		}
 	}
 
@@ -1020,6 +1033,16 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 
 	b.reportUnsupported("call target", &expr.Location)
 	return mir.InvalidValue
+}
+
+func builtinNameFromIdent(ident *hir.Ident) (string, bool) {
+	if ident == nil || ident.Symbol == nil || !ident.Symbol.IsBuiltin {
+		return "", false
+	}
+	if ident.Symbol.BuiltinName != "" {
+		return ident.Symbol.BuiltinName, true
+	}
+	return ident.Name, true
 }
 
 func (b *functionBuilder) lowerBuiltinLenCall(expr *hir.CallExpr) mir.ValueID {
