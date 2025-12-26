@@ -791,6 +791,15 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
+	if ident, ok := expr.Fun.(*hir.Ident); ok && ident.Symbol == nil {
+		switch ident.Name {
+		case "len":
+			return b.lowerBuiltinLenCall(expr)
+		case "append":
+			return b.lowerBuiltinAppendCall(expr)
+		}
+	}
+
 	if selector, ok := expr.Fun.(*hir.SelectorExpr); ok {
 		if target, method, ok := b.methodCallTarget(selector); ok {
 			recv := b.methodReceiverArg(selector, method)
@@ -826,6 +835,84 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 	}
 
 	return b.emitCall(target, args, expr)
+}
+
+func (b *functionBuilder) lowerBuiltinLenCall(expr *hir.CallExpr) mir.ValueID {
+	if expr == nil || len(expr.Args) != 1 {
+		b.reportUnsupported("len argument count", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	argExpr := expr.Args[0]
+	argVal := b.lowerExpr(argExpr)
+	if argVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	if arrType := b.arrayTypeOf(argExpr); arrType != nil {
+		if arrType.Length >= 0 {
+			return b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), expr.Location)
+		}
+		return b.emitArrayLen(argVal, expr.Location)
+	}
+
+	if b.mapTypeOf(argExpr) != nil {
+		result := mir.InvalidValue
+		if expr.Type != nil && !expr.Type.Equals(types.TypeVoid) {
+			result = b.gen.nextValueID()
+		}
+		b.emitInstr(&mir.Call{
+			Result:   result,
+			Target:   "ferret_map_size",
+			Args:     []mir.ValueID{argVal},
+			Type:     types.TypeI32,
+			Location: expr.Location,
+		})
+		return result
+	}
+
+	b.reportUnsupported("len target", expr.Loc())
+	return mir.InvalidValue
+}
+
+func (b *functionBuilder) lowerBuiltinAppendCall(expr *hir.CallExpr) mir.ValueID {
+	if expr == nil || len(expr.Args) != 2 {
+		b.reportUnsupported("append argument count", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	arrExpr := expr.Args[0]
+	valExpr := expr.Args[1]
+	arrVal := b.lowerExpr(arrExpr)
+	if arrVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	value := b.lowerExpr(valExpr)
+	if value == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	arrType := b.arrayTypeOf(arrExpr)
+	if arrType == nil || arrType.Length >= 0 {
+		b.reportUnsupported("append target", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	temp := b.emitAlloca(arrType.Element, expr.Location)
+	b.emitStore(temp, value, expr.Location)
+
+	result := mir.InvalidValue
+	if expr.Type != nil && !expr.Type.Equals(types.TypeVoid) {
+		result = b.gen.nextValueID()
+	}
+	b.emitInstr(&mir.Call{
+		Result:   result,
+		Target:   "ferret_array_append",
+		Args:     []mir.ValueID{arrVal, temp},
+		Type:     types.TypeBool,
+		Location: expr.Location,
+	})
+	return result
 }
 
 func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {
@@ -1027,8 +1114,7 @@ func (b *functionBuilder) lowerCompositeLit(expr *hir.CompositeLit) mir.ValueID 
 		return out
 	case *types.ArrayType:
 		if typ.Length < 0 {
-			b.reportUnsupported("dynamic array literal", expr.Loc())
-			return mir.InvalidValue
+			return b.lowerDynamicArrayLiteral(typ, expr)
 		}
 		out := b.emitAlloca(expr.Type, expr.Location)
 		b.lowerArrayLiteralInto(out, typ, expr)
@@ -1040,6 +1126,57 @@ func (b *functionBuilder) lowerCompositeLit(expr *hir.CompositeLit) mir.ValueID 
 		b.reportUnsupported("composite literal", expr.Loc())
 		return mir.InvalidValue
 	}
+}
+
+func (b *functionBuilder) lowerDynamicArrayLiteral(arrType *types.ArrayType, lit *hir.CompositeLit) mir.ValueID {
+	if arrType == nil || lit == nil {
+		return mir.InvalidValue
+	}
+
+	elemSize := b.gen.layout.SizeOf(arrType.Element)
+	if elemSize <= 0 {
+		b.reportUnsupported("array element size", lit.Loc())
+		return mir.InvalidValue
+	}
+
+	sizeType := types.TypeI64
+	if b.gen.layout.PointerSize <= 4 {
+		sizeType = types.TypeI32
+	}
+
+	sizeVal := b.emitConst(sizeType, strconv.Itoa(elemSize), lit.Location)
+	capVal := b.emitConst(types.TypeI32, strconv.Itoa(len(lit.Elts)), lit.Location)
+
+	arr := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   arr,
+		Target:   "ferret_array_new",
+		Args:     []mir.ValueID{sizeVal, capVal},
+		Type:     lit.Type,
+		Location: lit.Location,
+	})
+
+	for _, elt := range lit.Elts {
+		if _, ok := elt.(*hir.KeyValueExpr); ok {
+			b.reportUnsupported("array key/value literal", elt.Loc())
+			return mir.InvalidValue
+		}
+		value := b.lowerExpr(elt)
+		if value == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		temp := b.emitAlloca(arrType.Element, lit.Location)
+		b.emitStore(temp, value, lit.Location)
+		b.emitInstr(&mir.Call{
+			Result:   mir.InvalidValue,
+			Target:   "ferret_array_append",
+			Args:     []mir.ValueID{arr, temp},
+			Type:     types.TypeBool,
+			Location: lit.Location,
+		})
+	}
+
+	return arr
 }
 
 func (b *functionBuilder) lowerStructLiteralInto(addr mir.ValueID, structType *types.StructType, lit *hir.CompositeLit) {
@@ -2174,6 +2311,14 @@ func (b *functionBuilder) emitBoundsCheckedIndex(indexVal, lenVal mir.ValueID, i
 	}
 
 	b.setBlock(oobBlock)
+	msg := b.emitConst(types.TypeString, "index out of bounds", loc)
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   "ferret_panic",
+		Args:     []mir.ValueID{msg},
+		Type:     types.TypeVoid,
+		Location: loc,
+	})
 	oobBlock.Term = &mir.Unreachable{Location: loc}
 
 	b.setBlock(okBlock)

@@ -28,9 +28,10 @@
   - [x] Receiver lowering + name mangling across modules.
   - [x] Cross-module symbol resolution in MIR/QBE (imports + qualified names).
 - [ ] Collections and loops over them (depends on structs/enums)
+  - [x] Builtin `len()` for arrays/maps and `append()` for dynamic arrays.
   - [ ] MIR lowering for map literals.
   - [ ] MIR lowering for map iteration (MapIterInit/MapIterNext) and map for-loops.
-  - [ ] MIR lowering for dynamic array literals in expressions.
+  - [x] MIR lowering for dynamic array literals in expressions.
 - [ ] Interfaces (depends on structs/enums + methods)
   - [ ] Interface representation (vtable layout + method dispatch).
 - [ ] Functions beyond named decls (hard; depends on structs/enums + methods)
@@ -40,4 +41,4 @@
 - [ ] Backend targets
   - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).
   - [ ] MIR -> target IR/codegen (native + wasm).
-  - [ ] Decide runtime behavior for dynamic array OOB (trap vs panic).
+  - [x] Decide runtime behavior for dynamic array OOB (panic via ferret_panic).

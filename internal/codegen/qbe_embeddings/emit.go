@@ -687,6 +687,12 @@ func (g *Generator) loadOp(typ types.SemType) (string, error) {
 	if _, ok := typ.(*types.EnumType); ok {
 		return "loadw", nil
 	}
+	if arr, ok := typ.(*types.ArrayType); ok && arr.Length < 0 {
+		return "loadl", nil
+	}
+	if _, ok := typ.(*types.MapType); ok {
+		return "loadl", nil
+	}
 	if _, ok := typ.(*types.ReferenceType); ok {
 		return "loadl", nil
 	}
@@ -715,6 +721,12 @@ func (g *Generator) storeOp(typ types.SemType) (string, error) {
 	}
 	if _, ok := typ.(*types.EnumType); ok {
 		return "storew", nil
+	}
+	if arr, ok := typ.(*types.ArrayType); ok && arr.Length < 0 {
+		return "storel", nil
+	}
+	if _, ok := typ.(*types.MapType); ok {
+		return "storel", nil
 	}
 	if _, ok := typ.(*types.ReferenceType); ok {
 		return "storel", nil

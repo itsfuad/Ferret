@@ -68,6 +68,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 		filepath.Join(runtimePath, "map.c"),            // Hash map library
 		filepath.Join(runtimePath, "bigint.c"),         // Big integer library (128/256-bit)
 		filepath.Join(runtimePath, "array.c"),          // Dynamic array library
+		filepath.Join(runtimePath, "panic.c"),          // Panic helper
 		filepath.Join(runtimePath, "string_builder.c"), // String builder library
 	}
 

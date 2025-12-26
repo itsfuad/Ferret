@@ -2329,6 +2329,11 @@ func typeFromTypeNode(typeNode ast.TypeNode) types.SemType {
 // - Checking argument count (regular and variadic functions)
 // - Validating argument types against parameter types
 func checkCallExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.CallExpr) {
+	if name, ok := builtinCallName(mod, expr); ok {
+		checkBuiltinCallExpr(ctx, mod, expr, name)
+		return
+	}
+
 	// 0. Validate the callee expression (ordering rules, selectors, nested calls, etc.)
 	checkExpr(ctx, mod, expr.Fun, types.TypeUnknown)
 

@@ -1,0 +1,6 @@
+import "std/io";
+
+fn main() {
+    let vals := [1, 2, 3];
+    io::Println(vals[1]);
+}

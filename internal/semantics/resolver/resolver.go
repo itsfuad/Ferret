@@ -213,7 +213,9 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		resolveExpr(ctx, mod, e.X)
 
 	case *ast.CallExpr:
-		resolveExpr(ctx, mod, e.Fun)
+		if !isBuiltinCallExpr(mod, e) {
+			resolveExpr(ctx, mod, e.Fun)
+		}
 		for _, arg := range e.Args {
 			resolveExpr(ctx, mod, arg)
 		}
@@ -433,4 +435,23 @@ func resolveTypeNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, ty
 	default:
 		// Nothing to resolve
 	}
+}
+
+func isBuiltinCallExpr(mod *context_v2.Module, expr *ast.CallExpr) bool {
+	if expr == nil {
+		return false
+	}
+	ident, ok := expr.Fun.(*ast.IdentifierExpr)
+	if !ok {
+		return false
+	}
+	if ident.Name != "len" && ident.Name != "append" {
+		return false
+	}
+	if mod != nil && mod.CurrentScope != nil {
+		if _, ok := mod.CurrentScope.Lookup(ident.Name); ok {
+			return false
+		}
+	}
+	return true
 }
