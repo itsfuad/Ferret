@@ -38,7 +38,7 @@
 - [ ] Functions beyond named decls (hard; depends on structs/enums + methods)
   - [ ] Function literals and closure capture strategy (if supported in AST).
 - [ ] Error flow (depends on large primitive support)
-  - [ ] MIR lowering for result/catch paths.
+  - [x] MIR lowering for result/catch paths.
 - [ ] Backend targets
   - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).
   - [ ] MIR -> target IR/codegen (native; JS later).

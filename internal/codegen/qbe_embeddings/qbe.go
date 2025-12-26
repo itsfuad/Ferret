@@ -84,6 +84,9 @@ func (g *Generator) emitFunction(fn *mir.Function) {
 	if optType, ok := g.optionalType(fn.Return); ok {
 		g.retOutType = optType
 		g.retOutParam = "%ret"
+	} else if resType, ok := g.resultType(fn.Return); ok {
+		g.retOutType = resType
+		g.retOutParam = "%ret"
 	} else {
 		retType, mainReturnsInt = g.qbeReturnType(fn.Name, fn.Return)
 	}
@@ -200,13 +203,13 @@ func (g *Generator) emitInstr(instr mir.Instr) {
 	case *mir.OptionalUnwrap:
 		g.emitOptionalUnwrap(i)
 	case *mir.ResultOk:
-		g.reportUnsupported("result_ok", i.Loc())
+		g.emitResultOk(i)
 	case *mir.ResultErr:
-		g.reportUnsupported("result_err", i.Loc())
+		g.emitResultErr(i)
 	case *mir.ResultIsOk:
-		g.reportUnsupported("result_is_ok", i.Loc())
+		g.emitResultIsOk(i)
 	case *mir.ResultUnwrap:
-		g.reportUnsupported("result_unwrap", i.Loc())
+		g.emitResultUnwrap(i)
 	default:
 		g.reportUnsupported("instruction", instr.Loc())
 	}
@@ -227,7 +230,11 @@ func (g *Generator) emitTerm(term mir.Term, mainReturnsInt bool) {
 	case *mir.Return:
 		if g.retOutType != nil {
 			if t.HasValue {
-				g.emitOptionalCopy(g.retOutParam, g.valueName(t.Value), g.retOutType, &t.Location)
+				if _, ok := g.optionalType(g.retOutType); ok {
+					g.emitOptionalCopy(g.retOutParam, g.valueName(t.Value), g.retOutType, &t.Location)
+				} else if _, ok := g.resultType(g.retOutType); ok {
+					g.emitResultCopy(g.retOutParam, g.valueName(t.Value), g.retOutType, &t.Location)
+				}
 			}
 			g.emitLine("ret")
 			return

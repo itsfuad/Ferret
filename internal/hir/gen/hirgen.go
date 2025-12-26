@@ -534,7 +534,13 @@ func (g *Generator) lowerCatchClause(clause *ast.CatchClause) *hir.CatchClause {
 	}
 	var errIdent *hir.Ident
 	if clause.ErrIdent != nil {
-		errIdent = g.identFromExpr(clause.ErrIdent)
+		if clause.Handler != nil && clause.Handler.Scope != nil {
+			g.withScope(clause.Handler.Scope, func() {
+				errIdent = g.identFromExpr(clause.ErrIdent)
+			})
+		} else {
+			errIdent = g.identFromExpr(clause.ErrIdent)
+		}
 	}
 	return &hir.CatchClause{
 		ErrIdent: errIdent,

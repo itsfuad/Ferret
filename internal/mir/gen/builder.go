@@ -619,24 +619,7 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		})
 		return id
 	case *hir.ResultUnwrap:
-		if e.Catch != nil {
-			b.reportUnsupported("result catch", e.Loc())
-			return mir.InvalidValue
-		}
-		value := b.lowerExpr(e.Value)
-		if value == mir.InvalidValue {
-			return mir.InvalidValue
-		}
-		id := b.gen.nextValueID()
-		b.emitInstr(&mir.ResultUnwrap{
-			Result:     id,
-			Value:      value,
-			Default:    mir.InvalidValue,
-			HasDefault: false,
-			Type:       e.Type,
-			Location:   e.Location,
-		})
-		return id
+		return b.lowerResultUnwrap(e)
 	case *hir.BinaryExpr:
 		left := b.lowerExpr(e.X)
 		right := b.lowerExpr(e.Y)
@@ -714,6 +697,149 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		b.reportUnsupported("expression", expr.Loc())
 		return mir.InvalidValue
 	}
+}
+
+func (b *functionBuilder) lowerResultUnwrap(expr *hir.ResultUnwrap) mir.ValueID {
+	if expr == nil {
+		return mir.InvalidValue
+	}
+
+	if expr.Catch == nil {
+		value := b.lowerExpr(expr.Value)
+		if value == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.ResultUnwrap{
+			Result:     id,
+			Value:      value,
+			Default:    mir.InvalidValue,
+			HasDefault: false,
+			Type:       expr.Type,
+			Location:   expr.Location,
+		})
+		return id
+	}
+
+	value := b.lowerExpr(expr.Value)
+	if value == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	valueType := b.exprType(expr.Value)
+	resultType, ok := types.UnwrapType(valueType).(*types.ResultType)
+	if !ok || resultType == nil {
+		b.reportUnsupported("result catch type", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	isOk := b.gen.nextValueID()
+	b.emitInstr(&mir.ResultIsOk{
+		Result:   isOk,
+		Value:    value,
+		Location: expr.Location,
+	})
+
+	okBlock := b.newBlock("result.ok", expr.Location)
+	errBlock := b.newBlock("result.err", expr.Location)
+	needMerge := expr.Catch.Fallback != nil
+	var mergeBlock *mir.Block
+	if needMerge {
+		mergeBlock = b.newBlock("result.merge", expr.Location)
+	}
+
+	b.current.Term = &mir.CondBr{
+		Cond:     isOk,
+		Then:     okBlock.ID,
+		Else:     errBlock.ID,
+		Location: expr.Location,
+	}
+
+	b.setBlock(okBlock)
+	okType := resultType.Ok
+	if okType == nil {
+		okType = expr.Type
+	}
+	okVal := b.gen.nextValueID()
+	b.emitInstr(&mir.ResultUnwrap{
+		Result:     okVal,
+		Value:      value,
+		Default:    mir.InvalidValue,
+		HasDefault: false,
+		Type:       okType,
+		Location:   expr.Location,
+	})
+	if needMerge {
+		b.branchIfNoTerm(mergeBlock.ID, expr.Location)
+	}
+
+	b.setBlock(errBlock)
+	if expr.Catch.ErrIdent != nil {
+		errType := resultType.Err
+		if errType == nil {
+			b.reportUnsupported("result catch error type", expr.Loc())
+			return mir.InvalidValue
+		}
+		errVal := b.gen.nextValueID()
+		b.emitInstr(&mir.ResultUnwrap{
+			Result:     errVal,
+			Value:      value,
+			Default:    mir.InvalidValue,
+			HasDefault: false,
+			Type:       errType,
+			Location:   expr.Location,
+		})
+		b.bindCatchIdent(expr.Catch.ErrIdent, errVal, errType)
+	}
+	if expr.Catch.Handler != nil {
+		b.lowerBlock(expr.Catch.Handler)
+	}
+
+	var fallbackVal mir.ValueID
+	errReachesMerge := false
+	if needMerge && b.current.Term == nil {
+		fallbackVal = b.lowerExpr(expr.Catch.Fallback)
+		if fallbackVal == mir.InvalidValue {
+			b.current.Term = &mir.Unreachable{Location: expr.Location}
+		} else {
+			b.branchIfNoTerm(mergeBlock.ID, expr.Location)
+			errReachesMerge = true
+		}
+	} else if b.current.Term == nil {
+		b.current.Term = &mir.Unreachable{Location: expr.Location}
+	}
+
+	if needMerge {
+		b.setBlock(mergeBlock)
+		incoming := []mir.PhiIncoming{{Pred: okBlock.ID, Value: okVal}}
+		if errReachesMerge && fallbackVal != mir.InvalidValue {
+			incoming = append(incoming, mir.PhiIncoming{Pred: errBlock.ID, Value: fallbackVal})
+		}
+		result := b.gen.nextValueID()
+		b.emitInstr(&mir.Phi{
+			Result:   result,
+			Type:     expr.Type,
+			Incoming: incoming,
+			Location: expr.Location,
+		})
+		return result
+	}
+
+	b.setBlock(okBlock)
+	return okVal
+}
+
+func (b *functionBuilder) bindCatchIdent(ident *hir.Ident, value mir.ValueID, typ types.SemType) {
+	if ident == nil || value == mir.InvalidValue || typ == nil {
+		return
+	}
+	addr := b.emitAlloca(typ, ident.Location)
+	if ident.Symbol != nil {
+		b.slots[ident.Symbol] = addr
+	} else {
+		b.tempSlots[ident] = addr
+	}
+	b.emitStore(addr, value, ident.Location)
 }
 
 func (b *functionBuilder) lowerPrefix(expr *hir.PrefixExpr) mir.ValueID {

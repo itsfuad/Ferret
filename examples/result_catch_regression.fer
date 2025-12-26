@@ -1,0 +1,26 @@
+import "std/io";
+
+fn divide(a: i32, b: i32) -> str ! i32 {
+    if b == 0 {
+        return "Division by zero"!;
+    }
+    return a + b;
+}
+
+fn main() {
+    // fallback-only
+    let v1 := divide(10, 0) catch -1;
+    io::Println(v1);
+
+    // handler-only (returns early on error)
+    // divide(10, 0) catch e {
+    //     io::Println(e);
+    //     return;
+    // };
+
+    // handler + fallback (should not reach fallback when error returns)
+    let v2 := divide(10, 0) catch e {
+        io::Println(e);
+    } -2;
+    io::Println(v2);
+}

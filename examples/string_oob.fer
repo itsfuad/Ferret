@@ -1,0 +1,8 @@
+import "std/io";
+
+// Demonstrates runtime bounds checks for string indexing.
+fn main() {
+    let s: str = "Hi";
+    io::Println(s[0]);
+    io::Println(s[10]); // Should panic: index out of bounds
+}
