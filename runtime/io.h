@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "bigint.h"
 
 // Single argument versions
@@ -54,6 +55,10 @@ void ferret_io_Print_f32(float value);
 void ferret_io_Print_f64(double value);
 void ferret_io_Print_f128(ferret_f128 value);
 void ferret_io_Print_f256(ferret_f256 value);
+
+// Float formatting helpers (used by C backend for multi-arg Print/Println).
+void ferret_format_f32(char* buf, size_t size, float value);
+void ferret_format_f64(char* buf, size_t size, double value);
 
 // Bool version
 void ferret_io_Println_bool(int value);  // C uses int for bool

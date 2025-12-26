@@ -3680,6 +3680,7 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 	// Build format string
 	formatParts := []string{}
 	largeArgIndices := make(map[int]bool)
+	floatArgKinds := make(map[int]string)
 
 	for i, arg := range args {
 		// Use semantic analyzer's type inference which is comprehensive and handles
@@ -3744,9 +3745,11 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 					formatParts = append(formatParts, "%s")
 					largeArgIndices[i] = true
 				case types.TYPE_F32:
-					formatParts = append(formatParts, "%.6g")
+					formatParts = append(formatParts, "%s")
+					floatArgKinds[i] = "f32"
 				case types.TYPE_F64:
-					formatParts = append(formatParts, "%.15g")
+					formatParts = append(formatParts, "%s")
+					floatArgKinds[i] = "f64"
 				case types.TYPE_F128, types.TYPE_F256:
 					formatParts = append(formatParts, "%s")
 					largeArgIndices[i] = true
@@ -3849,6 +3852,16 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 				g.write("strcpy(%s, ", tempBuf)
 				g.generateExpr(arg)
 				g.write(".value ? \"true\" : \"false\");")
+			} else if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_F32 {
+				g.writeIndent()
+				g.write("ferret_format_f32(%s, sizeof(%s), ", tempBuf, tempBuf)
+				g.generateExpr(arg)
+				g.write(".value);")
+			} else if prim, ok := unwrappedInner.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_F64 {
+				g.writeIndent()
+				g.write("ferret_format_f64(%s, sizeof(%s), ", tempBuf, tempBuf)
+				g.generateExpr(arg)
+				g.write(".value);")
 			} else {
 				// Numeric or other types - use snprintf with appropriate format
 				// Determine format specifier based on inner type T (reusing existing type handlers)
@@ -3898,6 +3911,29 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 			g.writeIndent()
 			g.write("}\n")
 		}
+	}
+
+	floatTempBuffers := make(map[int]string)
+	for i, arg := range args {
+		kind, ok := floatArgKinds[i]
+		if !ok {
+			continue
+		}
+		if _, hasTemp := optionalTempBuffers[i]; hasTemp {
+			continue
+		}
+		tempBuf := fmt.Sprintf("__float_val_%d_%d", g.counter, i)
+		floatTempBuffers[i] = tempBuf
+		g.writeIndent()
+		g.write("char %s[64];\n", tempBuf)
+		g.writeIndent()
+		if kind == "f32" {
+			g.write("ferret_format_f32(%s, sizeof(%s), ", tempBuf, tempBuf)
+		} else {
+			g.write("ferret_format_f64(%s, sizeof(%s), ", tempBuf, tempBuf)
+		}
+		g.generateExpr(arg)
+		g.write(");\n")
 	}
 
 	largeTempBuffers := make(map[int]string)
@@ -3952,6 +3988,8 @@ func (g *Generator) generatePrintWithMultipleArgs(funcName string, args []ast.Ex
 		// Check if we have a temp buffer for this optional
 		if tempBuf, hasTempBuf := optionalTempBuffers[i]; hasTempBuf {
 			// Use the pre-formatted temp buffer
+			g.write("%s", tempBuf)
+		} else if tempBuf, hasTempBuf := floatTempBuffers[i]; hasTempBuf {
 			g.write("%s", tempBuf)
 		} else if tempBuf, hasTempBuf := largeTempBuffers[i]; hasTempBuf {
 			// Use pre-formatted large primitive string

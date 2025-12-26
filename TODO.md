@@ -14,7 +14,7 @@
 ### Incremental plan (easy -> hard, dependency-ordered)
 - [x] Builtin primitive coverage (foundation)
   - [x] Ensure full builtin type support in MIR + QBE (i8..i256/u8..u256, f32..f256, bool, str, byte).
-  - [ ] Show .0 in floating point numbers
+  - [x] Show .0 in floating point numbers
   - [x] Validate const/load/store coverage for those primitives.
   - [x] Limb-based integer runtime (i128/u128/i256/u256) with 32/64-bit limb selection.
 - [x] Control flow completeness (depends on large primitive support)
@@ -28,7 +28,7 @@
 - [x] Methods on named types + cross-module usability (depends on structs/enums)
   - [x] Receiver lowering + name mangling across modules.
   - [x] Cross-module symbol resolution in MIR/QBE (imports + qualified names).
-- [ ] Collections and loops over them (depends on structs/enums)
+- [x] Collections and loops over them (depends on structs/enums)
   - [x] Builtin `len()` for arrays/maps and `append()` for dynamic arrays.
   - [x] MIR lowering for map literals.
   - [x] MIR lowering for map iteration (MapIterInit/MapIterNext) and map for-loops.
@@ -36,8 +36,8 @@
   - [x] QBE support for map indexing/assignment (MapGet/MapSet + optionals).
 - [ ] Interfaces (depends on structs/enums + methods)
   - [ ] Interface representation (vtable layout + method dispatch).
-- [ ] Functions beyond named decls (hard; depends on structs/enums + methods)
-  - [ ] Function literals and closure capture strategy (if supported in AST).
+- [x] Functions beyond named decls (hard; depends on structs/enums + methods)
+  - [x] Function literals and closure capture strategy (if supported in AST).
 - [ ] Error flow (depends on large primitive support)
   - [x] MIR lowering for result/catch paths.
 - [ ] Backend targets

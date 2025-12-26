@@ -1049,6 +1049,37 @@ double ferret_f256_to_f64(ferret_f256 val) {
     return result;
 }
 
+static void ferret_ensure_float_decimal(char* buf, size_t size) {
+    if (!buf || size == 0) {
+        return;
+    }
+
+    bool has_dot = false;
+    bool has_exp = false;
+    for (size_t i = 0; buf[i] != '\0'; i++) {
+        char c = buf[i];
+        if (c == '.') {
+            has_dot = true;
+        } else if (c == 'e' || c == 'E') {
+            has_exp = true;
+        } else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+            return;
+        }
+    }
+
+    if (has_dot || has_exp) {
+        return;
+    }
+
+    size_t len = strlen(buf);
+    if (len + 2 >= size) {
+        return;
+    }
+    buf[len] = '.';
+    buf[len + 1] = '0';
+    buf[len + 2] = '\0';
+}
+
 char* ferret_f128_to_string(ferret_f128 val) {
     char* buf = (char*)malloc(50);
     if (!buf) return NULL;
@@ -1058,6 +1089,7 @@ char* ferret_f128_to_string(ferret_f128 val) {
     double d = ferret_f128_to_f64(val);
     snprintf(buf, 50, "%.15g", d);
 #endif
+    ferret_ensure_float_decimal(buf, 50);
     return buf;
 }
 
@@ -1066,6 +1098,7 @@ char* ferret_f256_to_string(ferret_f256 val) {
     if (!buf) return NULL;
     double d = ferret_f256_to_f64(val);
     snprintf(buf, 50, "%.20g", d);
+    ferret_ensure_float_decimal(buf, 50);
     return buf;
 }
 

@@ -11,6 +11,53 @@
 #include "bigint.h"
 #include "io.h"
 
+static void ferret_ensure_float_decimal(char* buf, size_t size) {
+    if (!buf || size == 0) {
+        return;
+    }
+
+    bool has_dot = false;
+    bool has_exp = false;
+    for (size_t i = 0; buf[i] != '\0'; i++) {
+        char c = buf[i];
+        if (c == '.') {
+            has_dot = true;
+        } else if (c == 'e' || c == 'E') {
+            has_exp = true;
+        } else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+            return;
+        }
+    }
+
+    if (has_dot || has_exp) {
+        return;
+    }
+
+    size_t len = strlen(buf);
+    if (len + 2 >= size) {
+        return;
+    }
+    buf[len] = '.';
+    buf[len + 1] = '0';
+    buf[len + 2] = '\0';
+}
+
+void ferret_format_f32(char* buf, size_t size, float value) {
+    if (!buf || size == 0) {
+        return;
+    }
+    snprintf(buf, size, "%.6g", value);
+    ferret_ensure_float_decimal(buf, size);
+}
+
+void ferret_format_f64(char* buf, size_t size, double value) {
+    if (!buf || size == 0) {
+        return;
+    }
+    snprintf(buf, size, "%.15g", value);
+    ferret_ensure_float_decimal(buf, size);
+}
+
 static void ferret_io_print_owned(char* msg, bool newline) {
     if (msg != NULL) {
         if (newline) {
@@ -161,11 +208,15 @@ void ferret_io_Print_i256(ferret_i256 value) {
 
 // Float versions
 void ferret_io_Println_f32(float value) {
-    printf("%.6g\n", value);
+    char buf[64];
+    ferret_format_f32(buf, sizeof(buf), value);
+    printf("%s\n", buf);
 }
 
 void ferret_io_Println_f64(double value) {
-    printf("%.15g\n", value);
+    char buf[64];
+    ferret_format_f64(buf, sizeof(buf), value);
+    printf("%s\n", buf);
 }
 
 void ferret_io_Println_f128(ferret_f128 value) {
@@ -177,11 +228,15 @@ void ferret_io_Println_f256(ferret_f256 value) {
 }
 
 void ferret_io_Print_f32(float value) {
-    printf("%.6g", value);
+    char buf[64];
+    ferret_format_f32(buf, sizeof(buf), value);
+    printf("%s", buf);
 }
 
 void ferret_io_Print_f64(double value) {
-    printf("%.15g", value);
+    char buf[64];
+    ferret_format_f64(buf, sizeof(buf), value);
+    printf("%s", buf);
 }
 
 void ferret_io_Print_f128(ferret_f128 value) {
