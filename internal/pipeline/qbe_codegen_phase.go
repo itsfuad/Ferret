@@ -93,6 +93,8 @@ func (p *Pipeline) generateModuleQBE(importPath, tempDir string) ([]string, erro
 		return nil, fmt.Errorf("MIR module not found for %s", importPath)
 	}
 
+	mir.LowerSwitches(mirModule)
+
 	gen := qbe.New(p.ctx, module, mirModule)
 	ssa, err := gen.Emit()
 	if err != nil {

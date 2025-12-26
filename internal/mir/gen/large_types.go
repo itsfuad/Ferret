@@ -28,6 +28,24 @@ func isLargePrimitiveType(typ types.SemType) bool {
 	return ok
 }
 
+func isSwitchableMatchType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if isLargePrimitiveType(typ) {
+		return false
+	}
+	if prim, ok := typ.(*types.PrimitiveType); ok {
+		name := prim.GetName()
+		return types.IsIntegerTypeName(name) || name == types.TYPE_BOOL
+	}
+	if _, ok := typ.(*types.EnumType); ok {
+		return true
+	}
+	return false
+}
+
 func isStructType(typ types.SemType) bool {
 	if typ == nil {
 		return false

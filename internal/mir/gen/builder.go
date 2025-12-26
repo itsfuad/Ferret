@@ -387,73 +387,115 @@ func (b *functionBuilder) lowerMatch(stmt *hir.MatchStmt) {
 	mergeBlock := b.newBlock("match.end", stmt.Location)
 	defaultBlock := mergeBlock
 
-	caseBlocks := make([]*mir.Block, 0, len(stmt.Cases))
+	type caseEntry struct {
+		clause *hir.CaseClause
+		block  *mir.Block
+	}
+	entries := make([]caseEntry, 0, len(stmt.Cases))
+
+	useSwitch := isSwitchableMatchType(matchType)
+	switchCases := make([]mir.SwitchCase, 0, len(stmt.Cases))
+	seenValues := make(map[string]struct{}, len(stmt.Cases))
+
 	type matchCase struct {
 		block *mir.Block
 		value mir.ValueID
 		loc   source.Location
 	}
-	patternCases := make([]matchCase, 0, len(stmt.Cases))
+
 	for idx := range stmt.Cases {
 		clause := &stmt.Cases[idx]
 		block := b.newBlock("match.case", clause.Location)
-		caseBlocks = append(caseBlocks, block)
+		entries = append(entries, caseEntry{clause: clause, block: block})
 
 		if clause.Pattern == nil {
 			defaultBlock = block
 			continue
 		}
 
-		value, ok := b.matchCaseConstValue(clause.Pattern, matchType)
-		if !ok {
-			b.reportUnsupported("match pattern", clause.Pattern.Loc())
-			continue
+		if useSwitch {
+			value, ok := b.matchCaseValue(clause.Pattern)
+			if !ok {
+				useSwitch = false
+				continue
+			}
+			if _, exists := seenValues[value]; exists {
+				useSwitch = false
+				continue
+			}
+			seenValues[value] = struct{}{}
+			switchCases = append(switchCases, mir.SwitchCase{
+				Value:  value,
+				Target: block.ID,
+			})
 		}
-
-		patternCases = append(patternCases, matchCase{
-			block: block,
-			value: value,
-			loc:   clause.Location,
-		})
 	}
 
-	if len(patternCases) == 0 {
-		b.branchIfNoTerm(defaultBlock.ID, stmt.Location)
+	if useSwitch && len(switchCases) > 0 {
+		b.current.Term = &mir.Switch{
+			Cond:     cond,
+			Cases:    switchCases,
+			Default:  defaultBlock.ID,
+			Location: stmt.Location,
+		}
 	} else {
-		current := b.current
-		for idx, entry := range patternCases {
-			var elseTarget mir.BlockID
-			var elseBlock *mir.Block
-			if idx < len(patternCases)-1 {
-				elseBlock = b.newBlock("match.check", entry.loc)
-				elseTarget = elseBlock.ID
-			} else {
-				elseTarget = defaultBlock.ID
+		patternCases := make([]matchCase, 0, len(stmt.Cases))
+		for _, entry := range entries {
+			clause := entry.clause
+			if clause.Pattern == nil {
+				continue
 			}
-
-			var cmp mir.ValueID
-			if isLargePrimitiveType(matchType) {
-				cmp = b.emitLargeCompare(tokens.DOUBLE_EQUAL_TOKEN, cond, entry.value, matchType, entry.loc)
-			} else {
-				cmp = b.emitBinary(tokens.DOUBLE_EQUAL_TOKEN, cond, entry.value, matchType, entry.loc)
+			value, ok := b.matchCaseConstValue(clause.Pattern, matchType)
+			if !ok {
+				b.reportUnsupported("match pattern", clause.Pattern.Loc())
+				continue
 			}
+			patternCases = append(patternCases, matchCase{
+				block: entry.block,
+				value: value,
+				loc:   clause.Location,
+			})
+		}
 
-			current.Term = &mir.CondBr{
-				Cond:     cmp,
-				Then:     entry.block.ID,
-				Else:     elseTarget,
-				Location: stmt.Location,
-			}
+		if len(patternCases) == 0 {
+			b.branchIfNoTerm(defaultBlock.ID, stmt.Location)
+		} else {
+			current := b.current
+			for idx, entry := range patternCases {
+				var elseTarget mir.BlockID
+				var elseBlock *mir.Block
+				if idx < len(patternCases)-1 {
+					elseBlock = b.newBlock("match.check", entry.loc)
+					elseTarget = elseBlock.ID
+				} else {
+					elseTarget = defaultBlock.ID
+				}
 
-			if elseBlock != nil {
-				b.setBlock(elseBlock)
-				current = elseBlock
+				var cmp mir.ValueID
+				if isLargePrimitiveType(matchType) {
+					cmp = b.emitLargeCompare(tokens.DOUBLE_EQUAL_TOKEN, cond, entry.value, matchType, entry.loc)
+				} else {
+					cmp = b.emitBinary(tokens.DOUBLE_EQUAL_TOKEN, cond, entry.value, matchType, entry.loc)
+				}
+
+				current.Term = &mir.CondBr{
+					Cond:     cmp,
+					Then:     entry.block.ID,
+					Else:     elseTarget,
+					Location: stmt.Location,
+				}
+
+				if elseBlock != nil {
+					b.setBlock(elseBlock)
+					current = elseBlock
+				}
 			}
 		}
 	}
 
-	for idx, clause := range stmt.Cases {
-		block := caseBlocks[idx]
+	for _, entry := range entries {
+		clause := entry.clause
+		block := entry.block
 		b.setBlock(block)
 		if clause.Body != nil {
 			b.lowerBlock(clause.Body)
