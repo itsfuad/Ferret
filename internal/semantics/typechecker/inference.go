@@ -842,8 +842,11 @@ func inferFuncLitType(ctx *context_v2.CompilerContext, mod *context_v2.Module, l
 		}
 	}
 
-	// Get return type
-	returnType := TypeFromTypeNodeWithContext(ctx, mod, lit.Type.Result)
+	// Get return type (default to void when omitted)
+	returnType := types.TypeVoid
+	if lit.Type.Result != nil {
+		returnType = TypeFromTypeNodeWithContext(ctx, mod, lit.Type.Result)
+	}
 
 	// Set the current function return type for validating return statements
 	// Save the parent function's return type and restore it after
