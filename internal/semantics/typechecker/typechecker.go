@@ -1283,6 +1283,9 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		return
 	}
 
+	// Automatic dereferencing: &T -> T
+	baseType = dereferenceType(baseType)
+
 	fieldName := expr.Field.Name
 
 	// Check if baseType is an interface type (or NamedType wrapping an interface)
@@ -1330,10 +1333,13 @@ func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		// Anonymous struct - no methods, only fields
 		structType = st
 	} else {
-		// Not a struct or named type with struct underlying - could be module access or other
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("type '%s' has no fields or methods", baseType.String())).
+				WithCode(diagnostics.ErrFieldNotFound).
+				WithPrimaryLabel(expr.Field.Loc(), "invalid selector target"),
+		)
 		return
 	}
-
 	// Check if it's a field
 	if structType != nil {
 		for _, field := range structType.Fields {
@@ -1587,6 +1593,18 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
+	if !lhsType.Equals(types.TypeUnknown) && !isAssignableTarget(ctx, mod, stmt.Lhs) {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("invalid assignment target").
+				WithCode(diagnostics.ErrInvalidAssignment).
+				WithPrimaryLabel(stmt.Lhs.Loc(), "cannot assign to this expression").
+				WithHelp("assignments require a variable, field, or index on an addressable value"),
+		)
+		if stmt.Rhs != nil {
+			checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+		}
+		return
+	}
 	assignType := lhsType
 	if idx, ok := stmt.Lhs.(*ast.IndexExpr); ok {
 		baseType := inferExprType(ctx, mod, idx.X)
@@ -1681,6 +1699,50 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 	// 2. Clear all potentially aliased variables on reference assignment
 	// 3. Consider inter-procedural effects (function calls with &params)
 	// For now, method calls with reference receivers handle invalidation separately
+}
+
+func isAssignableTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		return true
+	case *ast.ParenExpr:
+		return isAssignableTarget(ctx, mod, e.X)
+	case *ast.SelectorExpr:
+		baseType := inferExprType(ctx, mod, e.X)
+		if isReferenceType(baseType) {
+			return true
+		}
+		return isAssignableTarget(ctx, mod, e.X)
+	case *ast.IndexExpr:
+		baseType := inferExprType(ctx, mod, e.X)
+		baseType = dereferenceType(types.UnwrapType(baseType))
+		if _, ok := baseType.(*types.MapType); ok {
+			return true
+		}
+		if isReferenceType(baseType) {
+			return true
+		}
+		return isAssignableTarget(ctx, mod, e.X)
+	default:
+		return false
+	}
+}
+
+func isReferenceType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	if _, ok := typ.(*types.ReferenceType); ok {
+		return true
+	}
+	if _, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
+		return true
+	}
+	return false
 }
 
 func receiverSymbolFromExpr(mod *context_v2.Module, expr ast.Expression) *symbols.Symbol {

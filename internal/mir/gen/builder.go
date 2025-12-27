@@ -2076,10 +2076,6 @@ func (b *functionBuilder) lowerMapIndexAssign(expr *hir.IndexExpr, rhs hir.Expr,
 	if expr == nil || mapType == nil {
 		return
 	}
-	if op != nil && op.Kind != tokens.EQUALS_TOKEN {
-		b.reportUnsupported("map compound assignment", &loc)
-		return
-	}
 
 	mapVal := b.lowerExpr(expr.X)
 	if mapVal == mir.InvalidValue {
@@ -2101,6 +2097,34 @@ func (b *functionBuilder) lowerMapIndexAssign(expr *hir.IndexExpr, rhs hir.Expr,
 	}
 	if mapType.Value != nil {
 		valueVal = b.castValue(valueVal, b.exprType(rhs), mapType.Value, loc)
+	}
+
+	if op != nil && op.Kind != tokens.EQUALS_TOKEN {
+		opKind := assignTokenToBinary(op.Kind)
+		if opKind == "" {
+			b.reportUnsupported("assignment operator", &loc)
+			return
+		}
+
+		optType := types.NewOptional(mapType.Value)
+		curOpt := b.gen.nextValueID()
+		b.emitInstr(&mir.MapGet{
+			Result:   curOpt,
+			Map:      mapVal,
+			Key:      keyVal,
+			Type:     optType,
+			Location: expr.Location,
+		})
+		curVal := b.gen.nextValueID()
+		b.emitInstr(&mir.OptionalUnwrap{
+			Result:     curVal,
+			Value:      curOpt,
+			HasDefault: false,
+			Type:       mapType.Value,
+			Location:   loc,
+		})
+
+		valueVal = b.emitBinary(opKind, curVal, valueVal, mapType.Value, loc)
 	}
 
 	b.emitInstr(&mir.MapSet{
