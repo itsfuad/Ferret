@@ -278,14 +278,22 @@ func (o *OptionalType) Equals(other SemType) bool {
 
 // ReferenceType represents reference types: &T
 type ReferenceType struct {
-	Inner SemType
+	Inner   SemType
+	Mutable bool
 }
 
 func NewReference(inner SemType) *ReferenceType {
 	return &ReferenceType{Inner: inner}
 }
 
+func NewMutableReference(inner SemType) *ReferenceType {
+	return &ReferenceType{Inner: inner, Mutable: true}
+}
+
 func (r *ReferenceType) String() string {
+	if r.Mutable {
+		return fmt.Sprintf("&'%s", r.Inner.String())
+	}
 	return fmt.Sprintf("&%s", r.Inner.String())
 }
 
@@ -297,7 +305,7 @@ func (r *ReferenceType) isType() {}
 
 func (r *ReferenceType) Equals(other SemType) bool {
 	if rt, ok := other.(*ReferenceType); ok {
-		return r.Inner.Equals(rt.Inner)
+		return r.Mutable == rt.Mutable && r.Inner.Equals(rt.Inner)
 	}
 	return false
 }

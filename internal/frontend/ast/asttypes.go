@@ -54,7 +54,8 @@ func (o *OptionalType) Loc() *source.Location { return &o.Location }
 
 // ReferenceType represents reference type &T (C#-style reference)
 type ReferenceType struct {
-	Base TypeNode // The base type being referenced
+	Base    TypeNode // The base type being referenced
+	Mutable bool     // True if this is a mutable reference
 	source.Location
 }
 

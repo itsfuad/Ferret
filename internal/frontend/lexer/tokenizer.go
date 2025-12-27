@@ -86,6 +86,7 @@ func New(filepath, content string, diag *diagnostics.DiagnosticBag) *Lexer {
 			{regexp.MustCompile(`\.\.`), defaultHandler(tokens.RANGE_TOKEN)},
 			{regexp.MustCompile(`&&`), defaultHandler(tokens.AND_TOKEN)},
 			{regexp.MustCompile(`\|\|`), defaultHandler(tokens.OR_TOKEN)},
+			{regexp.MustCompile(`&'`), defaultHandler(tokens.MUT_REF_TOKEN)},
 			{regexp.MustCompile(`&`), defaultHandler(tokens.BIT_AND_TOKEN)},
 			{regexp.MustCompile(`\|`), defaultHandler(tokens.BIT_OR_TOKEN)},
 			{regexp.MustCompile(`\^`), defaultHandler(tokens.BIT_XOR_TOKEN)},

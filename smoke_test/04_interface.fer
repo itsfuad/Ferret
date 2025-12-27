@@ -1,0 +1,23 @@
+import "std/io";
+
+type Shape interface {
+    area() -> i32,
+};
+
+type Point struct {
+    .X: i32
+};
+
+fn (p: Point) area() -> i32 {
+    return p.X;
+}
+
+fn make() -> Shape {
+    let p: Point = { .X = 9 };
+    return p;
+}
+
+fn main() {
+    let s := make();
+    io::Println(s.area());
+}

@@ -85,6 +85,13 @@ func (p *Pipeline) Run() error {
 		colors.CYAN.Printf("\n[Phase 8] MIR Generation\n")
 	}
 
+	if p.ctx.HasErrors() {
+		if p.ctx.Config.Debug {
+			colors.YELLOW.Printf("\n[Skipping MIR Generation] Errors detected in previous phases\n")
+		}
+		return fmt.Errorf("compilation failed with errors")
+	}
+
 	if err := p.runMIRGenerationPhase(); err != nil {
 		return err
 	}

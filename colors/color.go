@@ -6,7 +6,7 @@ package colors
 type COLOR string
 
 const (
-	RESET COLOR = "\033[0m"
+	RESET   COLOR = "\033[0m"
 
 	// Basic Colors
 	BLACK  COLOR = "\033[30m"

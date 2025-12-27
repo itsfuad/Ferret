@@ -105,6 +105,13 @@ func (sh *SyntaxHighlighter) Highlight(line string) []Token {
 			continue
 		}
 
+		// Mutable reference operator (&') should not start a char literal
+		if line[i] == '&' && i+1 < len(line) && line[i+1] == '\'' {
+			tokensSlice = append(tokensSlice, Token{Text: line[i : i+2], Color: colorMap[OP]})
+			i += 2
+			continue
+		}
+
 		// Character literals (single quotes)
 		if line[i] == '\'' {
 			start := i

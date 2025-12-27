@@ -60,6 +60,8 @@ const (
 	BIT_AND_TOKEN TOKEN = "&"
 	BIT_OR_TOKEN  TOKEN = "|"
 	BIT_XOR_TOKEN TOKEN = "^"
+	//reference operators
+	MUT_REF_TOKEN TOKEN = "&'"
 	//unary operators
 	NOT_TOKEN TOKEN = "!"
 	//arithmetic operators

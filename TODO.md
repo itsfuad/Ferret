@@ -46,8 +46,16 @@
   - [x] MIR lowering for map iteration (MapIterInit/MapIterNext) and map for-loops.
   - [x] MIR lowering for dynamic array literals in expressions.
   - [x] QBE support for map indexing/assignment (MapGet/MapSet + optionals).
-- [ ] Interfaces (depends on structs/enums + methods)
-  - [ ] Interface representation (vtable layout + method dispatch).
+- [x] Interfaces (depends on structs/enums + methods)
+  - [x] Interface representation (vtable layout + method dispatch).
+- [ ] References + borrowing (design + implementation)
+  - [x] Add unary `&` expression parsing and HIR/MIR lowering (address-of).
+  - [x] Enforce borrowable lvalues only; disallow `&&T` and `&` on temporaries.
+  - [x] Reference binding rules: `&T` must be initialized with a reference; no rebinding after init.
+  - [x] Reference parameter passing requires `&` (no implicit borrow).
+  - [x] Reference return ABI: hidden out-param for `-> &T`, return pointer (move-out vs borrow).
+  - [x] Write-through assignment for `&T` variables and compound ops.
+  - [ ] Decide/refine reference semantics for map and dynamic array elements.
 - [x] Functions beyond named decls (hard; depends on structs/enums + methods)
   - [x] Function literals and closure capture strategy (if supported in AST).
 - [x] Error flow (depends on large primitive support)

@@ -192,7 +192,7 @@ func resolveExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr a
 		if name == "_" {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError("invalid use of '_' identifier").
-					WithPrimaryLabel(&e.Location, "blank identifier is only allowed in for loop iterators").
+					WithPrimaryLabel(&e.Location, "blank identifier is only allowed in for loop iterators and function parameters").
 					WithHelp("use a real variable name"),
 			)
 			return

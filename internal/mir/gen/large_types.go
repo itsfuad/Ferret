@@ -67,7 +67,13 @@ func isFixedArrayType(typ types.SemType) bool {
 }
 
 func needsByRefType(typ types.SemType) bool {
-	return isLargePrimitiveType(typ) || isStructType(typ) || isFixedArrayType(typ)
+	if isLargePrimitiveType(typ) || isStructType(typ) || isFixedArrayType(typ) {
+		return true
+	}
+	if iface := interfaceTypeOf(typ); iface != nil {
+		return len(iface.Methods) > 0
+	}
+	return false
 }
 
 func isLargeIntName(name string) bool {

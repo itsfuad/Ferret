@@ -250,6 +250,8 @@ func inferIdentifierType(_ *context_v2.CompilerContext, mod *context_v2.Module, 
 func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.BinaryExpr) types.SemType {
 	lhsType := inferExprType(ctx, mod, expr.X)
 	rhsType := inferExprType(ctx, mod, expr.Y)
+	lhsType = dereferenceType(types.UnwrapType(lhsType))
+	rhsType = dereferenceType(types.UnwrapType(rhsType))
 
 	switch expr.Op.Kind {
 	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN,
@@ -323,15 +325,27 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 // inferUnaryExprType determines the result type of a unary expression
 func inferUnaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.UnaryExpr) types.SemType {
 	xType := inferExprType(ctx, mod, expr.X)
+	baseType := dereferenceType(types.UnwrapType(xType))
 
 	switch expr.Op.Kind {
 	case tokens.MINUS_TOKEN, tokens.PLUS_TOKEN:
 		// Unary +/- preserves numeric type
-		return xType
+		return baseType
 
 	case tokens.NOT_TOKEN:
 		// Logical not returns bool
 		return types.TypeBool
+	case tokens.BIT_AND_TOKEN:
+		// Address-of returns a reference type
+		if _, ok := xType.(*types.ReferenceType); ok {
+			return types.TypeUnknown
+		}
+		return types.NewReference(xType)
+	case tokens.MUT_REF_TOKEN:
+		if _, ok := xType.(*types.ReferenceType); ok {
+			return types.TypeUnknown
+		}
+		return types.NewMutableReference(xType)
 
 	default:
 		return xType
