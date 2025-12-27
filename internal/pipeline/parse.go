@@ -138,6 +138,7 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 	module.Mu.Unlock()
 
 	if astModule != nil && p.ctx.Config.SaveAST {
+		fmt.Printf("Saving AST %s\n", astModule.FullPath)
 		astModule.SaveAST()
 	}
 

@@ -86,6 +86,7 @@ func Compile(opts *Options) Result {
 		BuiltinModulesPath: builtinPath,
 		RuntimePath:        runtimePath, // Runtime path relative to executable
 		OutputPath:         outputPath,
+		SaveAST: 		 	opts.SaveAST,
 		KeepGenFiles:       opts.KeepGenFiles,
 		SkipCodegen:        opts.SkipCodegen,
 		CodegenBackend:     opts.CodegenBackend,
