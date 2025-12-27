@@ -615,7 +615,7 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 		return p.parsePostfix()
 	}
 
-	if p.match(tokens.NOT_TOKEN, tokens.MINUS_TOKEN) {
+	if p.match(tokens.NOT_TOKEN, tokens.MINUS_TOKEN, tokens.BIT_AND_TOKEN, tokens.MUT_REF_TOKEN) {
 		op := p.advance()
 		expr := p.parseUnaryDepth(depth + 1)
 		return &ast.UnaryExpr{

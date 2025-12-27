@@ -277,7 +277,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					}
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
+						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, resultType.Err)
 						if !isImplicitlyCompatible(compatibility) {
 							returnedDesc := resolveType(returnedType, resultType.Err)
 							diag := diagnostics.NewError("error return type mismatch").
@@ -302,7 +302,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					}
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibility(returnedType, resultType.Ok)
+						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, resultType.Ok)
 						if !isImplicitlyCompatible(compatibility) {
 							diag := diagnostics.NewError("return type mismatch").
 								WithCode(diagnostics.ErrTypeMismatch).
@@ -324,7 +324,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Normal return type checking
 					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
 					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
+						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, expectedReturnType)
 						if !isImplicitlyCompatible(compatibility) {
 							diag := diagnostics.NewError("type mismatch in return statement").
 								WithCode(diagnostics.ErrTypeMismatch).
@@ -622,8 +622,28 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 			// Check initializer if present
 			if item.Value != nil {
+				if _, ok := types.UnwrapType(declType).(*types.ReferenceType); ok {
+					initType := inferExprType(ctx, mod, item.Value)
+					if !initType.Equals(types.TypeUnknown) && !isReferenceType(initType) {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError("reference variables must be initialized with a reference").
+								WithCode(diagnostics.ErrInvalidAssignment).
+								WithPrimaryLabel(item.Value.Loc(), "expected a reference value").
+								WithHelp("use '&' to bind a reference"),
+						)
+						checkExpr(ctx, mod, item.Value, declType)
+						continue
+					}
+				}
 				// Pass item.Type for type location in error messages
 				checkAssignLike(ctx, mod, declType, item.Type, item.Value)
+			} else if _, ok := types.UnwrapType(declType).(*types.ReferenceType); ok {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("reference '%s' must be initialized", name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(item.Name.Loc(), "references require an initializer").
+						WithHelp("bind with '&': let r: &T = &value"),
+				)
 			} else if isConst {
 				// Constants must have an initializer even with explicit type
 				ctx.Diagnostics.Add(
@@ -724,13 +744,15 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 	if lhsType.Equals(types.TypeUnknown) || rhsType.Equals(types.TypeUnknown) {
 		return
 	}
+	lhsBase := dereferenceType(types.UnwrapType(lhsType))
+	rhsBase := dereferenceType(types.UnwrapType(rhsType))
 
 	switch expr.Op.Kind {
 	case tokens.PLUS_TOKEN:
-		lhsString := lhsType.Equals(types.TypeString)
-		rhsString := rhsType.Equals(types.TypeString)
-		lhsNumericOrUntyped := types.IsNumericType(lhsType) || types.IsUntyped(lhsType)
-		rhsNumericOrUntyped := types.IsNumericType(rhsType) || types.IsUntyped(rhsType)
+		lhsString := lhsBase.Equals(types.TypeString)
+		rhsString := rhsBase.Equals(types.TypeString)
+		lhsNumericOrUntyped := types.IsNumericType(lhsBase) || types.IsUntyped(lhsBase)
+		rhsNumericOrUntyped := types.IsNumericType(rhsBase) || types.IsUntyped(rhsBase)
 
 		// If one side is string and the other is not, that's an error
 		if (lhsString && !rhsString) || (!lhsString && rhsString) {
@@ -761,13 +783,13 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 
 	case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
 		// Allow untyped operands - they will be contextualized
-		if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
+		if types.IsUntyped(lhsBase) || types.IsUntyped(rhsBase) {
 			return
 		}
 
 		// These operators only work with numeric types
-		lhsNumeric := types.IsNumericType(lhsType)
-		rhsNumeric := types.IsNumericType(rhsType)
+		lhsNumeric := types.IsNumericType(lhsBase)
+		rhsNumeric := types.IsNumericType(rhsBase)
 
 		if !lhsNumeric || !rhsNumeric {
 			ctx.Diagnostics.Add(
@@ -1162,7 +1184,15 @@ func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 							break
 						}
 					}
-					checkExpr(ctx, mod, kv.Value, fieldExpected)
+					valueType := checkExpr(ctx, mod, kv.Value, fieldExpected)
+					if isReferenceType(fieldExpected) && !valueType.Equals(types.TypeUnknown) && !isReferenceType(valueType) {
+						ctx.Diagnostics.Add(
+							diagnostics.NewError("reference field must be initialized with a reference").
+								WithCode(diagnostics.ErrInvalidAssignment).
+								WithPrimaryLabel(kv.Value.Loc(), "expected a reference value").
+								WithHelp("use '&' to bind the field"),
+						)
+					}
 				}
 			}
 		}
@@ -1185,6 +1215,14 @@ func validateArrayLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	for _, elem := range lit.Elts {
 		if _, isKV := elem.(*ast.KeyValueExpr); !isKV {
 			elemType := checkExpr(ctx, mod, elem, arrayType.Element)
+			if isReferenceType(arrayType.Element) && !elemType.Equals(types.TypeUnknown) && !isReferenceType(elemType) {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("array element must be initialized with a reference").
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(elem.Loc(), "expected a reference value").
+						WithHelp("use '&' to bind the element"),
+				)
+			}
 			if compat := checkTypeCompatibility(elemType, arrayType.Element); !isImplicitlyCompatible(compat) {
 				elemTypeStr := resolveType(elemType, types.TypeUnknown)
 				diag := diagnostics.NewError(fmt.Sprintf("array elements must all be same type, expected %s but found %s", arrayType.Element.String(), elemTypeStr)).
@@ -1223,6 +1261,14 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 
 		// Check value type compatibility - with contextualization
 		valueType := checkExpr(ctx, mod, kv.Value, mapType.Value)
+		if isReferenceType(mapType.Value) && !valueType.Equals(types.TypeUnknown) && !isReferenceType(valueType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("map value must be initialized with a reference").
+					WithCode(diagnostics.ErrInvalidAssignment).
+					WithPrimaryLabel(kv.Value.Loc(), "expected a reference value").
+					WithHelp("use '&' to bind the value"),
+			)
+		}
 		if compat := checkTypeCompatibility(valueType, mapType.Value); !isImplicitlyCompatible(compat) {
 			valueTypeStr := resolveType(valueType, types.TypeUnknown)
 			diag := diagnostics.NewError(fmt.Sprintf("map values must all be same type, expected %s but found %s", mapType.Value.String(), valueTypeStr)).
@@ -1593,6 +1639,8 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
+	lhsIsRef := isReferenceType(lhsType)
+	lhsRef, _ := types.UnwrapType(lhsType).(*types.ReferenceType)
 	if !lhsType.Equals(types.TypeUnknown) && !isAssignableTarget(ctx, mod, stmt.Lhs) {
 		ctx.Diagnostics.Add(
 			diagnostics.NewError("invalid assignment target").
@@ -1606,6 +1654,7 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		return
 	}
 	assignType := lhsType
+	isMapIndex := false
 	if idx, ok := stmt.Lhs.(*ast.IndexExpr); ok {
 		baseType := inferExprType(ctx, mod, idx.X)
 		baseType = types.UnwrapType(baseType)
@@ -1614,16 +1663,37 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		}
 		if mapType, ok := baseType.(*types.MapType); ok && mapType.Value != nil {
 			assignType = mapType.Value
+			isMapIndex = true
 		}
+	}
+	if ref, ok := types.UnwrapType(lhsType).(*types.ReferenceType); ok && !isMapIndex {
+		if !ref.Mutable {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("cannot assign through immutable reference").
+					WithCode(diagnostics.ErrInvalidAssignment).
+					WithPrimaryLabel(stmt.Lhs.Loc(), "immutable reference"),
+			)
+			if stmt.Rhs != nil {
+				checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+			}
+			return
+		}
+	}
+	if ref, ok := types.UnwrapType(lhsType).(*types.ReferenceType); ok && !isMapIndex {
+		assignType = ref.Inner
 	}
 
 	// Handle increment/decrement operators (x++, x--)
 	if stmt.Op != nil && (stmt.Op.Kind == tokens.PLUS_PLUS_TOKEN || stmt.Op.Kind == tokens.MINUS_MINUS_TOKEN) {
 		// For ++ and --, RHS is nil
 		// Check that LHS is a numeric type
-		if !types.IsNumeric(lhsType) {
+		incDecType := lhsType
+		if ref, ok := types.UnwrapType(lhsType).(*types.ReferenceType); ok {
+			incDecType = ref.Inner
+		}
+		if !types.IsNumeric(incDecType) {
 			ctx.Diagnostics.Add(
-				diagnostics.NewError(fmt.Sprintf("cannot use %s operator on non-numeric type '%s'", stmt.Op.Value, lhsType.String())).
+				diagnostics.NewError(fmt.Sprintf("cannot use %s operator on non-numeric type '%s'", stmt.Op.Value, incDecType.String())).
 					WithPrimaryLabel(stmt.Lhs.Loc(), "expected numeric type").
 					WithHelp("increment/decrement operators only work on numeric types"),
 			)
@@ -1637,6 +1707,43 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		// For compound assignments, we need to check that the operation is valid
 		// The RHS should be compatible with the operation
 		rhsType := checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+		if lhsIsRef {
+			if !rhsType.Equals(types.TypeUnknown) && isMapIndex {
+				rhsRef, ok := types.UnwrapType(rhsType).(*types.ReferenceType)
+				if !ok {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("map value is a reference and must be assigned with '&'").
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(stmt.Rhs.Loc(), "expected a reference value"),
+					)
+					return
+				}
+				if lhsRef != nil && lhsRef.Mutable && !rhsRef.Mutable {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("map value is a mutable reference and must be assigned with \"&'\"").
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(stmt.Rhs.Loc(), "expected a mutable reference"),
+					)
+					return
+				}
+			} else if !rhsType.Equals(types.TypeUnknown) && isMapIndex && !isReferenceType(rhsType) {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("map value is a reference and must be assigned with '&'").
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(stmt.Rhs.Loc(), "expected a reference value"),
+				)
+				return
+			}
+			if !rhsType.Equals(types.TypeUnknown) && !isMapIndex && isReferenceType(rhsType) {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("reference is already bound and cannot be reassigned").
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(stmt.Rhs.Loc(), "cannot rebind reference").
+						WithHelp("assign a value to update the referenced data"),
+				)
+				return
+			}
+		}
 
 		// Check if the operation is valid for these types
 		opKind := stmt.Op.Kind
@@ -1690,6 +1797,48 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		checkBinaryExpr(ctx, mod, tempBinExpr, assignType, rhsType)
 	} else {
 		// Regular assignment: Check the RHS with the LHS type as context
+		if lhsIsRef {
+			rhsType := inferExprType(ctx, mod, stmt.Rhs)
+			if !rhsType.Equals(types.TypeUnknown) && isMapIndex {
+				rhsRef, ok := types.UnwrapType(rhsType).(*types.ReferenceType)
+				if !ok {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("map value is a reference and must be assigned with '&'").
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(stmt.Rhs.Loc(), "expected a reference value"),
+					)
+					checkExpr(ctx, mod, stmt.Rhs, assignType)
+					return
+				}
+				if lhsRef != nil && lhsRef.Mutable && !rhsRef.Mutable {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("map value is a mutable reference and must be assigned with \"&'\"").
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(stmt.Rhs.Loc(), "expected a mutable reference"),
+					)
+					checkExpr(ctx, mod, stmt.Rhs, assignType)
+					return
+				}
+			} else if !rhsType.Equals(types.TypeUnknown) && isMapIndex && !isReferenceType(rhsType) {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("map value is a reference and must be assigned with '&'").
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(stmt.Rhs.Loc(), "expected a reference value"),
+				)
+				checkExpr(ctx, mod, stmt.Rhs, assignType)
+				return
+			}
+			if (isBorrowExpr(stmt.Rhs) || (!rhsType.Equals(types.TypeUnknown) && isReferenceType(rhsType))) && !isMapIndex {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("reference is already bound and cannot be reassigned").
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(stmt.Rhs.Loc(), "cannot rebind reference").
+						WithHelp("assign a value to update the referenced data"),
+				)
+				checkExpr(ctx, mod, stmt.Rhs, assignType)
+				return
+			}
+		}
 		checkAssignLike(ctx, mod, assignType, stmt.Lhs, stmt.Rhs)
 	}
 
@@ -1714,21 +1863,107 @@ func isAssignableTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	case *ast.SelectorExpr:
 		baseType := inferExprType(ctx, mod, e.X)
 		if isReferenceType(baseType) {
-			return true
+			return isAssignableTarget(ctx, mod, e.X)
 		}
 		return isAssignableTarget(ctx, mod, e.X)
 	case *ast.IndexExpr:
 		baseType := inferExprType(ctx, mod, e.X)
 		baseType = dereferenceType(types.UnwrapType(baseType))
 		if _, ok := baseType.(*types.MapType); ok {
-			return true
+			return isAssignableTarget(ctx, mod, e.X)
 		}
 		if isReferenceType(baseType) {
-			return true
+			return isAssignableTarget(ctx, mod, e.X)
 		}
 		return isAssignableTarget(ctx, mod, e.X)
 	default:
 		return false
+	}
+}
+
+func isBorrowableTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		if mod != nil && mod.CurrentScope != nil {
+			if sym, found := mod.CurrentScope.Lookup(e.Name); found {
+				if sym.Kind == symbols.SymbolConstant || sym.IsReadonly {
+					return false
+				}
+			}
+		}
+		return true
+	case *ast.ParenExpr:
+		return isBorrowableTarget(ctx, mod, e.X)
+	case *ast.SelectorExpr:
+		return isBorrowableTarget(ctx, mod, e.X)
+	case *ast.IndexExpr:
+		baseType := inferExprType(ctx, mod, e.X)
+		if baseType == nil || baseType.Equals(types.TypeUnknown) {
+			return false
+		}
+		baseType = dereferenceType(types.UnwrapType(baseType))
+		if arrType, ok := baseType.(*types.ArrayType); ok {
+			return arrType.Length >= 0 && isBorrowableTarget(ctx, mod, e.X)
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func isBorrowExpr(expr ast.Expression) bool {
+	if expr == nil {
+		return false
+	}
+	if unary, ok := expr.(*ast.UnaryExpr); ok {
+		return unary.Op.Kind == tokens.BIT_AND_TOKEN || unary.Op.Kind == tokens.MUT_REF_TOKEN
+	}
+	return false
+}
+
+func checkBorrowExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.UnaryExpr, operandType types.SemType) {
+	if ctx == nil || mod == nil || expr == nil {
+		return
+	}
+	if expr.Op.Kind != tokens.BIT_AND_TOKEN && expr.Op.Kind != tokens.MUT_REF_TOKEN {
+		return
+	}
+	if operandType == nil || operandType.Equals(types.TypeUnknown) {
+		return
+	}
+	if isReferenceType(operandType) {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("cannot take reference of a reference").
+				WithCode(diagnostics.ErrInvalidOperation).
+				WithPrimaryLabel(expr.Loc(), "nested references are not allowed"),
+		)
+		return
+	}
+	if expr.Op.Kind == tokens.MUT_REF_TOKEN {
+		if ident, ok := expr.X.(*ast.IdentifierExpr); ok {
+			if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
+				if sym.Kind == symbols.SymbolConstant || sym.IsReadonly {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("cannot take mutable reference of a read-only value").
+							WithCode(diagnostics.ErrInvalidOperation).
+							WithPrimaryLabel(expr.X.Loc(), "value is not mutable"),
+					)
+					return
+				}
+			}
+		}
+	}
+	if !isBorrowableTarget(ctx, mod, expr.X) {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("cannot take reference of this expression").
+				WithCode(diagnostics.ErrInvalidOperation).
+				WithPrimaryLabel(expr.X.Loc(), "not an addressable value").
+				WithHelp("borrow a variable, field, or fixed array element"),
+		)
 	}
 }
 
@@ -1741,6 +1976,16 @@ func isReferenceType(typ types.SemType) bool {
 	}
 	if _, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
 		return true
+	}
+	return false
+}
+
+func isMutableReferenceType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	if ref, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
+		return ref.Mutable
 	}
 	return false
 }
@@ -1837,6 +2082,17 @@ func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 
 	warnValueReceiverMutation(ctx, mod, target)
 
+	if ref, ok := types.UnwrapType(targetType).(*types.ReferenceType); ok {
+		if !ref.Mutable {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("cannot modify through immutable reference").
+					WithCode(diagnostics.ErrInvalidAssignment).
+					WithPrimaryLabel(target.Loc(), "immutable reference"),
+			)
+			return
+		}
+	}
+	targetType = dereferenceType(types.UnwrapType(targetType))
 	if !types.IsNumeric(targetType) {
 		ctx.Diagnostics.Add(
 			diagnostics.NewError(fmt.Sprintf("cannot use %s operator on non-numeric type '%s'", op.Value, targetType.String())).
@@ -1910,7 +2166,10 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	case *ast.UnaryExpr:
 		// Recursively check operand
-		checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		operandType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+		if e.Op.Kind == tokens.BIT_AND_TOKEN || e.Op.Kind == tokens.MUT_REF_TOKEN {
+			checkBorrowExpr(ctx, mod, e, operandType)
+		}
 	case *ast.PrefixExpr:
 		// Validate ++/-- target and operand type
 		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
@@ -2351,6 +2610,19 @@ func TypeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 	case *ast.ReferenceType:
 		// Reference type: &T
 		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
+		if isReferenceType(innerType) {
+			if ctx != nil {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("nested references are not supported").
+						WithCode(diagnostics.ErrInvalidType).
+						WithPrimaryLabel(t.Base.Loc(), "use a single '&' reference"),
+				)
+			}
+			return types.TypeUnknown
+		}
+		if t.Mutable {
+			return types.NewMutableReference(innerType)
+		}
 		return types.NewReference(innerType)
 
 	case *ast.ResultType:
@@ -2564,6 +2836,27 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 		// Infer argument type with parameter type as context
 		argType := checkExpr(ctx, mod, arg, param.Type)
+		if refParam, ok := types.UnwrapType(param.Type).(*types.ReferenceType); ok && !argType.Equals(types.TypeUnknown) {
+			refArg, isRefArg := types.UnwrapType(argType).(*types.ReferenceType)
+			if !isRefArg {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("argument '%s' must be a reference", param.Name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(arg.Loc(), "expected a reference value").
+						WithHelp("use '&' to pass a reference"),
+				)
+				continue
+			}
+			if refParam.Mutable && !refArg.Mutable {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("argument '%s' must be a mutable reference", param.Name)).
+						WithCode(diagnostics.ErrInvalidAssignment).
+						WithPrimaryLabel(arg.Loc(), "expected a mutable reference").
+						WithHelp("use \"&'\" to pass a mutable reference"),
+				)
+				continue
+			}
+		}
 
 		// Check compatibility (use WithContext to handle interfaces properly)
 		compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, param.Type)
@@ -2602,6 +2895,27 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 
 			// Infer argument type with variadic element type as context
 			argType := checkExpr(ctx, mod, arg, variadicElemType)
+			if refParam, ok := types.UnwrapType(variadicElemType).(*types.ReferenceType); ok && !argType.Equals(types.TypeUnknown) {
+				refArg, isRefArg := types.UnwrapType(argType).(*types.ReferenceType)
+				if !isRefArg {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("argument '%s' must be a reference", variadicParam.Name)).
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(arg.Loc(), "expected a reference value").
+							WithHelp("use '&' to pass a reference"),
+					)
+					continue
+				}
+				if refParam.Mutable && !refArg.Mutable {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("argument '%s' must be a mutable reference", variadicParam.Name)).
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(arg.Loc(), "expected a mutable reference").
+							WithHelp("use \"&'\" to pass a mutable reference"),
+					)
+					continue
+				}
+			}
 
 			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)
 			compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, variadicElemType)

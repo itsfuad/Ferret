@@ -113,6 +113,24 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Incompatible
 	}
 
+	if srcRef, ok := types.UnwrapType(source).(*types.ReferenceType); ok {
+		if tgtRef, ok := types.UnwrapType(target).(*types.ReferenceType); ok {
+			if !srcRef.Inner.Equals(tgtRef.Inner) {
+				return Incompatible
+			}
+			if tgtRef.Mutable && !srcRef.Mutable {
+				return Incompatible
+			}
+			if srcRef.Mutable == tgtRef.Mutable {
+				return Identical
+			}
+			return ImplicitCastable // &mut -> & (shared)
+		}
+	}
+	if _, ok := types.UnwrapType(target).(*types.ReferenceType); ok {
+		return Incompatible
+	}
+
 	// Automatic dereferencing: &T is compatible with T
 	// This allows reference types to be used transparently
 	source = dereferenceType(source)
@@ -246,6 +264,24 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, source, target types.SemType) TypeCompatibility {
 	// Handle unknown types
 	if source.Equals(types.TypeUnknown) || target.Equals(types.TypeUnknown) {
+		return Incompatible
+	}
+
+	if srcRef, ok := types.UnwrapType(source).(*types.ReferenceType); ok {
+		if tgtRef, ok := types.UnwrapType(target).(*types.ReferenceType); ok {
+			if !srcRef.Inner.Equals(tgtRef.Inner) {
+				return Incompatible
+			}
+			if tgtRef.Mutable && !srcRef.Mutable {
+				return Incompatible
+			}
+			if srcRef.Mutable == tgtRef.Mutable {
+				return Identical
+			}
+			return ImplicitCastable // &mut -> & (shared)
+		}
+	}
+	if _, ok := types.UnwrapType(target).(*types.ReferenceType); ok {
 		return Incompatible
 	}
 

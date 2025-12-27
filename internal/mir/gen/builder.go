@@ -26,6 +26,8 @@ type functionBuilder struct {
 	loopStack    []loopTargets
 	retParam     mir.ValueID
 	retType      types.SemType
+	refOutParam  mir.ValueID
+	refOutType   types.SemType
 	closureEnv   mir.ValueID
 	captures     map[*symbols.Symbol]captureInfo
 	boxed        map[*symbols.Symbol]mir.ValueID
@@ -41,6 +43,7 @@ func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
 		ptrElem:      make(map[mir.ValueID]types.SemType),
 		loopStack:    nil,
 		retParam:     mir.InvalidValue,
+		refOutParam:  mir.InvalidValue,
 		closureEnv:   mir.InvalidValue,
 		captures:     nil,
 		boxed:        make(map[*symbols.Symbol]mir.ValueID),
@@ -63,6 +66,15 @@ func (b *functionBuilder) buildFuncBody(body *hir.Block) {
 				b.retType = param.Type
 			}
 			b.ptrElem[b.retParam] = b.retType
+		}
+		if param.Name == "__out" {
+			b.refOutParam = param.ID
+			if ref, ok := types.UnwrapType(param.Type).(*types.ReferenceType); ok {
+				b.refOutType = ref.Inner
+			} else {
+				b.refOutType = param.Type
+			}
+			b.ptrElem[b.refOutParam] = b.refOutType
 		}
 	}
 
@@ -213,9 +225,7 @@ func (b *functionBuilder) lowerDeclItem(item hir.DeclItem) {
 
 		val := b.lowerExpr(item.Value)
 		if val != mir.InvalidValue {
-			if interfaceTypeOf(typ) != nil {
-				val = b.boxInterfaceValue(val, b.exprType(item.Value), typ, item.Name.Location)
-			}
+			val = b.coerceValueForAssign(val, b.exprType(item.Value), typ, item.Name.Location)
 			if val != mir.InvalidValue {
 				b.emitStore(addr, val, item.Name.Location)
 			}
@@ -238,10 +248,53 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 		return
 	}
 
+	if lhsType := b.exprType(stmt.Lhs); lhsType != nil {
+		if ref, ok := types.UnwrapType(lhsType).(*types.ReferenceType); ok {
+			refPtr := b.emitLoad(addr, lhsType, stmt.Location)
+			if refPtr == mir.InvalidValue {
+				return
+			}
+			if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
+				cur := b.emitLoad(refPtr, ref.Inner, stmt.Location)
+				rhs := b.lowerExpr(stmt.Rhs)
+				if cur == mir.InvalidValue || rhs == mir.InvalidValue {
+					return
+				}
+				rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), ref.Inner, stmt.Location)
+				if rhs == mir.InvalidValue {
+					return
+				}
+				op := assignTokenToBinary(stmt.Op.Kind)
+				if op == "" {
+					b.reportUnsupported("assignment operator", stmt.Loc())
+					return
+				}
+				res := b.emitBinary(op, cur, rhs, ref.Inner, stmt.Location)
+				b.emitStore(refPtr, res, stmt.Location)
+				return
+			}
+
+			rhs := b.lowerExpr(stmt.Rhs)
+			if rhs == mir.InvalidValue {
+				return
+			}
+			rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), ref.Inner, stmt.Location)
+			if rhs == mir.InvalidValue {
+				return
+			}
+			b.emitStore(refPtr, rhs, stmt.Location)
+			return
+		}
+	}
+
 	if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
 		cur := b.emitLoad(addr, b.exprType(stmt.Lhs), stmt.Location)
 		rhs := b.lowerExpr(stmt.Rhs)
 		if cur == mir.InvalidValue || rhs == mir.InvalidValue {
+			return
+		}
+		rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+		if rhs == mir.InvalidValue {
 			return
 		}
 		op := assignTokenToBinary(stmt.Op.Kind)
@@ -259,11 +312,9 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 	if rhs == mir.InvalidValue {
 		return
 	}
-	if interfaceTypeOf(b.exprType(stmt.Lhs)) != nil {
-		rhs = b.boxInterfaceValue(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
-		if rhs == mir.InvalidValue {
-			return
-		}
+	rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+	if rhs == mir.InvalidValue {
+		return
 	}
 	b.emitStore(addr, rhs, stmt.Location)
 }
@@ -284,16 +335,27 @@ func (b *functionBuilder) lowerReturn(stmt *hir.ReturnStmt) {
 		return
 	}
 
+	resultType := b.exprType(stmt.Result)
 	retType := b.fn.Return
 	if b.retParam != mir.InvalidValue {
 		retType = b.retType
 	}
-	if interfaceTypeOf(retType) != nil {
-		val = b.boxInterfaceValue(val, b.exprType(stmt.Result), retType, stmt.Location)
-		if val == mir.InvalidValue {
-			b.current.Term = &mir.Unreachable{Location: stmt.Location}
-			return
+	val = b.coerceValueForAssign(val, resultType, retType, stmt.Location)
+	if val == mir.InvalidValue {
+		b.current.Term = &mir.Unreachable{Location: stmt.Location}
+		return
+	}
+
+	if b.refOutParam != mir.InvalidValue {
+		if resultType != nil {
+			if _, ok := types.UnwrapType(resultType).(*types.ReferenceType); ok {
+				b.current.Term = &mir.Return{HasValue: true, Value: val, Location: stmt.Location}
+				return
+			}
 		}
+		b.emitStore(b.refOutParam, val, stmt.Location)
+		b.current.Term = &mir.Return{HasValue: true, Value: b.refOutParam, Location: stmt.Location}
+		return
 	}
 
 	if b.retParam != mir.InvalidValue {
@@ -310,7 +372,7 @@ func (b *functionBuilder) lowerIf(stmt *hir.IfStmt) {
 		return
 	}
 
-	cond := b.lowerExpr(stmt.Cond)
+	cond := b.lowerValueExpr(stmt.Cond, stmt.Location)
 	if cond == mir.InvalidValue {
 		b.current.Term = &mir.Unreachable{Location: stmt.Location}
 		return
@@ -393,7 +455,7 @@ func (b *functionBuilder) lowerWhile(stmt *hir.WhileStmt) {
 	b.branchIfNoTerm(condBlock.ID, stmt.Location)
 
 	b.setBlock(condBlock)
-	cond := b.lowerExpr(stmt.Cond)
+	cond := b.lowerValueExpr(stmt.Cond, stmt.Location)
 	if cond == mir.InvalidValue {
 		b.current.Term = &mir.Unreachable{Location: stmt.Location}
 	} else {
@@ -421,13 +483,16 @@ func (b *functionBuilder) lowerMatch(stmt *hir.MatchStmt) {
 		return
 	}
 
-	cond := b.lowerExpr(stmt.Expr)
+	cond := b.lowerValueExpr(stmt.Expr, stmt.Location)
 	if cond == mir.InvalidValue {
 		b.current.Term = &mir.Unreachable{Location: stmt.Location}
 		return
 	}
 
 	matchType := b.exprType(stmt.Expr)
+	if ref, ok := types.UnwrapType(matchType).(*types.ReferenceType); ok {
+		matchType = ref.Inner
+	}
 	if matchType == nil || matchType.Equals(types.TypeUnknown) {
 		matchType = b.exprType(stmt.Expr)
 	}
@@ -672,6 +737,10 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		if left == mir.InvalidValue || right == mir.InvalidValue {
 			return mir.InvalidValue
 		}
+		leftType := b.exprType(e.X)
+		rightType := b.exprType(e.Y)
+		left, leftType = b.derefValueIfNeeded(left, leftType, e.Location)
+		right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
 		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) && b.isStringType(e.Y) {
 			result := b.gen.nextValueID()
 			b.emitInstr(&mir.Call{
@@ -686,8 +755,6 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		if e.Type != nil && !isCompareOp(e.Op.Kind) {
 			target := types.UnwrapType(e.Type)
 			if types.IsNumeric(target) {
-				leftType := b.exprType(e.X)
-				rightType := b.exprType(e.Y)
 				if leftType != nil && types.IsNumeric(types.UnwrapType(leftType)) && !leftType.Equals(e.Type) {
 					left = b.castValue(left, leftType, e.Type, e.Location)
 				}
@@ -696,18 +763,22 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 				}
 			}
 		}
-		if isLargePrimitiveType(b.exprType(e.X)) {
+		if isLargePrimitiveType(leftType) {
 			if isCompareOp(e.Op.Kind) {
-				return b.emitLargeCompare(e.Op.Kind, left, right, b.exprType(e.X), e.Location)
+				return b.emitLargeCompare(e.Op.Kind, left, right, leftType, e.Location)
 			}
-			return b.emitLargeBinary(e.Op.Kind, left, right, b.exprType(e.X), e.Location)
+			return b.emitLargeBinary(e.Op.Kind, left, right, leftType, e.Location)
 		}
 		return b.emitBinary(e.Op.Kind, left, right, e.Type, e.Location)
 	case *hir.UnaryExpr:
+		if e.Op.Kind == tokens.BIT_AND_TOKEN || e.Op.Kind == tokens.MUT_REF_TOKEN {
+			return b.lowerLValue(e.X)
+		}
 		operand := b.lowerExpr(e.X)
 		if operand == mir.InvalidValue {
 			return mir.InvalidValue
 		}
+		operand, _ = b.derefValueIfNeeded(operand, b.exprType(e.X), e.Location)
 		return b.emitUnary(e.Op.Kind, operand, e.Type, e.Location)
 	case *hir.PrefixExpr:
 		return b.lowerPrefix(e)
@@ -726,11 +797,11 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		}
 		return b.castValue(value, b.exprType(e.X), e.Type, e.Location)
 	case *hir.CoalescingExpr:
-		cond := b.lowerExpr(e.Cond)
+		cond := b.lowerValueExpr(e.Cond, e.Location)
 		if cond == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		def := b.lowerExpr(e.Default)
+		def := b.lowerValueExpr(e.Default, e.Location)
 		if def == mir.InvalidValue {
 			return mir.InvalidValue
 		}
@@ -767,6 +838,46 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		b.reportUnsupported("expression", expr.Loc())
 		return mir.InvalidValue
 	}
+}
+
+func (b *functionBuilder) lowerValueExpr(expr hir.Expr, loc source.Location) mir.ValueID {
+	if expr == nil {
+		return mir.InvalidValue
+	}
+	val := b.lowerExpr(expr)
+	if val == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	val, _ = b.derefValueIfNeeded(val, b.exprType(expr), loc)
+	return val
+}
+
+func (b *functionBuilder) derefValueIfNeeded(val mir.ValueID, typ types.SemType, loc source.Location) (mir.ValueID, types.SemType) {
+	if val == mir.InvalidValue || typ == nil {
+		return val, typ
+	}
+	if ref, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
+		val = b.emitLoad(val, ref.Inner, loc)
+		typ = ref.Inner
+	}
+	return val, typ
+}
+
+func (b *functionBuilder) coerceValueForAssign(val mir.ValueID, fromType, toType types.SemType, loc source.Location) mir.ValueID {
+	if val == mir.InvalidValue || fromType == nil || toType == nil {
+		return val
+	}
+	if _, ok := types.UnwrapType(toType).(*types.ReferenceType); ok {
+		return val
+	}
+	if ref, ok := types.UnwrapType(fromType).(*types.ReferenceType); ok {
+		val = b.emitLoad(val, ref.Inner, loc)
+		fromType = ref.Inner
+	}
+	if interfaceTypeOf(toType) != nil {
+		val = b.boxInterfaceValue(val, fromType, toType, loc)
+	}
+	return val
 }
 
 func (b *functionBuilder) lowerResultUnwrap(expr *hir.ResultUnwrap) mir.ValueID {
@@ -922,6 +1033,7 @@ func (b *functionBuilder) lowerPrefix(expr *hir.PrefixExpr) mir.ValueID {
 		if operand == mir.InvalidValue {
 			return mir.InvalidValue
 		}
+		operand, _ = b.derefValueIfNeeded(operand, b.exprType(expr.X), expr.Location)
 		return b.emitUnary(expr.Op.Kind, operand, expr.Type, expr.Location)
 	}
 
@@ -930,12 +1042,35 @@ func (b *functionBuilder) lowerPrefix(expr *hir.PrefixExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	cur := b.emitLoad(addr, b.exprType(expr.X), expr.Location)
+	typ := b.exprType(expr.X)
+	if ref, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
+		refPtr := b.emitLoad(addr, typ, expr.Location)
+		if refPtr == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		cur := b.emitLoad(refPtr, ref.Inner, expr.Location)
+		if cur == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		one := mir.InvalidValue
+		if isLargePrimitiveType(ref.Inner) {
+			one = b.emitLargeConst(ref.Inner, "1", expr.Location)
+		} else {
+			one = b.emitConst(ref.Inner, "1", expr.Location)
+		}
+		op := tokens.PLUS_TOKEN
+		if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+			op = tokens.MINUS_TOKEN
+		}
+		next := b.emitBinary(op, cur, one, ref.Inner, expr.Location)
+		b.emitStore(refPtr, next, expr.Location)
+		return next
+	}
+
+	cur := b.emitLoad(addr, typ, expr.Location)
 	if cur == mir.InvalidValue {
 		return mir.InvalidValue
 	}
-
-	typ := b.exprType(expr.X)
 	one := mir.InvalidValue
 	if isLargePrimitiveType(typ) {
 		one = b.emitLargeConst(typ, "1", expr.Location)
@@ -961,6 +1096,7 @@ func (b *functionBuilder) lowerPostfix(expr *hir.PostfixExpr) mir.ValueID {
 		if operand == mir.InvalidValue {
 			return mir.InvalidValue
 		}
+		operand, _ = b.derefValueIfNeeded(operand, b.exprType(expr.X), expr.Location)
 		return b.emitUnary(expr.Op.Kind, operand, expr.Type, expr.Location)
 	}
 
@@ -969,12 +1105,36 @@ func (b *functionBuilder) lowerPostfix(expr *hir.PostfixExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	cur := b.emitLoad(addr, b.exprType(expr.X), expr.Location)
+	typ := b.exprType(expr.X)
+	if ref, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
+		refPtr := b.emitLoad(addr, typ, expr.Location)
+		if refPtr == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		cur := b.emitLoad(refPtr, ref.Inner, expr.Location)
+		if cur == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		one := mir.InvalidValue
+		if isLargePrimitiveType(ref.Inner) {
+			one = b.emitLargeConst(ref.Inner, "1", expr.Location)
+		} else {
+			one = b.emitConst(ref.Inner, "1", expr.Location)
+		}
+		op := tokens.PLUS_TOKEN
+		if expr.Op.Kind == tokens.MINUS_MINUS_TOKEN {
+			op = tokens.MINUS_TOKEN
+		}
+		next := b.emitBinary(op, cur, one, ref.Inner, expr.Location)
+		b.emitStore(refPtr, next, expr.Location)
+		return cur
+	}
+
+	cur := b.emitLoad(addr, typ, expr.Location)
 	if cur == mir.InvalidValue {
 		return mir.InvalidValue
 	}
 
-	typ := b.exprType(expr.X)
 	one := mir.InvalidValue
 	if isLargePrimitiveType(typ) {
 		one = b.emitLargeConst(typ, "1", expr.Location)
@@ -1058,13 +1218,27 @@ func (b *functionBuilder) lowerCallArgs(args []hir.Expr, fnType *types.FunctionT
 		if val == mir.InvalidValue {
 			return nil
 		}
-		if !skipInterfaceBoxing && fnType != nil && i < len(fnType.Params) {
-			paramType := fnType.Params[i].Type
-			if interfaceTypeOf(paramType) != nil {
-				val = b.boxInterfaceValue(val, b.exprType(arg), paramType, loc)
-				if val == mir.InvalidValue {
-					return nil
+		argType := b.exprType(arg)
+		var paramType types.SemType
+		if fnType != nil && i < len(fnType.Params) {
+			paramType = fnType.Params[i].Type
+		}
+		if ref, ok := types.UnwrapType(argType).(*types.ReferenceType); ok {
+			paramIsRef := false
+			if paramType != nil {
+				if _, ok := types.UnwrapType(paramType).(*types.ReferenceType); ok {
+					paramIsRef = true
 				}
+			}
+			if paramType == nil || !paramIsRef {
+				val = b.emitLoad(val, ref.Inner, loc)
+				argType = ref.Inner
+			}
+		}
+		if !skipInterfaceBoxing && paramType != nil && interfaceTypeOf(paramType) != nil {
+			val = b.boxInterfaceValue(val, argType, paramType, loc)
+			if val == mir.InvalidValue {
+				return nil
 			}
 		}
 		out = append(out, val)
@@ -1159,9 +1333,26 @@ func (b *functionBuilder) boxInterfaceValue(value mir.ValueID, valueType, ifaceT
 
 	dataPtr := value
 	if _, ok := types.UnwrapType(valueType).(*types.ReferenceType); !ok {
-		tmp := b.emitAlloca(valueType, loc)
-		b.emitStore(tmp, value, loc)
-		dataPtr = tmp
+		size := 0
+		if b.gen != nil && b.gen.layout != nil {
+			size = b.gen.layout.SizeOf(valueType)
+		}
+		if size <= 0 {
+			b.reportUnsupported("interface box size", &loc)
+			return mir.InvalidValue
+		}
+		sizeVal := b.emitConst(types.TypeU64, strconv.Itoa(size), loc)
+		box := b.gen.nextValueID()
+		b.emitInstr(&mir.Call{
+			Result:   box,
+			Target:   "ferret_alloc",
+			Args:     []mir.ValueID{sizeVal},
+			Type:     types.NewReference(valueType),
+			Location: loc,
+		})
+		b.ptrElem[box] = valueType
+		b.emitStore(box, value, loc)
+		dataPtr = box
 	}
 
 	if isEmptyInterface(ifaceType) {
@@ -1288,6 +1479,22 @@ func (b *functionBuilder) lowerBuiltinAppendCall(expr *hir.CallExpr) mir.ValueID
 
 func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {
 	retType := expr.Type
+	if ref, ok := types.UnwrapType(retType).(*types.ReferenceType); ok {
+		out := b.emitAlloca(ref.Inner, expr.Location)
+		callArgs := append([]mir.ValueID{out}, args...)
+		result := b.gen.nextValueID()
+		b.emitInstr(&mir.Call{
+			Result:   result,
+			Target:   target,
+			Args:     callArgs,
+			Type:     retType,
+			Location: expr.Location,
+		})
+		if expr.Catch != nil {
+			b.reportUnsupported("call-site catch should be lowered in HIR", &expr.Location)
+		}
+		return result
+	}
 	if needsByRefType(retType) {
 		out := b.emitAlloca(retType, expr.Location)
 		callArgs := append([]mir.ValueID{out}, args...)
@@ -1326,6 +1533,22 @@ func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.
 
 func (b *functionBuilder) emitCallIndirect(callee mir.ValueID, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {
 	retType := expr.Type
+	if ref, ok := types.UnwrapType(retType).(*types.ReferenceType); ok {
+		out := b.emitAlloca(ref.Inner, expr.Location)
+		callArgs := append([]mir.ValueID{out}, args...)
+		result := b.gen.nextValueID()
+		b.emitInstr(&mir.CallIndirect{
+			Result:   result,
+			Callee:   callee,
+			Args:     callArgs,
+			Type:     retType,
+			Location: expr.Location,
+		})
+		if expr.Catch != nil {
+			b.reportUnsupported("call-site catch should be lowered in HIR", &expr.Location)
+		}
+		return result
+	}
 	if needsByRefType(retType) {
 		out := b.emitAlloca(retType, expr.Location)
 		callArgs := append([]mir.ValueID{out}, args...)
@@ -1893,10 +2116,51 @@ func (b *functionBuilder) lowerIndexAssign(expr *hir.IndexExpr, rhs hir.Expr, op
 		return
 	}
 
+	if ref, ok := types.UnwrapType(expr.Type).(*types.ReferenceType); ok {
+		refPtr := b.emitLoad(addr, expr.Type, loc)
+		if refPtr == mir.InvalidValue {
+			return
+		}
+		if op != nil && op.Kind != tokens.EQUALS_TOKEN {
+			cur := b.emitLoad(refPtr, ref.Inner, loc)
+			rhsVal := b.lowerExpr(rhs)
+			if cur == mir.InvalidValue || rhsVal == mir.InvalidValue {
+				return
+			}
+			rhsVal = b.coerceValueForAssign(rhsVal, b.exprType(rhs), ref.Inner, loc)
+			if rhsVal == mir.InvalidValue {
+				return
+			}
+			opKind := assignTokenToBinary(op.Kind)
+			if opKind == "" {
+				b.reportUnsupported("assignment operator", &loc)
+				return
+			}
+			res := b.emitBinary(opKind, cur, rhsVal, ref.Inner, loc)
+			b.emitStore(refPtr, res, loc)
+			return
+		}
+
+		rhsVal := b.lowerExpr(rhs)
+		if rhsVal == mir.InvalidValue {
+			return
+		}
+		rhsVal = b.coerceValueForAssign(rhsVal, b.exprType(rhs), ref.Inner, loc)
+		if rhsVal == mir.InvalidValue {
+			return
+		}
+		b.emitStore(refPtr, rhsVal, loc)
+		return
+	}
+
 	if op != nil && op.Kind != tokens.EQUALS_TOKEN {
 		cur := b.emitLoad(addr, expr.Type, loc)
 		rhsVal := b.lowerExpr(rhs)
 		if cur == mir.InvalidValue || rhsVal == mir.InvalidValue {
+			return
+		}
+		rhsVal = b.coerceValueForAssign(rhsVal, b.exprType(rhs), expr.Type, loc)
+		if rhsVal == mir.InvalidValue {
 			return
 		}
 		opKind := assignTokenToBinary(op.Kind)
@@ -1910,6 +2174,10 @@ func (b *functionBuilder) lowerIndexAssign(expr *hir.IndexExpr, rhs hir.Expr, op
 	}
 
 	rhsVal := b.lowerExpr(rhs)
+	if rhsVal == mir.InvalidValue {
+		return
+	}
+	rhsVal = b.coerceValueForAssign(rhsVal, b.exprType(rhs), expr.Type, loc)
 	if rhsVal == mir.InvalidValue {
 		return
 	}
@@ -1980,14 +2248,47 @@ func (b *functionBuilder) lowerDynamicIndexAssign(expr *hir.IndexExpr, rhs hir.E
 
 	indexVal = b.castValue(indexVal, b.exprType(expr.Index), types.TypeI32, expr.Location)
 
+	lenVal := b.emitArrayLen(arrVal, loc)
+	indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, loc)
+	if indexVal == mir.InvalidValue {
+		return
+	}
+
+	if ref, ok := types.UnwrapType(arrType.Element).(*types.ReferenceType); ok {
+		refPtr := b.emitDynamicArrayGet(arrVal, indexVal, arrType.Element, loc)
+		if refPtr == mir.InvalidValue {
+			return
+		}
+		value := b.lowerExpr(rhs)
+		if value == mir.InvalidValue {
+			return
+		}
+		value = b.coerceValueForAssign(value, b.exprType(rhs), ref.Inner, loc)
+		if value == mir.InvalidValue {
+			return
+		}
+		if op != nil && op.Kind != tokens.EQUALS_TOKEN {
+			cur := b.emitLoad(refPtr, ref.Inner, loc)
+			if cur == mir.InvalidValue {
+				return
+			}
+			opKind := assignTokenToBinary(op.Kind)
+			if opKind == "" {
+				b.reportUnsupported("assignment operator", &loc)
+				return
+			}
+			value = b.emitBinary(opKind, cur, value, ref.Inner, loc)
+		}
+		b.emitStore(refPtr, value, loc)
+		return
+	}
+
 	value := b.lowerExpr(rhs)
 	if value == mir.InvalidValue {
 		return
 	}
-
-	lenVal := b.emitArrayLen(arrVal, loc)
-	indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, loc)
-	if indexVal == mir.InvalidValue {
+	value = b.coerceValueForAssign(value, b.exprType(rhs), arrType.Element, loc)
+	if value == mir.InvalidValue {
 		return
 	}
 
@@ -3251,6 +3552,12 @@ func (b *functionBuilder) reportUnsupported(kind string, loc *source.Location) {
 func (b *functionBuilder) castValue(value mir.ValueID, from, to types.SemType, loc source.Location) mir.ValueID {
 	if from == nil || to == nil {
 		return value
+	}
+	if ref, ok := types.UnwrapType(from).(*types.ReferenceType); ok {
+		if _, ok := types.UnwrapType(to).(*types.ReferenceType); !ok {
+			value = b.emitLoad(value, ref.Inner, loc)
+			from = ref.Inner
+		}
 	}
 	if from.Equals(to) {
 		return value

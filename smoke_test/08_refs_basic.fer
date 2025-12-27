@@ -1,0 +1,14 @@
+import "std/io";
+
+fn main() {
+    let a := 10;
+
+    {
+        let r: &i32 = &a;
+        io::Println(r);
+    }
+
+    let m: &'i32 = &'a;
+    m = 12;
+    io::Println(a);
+}

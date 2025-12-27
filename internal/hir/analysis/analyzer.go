@@ -38,6 +38,9 @@ func AnalyzeModule(ctx *context_v2.CompilerContext, mod *context_v2.Module, hirM
 
 	// Check catch handlers that rely on returning without fallback values.
 	checkCatchHandlers(ctx, mod, hirMod)
+
+	// Enforce borrow rules for references.
+	checkBorrowRules(ctx, mod, hirMod)
 }
 
 // checkConstantConditions checks for constant conditions in if statements and while loops.

@@ -184,13 +184,18 @@ func (g *Generator) buildInterfaceWrapper(wrapperName, target string, ifaceMetho
 		fn.Params = append(fn.Params, g.newParam(param.Name, paramType, loc))
 	}
 
+	g.applyRefReturnABI(fn, retType, loc)
 	g.applyLargeReturnABI(fn, retType, loc)
 
 	retParam := mir.InvalidValue
+	outParam := mir.InvalidValue
 	for _, p := range fn.Params {
 		if p.Name == "__ret" {
 			retParam = p.ID
 			break
+		}
+		if p.Name == "__out" {
+			outParam = p.ID
 		}
 	}
 
@@ -236,10 +241,13 @@ func (g *Generator) buildInterfaceWrapper(wrapperName, target string, ifaceMetho
 
 	callArgs := []mir.ValueID{recvVal}
 	for _, p := range fn.Params {
-		if p.Name == "__self" || p.Name == "__ret" {
+		if p.Name == "__self" || p.Name == "__ret" || p.Name == "__out" {
 			continue
 		}
 		callArgs = append(callArgs, p.ID)
+	}
+	if outParam != mir.InvalidValue {
+		callArgs = append([]mir.ValueID{outParam}, callArgs...)
 	}
 
 	call := &mir.Call{

@@ -14,8 +14,9 @@ func (p *Parser) parseType() ast.TypeNode {
 	tok := p.peek()
 
 	// Check for reference type &T
-	if p.match(tokens.BIT_AND_TOKEN) {
+	if p.match(tokens.MUT_REF_TOKEN, tokens.BIT_AND_TOKEN) {
 		ampersand := p.advance()
+		isMutable := ampersand.Kind == tokens.MUT_REF_TOKEN
 		baseType := p.parseType()
 		// Handle case where baseType might be Invalid with potential nil location issues
 		var endPos *source.Position
@@ -26,6 +27,7 @@ func (p *Parser) parseType() ast.TypeNode {
 		}
 		return &ast.ReferenceType{
 			Base:     baseType,
+			Mutable:  isMutable,
 			Location: *source.NewLocation(&p.filepath, &ampersand.Start, endPos),
 		}
 	}

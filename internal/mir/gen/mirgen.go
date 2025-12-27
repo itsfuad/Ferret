@@ -106,6 +106,7 @@ func (g *Generator) lowerFuncDecl(decl *hir.FuncDecl) *mir.Function {
 	}
 
 	fn.Params = g.lowerParams(decl.Type)
+	g.applyRefReturnABI(fn, retType, decl.Location)
 	g.applyLargeReturnABI(fn, retType, decl.Location)
 	builder := newFunctionBuilder(g, fn)
 	builder.buildFuncBody(decl.Body)
@@ -136,6 +137,7 @@ func (g *Generator) lowerMethodDecl(decl *hir.MethodDecl) *mir.Function {
 	}
 
 	fn.Params = append(fn.Params, g.lowerParams(decl.Type)...)
+	g.applyRefReturnABI(fn, retType, decl.Location)
 	g.applyLargeReturnABI(fn, retType, decl.Location)
 	builder := newFunctionBuilder(g, fn)
 	builder.buildFuncBody(decl.Body)
@@ -261,6 +263,7 @@ func (g *Generator) closureForFuncLit(lit *hir.FuncLit) *closureInfo {
 	envParam := g.newParam("__env", types.NewReference(envType), lit.Location)
 	fn.Params = append(fn.Params, envParam)
 	fn.Params = append(fn.Params, g.lowerParams(fnType)...)
+	g.applyRefReturnABI(fn, retType, lit.Location)
 	g.applyLargeReturnABI(fn, retType, lit.Location)
 
 	builder := newFunctionBuilder(g, fn)
@@ -507,6 +510,7 @@ func (g *Generator) funcValueWrapper(name string, fnType *types.FunctionType, en
 	fn.Params = append(fn.Params, envParam)
 	origParams := g.lowerParams(fnType)
 	fn.Params = append(fn.Params, origParams...)
+	g.applyRefReturnABI(fn, retType, loc)
 	g.applyLargeReturnABI(fn, retType, loc)
 
 	entry := &mir.Block{
@@ -515,7 +519,15 @@ func (g *Generator) funcValueWrapper(name string, fnType *types.FunctionType, en
 		Location: loc,
 	}
 
-	callArgs := make([]mir.ValueID, 0, len(origParams)+1)
+	callArgs := make([]mir.ValueID, 0, len(origParams)+2)
+	if _, ok := types.UnwrapType(retType).(*types.ReferenceType); ok {
+		for _, param := range fn.Params {
+			if param.Name == "__out" {
+				callArgs = append(callArgs, param.ID)
+				break
+			}
+		}
+	}
 	if needsByRefType(retType) {
 		for _, param := range fn.Params {
 			if param.Name == "__ret" {
@@ -530,7 +542,9 @@ func (g *Generator) funcValueWrapper(name string, fnType *types.FunctionType, en
 
 	callResult := mir.InvalidValue
 	callType := retType
-	if needsByRefType(retType) || retType == nil || retType.Equals(types.TypeVoid) {
+	if _, ok := types.UnwrapType(retType).(*types.ReferenceType); ok {
+		callResult = g.nextValueID()
+	} else if needsByRefType(retType) || retType == nil || retType.Equals(types.TypeVoid) {
 		callType = types.TypeVoid
 	} else {
 		callResult = g.nextValueID()
@@ -569,6 +583,26 @@ func (g *Generator) applyLargeReturnABI(fn *mir.Function, retType types.SemType,
 	params = append(params, fn.Params[insertAt:]...)
 	fn.Params = params
 	fn.Return = types.TypeVoid
+}
+
+func (g *Generator) applyRefReturnABI(fn *mir.Function, retType types.SemType, loc source.Location) {
+	if fn == nil {
+		return
+	}
+	ref, ok := types.UnwrapType(retType).(*types.ReferenceType)
+	if !ok || ref == nil {
+		return
+	}
+	outParam := g.newParam("__out", types.NewReference(ref.Inner), loc)
+	insertAt := 0
+	if len(fn.Params) > 0 && fn.Params[0].IsEnv {
+		insertAt = 1
+	}
+	params := make([]mir.Param, 0, len(fn.Params)+1)
+	params = append(params, fn.Params[:insertAt]...)
+	params = append(params, outParam)
+	params = append(params, fn.Params[insertAt:]...)
+	fn.Params = params
 }
 
 func (g *Generator) newParam(name string, typ types.SemType, loc source.Location) mir.Param {
