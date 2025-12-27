@@ -168,7 +168,7 @@
 
             console.log("📥 Fetching ferret.wasm...");
             const wasmVersion = "10.0.0"; // Clean architecture with internal/compiler package
-            const response = await fetch("/ferret.wasm?v=" + wasmVersion, {
+            const response = await fetch("/ferret2.wasm?v=" + wasmVersion, {
                 cache: "no-store", // Force no cache
             });
             if (!response.ok) {
