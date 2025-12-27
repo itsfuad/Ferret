@@ -59,6 +59,9 @@ func (g *Generator) generateFunction(decl *ast.FuncDecl) {
 	if decl.Name == nil {
 		return
 	}
+	if decl.Body == nil {
+		return
+	}
 
 	funcName := decl.Name.Name
 

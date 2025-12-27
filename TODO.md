@@ -17,10 +17,13 @@
   - [x] Attach doc blocks only to symbol declarations (let/const/type/fn/method); discard unused comments.
   - [x] Skip non-doc comments during parsing so inline comments don't break expressions.
   - [x] Restrict `@extern` usage to standard library (ferret_libs) and use doc blocks to mark extern symbols.
-- [ ] Standardize ferret_libs
+- [x] Standardize ferret_libs
   - [x] Add `ferret_libs/global.fer` prelude with builtin declarations (e.g., len/append) using `@extern`.
   - [x] Ensure global prelude loads without import and is visible to LSP/symbols.
-  - [ ] Audit stdlib declarations for extern/implementation consistency.
+  - [x] Warn on stdlib `@extern` declarations without runtime implementations.
+  - [x] Implement `io::Read` runtime helper and align `ReadInt/ReadFloat` with result out-params.
+  - [x] Audit stdlib declarations for extern/implementation consistency.
+  - [x] Lower string concatenation to runtime helper in the QBE path.
 - [x] Builtin primitive coverage (foundation)
   - [x] Ensure full builtin type support in MIR + QBE (i8..i256/u8..u256, f32..f256, bool, str, byte).
   - [x] Show .0 in floating point numbers
@@ -47,7 +50,7 @@
   - [ ] Interface representation (vtable layout + method dispatch).
 - [x] Functions beyond named decls (hard; depends on structs/enums + methods)
   - [x] Function literals and closure capture strategy (if supported in AST).
-- [ ] Error flow (depends on large primitive support)
+- [x] Error flow (depends on large primitive support)
   - [x] MIR lowering for result/catch paths.
 - [ ] Backend targets
   - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).

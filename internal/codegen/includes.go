@@ -27,6 +27,7 @@ var (
 		"#include \"map.h\"",
 		"#include \"bigint.h\"",
 		"#include \"optional.h\"",
+		"#include \"ferret_time.h\"",
 		"#include \"string_runtime.h\"",
 	}
 )

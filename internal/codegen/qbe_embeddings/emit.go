@@ -1520,6 +1520,12 @@ func (g *Generator) resolveCallTarget(target string, args []callArg, loc *source
 		return g.qbeFuncName(funcName, importPath), args, nil
 	}
 
+	if g.mod != nil && g.mod.ModuleScope != nil {
+		if sym, ok := g.mod.ModuleScope.GetSymbol(target); ok && sym.IsNative && sym.NativeName != "" {
+			return sym.NativeName, args, nil
+		}
+	}
+
 	return g.qbeFuncName(target, g.moduleImportPath()), args, nil
 }
 
@@ -1560,6 +1566,12 @@ func (g *Generator) resolveFuncSymbol(target string, fnType *types.FunctionType,
 		}
 
 		return g.qbeFuncName(funcName, importPath), nil
+	}
+
+	if g.mod != nil && g.mod.ModuleScope != nil {
+		if sym, ok := g.mod.ModuleScope.GetSymbol(target); ok && sym.IsNative && sym.NativeName != "" {
+			return sym.NativeName, nil
+		}
 	}
 
 	return g.qbeFuncName(target, g.moduleImportPath()), nil

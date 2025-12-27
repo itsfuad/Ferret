@@ -92,12 +92,22 @@ func (p *Pipeline) collectModulesForCodegen() []string {
 			continue
 		}
 		module, exists := p.ctx.GetModule(importPath)
-		if !exists || module.Type == context_v2.ModuleBuiltin {
+		if !exists {
 			continue
 		}
 
 		modulePhase := p.ctx.GetModulePhase(importPath)
-		if modulePhase >= phase.PhaseMIRGenerated && module.Type == context_v2.ModuleLocal {
+		include := false
+		switch module.Type {
+		case context_v2.ModuleLocal:
+			include = modulePhase >= phase.PhaseMIRGenerated
+		case context_v2.ModuleBuiltin:
+			if importPath != context_v2.GlobalModuleImport {
+				include = modulePhase >= phase.PhaseMIRGenerated
+			}
+		}
+
+		if include {
 			modulesToGenerate = append(modulesToGenerate, importPath)
 			if p.ctx.Config.Debug {
 				colors.CYAN.Printf("  Including module: %s (phase: %s, type: %s)\n", importPath, modulePhase, module.Type)

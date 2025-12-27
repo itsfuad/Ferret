@@ -84,6 +84,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 		filepath.Join(runtimePath, "optional.c"),       // Optional helpers
 		filepath.Join(runtimePath, "array.c"),          // Dynamic array library
 		filepath.Join(runtimePath, "panic.c"),          // Panic helper
+		filepath.Join(runtimePath, "time.c"),           // Time helpers
 		filepath.Join(runtimePath, "string_runtime.c"), // String helpers
 		filepath.Join(runtimePath, "string_builder.c"), // String builder library
 	}

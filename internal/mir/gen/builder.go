@@ -1148,7 +1148,7 @@ func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.
 			Location: expr.Location,
 		})
 		if expr.Catch != nil {
-			b.reportUnsupported("catch clause", &expr.Location)
+			b.reportUnsupported("call-site catch should be lowered in HIR", &expr.Location)
 		}
 		return out
 	}
@@ -1167,7 +1167,7 @@ func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.
 	})
 
 	if expr.Catch != nil {
-		b.reportUnsupported("catch clause", &expr.Location)
+		b.reportUnsupported("call-site catch should be lowered in HIR", &expr.Location)
 	}
 
 	return result
@@ -1186,7 +1186,7 @@ func (b *functionBuilder) emitCallIndirect(callee mir.ValueID, args []mir.ValueI
 			Location: expr.Location,
 		})
 		if expr.Catch != nil {
-			b.reportUnsupported("catch clause", &expr.Location)
+			b.reportUnsupported("call-site catch should be lowered in HIR", &expr.Location)
 		}
 		return out
 	}
@@ -1204,7 +1204,7 @@ func (b *functionBuilder) emitCallIndirect(callee mir.ValueID, args []mir.ValueI
 	})
 
 	if expr.Catch != nil {
-		b.reportUnsupported("catch clause", &expr.Location)
+		b.reportUnsupported("call-site catch should be lowered in HIR", &expr.Location)
 	}
 
 	return result
