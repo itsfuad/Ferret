@@ -34,6 +34,8 @@ type Generator struct {
 	extraFns  []*mir.Function
 	funcWraps map[string]string
 	wrapID    int
+	vtableSeq int
+	vtables   map[string]*mir.VTable
 }
 
 // New creates a new MIR generator for a module.
@@ -48,6 +50,7 @@ func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
 		layout:    mir.NewDataLayout(pointerSize),
 		funcLits:  make(map[string]*closureInfo),
 		funcWraps: make(map[string]string),
+		vtables:   make(map[string]*mir.VTable),
 	}
 }
 
@@ -76,6 +79,15 @@ func (g *Generator) GenerateModule(hirMod *hir.Module) *mir.Module {
 	}
 	if len(g.extraFns) > 0 {
 		mirMod.Functions = append(mirMod.Functions, g.extraFns...)
+	}
+	if len(g.vtables) > 0 {
+		mirMod.VTables = make([]mir.VTable, 0, len(g.vtables))
+		for _, table := range g.vtables {
+			if table == nil {
+				continue
+			}
+			mirMod.VTables = append(mirMod.VTables, *table)
+		}
 	}
 
 	return mirMod

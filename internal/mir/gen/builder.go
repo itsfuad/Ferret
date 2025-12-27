@@ -213,7 +213,12 @@ func (b *functionBuilder) lowerDeclItem(item hir.DeclItem) {
 
 		val := b.lowerExpr(item.Value)
 		if val != mir.InvalidValue {
-			b.emitStore(addr, val, item.Name.Location)
+			if interfaceTypeOf(typ) != nil {
+				val = b.boxInterfaceValue(val, b.exprType(item.Value), typ, item.Name.Location)
+			}
+			if val != mir.InvalidValue {
+				b.emitStore(addr, val, item.Name.Location)
+			}
 		}
 	}
 }
@@ -254,6 +259,12 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 	if rhs == mir.InvalidValue {
 		return
 	}
+	if interfaceTypeOf(b.exprType(stmt.Lhs)) != nil {
+		rhs = b.boxInterfaceValue(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+		if rhs == mir.InvalidValue {
+			return
+		}
+	}
 	b.emitStore(addr, rhs, stmt.Location)
 }
 
@@ -271,6 +282,18 @@ func (b *functionBuilder) lowerReturn(stmt *hir.ReturnStmt) {
 	if val == mir.InvalidValue {
 		b.current.Term = &mir.Unreachable{Location: stmt.Location}
 		return
+	}
+
+	retType := b.fn.Return
+	if b.retParam != mir.InvalidValue {
+		retType = b.retType
+	}
+	if interfaceTypeOf(retType) != nil {
+		val = b.boxInterfaceValue(val, b.exprType(stmt.Result), retType, stmt.Location)
+		if val == mir.InvalidValue {
+			b.current.Term = &mir.Unreachable{Location: stmt.Location}
+			return
+		}
 	}
 
 	if b.retParam != mir.InvalidValue {
@@ -983,33 +1006,31 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		}
 	}
 
+	fnType, _ := types.UnwrapType(b.exprType(expr.Fun)).(*types.FunctionType)
+
 	if selector, ok := expr.Fun.(*hir.SelectorExpr); ok {
+		if iface := interfaceTypeOf(b.exprType(selector.X)); iface != nil && len(iface.Methods) > 0 {
+			return b.lowerInterfaceMethodCall(selector, expr, fnType)
+		}
 		if target, method, ok := b.methodCallTarget(selector); ok {
 			recv := b.methodReceiverArg(selector, method)
 			if recv == mir.InvalidValue {
 				return mir.InvalidValue
 			}
-			args := make([]mir.ValueID, 0, len(expr.Args)+1)
-			args = append(args, recv)
-			for _, arg := range expr.Args {
-				val := b.lowerExpr(arg)
-				if val == mir.InvalidValue {
-					return mir.InvalidValue
-				}
-				args = append(args, val)
+			args := b.lowerCallArgs(expr.Args, fnType, expr.Location, false)
+			if args == nil {
+				return mir.InvalidValue
 			}
-			return b.emitCall(target, args, expr)
+			return b.emitCall(target, append([]mir.ValueID{recv}, args...), expr)
 		}
 	}
 
 	if target, ok := b.callTarget(expr.Fun); ok {
-		args := make([]mir.ValueID, 0, len(expr.Args))
-		for _, arg := range expr.Args {
-			val := b.lowerExpr(arg)
-			if val == mir.InvalidValue {
-				return mir.InvalidValue
-			}
-			args = append(args, val)
+		// Print/Println resolve by concrete arg type in QBE.
+		skipInterfaceBoxing := b.isStdIoPrintTarget(target)
+		args := b.lowerCallArgs(expr.Args, fnType, expr.Location, skipInterfaceBoxing)
+		if args == nil {
+			return mir.InvalidValue
 		}
 		return b.emitCall(target, args, expr)
 	}
@@ -1019,20 +1040,150 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 		if callee == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		args := make([]mir.ValueID, 0, len(expr.Args)+1)
-		args = append(args, callee)
-		for _, arg := range expr.Args {
-			val := b.lowerExpr(arg)
-			if val == mir.InvalidValue {
-				return mir.InvalidValue
-			}
-			args = append(args, val)
+		args := b.lowerCallArgs(expr.Args, fnType, expr.Location, false)
+		if args == nil {
+			return mir.InvalidValue
 		}
-		return b.emitCallIndirect(callee, args, expr)
+		return b.emitCallIndirect(callee, append([]mir.ValueID{callee}, args...), expr)
 	}
 
 	b.reportUnsupported("call target", &expr.Location)
 	return mir.InvalidValue
+}
+
+func (b *functionBuilder) lowerCallArgs(args []hir.Expr, fnType *types.FunctionType, loc source.Location, skipInterfaceBoxing bool) []mir.ValueID {
+	out := make([]mir.ValueID, 0, len(args))
+	for i, arg := range args {
+		val := b.lowerExpr(arg)
+		if val == mir.InvalidValue {
+			return nil
+		}
+		if !skipInterfaceBoxing && fnType != nil && i < len(fnType.Params) {
+			paramType := fnType.Params[i].Type
+			if interfaceTypeOf(paramType) != nil {
+				val = b.boxInterfaceValue(val, b.exprType(arg), paramType, loc)
+				if val == mir.InvalidValue {
+					return nil
+				}
+			}
+		}
+		out = append(out, val)
+	}
+	return out
+}
+
+func (b *functionBuilder) isStdIoPrintTarget(target string) bool {
+	if target == "" {
+		return false
+	}
+	if !strings.Contains(target, "::") {
+		if target != "Print" && target != "Println" {
+			return false
+		}
+		return b.gen != nil && b.gen.mod != nil && b.gen.mod.ImportPath == "std/io"
+	}
+
+	parts := strings.Split(target, "::")
+	if len(parts) < 2 {
+		return false
+	}
+	funcName := parts[len(parts)-1]
+	if funcName != "Print" && funcName != "Println" {
+		return false
+	}
+	moduleAlias := strings.Join(parts[:len(parts)-1], "::")
+	if moduleAlias == "" {
+		return false
+	}
+
+	if b.gen == nil || b.gen.mod == nil || b.gen.mod.ImportAliasMap == nil {
+		return false
+	}
+	return b.gen.mod.ImportAliasMap[moduleAlias] == "std/io"
+}
+
+func (b *functionBuilder) lowerInterfaceMethodCall(selector *hir.SelectorExpr, call *hir.CallExpr, fnType *types.FunctionType) mir.ValueID {
+	if selector == nil || selector.Field == nil || call == nil {
+		return mir.InvalidValue
+	}
+	iface := interfaceTypeOf(b.exprType(selector.X))
+	if iface == nil || len(iface.Methods) == 0 {
+		b.reportUnsupported("interface call", selector.Loc())
+		return mir.InvalidValue
+	}
+
+	methodIndex := -1
+	for i, method := range iface.Methods {
+		if method.Name == selector.Field.Name {
+			methodIndex = i
+			break
+		}
+	}
+	if methodIndex < 0 {
+		b.reportUnsupported("interface method", selector.Loc())
+		return mir.InvalidValue
+	}
+
+	ifaceVal := b.lowerExpr(selector.X)
+	if ifaceVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	ptrType := types.NewReference(types.TypeU8)
+	dataSlot := b.emitPtrAdd(ifaceVal, 0, ptrType, call.Location)
+	dataPtr := b.emitLoad(dataSlot, ptrType, call.Location)
+	vtSlot := b.emitPtrAdd(ifaceVal, b.gen.layout.PointerSize, ptrType, call.Location)
+	vtPtr := b.emitLoad(vtSlot, ptrType, call.Location)
+
+	offset := methodIndex * b.gen.layout.PointerSize
+	methodSlot := b.emitPtrAdd(vtPtr, offset, ptrType, call.Location)
+
+	args := b.lowerCallArgs(call.Args, fnType, call.Location, false)
+	if args == nil {
+		return mir.InvalidValue
+	}
+	allArgs := append([]mir.ValueID{dataPtr}, args...)
+	return b.emitCallIndirect(methodSlot, allArgs, call)
+}
+
+func (b *functionBuilder) boxInterfaceValue(value mir.ValueID, valueType, ifaceType types.SemType, loc source.Location) mir.ValueID {
+	if value == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+	if valueType == nil || ifaceType == nil {
+		return value
+	}
+	if interfaceTypeOf(valueType) != nil {
+		return value
+	}
+
+	dataPtr := value
+	if _, ok := types.UnwrapType(valueType).(*types.ReferenceType); !ok {
+		tmp := b.emitAlloca(valueType, loc)
+		b.emitStore(tmp, value, loc)
+		dataPtr = tmp
+	}
+
+	if isEmptyInterface(ifaceType) {
+		return b.emitCast(dataPtr, ifaceType, loc)
+	}
+
+	vtableName, ok := b.gen.ensureInterfaceVTable(valueType, ifaceType, loc)
+	if !ok || vtableName == "" {
+		return mir.InvalidValue
+	}
+
+	vtablePtr := b.emitConst(types.NewReference(types.TypeU8), "$"+vtableName, loc)
+	ifaceAddr := b.emitAlloca(ifaceType, loc)
+	ptrType := types.NewReference(types.TypeU8)
+
+	dataSlot := b.emitPtrAdd(ifaceAddr, 0, ptrType, loc)
+	b.emitStore(dataSlot, dataPtr, loc)
+
+	vtSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
+	b.emitStore(vtSlot, vtablePtr, loc)
+
+	return ifaceAddr
 }
 
 func builtinNameFromIdent(ident *hir.Ident) (string, bool) {
@@ -3079,6 +3230,9 @@ func (b *functionBuilder) castValue(value mir.ValueID, from, to types.SemType, l
 	}
 	if from.Equals(to) {
 		return value
+	}
+	if interfaceTypeOf(to) != nil {
+		return b.boxInterfaceValue(value, from, to, loc)
 	}
 	if isLargePrimitiveType(from) || isLargePrimitiveType(to) {
 		return b.emitLargeCast(value, from, to, loc)

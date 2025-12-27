@@ -566,6 +566,11 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 		name := item.Name.Name
 
 		if name == "_" {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("blank identifier '_' is only allowed in for loop iterators and function parameters").
+					WithPrimaryLabel(item.Name.Loc(), "cannot declare '_' here").
+					WithHelp("use a real variable name"),
+			)
 			if item.Value != nil {
 				expectedType := types.TypeUnknown
 				if item.Type != nil {
@@ -574,12 +579,6 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 				} else {
 					checkExpr(ctx, mod, item.Value, expectedType)
 				}
-			} else if isConst {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError("constant '_' must be initialized").
-						WithPrimaryLabel(item.Name.Loc(), "constants require an initializer").
-						WithHelp("provide a value: const _ := 42"),
-				)
 			}
 			continue
 		}

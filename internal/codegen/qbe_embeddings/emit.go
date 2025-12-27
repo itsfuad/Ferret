@@ -1126,6 +1126,9 @@ func (g *Generator) constValue(typ types.SemType, value string) (string, error) 
 	}
 
 	if _, ok := typ.(*types.ReferenceType); ok {
+		if strings.HasPrefix(value, "$") {
+			return value, nil
+		}
 		val, err := g.normalizeInt(value)
 		if err != nil {
 			return "", err
@@ -1368,6 +1371,16 @@ func (g *Generator) loadOp(typ types.SemType) (string, error) {
 	if _, ok := typ.(*types.MapType); ok {
 		return "loadl", nil
 	}
+	if iface, ok := typ.(*types.InterfaceType); ok {
+		if len(iface.Methods) == 0 {
+			return "loadl", nil
+		}
+	}
+	if named, ok := typ.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+			return "loadl", nil
+		}
+	}
 	if _, ok := typ.(*types.ReferenceType); ok {
 		return "loadl", nil
 	}
@@ -1405,6 +1418,16 @@ func (g *Generator) storeOp(typ types.SemType) (string, error) {
 	}
 	if _, ok := typ.(*types.MapType); ok {
 		return "storel", nil
+	}
+	if iface, ok := typ.(*types.InterfaceType); ok {
+		if len(iface.Methods) == 0 {
+			return "storel", nil
+		}
+	}
+	if named, ok := typ.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+			return "storel", nil
+		}
 	}
 	if _, ok := typ.(*types.ReferenceType); ok {
 		return "storel", nil
@@ -1895,6 +1918,14 @@ func (g *Generator) needsByRefType(typ types.SemType) bool {
 	}
 	if arr, ok := typ.(*types.ArrayType); ok && arr.Length >= 0 {
 		return true
+	}
+	if iface, ok := typ.(*types.InterfaceType); ok && len(iface.Methods) > 0 {
+		return true
+	}
+	if named, ok := typ.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) > 0 {
+			return true
+		}
 	}
 	return false
 }

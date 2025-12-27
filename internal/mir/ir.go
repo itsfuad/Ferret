@@ -20,7 +20,14 @@ const (
 type Module struct {
 	ImportPath string
 	Functions  []*Function
+	VTables    []VTable
 	Location   source.Location
+}
+
+// VTable describes an interface vtable instance for codegen.
+type VTable struct {
+	Name    string
+	Methods []string
 }
 
 // Function is a typed, SSA-based MIR function.

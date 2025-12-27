@@ -5,7 +5,6 @@ temp
 dist
 *.ast.json
 
-temp
 .gocache
 .cache/
 

@@ -51,6 +51,7 @@ func (g *Generator) Emit() (string, error) {
 		return "", fmt.Errorf("qbe: missing MIR module")
 	}
 
+	g.emitVTables()
 	for _, fn := range g.mirMod.Functions {
 		g.emitFunction(fn)
 	}
@@ -66,6 +67,24 @@ func (g *Generator) Emit() (string, error) {
 	}
 	out.WriteString(g.buf.String())
 	return out.String(), nil
+}
+
+func (g *Generator) emitVTables() {
+	if g == nil || g.mirMod == nil || len(g.mirMod.VTables) == 0 {
+		return
+	}
+
+	for _, table := range g.mirMod.VTables {
+		if table.Name == "" || len(table.Methods) == 0 {
+			continue
+		}
+		entries := make([]string, 0, len(table.Methods))
+		for _, method := range table.Methods {
+			name := g.qbeFuncName(method, g.moduleImportPath())
+			entries = append(entries, fmt.Sprintf("l $%s", name))
+		}
+		g.data.WriteString(fmt.Sprintf("data $%s = { %s }\n", table.Name, strings.Join(entries, ", ")))
+	}
 }
 
 func (g *Generator) emitFunction(fn *mir.Function) {
