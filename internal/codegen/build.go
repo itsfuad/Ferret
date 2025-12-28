@@ -157,6 +157,9 @@ func BuildExecutable(ctx *context_v2.CompilerContext, asmFiles []string, opts *B
 	if assembler == "" {
 		assembler = "as"
 	}
+	if err := ensureToolExists("assembler", assembler); err != nil {
+		return err
+	}
 
 	objFiles := make([]string, 0, len(asmFiles))
 	for _, asmFile := range asmFiles {
@@ -184,6 +187,9 @@ func BuildExecutable(ctx *context_v2.CompilerContext, asmFiles []string, opts *B
 	linker := opts.Linker
 	if linker == "" {
 		return fmt.Errorf("linker must be specified")
+	}
+	if err := ensureToolExists("linker", linker); err != nil {
+		return err
 	}
 
 	if err := applyLdDefaults(opts); err != nil {
@@ -223,6 +229,19 @@ func isLdLinker(linker string) bool {
 	base := filepath.Base(linker)
 	base = strings.TrimSuffix(strings.ToLower(base), ".exe")
 	return base == "ld" || strings.HasPrefix(base, "ld.")
+}
+
+func ensureToolExists(kind, tool string) error {
+	if tool == "" {
+		return fmt.Errorf("%s must be specified", kind)
+	}
+	if _, err := exec.LookPath(tool); err == nil {
+		return nil
+	}
+	if runtime.GOOS == "darwin" {
+		return fmt.Errorf("%s not found: %s; install Xcode Command Line Tools with: xcode-select --install", kind, tool)
+	}
+	return fmt.Errorf("%s not found: %s", kind, tool)
 }
 
 func applyLdDefaults(opts *BuildOptions) error {
