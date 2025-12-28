@@ -45,7 +45,7 @@
     /* Default; overwritten at runtime by Navbar resize observer for a perfect fit. */
     --sl-nav-height: 3.5rem;
     --sl-z-index-navbar: 1000;
-    
+
     --scroll-thumb: hsla(var(--accent-hsl), 0.5);
     --scroll-thumb-hover: hsla(var(--accent-hsl), 0.8);
 }
@@ -62,7 +62,7 @@
     --sl-color-accent: var(--accent-color);
     --sl-color-accent-high: var(--accent-color);
     --sl-color-text-accent: var(--accent-color);
-    
+
     --neutral: rgba(126, 126, 126, 0.164);
     --neutral-hover: rgba(148, 148, 148, 0.344);
 
@@ -351,8 +351,19 @@ header {
     filter: brightness(0.8);
 }
 
-.sidebar a[aria-current="false"]:hover span:first-of-type {
-    color: white !important;
+/* Sidebar hover - explicit theme contrast */
+:root[data-theme="light"]
+    .sidebar
+    a[aria-current="false"]:hover
+    span:first-of-type {
+    color: #111111 !important;
+}
+
+:root[data-theme="dark"]
+    .sidebar
+    a[aria-current="false"]:hover
+    span:first-of-type {
+    color: #ffffff !important;
 }
 
 /* Focus rings */
