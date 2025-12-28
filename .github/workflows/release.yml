@@ -25,6 +25,32 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Set artifact name (unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "FERRET_GOOS=$(go env GOOS)" >> "$GITHUB_ENV"
+          echo "FERRET_GOARCH=$(go env GOARCH)" >> "$GITHUB_ENV"
+          echo "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" >> "$GITHUB_ENV"
+
+      - name: Set artifact name (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "FERRET_GOOS=$(go env GOOS)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FERRET_GOARCH=$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Clean generated files (unix)
+        if: runner.os != 'Windows'
+        run: |
+          rm -rf dist stage libs
+
+      - name: Clean generated files (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force stage, dist, libs -ErrorAction SilentlyContinue
+
       - name: Setup MSYS2
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -78,21 +104,6 @@ jobs:
           Copy-Item -Recurse -Force libs "stage\$env:FERRET_ARTIFACT\"
           Copy-Item -Force LICENSE, README.md "stage\$env:FERRET_ARTIFACT\"
 
-      - name: Set artifact name (unix)
-        if: runner.os != 'Windows'
-        run: |
-          echo "FERRET_GOOS=$(go env GOOS)" >> "$GITHUB_ENV"
-          echo "FERRET_GOARCH=$(go env GOARCH)" >> "$GITHUB_ENV"
-          echo "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" >> "$GITHUB_ENV"
-
-      - name: Set artifact name (windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          "FERRET_GOOS=$(go env GOOS)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "FERRET_GOARCH=$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
-
       - name: Package (unix)
         if: runner.os != 'Windows'
         run: |
@@ -117,6 +128,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Clean dist
+        run: rm -rf dist
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
