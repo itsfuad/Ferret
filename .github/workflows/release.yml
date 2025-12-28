@@ -74,40 +74,38 @@ jobs:
           New-Item -ItemType Directory -Force -Path bin | Out-Null
           go build -v -o bin\ferret.exe
 
-      - name: Go env (unix)
+      - name: Set artifact name (unix)
         if: runner.os != 'Windows'
-        id: goenv
         run: |
-          echo "goos=$(go env GOOS)" >> "$GITHUB_OUTPUT"
-          echo "goarch=$(go env GOARCH)" >> "$GITHUB_OUTPUT"
+          echo "FERRET_GOOS=$(go env GOOS)" >> "$GITHUB_ENV"
+          echo "FERRET_GOARCH=$(go env GOARCH)" >> "$GITHUB_ENV"
+          echo "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" >> "$GITHUB_ENV"
 
-      - name: Go env (windows)
+      - name: Set artifact name (windows)
         if: runner.os == 'Windows'
-        id: goenv
         shell: pwsh
         run: |
-          "goos=$(go env GOOS)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "goarch=$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "FERRET_GOOS=$(go env GOOS)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FERRET_GOARCH=$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Package (unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
-          name="ferret-${{ steps.goenv.outputs.goos }}-${{ steps.goenv.outputs.goarch }}"
-          tar -czf "dist/${name}.tar.gz" bin libs LICENSE README.md
+          tar -czf "dist/${FERRET_ARTIFACT}.tar.gz" bin libs LICENSE README.md
 
       - name: Package (windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $name = "ferret-${{ steps.goenv.outputs.goos }}-${{ steps.goenv.outputs.goarch }}"
-          Compress-Archive -Path bin, libs, LICENSE, README.md -DestinationPath "dist/$name.zip"
+          Compress-Archive -Path bin, libs, LICENSE, README.md -DestinationPath "dist/$env:FERRET_ARTIFACT.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ferret-${{ steps.goenv.outputs.goos }}-${{ steps.goenv.outputs.goarch }}
+          name: ${{ env.FERRET_ARTIFACT }}
           path: dist/*
 
       - name: Publish release assets
