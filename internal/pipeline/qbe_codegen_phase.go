@@ -58,7 +58,7 @@ func (p *Pipeline) runQBECodegenPhase() error {
 		}
 	}
 
-	if err := p.buildExecutableMultiple(asmFiles, execPath, tempDir); err != nil {
+	if err := p.buildExecutableMultiple(asmFiles, execPath); err != nil {
 		p.ctx.ReportError(fmt.Sprintf("build failed: %v", err), nil)
 		return err
 	}

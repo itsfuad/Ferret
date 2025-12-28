@@ -16,3 +16,12 @@ git stash pop
 git stash apply
 # and later
 git stash drop
+
+
+--------
+
+Do one thing. currently ferret uses C files directly for the runtime implementation. So it calls gcc or similar c compiler.
+
+Rather than this way, as while compilation of ferret itself, we must have a c compiler installed to use cgo, we can compile those runtime C codes to static libraries. then QBE emits .s files which use assemble and link. So at user point, user do not need any c compiler or will have any c files. just they need assembler and linker which we will bundle with ferret later.
+
+Did you understand?

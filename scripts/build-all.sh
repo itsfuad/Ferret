@@ -17,7 +17,7 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 echo ""
-echo "[1/2] Building native executable..."
+echo "[1/3] Building native executable..."
 echo "------------------------------------"
 go build -v -o "$TARGET_DIR/ferret" main.go
 if [ $? -ne 0 ]; then
@@ -27,7 +27,17 @@ fi
 echo "[OK] Native executable: $TARGET_DIR/ferret"
 
 echo ""
-echo "[2/2] Building WebAssembly module..."
+echo "[2/3] Bootstrapping runtime + toolchain..."
+echo "------------------------------------"
+go run ./tools
+if [ $? -ne 0 ]; then
+    echo "[FAILED] Bootstrap step failed."
+    exit 1
+fi
+echo "[OK] Libraries + toolchain in libs/"
+
+echo ""
+echo "[3/3] Building WebAssembly module..."
 echo "------------------------------------"
 GOOS=js GOARCH=wasm go build -v -o "website/public/ferret.wasm" main_wasm.go
 if [ $? -ne 0 ]; then

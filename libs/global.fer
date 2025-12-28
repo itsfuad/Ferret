@@ -1,0 +1,7 @@
+// Global builtins (implicitly available in every module).
+// These are declarations only; implementations are compiler intrinsics.
+
+// @extern
+fn len(value: interface {}) -> i32;
+// @extern
+fn append(values: []interface {}, value: interface {}) -> bool;
