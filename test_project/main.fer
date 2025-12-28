@@ -1,9 +1,0 @@
-import "std/io";
-
-fn main() {
-    let fruits : []str = ["apple", "banana", "cherry"];
-
-    for _, _ in fruits {
-        io::Println("Fruit ");
-    }
-}

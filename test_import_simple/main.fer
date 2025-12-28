@@ -1,5 +1,0 @@
-import "std/io";
-
-fn main() {
-    io::Println("Import test: std/io works!");
-}

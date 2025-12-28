@@ -1,9 +1,0 @@
-import "std/io";
-
-fn main() {
-    let line := io::Read() catch e {
-        io::Println(e);
-        return;
-    };
-    io::Println(line);
-}
