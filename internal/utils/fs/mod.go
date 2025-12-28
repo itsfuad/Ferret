@@ -1,7 +1,6 @@
 package fs
 
 import (
-	//"compiler/config"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,8 +9,9 @@ import (
 // Check if file exists and is a regular file
 func IsValidFile(filename string) bool {
 	fileInfo, err := os.Stat(filename)
-	return err == nil && !fileInfo.Mode().IsDir()
+	return err == nil && fileInfo.Mode().IsRegular()
 }
+
 
 func IsDir(path string) bool {
 	fileInfo, err := os.Stat(path)

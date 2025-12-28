@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"compiler/colors"
 	"compiler/internal/compiler"
 )
 
@@ -96,6 +97,7 @@ func main() {
 
 	// Exit code
 	if !result.Success {
+		colors.RED.Println(result.Output)
 		os.Exit(1)
 	}
 }
