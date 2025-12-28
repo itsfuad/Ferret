@@ -104,6 +104,7 @@ export default defineConfig({
                     { label: 'Error Handling', slug: 'advanced/errors' },
                     { label: 'Generics', slug: 'advanced/generics' },
                     { label: 'Modules', slug: 'advanced/modules' },
+                    { label: 'Practical Examples', slug: 'advanced/practical'}
                 ],
             },
         ],
