@@ -44,15 +44,27 @@ func DefaultBuildOptions() *BuildOptions {
 	toolchainPath := resolveToolchainPath()
 	if toolchainPath != "" {
 		if assembler == "" {
-			candidate := filepath.Join(toolchainPath, "as")
-			if utilsfs.IsValidFile(candidate) {
-				assembler = candidate
+			candidates := []string{filepath.Join(toolchainPath, "as")}
+			if runtime.GOOS == "windows" {
+				candidates = append([]string{filepath.Join(toolchainPath, "as.exe")}, candidates...)
+			}
+			for _, candidate := range candidates {
+				if utilsfs.IsValidFile(candidate) {
+					assembler = candidate
+					break
+				}
 			}
 		}
 		if linker == "" {
-			candidate := filepath.Join(toolchainPath, "ld")
-			if utilsfs.IsValidFile(candidate) {
-				linker = candidate
+			candidates := []string{filepath.Join(toolchainPath, "ld")}
+			if runtime.GOOS == "windows" {
+				candidates = append([]string{filepath.Join(toolchainPath, "ld.exe")}, candidates...)
+			}
+			for _, candidate := range candidates {
+				if utilsfs.IsValidFile(candidate) {
+					linker = candidate
+					break
+				}
 			}
 		}
 
@@ -82,11 +94,25 @@ func DefaultBuildOptions() *BuildOptions {
 		}
 	}
 
+	linkLibs := []string{"-lm"}
+	if runtime.GOOS == "windows" {
+		linkLibs = []string{
+			"-lmingw32",
+			"-lmingwex",
+			"-lmsvcrt",
+			"-lkernel32",
+			"-luser32",
+			"-lgcc",
+			"-lgcc_eh",
+			"-lm",
+		}
+	}
+
 	return &BuildOptions{
 		Assembler:   assembler,
 		Linker:      linker,
 		LinkFlags:   linkFlags, // -s: strip symbols
-		LinkLibs:    []string{"-lm"},
+		LinkLibs:    linkLibs,
 		RuntimePath: "libs",
 		Debug:       false,
 	}
@@ -195,6 +221,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, asmFiles []string, opts *B
 
 func isLdLinker(linker string) bool {
 	base := filepath.Base(linker)
+	base = strings.TrimSuffix(strings.ToLower(base), ".exe")
 	return base == "ld" || strings.HasPrefix(base, "ld.")
 }
 
@@ -211,29 +238,37 @@ func applyLdDefaults(opts *BuildOptions) error {
 		opts.LinkLibs = append(opts.LinkLibs, extraLibs...)
 	}
 
-	if runtime.GOOS != "linux" {
-		return nil
-	}
+	switch runtime.GOOS {
+	case "linux":
+		crt1, crti, crtn := findLinuxCrtObjects()
+		if crt1 == "" || crti == "" || crtn == "" {
+			return fmt.Errorf("ld: missing C runtime objects; set FERRET_LD_CRT1, FERRET_LD_CRTI, and FERRET_LD_CRTN")
+		}
 
-	crt1, crti, crtn := findLinuxCrtObjects()
-	if crt1 == "" || crti == "" || crtn == "" {
-		return fmt.Errorf("ld: missing C runtime objects; set FERRET_LD_CRT1, FERRET_LD_CRTI, and FERRET_LD_CRTN")
-	}
+		dyn := findLinuxDynamicLinker()
+		if dyn == "" {
+			return fmt.Errorf("ld: dynamic linker not found; set FERRET_LD_DYNAMIC_LINKER")
+		}
 
-	dyn := findLinuxDynamicLinker()
-	if dyn == "" {
-		return fmt.Errorf("ld: dynamic linker not found; set FERRET_LD_DYNAMIC_LINKER")
-	}
+		if !containsArg(opts.LinkFlags, "-dynamic-linker") {
+			opts.LinkFlags = append(opts.LinkFlags, "-dynamic-linker", dyn)
+		}
 
-	if !containsArg(opts.LinkFlags, "-dynamic-linker") {
-		opts.LinkFlags = append(opts.LinkFlags, "-dynamic-linker", dyn)
+		opts.LinkInputs = append(opts.LinkInputs, crt1, crti)
+		if !containsArg(opts.LinkLibs, "-lc") {
+			opts.LinkLibs = append([]string{"-lc"}, opts.LinkLibs...)
+		}
+		opts.LinkPost = append(opts.LinkPost, crtn)
+	case "android":
+		return fmt.Errorf("android builds are not supported here; use install-termux.sh")
+	case "windows":
+		crt2, crtbegin, crtend := findWindowsCrtObjects()
+		if crt2 == "" || crtbegin == "" || crtend == "" {
+			return fmt.Errorf("ld: missing C runtime objects; set FERRET_LD_CRT2, FERRET_LD_CRTBEGIN, and FERRET_LD_CRTEND")
+		}
+		opts.LinkInputs = append(opts.LinkInputs, crt2, crtbegin)
+		opts.LinkPost = append(opts.LinkPost, crtend)
 	}
-
-	opts.LinkInputs = append(opts.LinkInputs, crt1, crti)
-	if !containsArg(opts.LinkLibs, "-lc") {
-		opts.LinkLibs = append([]string{"-lc"}, opts.LinkLibs...)
-	}
-	opts.LinkPost = append(opts.LinkPost, crtn)
 
 	return nil
 }
@@ -311,6 +346,42 @@ func linuxLibDirs() []string {
 		unique = append(unique, dir)
 	}
 	return unique
+}
+
+func windowsLibDirs() []string {
+	dirs := []string{}
+	if tc := toolchainLibDir(); tc != "" {
+		dirs = append(dirs, tc)
+	}
+	seen := make(map[string]struct{}, len(dirs))
+	unique := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		if _, ok := seen[dir]; ok {
+			continue
+		}
+		seen[dir] = struct{}{}
+		unique = append(unique, dir)
+	}
+	return unique
+}
+
+func findWindowsCrtObjects() (string, string, string) {
+	crt2 := os.Getenv("FERRET_LD_CRT2")
+	crtbegin := os.Getenv("FERRET_LD_CRTBEGIN")
+	crtend := os.Getenv("FERRET_LD_CRTEND")
+
+	dirs := windowsLibDirs()
+	if crt2 == "" {
+		crt2 = firstExisting(dirs, "crt2.o")
+	}
+	if crtbegin == "" {
+		crtbegin = firstExisting(dirs, "crtbegin.o")
+	}
+	if crtend == "" {
+		crtend = firstExisting(dirs, "crtend.o")
+	}
+
+	return crt2, crtbegin, crtend
 }
 
 func firstExisting(dirs []string, name string) string {

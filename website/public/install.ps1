@@ -26,7 +26,25 @@ Remove-Item -Recurse -Force (Join-Path $installDir "libs") -ErrorAction Silently
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
 Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+$binDir = Join-Path $installDir "bin"
+
+function Add-ToPath {
+    param([string]$dir)
+    $current = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ([string]::IsNullOrWhiteSpace($current)) {
+        $current = ""
+    }
+    $parts = $current -split ';' | Where-Object { $_ -and $_ -ne "" }
+    if ($parts -contains $dir) {
+        return
+    }
+    $newPath = ($parts + $dir) -join ';'
+    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+    $env:Path = "$newPath;$env:Path"
+}
+
+Add-ToPath $binDir
 
 Write-Host "Installed to $installDir"
-Write-Host "Add to PATH:"
-Write-Host "  $installDir\bin"
+Write-Host "Added to PATH: $binDir"
+Write-Host "Restart your terminal to use 'ferret'."

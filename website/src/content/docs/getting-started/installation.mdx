@@ -23,11 +23,16 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
     powershell -NoProfile -ExecutionPolicy Bypass -Command "irm -useb https://ferret.brainbird.org/install.ps1 | iex"
     ```
   </TabItem>
+  <TabItem label="Termux">
+    ```bash
+    curl -fsSL https://ferret.brainbird.org/install-termux.sh | sh
+    ```
+  </TabItem>
 </Tabs>
 
 :::note
-The installer downloads a prebuilt release for your OS/arch into `~/.ferret` (Linux/macOS) or `%USERPROFILE%\.ferret` (Windows).
-You can change the location by setting `FERRET_INSTALL_DIR`.
+The installer downloads a prebuilt release for your OS/arch into `~/.ferret` (Linux/macOS) or `%USERPROFILE%\.ferret` (Windows), and adds the `bin/` directory to your PATH. On Termux, the script builds from source and installs into `$PREFIX`.
+You can change the location by setting `FERRET_INSTALL_DIR`. Set `FERRET_ADD_TO_PATH=0` to skip PATH changes.
 :::
 
 ## Verify installation

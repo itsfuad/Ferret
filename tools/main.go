@@ -25,6 +25,10 @@ func run() error {
 		return err
 	}
 
+	if runtime.GOOS == "android" {
+		return fmt.Errorf("android/termux bootstrap is handled by install-termux.sh")
+	}
+
 	libsDir := filepath.Join(root, "libs")
 	if err := os.MkdirAll(libsDir, 0755); err != nil {
 		return fmt.Errorf("create libs dir: %w", err)
@@ -38,8 +42,15 @@ func run() error {
 		return err
 	}
 
-	if err := copyToolchain(libsDir); err != nil {
-		return err
+	if shouldBundleToolchain() {
+		if err := copyToolchain(libsDir); err != nil {
+			return err
+		}
+	} else {
+		toolchainDir := filepath.Join(libsDir, "toolchain")
+		if err := os.RemoveAll(toolchainDir); err != nil {
+			return fmt.Errorf("clean toolchain dir: %w", err)
+		}
 	}
 
 	return nil
@@ -169,6 +180,9 @@ func buildRuntimeLib(runtimeDir, libsDir string) error {
 
 func copyToolchain(libsDir string) error {
 	toolchainDir := filepath.Join(libsDir, "toolchain")
+	if err := os.RemoveAll(toolchainDir); err != nil {
+		return fmt.Errorf("clean toolchain dir: %w", err)
+	}
 	if err := os.MkdirAll(toolchainDir, 0755); err != nil {
 		return fmt.Errorf("create toolchain dir: %w", err)
 	}
@@ -186,10 +200,12 @@ func copyToolchain(libsDir string) error {
 		return err
 	}
 
-	if err := copyFile(asPath, filepath.Join(toolchainDir, "as")); err != nil {
+	asDest := toolBinaryName("as", asPath)
+	if err := copyFile(asPath, filepath.Join(toolchainDir, asDest)); err != nil {
 		return fmt.Errorf("copy as: %w", err)
 	}
-	if err := copyFile(ldPath, filepath.Join(toolchainDir, "ld")); err != nil {
+	ldDest := toolBinaryName("ld", ldPath)
+	if err := copyFile(ldPath, filepath.Join(toolchainDir, ldDest)); err != nil {
 		return fmt.Errorf("copy ld: %w", err)
 	}
 
@@ -263,10 +279,20 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
+func shouldBundleToolchain() bool {
+	if val := strings.TrimSpace(os.Getenv("FERRET_BUNDLE_TOOLCHAIN")); val != "" {
+		val = strings.ToLower(val)
+		return val == "1" || val == "true" || val == "yes"
+	}
+	return runtime.GOOS != "darwin"
+}
+
 func copyToolchainDeps(toolchainDir, libDir, asPath, ldPath string) error {
 	switch runtime.GOOS {
 	case "linux":
 		return copyLinuxToolchain(libDir, asPath, ldPath)
+	case "windows":
+		return copyWindowsToolchain(libDir, asPath, ldPath)
 	default:
 		return copyBinaryDeps(libDir, asPath, ldPath)
 	}
@@ -296,6 +322,105 @@ func copyLinuxToolchain(libDir, asPath, ldPath string) error {
 		if err := copyIfExists(libDir, loader); err != nil {
 			return err
 		}
+	}
+
+	if err := copyBinaryDeps(libDir, asPath, ldPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyWindowsToolchain(libDir, asPath, ldPath string) error {
+	cc, err := resolveTool("FERRET_CC", "CC", defaultCompiler())
+	if err != nil {
+		return err
+	}
+	ccPath, _ := exec.LookPath(cc)
+	libDirs := gccLibDirs(cc)
+
+	crt2 := gccPrintFile(cc, "crt2.o")
+	if crt2 == "" {
+		crt2 = findInDirs(libDirs, "crt2.o")
+	}
+	crtbegin := gccPrintFile(cc, "crtbegin.o")
+	if crtbegin == "" {
+		crtbegin = findInDirs(libDirs, "crtbegin.o")
+	}
+	crtend := gccPrintFile(cc, "crtend.o")
+	if crtend == "" {
+		crtend = findInDirs(libDirs, "crtend.o")
+	}
+
+	libm := gccPrintFile(cc, "libm.a")
+	if libm == "" {
+		libm = gccPrintFile(cc, "libm.dll.a")
+	}
+	if libm == "" {
+		libm = findInDirs(libDirs, "libm.a")
+		if libm == "" {
+			libm = findInDirs(libDirs, "libm.dll.a")
+		}
+	}
+	libmsvcrt := gccPrintFile(cc, "libmsvcrt.a")
+	if libmsvcrt == "" {
+		libmsvcrt = gccPrintFile(cc, "libmsvcrt.dll.a")
+	}
+	if libmsvcrt == "" {
+		libmsvcrt = findInDirs(libDirs, "libmsvcrt.a")
+		if libmsvcrt == "" {
+			libmsvcrt = findInDirs(libDirs, "libmsvcrt.dll.a")
+		}
+	}
+	libmingw32 := gccPrintFile(cc, "libmingw32.a")
+	if libmingw32 == "" {
+		libmingw32 = findInDirs(libDirs, "libmingw32.a")
+	}
+	libmingwex := gccPrintFile(cc, "libmingwex.a")
+	if libmingwex == "" {
+		libmingwex = findInDirs(libDirs, "libmingwex.a")
+	}
+	libgcc := gccPrintFile(cc, "libgcc.a")
+	if libgcc == "" {
+		libgcc = findInDirs(libDirs, "libgcc.a")
+	}
+	libgcceh := gccPrintFile(cc, "libgcc_eh.a")
+	if libgcceh == "" {
+		libgcceh = findInDirs(libDirs, "libgcc_eh.a")
+	}
+	libkernel32 := gccPrintFile(cc, "libkernel32.a")
+	if libkernel32 == "" {
+		libkernel32 = findInDirs(libDirs, "libkernel32.a")
+	}
+	libuser32 := gccPrintFile(cc, "libuser32.a")
+	if libuser32 == "" {
+		libuser32 = findInDirs(libDirs, "libuser32.a")
+	}
+
+	if err := copyIfExists(libDir, crt2, crtbegin, crtend, libm, libmsvcrt, libmingw32, libmingwex, libgcc, libgcceh, libkernel32, libuser32); err != nil {
+		return err
+	}
+
+	dllNames := []string{
+		"libgcc_s_seh-1.dll",
+		"libgcc_s_dw2-1.dll",
+		"libwinpthread-1.dll",
+		"libstdc++-6.dll",
+	}
+	dllDirs := []string{}
+	if ccPath != "" {
+		dllDirs = append(dllDirs, filepath.Dir(ccPath))
+	}
+	dlls := make([]string, 0, len(dllNames))
+	for _, name := range dllNames {
+		path := gccPrintFile(cc, name)
+		if path == "" && len(dllDirs) > 0 {
+			path = findInDirs(dllDirs, name)
+		}
+		dlls = append(dlls, path)
+	}
+	if err := copyIfExists(libDir, dlls...); err != nil {
+		return err
 	}
 
 	if err := copyBinaryDeps(libDir, asPath, ldPath); err != nil {
@@ -339,7 +464,32 @@ func copyWithLdd(libDir string, binaries ...string) error {
 	return nil
 }
 
+func toolBinaryName(defaultName, path string) string {
+	base := filepath.Base(path)
+	if runtime.GOOS == "windows" && strings.HasSuffix(strings.ToLower(base), ".exe") {
+		return base
+	}
+	if runtime.GOOS == "windows" {
+		return defaultName + ".exe"
+	}
+	return defaultName
+}
+
+func findInDirs(dirs []string, name string) string {
+	if name == "" {
+		return ""
+	}
+	for _, dir := range dirs {
+		path := filepath.Join(dir, name)
+		if fileExists(path) {
+			return path
+		}
+	}
+	return ""
+}
+
 func copyWithOtool(libDir string, binaries ...string) error {
+	searchDirs := darwinSearchDirs(binaries...)
 	seen := map[string]struct{}{}
 	for _, bin := range binaries {
 		if bin == "" {
@@ -354,6 +504,13 @@ func copyWithOtool(libDir string, binaries ...string) error {
 				continue
 			}
 			seen[path] = struct{}{}
+			if strings.HasPrefix(path, "@") {
+				resolved := resolveDarwinPath(path, bin, searchDirs)
+				if resolved == "" {
+					continue
+				}
+				path = resolved
+			}
 			if err := copyIfExists(libDir, path); err != nil {
 				return err
 			}
@@ -415,9 +572,7 @@ func otoolPaths(bin string) ([]string, error) {
 			continue
 		}
 		path := fields[0]
-		if strings.HasPrefix(path, "/") {
-			paths = append(paths, path)
-		}
+		paths = append(paths, path)
 	}
 	return paths, nil
 }
@@ -513,4 +668,97 @@ func gccLibDirs(cc string) []string {
 		return dirs
 	}
 	return nil
+}
+
+func darwinSearchDirs(binaries ...string) []string {
+	dirs := []string{
+		"/usr/lib",
+		"/usr/local/lib",
+		"/Library/Developer/CommandLineTools/usr/lib",
+	}
+
+	for _, bin := range binaries {
+		if bin == "" {
+			continue
+		}
+		binDir := filepath.Dir(bin)
+		dirs = append(dirs, binDir, filepath.Join(binDir, "..", "lib"))
+	}
+
+	if sdk := xcrunSDKPath(); sdk != "" {
+		dirs = append(dirs, filepath.Join(sdk, "usr", "lib"))
+	}
+	if clang := xcrunFind("clang"); clang != "" {
+		dirs = append(dirs, filepath.Join(filepath.Dir(clang), "..", "lib"))
+	}
+	if ld := xcrunFind("ld"); ld != "" {
+		dirs = append(dirs, filepath.Join(filepath.Dir(ld), "..", "lib"))
+	}
+
+	seen := make(map[string]struct{}, len(dirs))
+	unique := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		dir = filepath.Clean(dir)
+		if dir == "" {
+			continue
+		}
+		if _, ok := seen[dir]; ok {
+			continue
+		}
+		seen[dir] = struct{}{}
+		unique = append(unique, dir)
+	}
+
+	return unique
+}
+
+func resolveDarwinPath(path, bin string, searchDirs []string) string {
+	switch {
+	case strings.HasPrefix(path, "@loader_path/"):
+		rel := strings.TrimPrefix(path, "@loader_path/")
+		candidate := filepath.Join(filepath.Dir(bin), rel)
+		if fileExists(candidate) {
+			return candidate
+		}
+	case strings.HasPrefix(path, "@executable_path/"):
+		rel := strings.TrimPrefix(path, "@executable_path/")
+		candidate := filepath.Join(filepath.Dir(bin), rel)
+		if fileExists(candidate) {
+			return candidate
+		}
+	case strings.HasPrefix(path, "@rpath/"):
+		name := strings.TrimPrefix(path, "@rpath/")
+		if resolved := findInDirs(searchDirs, name); resolved != "" {
+			return resolved
+		}
+	}
+
+	if strings.HasPrefix(path, "/") && fileExists(path) {
+		return path
+	}
+	return ""
+}
+
+func xcrunFind(tool string) string {
+	out, err := exec.Command("xcrun", "--find", tool).CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimSpace(string(out))
+	if path == "" || !fileExists(path) {
+		return ""
+	}
+	return path
+}
+
+func xcrunSDKPath() string {
+	out, err := exec.Command("xcrun", "--show-sdk-path").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimSpace(string(out))
+	if path == "" || !fileExists(path) {
+		return ""
+	}
+	return path
 }
