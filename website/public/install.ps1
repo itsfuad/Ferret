@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $repo = if ($env:FERRET_REPO) { $env:FERRET_REPO } else { "itsfuad/Ferret" }
 $baseUrl = if ($env:FERRET_RELEASE_BASE) { $env:FERRET_RELEASE_BASE } else { "https://github.com/$repo/releases/latest/download" }

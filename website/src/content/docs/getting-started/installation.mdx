@@ -10,17 +10,17 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 <Tabs>
   <TabItem label="macOS / Linux (shell)">
     ```bash
-    curl -fsSL https://itsfuad.github.io/Ferret/install.sh | sh
+    curl -fsSL https://ferret.brainbird.org/install.sh | sh
     ```
   </TabItem>
   <TabItem label="Windows (PowerShell)">
     ```sh
-    iwr -useb https://itsfuad.github.io/Ferret/install.ps1 | iex
+    irm -useb https://ferret.brainbird.org/install.ps1 | iex
     ```
   </TabItem>
   <TabItem label="Windows (Command Prompt)">
     ```bat
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://itsfuad.github.io/Ferret/install.ps1 | iex"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "irm -useb https://ferret.brainbird.org/install.ps1 | iex"
     ```
   </TabItem>
 </Tabs>
