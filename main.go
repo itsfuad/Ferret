@@ -11,7 +11,7 @@ import (
 	"compiler/internal/compiler"
 )
 
-const version = "0.0.3-alpha"
+const version = "0.0.1"
 
 func main() {
 	// Define flags

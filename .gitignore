@@ -1,10 +1,3 @@
-node_modules
-temp
-.env
-.astro
-dist
-*.ast.json
-
 .gocache
 .cache/
 
@@ -31,3 +24,4 @@ dist
 *.dll
 .tmp
 bin
+libs
