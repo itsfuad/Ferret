@@ -30,3 +30,4 @@ dist
 *.exe
 *.dll
 .tmp
+bin
