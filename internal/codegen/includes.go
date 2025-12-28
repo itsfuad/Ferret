@@ -29,6 +29,7 @@ var (
 		"#include \"optional.h\"",
 		"#include \"ferret_time.h\"",
 		"#include \"string_runtime.h\"",
+		"#include \"random.h\"",
 	}
 )
 

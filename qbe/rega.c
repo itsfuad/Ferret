@@ -65,6 +65,17 @@ rfind(RMap *m, int t)
 	return -1;
 }
 
+static int
+regused(RMap *m, int r, int skip)
+{
+	int i;
+
+	for (i=0; i<m->n; i++)
+		if (i != skip && m->r[i] == r)
+			return 1;
+	return 0;
+}
+
 static Ref
 rref(RMap *m, int t)
 {
@@ -595,7 +606,14 @@ rega(Fn *fn)
 			x = rl[r];
 			assert(x != 0 || t < Tmp0 /* todo, ditto */);
 			if (x > 0) {
+				if (x != r && regused(m, x, j))
+					continue;
 				pmadd(TMP(x), TMP(r), tmp[t].cls);
+				if (x != r) {
+					if (!regused(m, r, j))
+						bsclr(m->b, r);
+					bsset(m->b, x);
+				}
 				m->r[j] = x;
 			}
 		}

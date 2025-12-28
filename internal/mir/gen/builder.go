@@ -31,6 +31,7 @@ type functionBuilder struct {
 	closureEnv   mir.ValueID
 	captures     map[*symbols.Symbol]captureInfo
 	boxed        map[*symbols.Symbol]mir.ValueID
+	entry        *mir.Block
 }
 
 func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
@@ -52,6 +53,7 @@ func newFunctionBuilder(gen *Generator, fn *mir.Function) *functionBuilder {
 
 func (b *functionBuilder) buildFuncBody(body *hir.Block) {
 	entry := b.newBlock("entry", b.fn.Location)
+	b.entry = entry
 	b.setBlock(entry)
 
 	for _, param := range b.fn.Params {
@@ -1641,12 +1643,26 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	if addr := b.addrForIdent(ident); addr != mir.InvalidValue {
-		return b.emitLoad(addr, ident.Type, ident.Location)
-	}
-
 	if ident.Symbol != nil && ident.Symbol.Kind == symbols.SymbolFunction {
 		return b.makeFuncValue(ident.Name, ident.Type, ident.Location)
+	}
+
+	if ident.Symbol != nil && b.captures != nil {
+		if _, ok := b.captures[ident.Symbol]; ok {
+			if addr := b.addrForIdent(ident); addr != mir.InvalidValue {
+				return b.emitLoad(addr, ident.Type, ident.Location)
+			}
+		}
+	}
+
+	if ident.Symbol != nil {
+		if addr, ok := b.slots[ident.Symbol]; ok {
+			return b.emitLoad(addr, ident.Type, ident.Location)
+		}
+	}
+
+	if addr, ok := b.tempSlots[ident]; ok {
+		return b.emitLoad(addr, ident.Type, ident.Location)
 	}
 
 	if ident.Symbol != nil && (ident.Symbol.Kind == symbols.SymbolParameter || ident.Symbol.Kind == symbols.SymbolReceiver) {
@@ -1684,8 +1700,8 @@ func (b *functionBuilder) addrForIdent(ident *hir.Ident) mir.ValueID {
 		}
 		if ident.Symbol.Kind == symbols.SymbolParameter || ident.Symbol.Kind == symbols.SymbolReceiver {
 			if val, ok := b.paramsByName[ident.Name]; ok {
-				addr := b.emitAlloca(ident.Type, ident.Location)
-				b.emitStore(addr, val, ident.Location)
+				addr := b.emitAllocaInEntry(ident.Type, ident.Location)
+				b.emitStoreInEntry(addr, val, ident.Location)
 				b.slots[ident.Symbol] = addr
 				return addr
 			}
@@ -3341,6 +3357,32 @@ func (b *functionBuilder) emitAlloca(typ types.SemType, loc source.Location) mir
 	})
 	b.ptrElem[id] = typ
 	return id
+}
+
+func (b *functionBuilder) emitAllocaInEntry(typ types.SemType, loc source.Location) mir.ValueID {
+	if b.entry == nil {
+		return b.emitAlloca(typ, loc)
+	}
+	id := b.gen.nextValueID()
+	b.entry.Instrs = append(b.entry.Instrs, &mir.Alloca{
+		Result:   id,
+		Type:     typ,
+		Location: loc,
+	})
+	b.ptrElem[id] = typ
+	return id
+}
+
+func (b *functionBuilder) emitStoreInEntry(addr, value mir.ValueID, loc source.Location) {
+	if b.entry == nil {
+		b.emitStore(addr, value, loc)
+		return
+	}
+	b.entry.Instrs = append(b.entry.Instrs, &mir.Store{
+		Addr:     addr,
+		Value:    value,
+		Location: loc,
+	})
 }
 
 func (b *functionBuilder) emitLoad(addr mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {

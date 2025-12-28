@@ -1,0 +1,6 @@
+import "random";
+import "std/io";
+
+fn main() {
+    io::Println(random::Random());
+}

@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"compiler/colors"
 	"compiler/internal/context_v2"
@@ -84,7 +83,8 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 		filepath.Join(runtimePath, "optional.c"),       // Optional helpers
 		filepath.Join(runtimePath, "array.c"),          // Dynamic array library
 		filepath.Join(runtimePath, "panic.c"),          // Panic helper
-		filepath.Join(runtimePath, "time.c"),           // Time helpers
+		filepath.Join(runtimePath, "ferret_time.c"),    // Time helpers
+		filepath.Join(runtimePath, "random.c"),         // Random helpers
 		filepath.Join(runtimePath, "string_runtime.c"), // String helpers
 		filepath.Join(runtimePath, "string_builder.c"), // String builder library
 	}
@@ -92,11 +92,7 @@ func BuildExecutable(ctx *context_v2.CompilerContext, cFiles []string, includeDi
 	// Check that all runtime files exist
 	for _, runtimeFile := range runtimeFiles {
 		if !utilsfs.IsValidFile(runtimeFile) {
-			// Some runtime files are optional (array.c, string_builder.c)
-			// Only io.c, interface.c, and bigint.c are required
-			if strings.HasSuffix(runtimeFile, "alloc.c") || strings.HasSuffix(runtimeFile, "cast.c") || strings.HasSuffix(runtimeFile, "io.c") || strings.HasSuffix(runtimeFile, "interface.c") || strings.HasSuffix(runtimeFile, "bigint.c") || strings.HasSuffix(runtimeFile, "optional.c") || strings.HasSuffix(runtimeFile, "string_runtime.c") {
-				return fmt.Errorf("required runtime file not found: %s", runtimeFile)
-			}
+			return fmt.Errorf("required runtime file '%s' not found", runtimeFile)
 		}
 	}
 

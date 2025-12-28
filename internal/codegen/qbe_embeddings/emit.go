@@ -47,12 +47,12 @@ func (g *Generator) emitBinary(b *mir.Binary) {
 	switch b.Op {
 	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
 		tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN, tokens.AND_TOKEN, tokens.OR_TOKEN:
-		op, err := g.binaryOp(b.Op, b.Type)
+		qbeType, err := g.qbeType(b.Type)
 		if err != nil {
 			g.reportError(err.Error(), &b.Location)
 			return
 		}
-		qbeType, err := g.qbeType(b.Type)
+		op, err := g.binaryOp(b.Op, b.Type)
 		if err != nil {
 			g.reportError(err.Error(), &b.Location)
 			return

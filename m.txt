@@ -1,0 +1,18 @@
+# stash only qbe.go change
+git stash push -p internal/codegen/qbe_embeddings/qbe.go
+
+# build/run without the hoist
+./build.sh
+# ...run your tests...
+
+# re‑apply the hoist
+git stash pop
+
+
+
+--------
+
+
+git stash apply
+# and later
+git stash drop

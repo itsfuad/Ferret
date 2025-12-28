@@ -27,6 +27,10 @@ type Generator struct {
 	enumTableID int
 	retOutParam string
 	retOutType  types.SemType
+	entryBlock  mir.BlockID
+
+	hoistedAllocas   []*mir.Alloca
+	hoistedAllocaIDs map[mir.ValueID]struct{}
 }
 
 func New(ctx *context_v2.CompilerContext, mod *context_v2.Module, mirMod *mir.Module) *Generator {
@@ -96,6 +100,11 @@ func (g *Generator) emitFunction(fn *mir.Function) {
 	g.tempID = 0
 	g.retOutParam = ""
 	g.retOutType = nil
+	g.entryBlock = mir.InvalidBlock
+	g.collectAllocas(fn)
+	if len(fn.Blocks) > 0 {
+		g.entryBlock = fn.Blocks[0].ID
+	}
 
 	fnName := g.qbeFuncName(fn.Name, g.moduleImportPath())
 	mainReturnsInt := false
@@ -169,14 +178,49 @@ func (g *Generator) emitBlock(block *mir.Block, mainReturnsInt bool) {
 		}
 	}
 
+	if block.ID == g.entryBlock && len(g.hoistedAllocas) > 0 {
+		for _, alloc := range g.hoistedAllocas {
+			g.emitAlloca(alloc)
+		}
+	}
+
 	for _, instr := range block.Instrs {
 		if _, ok := instr.(*mir.Phi); ok {
 			continue
+		}
+		if alloc, ok := instr.(*mir.Alloca); ok {
+			if _, hoisted := g.hoistedAllocaIDs[alloc.Result]; hoisted {
+				continue
+			}
 		}
 		g.emitInstr(instr)
 	}
 
 	g.emitTerm(block.Term, mainReturnsInt)
+}
+
+func (g *Generator) collectAllocas(fn *mir.Function) {
+	g.hoistedAllocas = g.hoistedAllocas[:0]
+	if g.hoistedAllocaIDs == nil {
+		g.hoistedAllocaIDs = make(map[mir.ValueID]struct{})
+	} else {
+		for id := range g.hoistedAllocaIDs {
+			delete(g.hoistedAllocaIDs, id)
+		}
+	}
+	if fn == nil {
+		return
+	}
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			alloc, ok := instr.(*mir.Alloca)
+			if !ok || alloc == nil {
+				continue
+			}
+			g.hoistedAllocas = append(g.hoistedAllocas, alloc)
+			g.hoistedAllocaIDs[alloc.Result] = struct{}{}
+		}
+	}
 }
 
 func (g *Generator) emitInstr(instr mir.Instr) {
