@@ -1,28 +1,17 @@
 @echo off
+setlocal enabledelayedexpansion
 
-echo Building Ferret...
+REM Fail on first error
+call :run_or_fail go run ./tools
+call :run_or_fail go build -v -o bin\ferret.exe
 
-rem set target directory
+echo Build complete.
+exit /b 0
 
-set TARGET_DIR=bin
-
-rem create target directory if it doesn't exist
-
-if not exist %TARGET_DIR% (
-    mkdir %TARGET_DIR%
+:run_or_fail
+%*
+if errorlevel 1 (
+    echo Command failed: %*
+    exit /b 1
 )
-
-rem build the project
-cd ..
-go run .\tools
-if %errorlevel% neq 0 (
-    echo Bootstrap step failed.
-    exit /b %errorlevel%
-)
-go build -v -o %TARGET_DIR%\ferret.exe main.go
-if %errorlevel% neq 0 (
-    echo Build failed.
-    exit /b %errorlevel%
-)
-
-echo Build succeeded. Output: %TARGET_DIR%\ferret.exe
+exit /b 0

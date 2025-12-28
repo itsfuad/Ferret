@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compiler/colors"
 	"fmt"
 	"io"
 	"os"
@@ -12,11 +13,11 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "bootstrap:", err)
+		colors.RED.Fprintln(os.Stderr, "bootstrap:", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Done")
+	colors.GREEN.Println("built successfully!")
 }
 
 func run() error {

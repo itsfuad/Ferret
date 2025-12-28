@@ -10,7 +10,7 @@ import (
 // Check if file exists and is a regular file
 func IsValidFile(filename string) bool {
 	fileInfo, err := os.Stat(filename)
-	return err == nil && fileInfo.Mode().IsRegular()
+	return err == nil && !fileInfo.Mode().IsDir()
 }
 
 func IsDir(path string) bool {
