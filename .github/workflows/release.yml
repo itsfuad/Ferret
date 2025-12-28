@@ -1,0 +1,126 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          - runner: ubuntu-24.04-arm64
+          - runner: macos-14
+          - runner: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Setup MSYS2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-binutils
+
+      - name: Add MSYS2 to PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: echo "C:\msys64\mingw64\bin" >> $env:GITHUB_PATH
+
+      - name: Bootstrap libs/toolchain (unix)
+        if: runner.os != 'Windows'
+        env:
+          CGO_ENABLED: "1"
+        run: go run ./tools
+
+      - name: Bootstrap libs/toolchain (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CGO_ENABLED: "1"
+          CC: gcc
+        run: go run .\tools
+
+      - name: Build (unix)
+        if: runner.os != 'Windows'
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          mkdir -p bin
+          go build -v -o bin/ferret
+
+      - name: Build (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CGO_ENABLED: "1"
+          CC: gcc
+        run: |
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          go build -v -o bin\ferret.exe
+
+      - name: Set artifact name (unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "FERRET_GOOS=$(go env GOOS)" >> "$GITHUB_ENV"
+          echo "FERRET_GOARCH=$(go env GOARCH)" >> "$GITHUB_ENV"
+          echo "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" >> "$GITHUB_ENV"
+
+      - name: Set artifact name (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "FERRET_GOOS=$(go env GOOS)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FERRET_GOARCH=$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "FERRET_ARTIFACT=ferret-$(go env GOOS)-$(go env GOARCH)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          tar -czf "dist/${FERRET_ARTIFACT}.tar.gz" bin libs LICENSE README.md
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path bin, libs, LICENSE, README.md -DestinationPath "dist/$env:FERRET_ARTIFACT.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FERRET_ARTIFACT }}
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: ferret-*
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

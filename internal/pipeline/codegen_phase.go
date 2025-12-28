@@ -59,7 +59,7 @@ func (p *Pipeline) sanitizeModuleName(importPath string) string {
 	return ustrings.ToIdentifier(importPath)
 }
 
-func (p *Pipeline) buildExecutableMultiple(cFiles []string, execPath, includeDir string) error {
+func (p *Pipeline) buildExecutableMultiple(asmFiles []string, execPath string) error {
 	opts := codegen.DefaultBuildOptions()
 	if p.ctx.Config.RuntimePath != "" {
 		opts.RuntimePath = p.ctx.Config.RuntimePath
@@ -67,5 +67,5 @@ func (p *Pipeline) buildExecutableMultiple(cFiles []string, execPath, includeDir
 	opts.OutputPath = execPath
 	opts.Debug = p.ctx.Config.Debug
 
-	return codegen.BuildExecutable(p.ctx, cFiles, includeDir, opts)
+	return codegen.BuildExecutable(p.ctx, asmFiles, opts)
 }

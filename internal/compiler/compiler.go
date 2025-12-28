@@ -70,8 +70,17 @@ func Compile(opts *Options) Result {
 
 	execPath, _ := os.Executable()
 	execDir := filepath.Dir(execPath)
-	builtinPath := filepath.Join(execDir, "../ferret_libs")
-	runtimePath := filepath.Join(execDir, "../runtime")
+	libsPath := filepath.Join(execDir, "../libs")
+	if override := os.Getenv("FERRET_LIBS_PATH"); override != "" {
+		libsPath = override
+	} else if !fs.IsDir(libsPath) {
+		if cwd, err := os.Getwd(); err == nil {
+			candidate := filepath.Join(cwd, "libs")
+			if fs.IsDir(candidate) {
+				libsPath = candidate
+			}
+		}
+	}
 
 	// Determine output path
 	outputPath := opts.OutputExecutable
@@ -83,10 +92,10 @@ func Compile(opts *Options) Result {
 		ProjectName:        projectName,
 		ProjectRoot:        projectRoot,
 		Extension:          ".fer",
-		BuiltinModulesPath: builtinPath,
-		RuntimePath:        runtimePath, // Runtime path relative to executable
+		BuiltinModulesPath: libsPath,
+		RuntimePath:        libsPath, // Runtime library path relative to executable
 		OutputPath:         outputPath,
-		SaveAST: 		 	opts.SaveAST,
+		SaveAST:            opts.SaveAST,
 		KeepGenFiles:       opts.KeepGenFiles,
 		SkipCodegen:        opts.SkipCodegen,
 		CodegenBackend:     opts.CodegenBackend,

@@ -1,0 +1,13 @@
+// Native IO module - implementations are in Go/C
+// This file provides type declarations for type checking
+
+// @extern
+fn Println(values: ...interface {}) -> void;
+// @extern
+fn Print(values: ...interface {}) -> void;
+// @extern
+fn ReadInt() -> str ! i32;
+// @extern
+fn ReadFloat() -> str ! f64;
+// @extern
+fn Read() -> str ! str;

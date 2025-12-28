@@ -1,0 +1,59 @@
+---
+title: Installation
+description: How to install and set up Ferret
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Install (recommended)
+
+<Tabs>
+  <TabItem label="macOS / Linux (shell)">
+    ```bash
+    curl -fsSL https://itsfuad.github.io/Ferret/install.sh | sh
+    ```
+  </TabItem>
+  <TabItem label="Windows (PowerShell)">
+    ```sh
+    iwr -useb https://itsfuad.github.io/Ferret/install.ps1 | iex
+    ```
+  </TabItem>
+  <TabItem label="Windows (Command Prompt)">
+    ```bat
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://itsfuad.github.io/Ferret/install.ps1 | iex"
+    ```
+  </TabItem>
+</Tabs>
+
+:::note
+The installer downloads a prebuilt release for your OS/arch into `~/.ferret` (Linux/macOS) or `%USERPROFILE%\.ferret` (Windows).
+You can change the location by setting `FERRET_INSTALL_DIR`.
+:::
+
+## Verify installation
+
+```bash
+ferret --version
+```
+
+## Build from source
+
+If you want to build Ferret yourself, you need Go and a C compiler available on the machine.
+
+```bash
+git clone https://github.com/itsfuad/Ferret.git
+cd Ferret
+./build.sh
+```
+
+Windows:
+
+```bat
+scripts\build.bat
+```
+
+## Running Ferret programs
+
+```bash
+ferret yourfile.fer
+```

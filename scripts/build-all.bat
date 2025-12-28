@@ -17,7 +17,7 @@ if not exist %TARGET_DIR% (
 )
 
 echo.
-echo [1/2] Building native executable (Windows)...
+echo [1/3] Building native executable (Windows)...
 echo --------------------------------------------
 go build -v -o %TARGET_DIR%\ferret.exe main.go
 if %errorlevel% neq 0 (
@@ -27,7 +27,17 @@ if %errorlevel% neq 0 (
 echo [OK] Native executable: %TARGET_DIR%\ferret.exe
 
 echo.
-echo [2/2] Building WebAssembly module...
+echo [2/3] Bootstrapping runtime + toolchain...
+echo --------------------------------------------
+go run .\tools
+if %errorlevel% neq 0 (
+    echo [FAILED] Bootstrap step failed.
+    exit /b %errorlevel%
+)
+echo [OK] Libraries + toolchain in libs\
+
+echo.
+echo [3/3] Building WebAssembly module...
 echo --------------------------------------------
 set GOOS=js
 set GOARCH=wasm

@@ -14,6 +14,11 @@ if not exist %TARGET_DIR% (
 
 rem build the project
 cd ..
+go run .\tools
+if %errorlevel% neq 0 (
+    echo Bootstrap step failed.
+    exit /b %errorlevel%
+)
 go build -v -o %TARGET_DIR%\ferret.exe main.go
 if %errorlevel% neq 0 (
     echo Build failed.

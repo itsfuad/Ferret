@@ -199,7 +199,7 @@ type Config struct {
 	// Module resolution
 	BuiltinModulesPath string            // Path to standard library
 	BuiltinModules     map[string]string // name -> path mapping
-	RuntimePath        string            // Path to runtime directory (relative to executable)
+	RuntimePath        string            // Path to runtime library directory (relative to executable)
 
 	// Remote modules (future)
 	RemoteCachePath string // Cache directory for remote dependencies (.ferret)
@@ -268,13 +268,31 @@ func (ctx *CompilerContext) loadBuiltinModules() {
 		if entry.IsDir() {
 			// For directories, register as module package
 			dirPath := filepath.Join(builtinPath, entry.Name())
-			ctx.Config.BuiltinModules[entry.Name()] = dirPath
+			if dirHasExtension(dirPath, ctx.Config.Extension) {
+				ctx.Config.BuiltinModules[entry.Name()] = dirPath
+			}
 		} else if strings.HasSuffix(entry.Name(), ctx.Config.Extension) {
 			// For individual .fer files, register as standalone module
 			moduleName := strings.TrimSuffix(entry.Name(), ctx.Config.Extension)
 			ctx.Config.BuiltinModules[moduleName] = builtinPath
 		}
 	}
+}
+
+func dirHasExtension(dir, ext string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(entry.Name(), ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // registerBuiltins populates the universe scope with built-in types
