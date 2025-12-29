@@ -258,9 +258,9 @@ func (g *Generator) emitInstr(instr mir.Instr) {
 	case *mir.MakeArray:
 		g.reportUnsupported("make_array", i.Loc())
 	case *mir.ArrayGet:
-		g.reportUnsupported("array_get", i.Loc())
+		g.emitArrayGet(i)
 	case *mir.ArraySet:
-		g.reportUnsupported("array_set", i.Loc())
+		g.emitArraySet(i)
 	case *mir.MapGet:
 		g.emitMapGet(i)
 	case *mir.MapSet:

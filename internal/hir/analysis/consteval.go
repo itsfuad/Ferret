@@ -5,10 +5,14 @@ import (
 	"compiler/internal/diagnostics"
 	"compiler/internal/hir"
 	"compiler/internal/hir/consteval"
+	"compiler/internal/semantics/symbols"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
 	"fmt"
 )
+
+// Track array literal lengths for variables assigned from array literals
+var arrayLiteralLengths = make(map[*symbols.Symbol]int)
 
 func propagateConstants(ctx *context_v2.CompilerContext, mod *context_v2.Module, hirMod *hir.Module) {
 	if hirMod == nil {
@@ -82,6 +86,16 @@ func walkDeclItemsConstEval(ctx *context_v2.CompilerContext, mod *context_v2.Mod
 	for _, item := range items {
 		walkExprConstEval(ctx, mod, item.Value)
 		updateConstValue(item.Name, consteval.EvaluateHIRExpr(ctx, mod, item.Value))
+		
+		// Track array literal lengths for dynamic arrays
+		if item.Name != nil && item.Name.Symbol != nil {
+			if lit, ok := item.Value.(*hir.CompositeLit); ok {
+				if arrType := arrayTypeOf(item.Value); arrType != nil && arrType.Length < 0 {
+					// Dynamic array literal - store its length
+					arrayLiteralLengths[item.Name.Symbol] = len(lit.Elts)
+				}
+			}
+		}
 	}
 }
 
@@ -100,10 +114,25 @@ func walkAssignConstEval(ctx *context_v2.CompilerContext, mod *context_v2.Module
 
 	if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
 		ident.Symbol.ConstValue = nil
+		delete(arrayLiteralLengths, ident.Symbol)
 		return
 	}
 
 	updateConstValue(ident, consteval.EvaluateHIRExpr(ctx, mod, stmt.Rhs))
+	
+	// Track array literal lengths for dynamic arrays
+	if lit, ok := stmt.Rhs.(*hir.CompositeLit); ok {
+		if arrType := arrayTypeOf(stmt.Rhs); arrType != nil && arrType.Length < 0 {
+			// Dynamic array literal - store its length
+			arrayLiteralLengths[ident.Symbol] = len(lit.Elts)
+		} else {
+			// Not a dynamic array literal, clear any previous length
+			delete(arrayLiteralLengths, ident.Symbol)
+		}
+	} else {
+		// Not a literal, clear any previous length
+		delete(arrayLiteralLengths, ident.Symbol)
+	}
 }
 
 func walkExprConstEval(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr hir.Expr) {
@@ -230,32 +259,63 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 	}
 
 	arrType := arrayTypeOf(indexExpr.X)
-	if arrType == nil || arrType.Length < 0 {
+	if arrType == nil {
 		return
+	}
+
+	// Get array length: from type for fixed arrays, from literal for dynamic arrays
+	var arrayLength int
+	var lengthKnown bool
+	if arrType.Length >= 0 {
+		// Fixed-size array: length is known from type
+		arrayLength = arrType.Length
+		lengthKnown = true
+	} else {
+		// Dynamic array: check if it's a literal or variable assigned from literal
+		if lit, ok := indexExpr.X.(*hir.CompositeLit); ok {
+			// It's an array literal, we can get the length at compile time
+			arrayLength = len(lit.Elts)
+			lengthKnown = true
+		} else if ident, ok := indexExpr.X.(*hir.Ident); ok && ident.Symbol != nil {
+			// It's a variable - check if it was assigned from an array literal
+			if len, found := arrayLiteralLengths[ident.Symbol]; found {
+				arrayLength = len
+				lengthKnown = true
+			}
+		}
+		
+		if !lengthKnown {
+			// Can't determine length at compile time
+			return
+		}
 	}
 
 	indexValue, isConstant := evaluateIndexAsInt(ctx, mod, indexExpr.Index)
 	if !isConstant {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError("fixed array index must be a compile-time constant").
-				WithCode(diagnostics.ErrArrayIndexNotConst).
-				WithPrimaryLabel(indexExpr.Index.Loc(), "non-constant index").
-				WithHelp("use a constant index or switch to a dynamic array []T for runtime indexing"),
-		)
+		// For fixed arrays, require constant index
+		if arrType.Length >= 0 {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("fixed array index must be a compile-time constant").
+					WithCode(diagnostics.ErrArrayIndexNotConst).
+					WithPrimaryLabel(indexExpr.Index.Loc(), "non-constant index").
+					WithHelp("use a constant index or switch to a dynamic array []T for runtime indexing"),
+			)
+		}
+		// For dynamic arrays with non-constant index, just skip compile-time checking
 		return
 	}
 
 	originalIndex := indexValue
 	if indexValue < 0 {
-		indexValue = int64(arrType.Length) + indexValue
+		indexValue = int64(arrayLength) + indexValue
 	}
 
-	if indexValue < 0 || indexValue >= int64(arrType.Length) {
+	if indexValue < 0 || indexValue >= int64(arrayLength) {
 		ctx.Diagnostics.Add(
-			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", originalIndex, arrType.Length)).
+			diagnostics.NewError(fmt.Sprintf("array index out of bounds: index %d, array length %d", originalIndex, arrayLength)).
 				WithCode(diagnostics.ErrArrayOutOfBounds).
 				WithPrimaryLabel(indexExpr.Index.Loc(), "index out of range").
-				WithNote(fmt.Sprintf("valid indices are 0 to %d, or -%d to -1 for reverse access", arrType.Length-1, arrType.Length)).
+				WithNote(fmt.Sprintf("valid indices are 0 to %d, or -%d to -1 for reverse access", arrayLength-1, arrayLength)).
 				WithHelp("check the array length before accessing"),
 		)
 	}

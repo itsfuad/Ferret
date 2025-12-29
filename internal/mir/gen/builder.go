@@ -2117,16 +2117,75 @@ func (b *functionBuilder) lowerIndexAssign(expr *hir.IndexExpr, rhs hir.Expr, op
 	}
 
 	arrType := b.arrayTypeOf(expr.X)
-	if arrType == nil {
-		b.reportUnsupported("index base", expr.Loc())
+	if arrType != nil {
+		// Use ArraySet MIR instruction for both fixed and dynamic arrays
+		// This ensures consistent bounds checking and panicking behavior
+		arrVal := b.lowerExpr(expr.X)
+		if arrVal == mir.InvalidValue {
+			return
+		}
+
+		indexVal := b.lowerExpr(expr.Index)
+		if indexVal == mir.InvalidValue {
+			return
+		}
+
+		indexVal = b.castValue(indexVal, b.exprType(expr.Index), types.TypeI32, loc)
+
+		// For fixed arrays, we still need runtime bounds checking
+		if arrType.Length >= 0 {
+			lenVal := b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), loc)
+			indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, loc)
+			if indexVal == mir.InvalidValue {
+				return
+			}
+		} else {
+			// Dynamic array: bounds check using runtime length
+			lenVal := b.emitArrayLen(arrVal, loc)
+			indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, loc)
+			if indexVal == mir.InvalidValue {
+				return
+			}
+		}
+
+		value := b.lowerExpr(rhs)
+		if value == mir.InvalidValue {
+			return
+		}
+		value = b.coerceValueForAssign(value, b.exprType(rhs), arrType.Element, loc)
+		if value == mir.InvalidValue {
+			return
+		}
+
+		// Handle compound assignment operators (e.g., +=, -=)
+		if op != nil && op.Kind != tokens.EQUALS_TOKEN {
+			cur := b.gen.nextValueID()
+			b.emitInstr(&mir.ArrayGet{
+				Result:   cur,
+				Array:    arrVal,
+				Index:    indexVal,
+				Type:     arrType.Element,
+				Location: loc,
+			})
+			opKind := assignTokenToBinary(op.Kind)
+			if opKind == "" {
+				b.reportUnsupported("assignment operator", &loc)
+				return
+			}
+			value = b.emitBinary(opKind, cur, value, arrType.Element, loc)
+		}
+
+		// Emit ArraySet instruction
+		b.emitInstr(&mir.ArraySet{
+			Array:    arrVal,
+			Index:    indexVal,
+			Value:    value,
+			Location: loc,
+		})
 		return
 	}
 
-	if arrType.Length < 0 {
-		b.lowerDynamicIndexAssign(expr, rhs, op, loc, arrType)
-		return
-	}
-
+	// Non-array indexing - use old code path for compatibility
 	addr := b.lowerIndexAddr(expr)
 	if addr == mir.InvalidValue {
 		return

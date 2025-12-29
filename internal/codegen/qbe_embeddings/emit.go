@@ -734,6 +734,159 @@ func (g *Generator) emitMapGet(m *mir.MapGet) {
 	}
 }
 
+func (g *Generator) emitArrayGet(a *mir.ArrayGet) {
+	if a == nil {
+		return
+	}
+	arrType, ok := g.arrayTypeOf(a.Array)
+	if !ok || arrType == nil {
+		g.reportUnsupported("array_get array", &a.Location)
+		return
+	}
+
+	elemType := a.Type
+	elemSize := g.layout.SizeOf(elemType)
+	if elemSize <= 0 {
+		g.reportUnsupported("array_get element size", &a.Location)
+		return
+	}
+
+	if arrType.Length >= 0 {
+		// Fixed-size array: calculate offset and load directly
+		// Bounds checking was done in MIR lowering
+		arrPtr := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		// Calculate offset: index * elemSize
+		// Convert index to long for multiplication
+		indexLong := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l extsw %s", indexLong, indexVal))
+		offset := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l mul %s, %d", offset, indexLong, elemSize))
+
+		// Add offset to array pointer
+		elemPtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l add %s, %s", elemPtr, arrPtr, offset))
+
+		// Load the element
+		loadOp, err := g.loadOp(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		qbeType, err := g.qbeType(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		result := g.valueName(a.Result)
+		g.emitLine(fmt.Sprintf("%s =%s %s %s", result, qbeType, loadOp, elemPtr))
+		g.valueTypes[a.Result] = elemType
+	} else {
+		// Dynamic array: call ferret_array_get and check for NULL
+		arrVal := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		valuePtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l call $ferret_array_get(l %s, w %s)", valuePtr, arrVal, indexVal))
+
+		// Check for NULL and panic if out of bounds
+		nullCheck := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w ceql %s, 0", nullCheck, valuePtr))
+		panicLabel := fmt.Sprintf("array_get_panic_%d", a.Result)
+		okLabel := fmt.Sprintf("array_get_ok_%d", a.Result)
+		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", nullCheck, panicLabel, okLabel))
+		g.emitLine(fmt.Sprintf("@%s", panicLabel))
+		msgSym := g.stringSymbol("index out of bounds")
+		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine("ret") // Unreachable after panic
+		g.emitLine(fmt.Sprintf("@%s", okLabel))
+
+		// Load the value from the pointer
+		loadOp, err := g.loadOp(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		qbeType, err := g.qbeType(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		result := g.valueName(a.Result)
+		g.emitLine(fmt.Sprintf("%s =%s %s %s", result, qbeType, loadOp, valuePtr))
+		g.valueTypes[a.Result] = elemType
+	}
+}
+
+func (g *Generator) emitArraySet(a *mir.ArraySet) {
+	if a == nil {
+		return
+	}
+	arrType, ok := g.arrayTypeOf(a.Array)
+	if !ok || arrType == nil {
+		g.reportUnsupported("array_set array", &a.Location)
+		return
+	}
+
+	elemType := arrType.Element
+	elemSize := g.layout.SizeOf(elemType)
+	if elemSize <= 0 {
+		g.reportUnsupported("array_set element size", &a.Location)
+		return
+	}
+
+	valuePtr := g.valueAddr(a.Value, elemType, &a.Location)
+	if valuePtr == "" {
+		return
+	}
+
+	if arrType.Length >= 0 {
+		// Fixed-size array: calculate offset and store directly
+		// Bounds checking was done in MIR lowering
+		arrPtr := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		// Calculate offset: index * elemSize
+		// Convert index to long for multiplication
+		indexLong := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l extsw %s", indexLong, indexVal))
+		offset := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l mul %s, %d", offset, indexLong, elemSize))
+
+		// Add offset to array pointer
+		elemPtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l add %s, %s", elemPtr, arrPtr, offset))
+
+		// Store the element
+		storeOp, err := g.storeOp(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		g.emitLine(fmt.Sprintf("%s %s, %s", storeOp, valuePtr, elemPtr))
+	} else {
+		// Dynamic array: call ferret_array_set and check return value
+		arrVal := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		result := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w call $ferret_array_set(l %s, w %s, l %s)", result, arrVal, indexVal, valuePtr))
+
+		// Check return value and panic if false (out of bounds)
+		zeroCheck := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w ceqw %s, 0", zeroCheck, result))
+		panicLabel := fmt.Sprintf("array_set_panic_%d", a.Array)
+		okLabel := fmt.Sprintf("array_set_ok_%d", a.Array)
+		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", zeroCheck, panicLabel, okLabel))
+		g.emitLine(fmt.Sprintf("@%s", panicLabel))
+		msgSym := g.stringSymbol("index out of bounds")
+		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine("ret") // Unreachable after panic
+		g.emitLine(fmt.Sprintf("@%s", okLabel))
+	}
+}
+
 func (g *Generator) emitMapSet(m *mir.MapSet) {
 	if m == nil {
 		return
@@ -1912,6 +2065,21 @@ func (g *Generator) mapTypeOf(id mir.ValueID) (*types.MapType, bool) {
 	}
 	if mapType, ok := typ.(*types.MapType); ok {
 		return mapType, true
+	}
+	return nil, false
+}
+
+func (g *Generator) arrayTypeOf(id mir.ValueID) (*types.ArrayType, bool) {
+	typ := g.valueTypes[id]
+	if typ == nil {
+		return nil, false
+	}
+	typ = types.UnwrapType(typ)
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = types.UnwrapType(ref.Inner)
+	}
+	if arrType, ok := typ.(*types.ArrayType); ok {
+		return arrType, true
 	}
 	return nil, false
 }
