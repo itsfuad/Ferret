@@ -2020,8 +2020,112 @@ func (b *functionBuilder) lowerIndexValue(expr *hir.IndexExpr) mir.ValueID {
 		return b.lowerMapIndexValue(expr, mapType)
 	}
 
-	if arrType := b.arrayTypeOf(expr.X); arrType != nil && arrType.Length < 0 {
-		return b.lowerDynamicIndexValue(expr, arrType)
+	// Check if it's an array literal first (before arrayTypeOf, which might fail for untyped literals)
+	if lit, ok := expr.X.(*hir.CompositeLit); ok {
+		// Try to get array type from the literal's type
+		var arrType *types.ArrayType
+		if lit.Type != nil {
+			baseType := types.UnwrapType(lit.Type)
+			if ref, ok := baseType.(*types.ReferenceType); ok {
+				baseType = types.UnwrapType(ref.Inner)
+			}
+			if arr, ok := baseType.(*types.ArrayType); ok {
+				arrType = arr
+			}
+		}
+		// If type not set, infer from elements (dynamic array)
+		if arrType == nil && len(lit.Elts) > 0 {
+			// Infer as dynamic array
+			elemType := b.exprType(lit.Elts[0])
+			if elemType != nil {
+				arrType = types.NewArray(elemType, -1)
+			}
+		}
+
+		if arrType != nil {
+			// Evaluate index as constant if possible (works for both literals and constant variables)
+			var index int
+			var indexOk bool
+			if arrType.Length >= 0 {
+				// Fixed array - use constArrayIndex
+				index, indexOk = b.constArrayIndex(expr, arrType)
+			} else {
+				// Dynamic array literal - evaluate index directly (supports constant variables too)
+				if b.gen != nil && b.gen.ctx != nil && b.gen.mod != nil {
+					val := consteval.EvaluateHIRExpr(b.gen.ctx, b.gen.mod, expr.Index)
+					if val != nil {
+						if idx, ok := val.AsInt64(); ok {
+							// Handle negative indices
+							if idx < 0 {
+								idx = int64(len(lit.Elts)) + idx
+							}
+							if idx >= 0 && idx < int64(len(lit.Elts)) {
+								index = int(idx)
+								indexOk = true
+							}
+						}
+					}
+				}
+			}
+
+			if indexOk && index >= 0 && index < len(lit.Elts) {
+				// Constant index within bounds - just extract the element directly
+				elt := lit.Elts[index]
+				return b.lowerExpr(elt)
+			}
+
+			// Non-constant index or out of bounds - need to materialize array
+			// Get the index value
+			indexVal := b.lowerExpr(expr.Index)
+			if indexVal == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+
+			// Non-constant index or out of bounds - need to materialize array
+			// (bounds checking will catch out-of-bounds at compile time in HIR analysis)
+			arrVal := b.lowerCompositeLit(lit)
+			if arrVal == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+
+			indexVal = b.castValue(indexVal, b.exprType(expr.Index), types.TypeI32, expr.Location)
+
+			// For fixed arrays, we still need runtime bounds checking
+			if arrType.Length >= 0 {
+				lenVal := b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), expr.Location)
+				indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, expr.Location)
+				if indexVal == mir.InvalidValue {
+					return mir.InvalidValue
+				}
+			} else {
+				// Dynamic array: bounds check using runtime length
+				lenVal := b.emitArrayLen(arrVal, expr.Location)
+				indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, expr.Location)
+				if indexVal == mir.InvalidValue {
+					return mir.InvalidValue
+				}
+			}
+
+			// Use ArrayGet to get the element
+			result := b.gen.nextValueID()
+			b.emitInstr(&mir.ArrayGet{
+				Result:   result,
+				Array:    arrVal,
+				Index:    indexVal,
+				Type:     expr.Type,
+				Location: expr.Location,
+			})
+			return result
+		}
+	}
+
+	// Not a literal or not an array - try normal array handling
+	arrType := b.arrayTypeOf(expr.X)
+	if arrType != nil {
+		// Not a literal - handle normally
+		if arrType.Length < 0 {
+			return b.lowerDynamicIndexValue(expr, arrType)
+		}
 	}
 
 	addr := b.lowerIndexAddr(expr)
