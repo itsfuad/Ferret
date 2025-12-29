@@ -29,13 +29,17 @@ type BuildOptions struct {
 }
 
 // DefaultBuildOptions returns default build options
+// Environment variables are checked with fallbacks, so the code works reliably
+// even if env vars are not set (os.Getenv returns empty string for unset vars).
 func DefaultBuildOptions() *BuildOptions {
 	linkFlags := []string{"-s"}
+	// Check FERRET_AS first, then AS, then toolchain, then default to "as"
 	assembler := os.Getenv("FERRET_AS")
 	if assembler == "" {
 		assembler = os.Getenv("AS")
 	}
 
+	// Check FERRET_LD first, then LD, then toolchain, then default to "ld"
 	linker := os.Getenv("FERRET_LD")
 	if linker == "" {
 		linker = os.Getenv("LD")
@@ -244,6 +248,10 @@ func ensureToolExists(kind, tool string) error {
 	return fmt.Errorf("%s not found: %s", kind, tool)
 }
 
+// applyLdDefaults sets up platform-specific linker defaults.
+// This function only runs for GNU ld linkers (checked via isLdLinker).
+// For other linkers (LLD, Gold, clang's linker), users should configure
+// linking manually via FERRET_LD_FLAGS and FERRET_LD_LIBS environment variables.
 func applyLdDefaults(opts *BuildOptions) error {
 	if opts == nil || opts.LdDefaults || !isLdLinker(opts.Linker) {
 		return nil
@@ -277,6 +285,44 @@ func applyLdDefaults(opts *BuildOptions) error {
 		if !containsArg(opts.LinkLibs, "-lc") {
 			opts.LinkLibs = append([]string{"-lc"}, opts.LinkLibs...)
 		}
+		// Link libgcc for compiler runtime functions (e.g., 128-bit float operations)
+		// Try to find static libgcc.a first, then fall back to shared libgcc_s.so.1
+		libgccLinked := false
+		if tcLib := toolchainLibDir(); tcLib != "" {
+			// Check for static libgcc.a in toolchain (though bootstrap doesn't copy it)
+			if path := filepath.Join(tcLib, "libgcc.a"); utilsfs.IsValidFile(path) {
+				opts.LinkLibs = append(opts.LinkLibs, "-l:libgcc.a")
+				libgccLinked = true
+			}
+		}
+		if !libgccLinked {
+			// Try to find libgcc.a via gcc
+			if cc := resolveCCompiler(); cc != "" {
+				if path := gccPrintFile(cc, "libgcc.a"); path != "" {
+					// Add the directory to library search path and link
+					libDir := filepath.Dir(path)
+					if !containsLibDir(opts.LinkFlags, libDir) {
+						opts.LinkFlags = append(opts.LinkFlags, "-L", libDir)
+					}
+					opts.LinkLibs = append(opts.LinkLibs, "-lgcc")
+					libgccLinked = true
+				}
+			}
+		}
+		if !libgccLinked {
+			// Fall back to shared library (bootstrap copies libgcc_s.so.1)
+			// Use -l: syntax (GNU ld specific) to link against exact filename
+			// This works without needing symlinks and is safe because applyLdDefaults
+			// only runs for GNU ld linkers
+			if tcLib := toolchainLibDir(); tcLib != "" {
+				if path := filepath.Join(tcLib, "libgcc_s.so.1"); utilsfs.IsValidFile(path) {
+					opts.LinkLibs = append(opts.LinkLibs, "-l:libgcc_s.so.1")
+					libgccLinked = true
+				}
+			}
+		}
+		// Note: We don't need a fallback to -lgcc_s since -l:libgcc_s.so.1 works
+		// without symlinks. If libgcc_s.so.1 doesn't exist, that's a bootstrap issue.
 		opts.LinkPost = append(opts.LinkPost, crtn)
 	case "android":
 		return fmt.Errorf("android builds are not supported here; use install-termux.sh")
@@ -297,6 +343,46 @@ func findLinuxCrtObjects() (string, string, string) {
 	crti := os.Getenv("FERRET_LD_CRTI")
 	crtn := os.Getenv("FERRET_LD_CRTN")
 
+	// First, check toolchain/lib directory (bundled files from bootstrap)
+	if tcLib := toolchainLibDir(); tcLib != "" {
+		if crt1 == "" {
+			if path := filepath.Join(tcLib, "crt1.o"); utilsfs.IsValidFile(path) {
+				crt1 = path
+			}
+		}
+		if crti == "" {
+			if path := filepath.Join(tcLib, "crti.o"); utilsfs.IsValidFile(path) {
+				crti = path
+			}
+		}
+		if crtn == "" {
+			if path := filepath.Join(tcLib, "crtn.o"); utilsfs.IsValidFile(path) {
+				crtn = path
+			}
+		}
+	}
+
+	// If still missing, use gcc to dynamically find files
+	cc := resolveCCompiler()
+	if cc != "" {
+		if crt1 == "" {
+			if path := gccPrintFile(cc, "crt1.o"); path != "" {
+				crt1 = path
+			}
+		}
+		if crti == "" {
+			if path := gccPrintFile(cc, "crti.o"); path != "" {
+				crti = path
+			}
+		}
+		if crtn == "" {
+			if path := gccPrintFile(cc, "crtn.o"); path != "" {
+				crtn = path
+			}
+		}
+	}
+
+	// Last resort: check hardcoded paths
 	dirs := linuxLibDirs()
 	if crt1 == "" {
 		crt1 = firstExisting(dirs, "crt1.o")
@@ -316,18 +402,40 @@ func findLinuxDynamicLinker() string {
 		return override
 	}
 
-	var candidates []string
-	switch runtime.GOARCH {
-	case "amd64":
-		candidates = []string{"ld-linux-x86-64.so.2", "ld-musl-x86_64.so.1"}
-	case "arm64":
-		candidates = []string{"ld-linux-aarch64.so.1", "ld-musl-aarch64.so.1"}
-	case "386":
-		candidates = []string{"ld-linux.so.2", "ld-musl-i386.so.1"}
-	default:
-		candidates = []string{"ld-linux.so.2", "ld-musl.so.1"}
+	candidates := linuxLoaderCandidates()
+
+	// First, check toolchain/lib directory (bundled files from bootstrap)
+	if tcLib := toolchainLibDir(); tcLib != "" {
+		for _, name := range candidates {
+			path := filepath.Join(tcLib, name)
+			if utilsfs.IsValidFile(path) {
+				return path
+			}
+		}
 	}
 
+	// Then, use gcc to dynamically find the loader
+	cc := resolveCCompiler()
+	if cc != "" {
+		for _, name := range candidates {
+			if path := gccPrintFile(cc, name); path != "" {
+				return path
+			}
+		}
+		// Also check gcc library directories
+		if dirs := gccLibDirs(cc); len(dirs) > 0 {
+			for _, dir := range dirs {
+				for _, name := range candidates {
+					path := filepath.Join(dir, name)
+					if utilsfs.IsValidFile(path) {
+						return path
+					}
+				}
+			}
+		}
+	}
+
+	// Last resort: check hardcoded paths
 	dirs := linuxLibDirs()
 	for _, dir := range dirs {
 		for _, name := range candidates {
@@ -342,19 +450,30 @@ func findLinuxDynamicLinker() string {
 }
 
 func linuxLibDirs() []string {
-	dirs := []string{"/lib", "/usr/lib", "/lib64", "/usr/lib64"}
+	dirs := []string{}
+	// Highest priority: toolchain/lib directory (bundled files from bootstrap)
 	if tc := toolchainLibDir(); tc != "" {
-		dirs = append([]string{tc}, dirs...)
+		dirs = append(dirs, tc)
 	}
+	// Next: use gcc's library directories if available (more dynamic, works across distros)
+	if cc := resolveCCompiler(); cc != "" {
+		if gccDirs := gccLibDirs(cc); len(gccDirs) > 0 {
+			dirs = append(dirs, gccDirs...)
+		}
+	}
+	// Fallback: common system library directories
+	dirs = append(dirs, "/lib", "/usr/lib", "/lib64", "/usr/lib64")
+	// Last resort: distro-specific paths (these won't exist on all distros like Arch)
 	switch runtime.GOARCH {
 	case "amd64":
-		dirs = append([]string{"/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu"}, dirs...)
+		dirs = append(dirs, "/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu")
 	case "arm64":
-		dirs = append([]string{"/lib/aarch64-linux-gnu", "/usr/lib/aarch64-linux-gnu"}, dirs...)
+		dirs = append(dirs, "/lib/aarch64-linux-gnu", "/usr/lib/aarch64-linux-gnu")
 	case "386":
-		dirs = append([]string{"/lib/i386-linux-gnu", "/usr/lib/i386-linux-gnu"}, dirs...)
+		dirs = append(dirs, "/lib/i386-linux-gnu", "/usr/lib/i386-linux-gnu")
 	}
 
+	// Remove duplicates while preserving order
 	seen := make(map[string]struct{}, len(dirs))
 	unique := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
@@ -389,6 +508,46 @@ func findWindowsCrtObjects() (string, string, string) {
 	crtbegin := os.Getenv("FERRET_LD_CRTBEGIN")
 	crtend := os.Getenv("FERRET_LD_CRTEND")
 
+	// First, check toolchain/lib directory (bundled files from bootstrap)
+	if tcLib := toolchainLibDir(); tcLib != "" {
+		if crt2 == "" {
+			if path := filepath.Join(tcLib, "crt2.o"); utilsfs.IsValidFile(path) {
+				crt2 = path
+			}
+		}
+		if crtbegin == "" {
+			if path := filepath.Join(tcLib, "crtbegin.o"); utilsfs.IsValidFile(path) {
+				crtbegin = path
+			}
+		}
+		if crtend == "" {
+			if path := filepath.Join(tcLib, "crtend.o"); utilsfs.IsValidFile(path) {
+				crtend = path
+			}
+		}
+	}
+
+	// If still missing, use gcc to dynamically find files
+	cc := resolveCCompiler()
+	if cc != "" {
+		if crt2 == "" {
+			if path := gccPrintFile(cc, "crt2.o"); path != "" {
+				crt2 = path
+			}
+		}
+		if crtbegin == "" {
+			if path := gccPrintFile(cc, "crtbegin.o"); path != "" {
+				crtbegin = path
+			}
+		}
+		if crtend == "" {
+			if path := gccPrintFile(cc, "crtend.o"); path != "" {
+				crtend = path
+			}
+		}
+	}
+
+	// Last resort: check toolchain/lib directory via windowsLibDirs
 	dirs := windowsLibDirs()
 	if crt2 == "" {
 		crt2 = firstExisting(dirs, "crt2.o")
@@ -416,6 +575,15 @@ func firstExisting(dirs []string, name string) string {
 func containsArg(args []string, value string) bool {
 	for _, arg := range args {
 		if arg == value {
+			return true
+		}
+	}
+	return false
+}
+
+func containsLibDir(flags []string, dir string) bool {
+	for i, flag := range flags {
+		if flag == "-L" && i+1 < len(flags) && flags[i+1] == dir {
 			return true
 		}
 	}
@@ -498,4 +666,92 @@ func withPathEnv(env []string, key, dir string) []string {
 		return env
 	}
 	return append(env, key+"="+dir)
+}
+
+func resolveCCompiler() string {
+	if val := os.Getenv("FERRET_CC"); val != "" {
+		if path, err := exec.LookPath(val); err == nil {
+			return path
+		}
+	}
+	if val := os.Getenv("CC"); val != "" {
+		if path, err := exec.LookPath(val); err == nil {
+			return path
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		if path, err := exec.LookPath("clang"); err == nil {
+			return path
+		}
+	}
+	if path, err := exec.LookPath("gcc"); err == nil {
+		return path
+	}
+	return ""
+}
+
+func gccPrintFile(cc, name string) string {
+	if cc == "" {
+		return ""
+	}
+	out, err := exec.Command(cc, "-print-file-name="+name).CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimSpace(string(out))
+	if path == "" || path == name {
+		return ""
+	}
+	if !utilsfs.IsValidFile(path) {
+		return ""
+	}
+	return path
+}
+
+func gccLibDirs(cc string) []string {
+	if cc == "" {
+		return nil
+	}
+	out, err := exec.Command(cc, "-print-search-dirs").CombinedOutput()
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "libraries:") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		raw := strings.TrimSpace(parts[1])
+		if raw == "" {
+			continue
+		}
+		chunks := strings.Split(raw, string(os.PathListSeparator))
+		dirs := make([]string, 0, len(chunks))
+		for _, chunk := range chunks {
+			if chunk == "" {
+				continue
+			}
+			dirs = append(dirs, chunk)
+		}
+		return dirs
+	}
+	return nil
+}
+
+func linuxLoaderCandidates() []string {
+	switch runtime.GOARCH {
+	case "amd64":
+		return []string{"ld-linux-x86-64.so.2", "ld-musl-x86_64.so.1"}
+	case "arm64":
+		return []string{"ld-linux-aarch64.so.1", "ld-musl-aarch64.so.1"}
+	case "386":
+		return []string{"ld-linux.so.2", "ld-musl-i386.so.1"}
+	default:
+		return []string{"ld-linux.so.2", "ld-musl.so.1"}
+	}
 }
