@@ -674,27 +674,64 @@ func (g *Generator) emitMapGet(m *mir.MapGet) {
 		g.reportUnsupported("map_get map", &m.Location)
 		return
 	}
-	optType, ok := g.optionalType(m.Type)
-	if !ok || optType == nil {
-		g.reportUnsupported("map_get optional", &m.Location)
-		return
-	}
-	optSize := g.layout.SizeOf(optType)
-	if optSize <= 0 {
-		g.reportUnsupported("map_get optional size", &m.Location)
-		return
-	}
-	align := g.layout.AlignOf(optType)
-	g.emitLine(fmt.Sprintf("%s =l %s %d", g.valueName(m.Result), g.allocOp(align), optSize))
 
 	keyPtr := g.valueAddr(m.Key, mapType.Key, &m.Location)
 	if keyPtr == "" {
 		return
 	}
 
-	g.emitLine(fmt.Sprintf("call $ferret_map_get_optional_out(l %s, l %s, l %s)",
-		g.valueName(m.Map), keyPtr, g.valueName(m.Result)))
-	g.valueTypes[m.Result] = m.Type
+	// Check if return type is optional or direct value
+	optType, isOptional := g.optionalType(m.Type)
+	if isOptional && optType != nil {
+		// Optional return type: use ferret_map_get_optional_out
+		optSize := g.layout.SizeOf(optType)
+		if optSize <= 0 {
+			g.reportUnsupported("map_get optional size", &m.Location)
+			return
+		}
+		align := g.layout.AlignOf(optType)
+		g.emitLine(fmt.Sprintf("%s =l %s %d", g.valueName(m.Result), g.allocOp(align), optSize))
+		g.emitLine(fmt.Sprintf("call $ferret_map_get_optional_out(l %s, l %s, l %s)",
+			g.valueName(m.Map), keyPtr, g.valueName(m.Result)))
+		g.valueTypes[m.Result] = m.Type
+	} else {
+		// Direct value type: call ferret_map_get and panic if NULL
+		valueType := m.Type
+		valueSize := g.layout.SizeOf(valueType)
+		if valueSize <= 0 {
+			g.reportUnsupported("map_get value size", &m.Location)
+			return
+		}
+		valuePtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l call $ferret_map_get(l %s, l %s)", valuePtr, g.valueName(m.Map), keyPtr))
+
+		// Check for NULL and panic if key not found
+		nullCheck := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w ceql %s, 0", nullCheck, valuePtr))
+		panicLabel := fmt.Sprintf("map_get_panic_%d", m.Result)
+		okLabel := fmt.Sprintf("map_get_ok_%d", m.Result)
+		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", nullCheck, panicLabel, okLabel))
+		g.emitLine(fmt.Sprintf("@%s", panicLabel))
+		msgSym := g.stringSymbol("key not found in map")
+		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine("ret") // Unreachable after panic, but QBE needs it
+		g.emitLine(fmt.Sprintf("@%s", okLabel))
+
+		// Load the value from the pointer
+		loadOp, err := g.loadOp(valueType)
+		if err != nil {
+			g.reportError(err.Error(), &m.Location)
+			return
+		}
+		qbeType, err := g.qbeType(valueType)
+		if err != nil {
+			g.reportError(err.Error(), &m.Location)
+			return
+		}
+		loadResult := g.valueName(m.Result)
+		g.emitLine(fmt.Sprintf("%s =%s %s %s", loadResult, qbeType, loadOp, valuePtr))
+		g.valueTypes[m.Result] = valueType
+	}
 }
 
 func (g *Generator) emitMapSet(m *mir.MapSet) {
