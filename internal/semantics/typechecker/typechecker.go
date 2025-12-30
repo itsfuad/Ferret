@@ -2456,17 +2456,14 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 		return
 
 	case ExplicitCastable:
-		// Requires explicit cast - use centralized hint system
-		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility))
-
-		// Add dual labels if we have type node location
-		if leftNode != nil {
-			diag = diag.WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
-		} else {
-			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion not allowed")
+		// For identical types, don't require explicit cast
+		if rhsType.Equals(leftType) {
+			return
 		}
-
+		// Requires explicit cast - use centralized hint system
+		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility)).
+			WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+			WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		diag = addExplicitCastHint(ctx, diag, rhsType, leftType, compatibility, rightNode)
 		ctx.Diagnostics.Add(diag)
 

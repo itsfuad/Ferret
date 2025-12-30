@@ -15,7 +15,7 @@ func NewOptionalNarrowingAnalyzer() *OptionalNarrowingAnalyzer {
 	return &OptionalNarrowingAnalyzer{}
 }
 
-// AnalyzeCondition checks if a condition narrows optional types
+// AnalyzeCondition checks if a condition narrows optional or union types
 func (a *OptionalNarrowingAnalyzer) AnalyzeCondition(ctx *context_v2.CompilerContext, mod *context_v2.Module, condition ast.Expression, parent *NarrowingContext) (*NarrowingContext, *NarrowingContext) {
 	thenNarrowing := NewNarrowingContext(parent)
 	elseNarrowing := NewNarrowingContext(parent)
@@ -76,6 +76,39 @@ func (a *OptionalNarrowingAnalyzer) AnalyzeCondition(ctx *context_v2.CompilerCon
 					}
 				}
 			}
+
+		case tokens.IS_TOKEN:
+			// a is T → a is narrowed to T in then branch, to union without T in else branch
+			if ident, ok := binExpr.X.(*ast.IdentifierExpr); ok {
+				varName := ident.Name
+				// Check if it's a union
+				if unionType := getUnionVarType(mod, varName); unionType != nil {
+					// Assume rhs is ident of the variant type
+					if rhsIdent, ok := binExpr.Y.(*ast.IdentifierExpr); ok {
+						variantName := rhsIdent.Name
+						// Find the matching variant
+						for i, variant := range unionType.Variants {
+							if name, ok := types.GetPrimitiveName(variant); ok && string(name) == variantName {
+								// Narrow then to this variant
+								thenNarrowing.Narrow(varName, variant)
+								// Narrow else to union without this variant
+								otherVariants := make([]types.SemType, 0, len(unionType.Variants)-1)
+								for j, v := range unionType.Variants {
+									if j != i {
+										otherVariants = append(otherVariants, v)
+									}
+								}
+								if len(otherVariants) == 1 {
+									elseNarrowing.Narrow(varName, otherVariants[0])
+								} else if len(otherVariants) > 1 {
+									elseNarrowing.Narrow(varName, types.NewUnion(otherVariants))
+								}
+								break
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -83,6 +116,7 @@ func (a *OptionalNarrowingAnalyzer) AnalyzeCondition(ctx *context_v2.CompilerCon
 }
 
 // isNoneComparison checks if a binary expression is comparing a variable to "none"
+// Returns the variable name and true if it's a none comparison
 func isNoneComparison(binExpr *ast.BinaryExpr) (string, bool) {
 	// Check left side: varName != none
 	if ident, ok := binExpr.X.(*ast.IdentifierExpr); ok {
@@ -118,6 +152,20 @@ func getOptionalVarType(mod *context_v2.Module, varName string) *types.OptionalT
 
 	if optType, ok := sym.Type.(*types.OptionalType); ok {
 		return optType
+	}
+
+	return nil
+}
+
+// getUnionVarType gets the union type of a variable if it exists
+func getUnionVarType(mod *context_v2.Module, varName string) *types.UnionType {
+	sym, ok := mod.CurrentScope.Lookup(varName)
+	if !ok {
+		return nil
+	}
+
+	if unionType, ok := sym.Type.(*types.UnionType); ok {
+		return unionType
 	}
 
 	return nil

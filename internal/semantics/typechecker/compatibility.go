@@ -271,7 +271,7 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 			if areStructsCompatible(srcStruct, tgtStruct) {
 				// If target is a NamedType, this is a structural -> nominal conversion (implicit castable)
 				// If both are anonymous or both are named and identical, it's identical
-				if source.Equals(target) {
+				if source == target || source.Equals(target) {
 					return Identical
 				}
 				return ImplicitCastable
