@@ -357,7 +357,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					}
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, resultType.Err)
+						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
 						if !isImplicitlyCompatible(compatibility) {
 							returnedDesc := resolveType(returnedType, resultType.Err)
 							diag := diagnostics.NewError("error return type mismatch").
@@ -382,7 +382,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					}
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, resultType.Ok)
+						compatibility := checkTypeCompatibility(returnedType, resultType.Ok)
 						if !isImplicitlyCompatible(compatibility) {
 							diag := diagnostics.NewError("return type mismatch").
 								WithCode(diagnostics.ErrTypeMismatch).
@@ -404,7 +404,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Normal return type checking
 					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
 					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, expectedReturnType)
+						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
 						if !isImplicitlyCompatible(compatibility) {
 							diag := diagnostics.NewError("type mismatch in return statement").
 								WithCode(diagnostics.ErrTypeMismatch).
@@ -1009,7 +1009,7 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	}
 
 	// Check if cast is valid
-	compatibility := checkTypeCompatibilityWithContext(ctx, mod, sourceType, targetType)
+	compatibility := checkTypeCompatibility(sourceType, targetType)
 
 	// For struct types, check structural compatibility (unwrap NamedType on both sides)
 	srcUnwrapped := types.UnwrapType(sourceType)
@@ -1213,11 +1213,6 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	if arrayType, ok := underlyingType.(*types.ArrayType); ok {
 		validateArrayLiteral(ctx, mod, lit, arrayType)
 		return nil
-	}
-
-	// Handle struct literals
-	if structType, ok := underlyingType.(*types.StructType); ok {
-		return checkStructLiteral(ctx, mod, lit, structType)
 	}
 
 	// Handle map literals
@@ -2241,8 +2236,37 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Recursively check operands
 		lhsType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
-		// Validate operand type compatibility
-		checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
+
+		if e.Op.Kind == tokens.IS_TOKEN {
+			// Special handling for 'is' operator
+			if unionType, ok := lhsType.(*types.UnionType); ok {
+				// rhsType should be a type that matches a variant
+				for _, variant := range unionType.Variants {
+					if rhsType.Equals(variant) {
+						// Valid, return bool
+						return types.TypeBool
+					}
+				}
+				// Not a valid variant
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("'is' operator: type '%s' is not a variant of union '%s'", rhsType.String(), lhsType.String())).
+						WithPrimaryLabel(e.Y.Loc(), "not a variant").
+						WithSecondaryLabel(e.X.Loc(), "union type"),
+				)
+				return types.TypeBool // Still return bool, error reported
+			} else {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("'is' operator requires left operand to be a union type").
+						WithPrimaryLabel(e.X.Loc(), "expected union type"),
+				)
+				return types.TypeBool
+			}
+		} else {
+			// Validate operand type compatibility for regular binary ops
+			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
+			// Return the result type (placeholder)
+			return types.TypeUnknown
+		}
 
 	case *ast.UnaryExpr:
 		// Recursively check operand
@@ -2707,6 +2731,14 @@ func TypeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
 		return types.NewOptional(innerType)
 
+	case *ast.UnionType:
+		// Union type: union { T1, T2, ..., TN }
+		variants := make([]types.SemType, len(t.Variants))
+		for i, variant := range t.Variants {
+			variants[i] = TypeFromTypeNodeWithContext(ctx, mod, variant)
+		}
+		return types.NewUnion(variants)
+
 	case *ast.ReferenceType:
 		// Reference type: &T
 		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
@@ -2959,7 +2991,7 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 		}
 
 		// Check compatibility (use WithContext to handle interfaces properly)
-		compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, param.Type)
+		compatibility := checkTypeCompatibility(argType, param.Type)
 
 		if !isImplicitlyCompatible(compatibility) {
 			// Format the argument type in a user-friendly way
@@ -3018,7 +3050,7 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 			}
 
 			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)
-			compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, variadicElemType)
+			compatibility := checkTypeCompatibility(argType, variadicElemType)
 
 			if !isImplicitlyCompatible(compatibility) {
 				// Format the argument type in a user-friendly way

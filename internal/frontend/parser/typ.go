@@ -60,6 +60,9 @@ func (p *Parser) parseType() ast.TypeNode {
 	case tokens.MAP_TOKEN:
 		t = p.parseMapType()
 
+	case tokens.UNION_TOKEN:
+		t = p.parseUnionType()
+
 	case tokens.FUNCTION_TOKEN:
 		start := p.advance().Start
 		t = p.parseFuncType(start)
@@ -131,6 +134,36 @@ func (p *Parser) parseType() ast.TypeNode {
 	}
 
 	return t
+}
+
+func (p *Parser) parseUnionType() *ast.UnionType {
+	tok := p.expect(tokens.UNION_TOKEN)
+	p.expect(tokens.OPEN_CURLY)
+
+	variants := []ast.TypeNode{}
+
+	for !(p.match(tokens.CLOSE_CURLY) || p.isAtEnd()) {
+		typ := p.parseType()
+		variants = append(variants, typ)
+
+		if p.match(tokens.CLOSE_CURLY) {
+			break
+		}
+
+		if p.checkTrailing(tokens.COMMA_TOKEN, tokens.CLOSE_CURLY, "union type") {
+			p.advance() // skip the token
+			break
+		}
+
+		p.expect(tokens.COMMA_TOKEN)
+	}
+
+	end := p.expect(tokens.CLOSE_CURLY)
+
+	return &ast.UnionType{
+		Variants: variants,
+		Location: *source.NewLocation(&p.filepath, &tok.Start, &end.End),
+	}
 }
 
 func (p *Parser) parseArrayType() *ast.ArrayType {

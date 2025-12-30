@@ -479,7 +479,7 @@ func (p *Parser) parseLogicalAnd() ast.Expression {
 func (p *Parser) parseEquality() ast.Expression {
 	left := p.parseComparison()
 
-	for p.match(tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN) {
+	for p.match(tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN, tokens.IS_TOKEN) {
 		op := p.advance()
 		right := p.parseComparison()
 		left = &ast.BinaryExpr{

@@ -42,6 +42,8 @@ const (
 	STRUCT_TOKEN    TOKEN = TOKEN(types.TYPE_STRUCT)
 	FUNCTION_TOKEN  TOKEN = TOKEN(types.TYPE_FUNC)
 	INTERFACE_TOKEN TOKEN = TOKEN(types.TYPE_INTERFACE)
+	UNION_TOKEN     TOKEN = "union"
+	IS_TOKEN        TOKEN = "is"
 	ENUM_TOKEN      TOKEN = TOKEN(types.TYPE_ENUM)
 	MAP_TOKEN       TOKEN = TOKEN(types.TYPE_MAP)
 
@@ -121,6 +123,8 @@ var keyWordsMap map[TOKEN]bool = map[TOKEN]bool{
 	STRUCT_TOKEN:    true,
 	PRIVATE_TOKEN:   true,
 	INTERFACE_TOKEN: true,
+	UNION_TOKEN:     true,
+	IS_TOKEN:        true,
 	ENUM_TOKEN:      true,
 	MAP_TOKEN:       true,
 	CATCH_TOKEN:     true,
