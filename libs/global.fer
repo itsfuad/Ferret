@@ -5,3 +5,5 @@
 fn len(value: interface {}) -> i32;
 // @extern
 fn append(values: []interface {}, value: interface {}) -> bool;
+// @extern
+fn panic(msg: str) -> void;

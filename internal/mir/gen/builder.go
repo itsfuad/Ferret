@@ -1164,6 +1164,8 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 				return b.lowerBuiltinLenCall(expr)
 			case "append":
 				return b.lowerBuiltinAppendCall(expr)
+			case "panic":
+				return b.lowerBuiltinPanicCall(expr)
 			}
 		}
 	}
@@ -1477,6 +1479,29 @@ func (b *functionBuilder) lowerBuiltinAppendCall(expr *hir.CallExpr) mir.ValueID
 		Location: expr.Location,
 	})
 	return result
+}
+
+func (b *functionBuilder) lowerBuiltinPanicCall(expr *hir.CallExpr) mir.ValueID {
+	if expr == nil || len(expr.Args) != 1 {
+		b.reportUnsupported("panic argument count", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	msgExpr := expr.Args[0]
+	msgVal := b.lowerExpr(msgExpr)
+	if msgVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	// Call ferret_panic with the message string
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   "ferret_panic",
+		Args:     []mir.ValueID{msgVal},
+		Type:     types.TypeVoid,
+		Location: expr.Location,
+	})
+	return mir.InvalidValue // panic never returns
 }
 
 func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {

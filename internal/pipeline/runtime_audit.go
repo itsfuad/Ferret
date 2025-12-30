@@ -60,6 +60,7 @@ func collectRuntimeSymbols(runtimePath string) map[string]struct{} {
 		if err != nil {
 			return nil
 		}
+		// Walk both core/ and libs/ subdirectories
 		if entry.IsDir() || filepath.Ext(path) != ".c" {
 			return nil
 		}
