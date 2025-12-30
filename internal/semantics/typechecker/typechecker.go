@@ -1,24 +1,104 @@
 package typechecker
 
 import (
+	str "compiler/internal/utils/strings"
+	"fmt"
+	"strings"
+
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/hir/consteval"
+	"compiler/internal/semantics/narrowing"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
 	"compiler/internal/utils"
-	str "compiler/internal/utils/strings"
-
-	"fmt"
-	"strings"
 )
 
+var narrowingAnalyzer narrowing.NarrowingAnalyzer = narrowing.NewOptionalNarrowingAnalyzer()
+
+// unwrapOptionalType unwraps optional types: T? -> T
+// Returns the inner type if it's optional, otherwise returns the original type.
+func unwrapOptionalType(typ types.SemType) types.SemType {
+	if optType, ok := typ.(*types.OptionalType); ok {
+		return optType.Inner
+	}
+	return typ
+}
+
+// dereferenceType unwraps reference types: &T -> T
+// Returns the inner type if it's a reference, otherwise returns the original type.
+func dereferenceType(typ types.SemType) types.SemType {
+	if refType, ok := typ.(*types.ReferenceType); ok {
+		return refType.Inner
+	}
+	return typ
+}
+
+// Helper functions
+
+// addParamsToScope adds function/method parameters to the given scope with their types
+func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, params []ast.Field) {
+	if params == nil {
+		return
+	}
+	for _, param := range params {
+		if param.Name != nil {
+			paramType := TypeFromTypeNodeWithContext(ctx, mod, param.Type)
+			psym, ok := scope.GetSymbol(param.Name.Name)
+			if !ok {
+				continue // should not happen but safe side
+			}
+			psym.Type = paramType
+		}
+	}
+}
+
+// setupFunctionContext sets up function scope and return type tracking.
+// Returns a cleanup function that should be deferred.
+func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, funcType *ast.FuncType) func() {
+	// Enter function scope and get restore function
+	restoreScope := mod.EnterScope(scope)
+
+	// Set expected return type for validation
+	var expectedReturnType types.SemType = types.TypeVoid
+	if funcType != nil && funcType.Result != nil {
+		expectedReturnType = TypeFromTypeNodeWithContext(ctx, mod, funcType.Result)
+	}
+	oldReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = expectedReturnType
+
+	// Return cleanup function that restores both scope and return type
+	return func() {
+		restoreScope()
+		mod.CurrentFunctionReturnType = oldReturnType
+	}
+}
+
+// lookupTypeSymbol finds a type symbol by name, checking current module first, then imported modules.
+// Returns the symbol and true if found, nil and false otherwise.
+func lookupTypeSymbol(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeName string) (*symbols.Symbol, bool) {
+	// First check current module's scope
+	if sym, found := mod.ModuleScope.Lookup(typeName); found {
+		return sym, true
+	}
+
+	// Not in current module, search imported modules
+	for _, importPath := range mod.ImportAliasMap {
+		if importedMod, exists := ctx.GetModule(importPath); exists {
+			if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+				return sym, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
 // TypeCheckTopLevelSignatures resolves types, method signatures, and function signatures.
-// This must run before CheckModule so forward references to functions work at module scope.
 func TypeCheckTopLevelSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	if mod.AST == nil {
 		return
@@ -349,7 +429,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Dead code detection (constant conditions) is done in control flow analysis phase
 
 		// Analyze condition for type narrowing
-		thenNarrowing, elseNarrowing := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+		thenNarrowing, elseNarrowing := narrowingAnalyzer.AnalyzeCondition(ctx, mod, n.Cond, nil)
 
 		// Check then branch with narrowing
 		if n.Body != nil {
@@ -501,7 +581,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Dead code detection (constant conditions) is done in control flow analysis phase
 
 		// Analyze condition for narrowing in loop body
-		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+		loopNarrowing, _ := narrowingAnalyzer.AnalyzeCondition(ctx, mod, n.Cond, nil)
 		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
 	case *ast.MatchStmt:
 		// Check the match expression
@@ -3038,7 +3118,7 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 
 // applyNarrowingToBlock temporarily overrides symbol types based on narrowing context
 // and checks the block. Uses defer to automatically restore original types.
-func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, narrowing *NarrowingContext) {
+func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, narrowing *narrowing.NarrowingContext) {
 	if block == nil {
 		return
 	}
@@ -3076,18 +3156,23 @@ func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 
 // collectNarrowedTypes walks the narrowing context chain and collects all narrowed types
 // Child contexts override parent contexts for the same variable
-func collectNarrowedTypes(nc *NarrowingContext, result map[string]types.SemType) {
+func collectNarrowedTypes(nc *narrowing.NarrowingContext, result map[string]types.SemType) {
 	if nc == nil {
 		return
 	}
 
 	// First collect from parent (so child can override)
-	if nc.parent != nil {
-		collectNarrowedTypes(nc.parent, result)
+	if nc.Parent != nil {
+		collectNarrowedTypes(nc.Parent, result)
 	}
 
 	// Then add/override with current level
-	for varName, narrowedType := range nc.narrowedTypes {
+	for varName, narrowedType := range nc.NarrowedTypes {
+		result[varName] = narrowedType
+	}
+
+	// Then add/override with current level
+	for varName, narrowedType := range nc.NarrowedTypes {
 		result[varName] = narrowedType
 	}
 }
@@ -3116,7 +3201,7 @@ func restoreSymbolTypes(mod *context_v2.Module, narrowedVars map[string]types.Se
 }
 
 // applyNarrowingToElse handles else and else-if branches with narrowing
-func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Module, elseNode ast.Node, elseNarrowing *NarrowingContext) {
+func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Module, elseNode ast.Node, elseNarrowing *narrowing.NarrowingContext) {
 	if elseNode == nil {
 		return
 	}
@@ -3125,7 +3210,7 @@ func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	switch e := elseNode.(type) {
 	case *ast.IfStmt:
 		// For else-if, re-analyze the condition with parent narrowing from else branch
-		elseIfThenNarrowing, elseIfElseNarrowing := analyzeConditionForNarrowing(ctx, mod, e.Cond, elseNarrowing)
+		elseIfThenNarrowing, elseIfElseNarrowing := narrowingAnalyzer.AnalyzeCondition(ctx, mod, e.Cond, elseNarrowing)
 
 		// Enter scope if exists
 		if e.Scope != nil {
