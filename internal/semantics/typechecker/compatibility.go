@@ -255,6 +255,13 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		}
 	}
 
+	// Check if target is optional and source matches inner type
+	if optType, ok := target.(*types.OptionalType); ok {
+		if source.Equals(optType.Inner) {
+			return ImplicitCastable
+		}
+	}
+
 	// No implicit conversion available
 	return Incompatible
 }
@@ -424,6 +431,13 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 				}
 				return ImplicitCastable
 			}
+		}
+	}
+
+	// Check if target is optional and source matches inner type
+	if optType, ok := target.(*types.OptionalType); ok {
+		if source.Equals(optType.Inner) {
+			return ImplicitCastable
 		}
 	}
 

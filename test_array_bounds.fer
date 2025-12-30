@@ -6,11 +6,16 @@ fn main() {
     let fixed: [3]i32 = [10, 20, 30];
     io::Println(fixed[0]);  // Should work: 10
     io::Println(fixed[2]);  // Should work: 30
+
+    let n := io::ReadInt() catch 0;
+
+    i += n;
     
+    //i -= 10;
     // Test dynamic array - valid accesses
     let dynamic := [100, 200];
     io::Println(dynamic[0]);  // Should work: 100
-    io::Println(dynamic[1]);  // Should work: 200
+    io::Println(dynamic[i]);  // Should work: 200
     // io::Println(dynamic[10]);  // Compile-time error: index out of bounds
     // io::Println(dynamic[i]);   // Compile-time error: index out of bounds (i = 10)
     

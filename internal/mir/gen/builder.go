@@ -1668,6 +1668,14 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return mir.InvalidValue
 	}
 
+	// Special handling for none constant
+	if ident.Name == "none" {
+		id := b.gen.nextValueID()
+		optType := &types.OptionalType{Inner: types.TypeNone}
+		b.emitInstr(&mir.OptionalNone{Result: id, Type: optType, Location: ident.Location})
+		return id
+	}
+
 	if ident.Symbol != nil && ident.Symbol.Kind == symbols.SymbolFunction {
 		return b.makeFuncValue(ident.Name, ident.Type, ident.Location)
 	}

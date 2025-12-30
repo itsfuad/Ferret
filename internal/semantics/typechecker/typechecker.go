@@ -2317,7 +2317,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 // valueExpr: the value expression being assigned
 // targetType: the expected/target type
 func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, leftType types.SemType, leftNode ast.Node, rightNode ast.Expression) {
-	rhsType := checkExpr(ctx, mod, rightNode, leftType)
+	rhsType := checkExpr(ctx, mod, rightNode, types.TypeUnknown)
 
 	// Special check for integer literals: ensure they fit in the target type
 	if ok := checkFitness(ctx, leftType, rightNode, leftNode); !ok {
@@ -2326,6 +2326,26 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 
 	// Check type compatibility (use context-aware version for interface checking)
 	compatibility := checkTypeCompatibilityWithContext(ctx, mod, rhsType, leftType)
+
+	// Try breaking narrowing if incompatible or explicit
+	breakNarrowing := false
+	if compatibility == Incompatible || compatibility == ExplicitCastable {
+		if ident, ok := leftNode.(*ast.IdentifierExpr); ok {
+			if sym, found := mod.CurrentScope.Lookup(ident.Name); found && sym.OriginalType != nil {
+				origCompat := checkTypeCompatibilityWithContext(ctx, mod, rhsType, sym.OriginalType)
+				if origCompat == Identical || origCompat == ImplicitCastable {
+					// Break narrowing
+					sym.Type = sym.OriginalType
+					sym.OriginalType = nil
+					breakNarrowing = true
+				}
+			}
+		}
+	}
+
+	if breakNarrowing {
+		return
+	}
 
 	switch compatibility {
 	case Identical, ImplicitCastable:
@@ -3043,6 +3063,9 @@ func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	// Apply narrowed types
 	for varName, narrowedType := range narrowedVars {
 		if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+			if sym.OriginalType == nil {
+				sym.OriginalType = sym.Type
+			}
 			sym.Type = narrowedType
 		}
 	}
@@ -3086,6 +3109,7 @@ func restoreSymbolTypes(mod *context_v2.Module, narrowedVars map[string]types.Se
 		for varName, origType := range originalTypes {
 			if sym, ok := mod.CurrentScope.Lookup(varName); ok {
 				sym.Type = origType
+				sym.OriginalType = nil
 			}
 		}
 	}

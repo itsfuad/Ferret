@@ -25,6 +25,7 @@ type Symbol struct {
 	Name          string
 	Kind          SymbolKind
 	Type          types.SemType          // Semantic type of the symbol
+	OriginalType  types.SemType          // Original type before narrowing (for optional narrowing)
 	Exported      bool                   // Whether symbol is accessible from other modules
 	Decl          ast.Node               // AST node that declared this symbol
 	DeclaredScope SymbolTable            // Scope where this symbol was declared
