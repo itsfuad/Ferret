@@ -1,0 +1,17 @@
+import "std/io";
+
+fn sum(numbers: ...i32) -> i32 {
+    let total := 0;
+    for n in numbers {
+        total = total + n;
+    }
+    return total;
+}
+
+fn main() {
+    io::Println(1, 2, 3);
+    io::Println("Before sum");
+    let s := sum(1, 2, 3, 4, 5);
+    io::Println("After sum, result:", s);
+    return;
+}

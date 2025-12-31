@@ -1,0 +1,10 @@
+import "std/io";
+
+fn get_len(values: ...i32) -> i32 {
+    return len(values);
+}
+
+fn main() {
+    let result := get_len(1, 2, 3, 4, 5);
+    io::Println("Length:", result);
+}

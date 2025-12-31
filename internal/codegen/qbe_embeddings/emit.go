@@ -1731,10 +1731,6 @@ func (g *Generator) resolveCallTarget(target string, args []callArg, loc *source
 			return "", args, fmt.Errorf("qbe: unknown module alias %q", moduleAlias)
 		}
 
-		if importPath == "std/io" && (funcName == "Print" || funcName == "Println") {
-			return g.resolvePrint(funcName, args, loc)
-		}
-
 		if g.ctx != nil {
 			if imported, ok := g.ctx.GetModule(importPath); ok && imported.ModuleScope != nil {
 				if sym, ok := imported.ModuleScope.GetSymbol(funcName); ok && sym.IsNative && sym.NativeName != "" {
@@ -1777,10 +1773,6 @@ func (g *Generator) resolveFuncSymbol(target string, fnType *types.FunctionType,
 		}
 		if importPath == "" {
 			return "", fmt.Errorf("qbe: unknown module alias %q", moduleAlias)
-		}
-
-		if importPath == "std/io" && (funcName == "Print" || funcName == "Println") {
-			return g.resolvePrintFuncValue(funcName, fnType, loc)
 		}
 
 		if g.ctx != nil {

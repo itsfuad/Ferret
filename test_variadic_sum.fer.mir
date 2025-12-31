@@ -1,0 +1,83 @@
+module Ferret/test_variadic_sum
+
+fn sum(nums: i32) -> i32 {
+  block b1 entry:
+    %t2 = alloca i32
+    %t3 = const i32 0
+    store %t2, %t3
+    %t4 = alloca i32
+    %t5 = const i32 0
+    store %t4, %t5
+    br b2
+  block b2 while.cond:
+    %t6 = load i32 %t4
+    %t7 = call ferret_array_len(%t1) : i32
+    %t8 = < bool %t6, %t7
+    br_if %t8, b3, b4
+  block b3 while.body:
+    %t9 = load i32 %t2
+    %t10 = load i32 %t4
+    %t11 = call ferret_array_len(%t1) : i32
+    %t12 = const i32 0
+    %t13 = < i32 %t10, %t12
+    br_if %t13, b5, b6
+  block b4 while.end:
+    %t26 = load i32 %t2
+    ret %t26
+  block b5 index.neg:
+    %t14 = + i32 %t11, %t10
+    br b7
+  block b6 index.pos:
+    br b7
+  block b7 index.merge:
+    %t15 = phi i32 [b5: %t14, b6: %t10]
+    %t16 = < i32 %t15, %t12
+    %t17 = >= i32 %t15, %t11
+    %t18 = || bool %t16, %t17
+    br_if %t18, b9, b8
+  block b8 index.ok:
+    %t20 = call ferret_array_get(%t1, %t15) : &i32
+    %t21 = load i32 %t20
+    %t22 = + i32 %t9, %t21
+    store %t2, %t22
+    %t23 = load i32 %t4
+    %t24 = const i32 1
+    %t25 = + i32 %t23, %t24
+    store %t4, %t25
+    br b2
+  block b9 index.oob:
+    %t19 = const str index out of bounds
+    call ferret_panic(%t19) : void
+    unreachable
+}
+
+fn main() -> void {
+  block b10 entry:
+    %t27 = alloca i32
+    %t28 = const i64 4
+    %t29 = const i32 5
+    %t30 = call ferret_array_new(%t28, %t29) : []i32
+    %t31 = const i32 1
+    %t32 = alloca i32
+    store %t32, %t31
+    call ferret_array_append(%t30, %t32) : bool
+    %t33 = const i32 2
+    %t34 = alloca i32
+    store %t34, %t33
+    call ferret_array_append(%t30, %t34) : bool
+    %t35 = const i32 3
+    %t36 = alloca i32
+    store %t36, %t35
+    call ferret_array_append(%t30, %t36) : bool
+    %t37 = const i32 4
+    %t38 = alloca i32
+    store %t38, %t37
+    call ferret_array_append(%t30, %t38) : bool
+    %t39 = const i32 5
+    %t40 = alloca i32
+    store %t40, %t39
+    call ferret_array_append(%t30, %t40) : bool
+    %t41 = call sum(%t30) : i32
+    store %t27, %t41
+    ret
+}

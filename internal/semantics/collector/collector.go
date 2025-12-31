@@ -420,10 +420,8 @@ func hasExternTag(doc *ast.CommentGroup) bool {
 }
 
 func externNativeName(importPath, name string) string {
-	modName := importPath
-	if idx := strings.LastIndex(importPath, "/"); idx >= 0 && idx+1 < len(importPath) {
-		modName = importPath[idx+1:]
-	}
+	// Convert import path to C-safe name: std/io -> std_io
+	modName := strings.ReplaceAll(importPath, "/", "_")
 	return fmt.Sprintf("ferret_%s_%s", modName, name)
 }
 

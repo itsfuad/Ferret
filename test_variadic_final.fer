@@ -1,0 +1,34 @@
+import "std/io";
+
+fn sum(numbers: ...i32) -> i32 {
+    let total := 0;
+    for n in numbers {
+        total = total + n;
+    }
+    return total;
+}
+
+fn max(numbers: ...i32) -> i32 {
+    if len(numbers) == 0 {
+        return 0;
+    }
+    let m := numbers[0];
+    for n in numbers {
+        if n > m {
+            m = n;
+        }
+    }
+    return m;
+}
+
+fn main() {
+    // Test sum with different argument counts
+    io::Println("sum():", sum());
+    io::Println("sum(5):", sum(5));
+    io::Println("sum(1,2,3):", sum(1, 2, 3));
+    io::Println("sum(1,2,3,4,5):", sum(1, 2, 3, 4, 5));
+    
+    // Test max
+    io::Println("max(10,5,20,3):", max(10, 5, 20, 3));
+    io::Println("max(-5,-10,-1):", max(-5, -10, -1));
+}

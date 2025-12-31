@@ -137,6 +137,8 @@ func (l *Lowerer) lowerFuncDecl(decl *hir.FuncDecl) *hir.FuncDecl {
 	body := l.lowerBlock(decl.Body)
 	l.currentReturnType = prevReturn
 
+	// Keep function type as-is (with IsVariadic flag) for call sites
+	// Parameter symbols were already converted from ...T to []T during type checking
 	return &hir.FuncDecl{
 		Name:     decl.Name,
 		Type:     decl.Type,
@@ -159,6 +161,8 @@ func (l *Lowerer) lowerMethodDecl(decl *hir.MethodDecl) *hir.MethodDecl {
 	body := l.lowerBlock(decl.Body)
 	l.currentReturnType = prevReturn
 
+	// Keep method type as-is (with IsVariadic flag) for call sites
+	// Parameter symbols were already converted from ...T to []T during type checking
 	return &hir.MethodDecl{
 		Receiver: decl.Receiver,
 		Name:     decl.Name,
@@ -1041,10 +1045,54 @@ func (l *Lowerer) lowerCallExpr(expr *hir.CallExpr) hir.Expr {
 	}
 
 	funType := l.getFunctionType(expr.Fun)
-	args := make([]hir.Expr, 0, len(expr.Args))
-	for i, arg := range expr.Args {
-		expected := l.expectedArgType(funType, i)
-		args = append(args, l.lowerExpr(arg, expected))
+
+	// Check if this is a variadic call - bundle args into array literal
+	var args []hir.Expr
+	if funType != nil && len(funType.Params) > 0 {
+		lastParamIdx := len(funType.Params) - 1
+		lastParam := funType.Params[lastParamIdx]
+
+		if lastParam.IsVariadic {
+			// Process regular parameters
+			args = make([]hir.Expr, 0, len(funType.Params))
+			for i := 0; i < lastParamIdx && i < len(expr.Args); i++ {
+				expected := funType.Params[i].Type
+				args = append(args, l.lowerExpr(expr.Args[i], expected))
+			}
+
+			// Bundle variadic args into array literal
+			variadicArgs := expr.Args[lastParamIdx:]
+			elemType := lastParam.Type
+
+			// Create array literal elements
+			litElts := make([]hir.Expr, len(variadicArgs))
+			for i, arg := range variadicArgs {
+				litElts[i] = l.lowerExpr(arg, elemType)
+			}
+
+			// Create []T array literal
+			arrayType := types.NewArray(elemType, -1)
+			sliceLit := &hir.CompositeLit{
+				Type:     arrayType,
+				Elts:     litElts,
+				Location: expr.Location,
+			}
+			args = append(args, sliceLit)
+		} else {
+			// Non-variadic
+			args = make([]hir.Expr, 0, len(expr.Args))
+			for i, arg := range expr.Args {
+				expected := l.expectedArgType(funType, i)
+				args = append(args, l.lowerExpr(arg, expected))
+			}
+		}
+	} else {
+		// No function type info
+		args = make([]hir.Expr, 0, len(expr.Args))
+		for i, arg := range expr.Args {
+			expected := l.expectedArgType(funType, i)
+			args = append(args, l.lowerExpr(arg, expected))
+		}
 	}
 
 	callType := expr.Type

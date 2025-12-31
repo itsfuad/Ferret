@@ -1,0 +1,14 @@
+fn sum(nums: ...i32) -> i32 {
+    let total: i32 = 0;
+    let i: i32 = 0;
+    while i < len(nums) {
+        total = total + nums[i];
+        i = i + 1;
+    }
+    return total;
+}
+
+fn main() {
+    let result: i32 = sum(1, 2, 3, 4, 5);
+    return;
+}

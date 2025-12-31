@@ -1,0 +1,40 @@
+module Ferret/test_println_simple
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = const i64 20
+    %t2 = const i32 3
+    %t3 = call ferret_array_new(%t1, %t2) : []Printable
+    %t4 = const i32 1
+    %t5 = alloca union {i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, str, byte, bool}
+    %t6 = ptr_add i32 %t5, 0
+    %t7 = const i32 2
+    store %t6, %t7
+    %t8 = ptr_add i32 %t5, 4
+    store %t8, %t4
+    %t9 = alloca Printable
+    store %t9, %t5
+    call ferret_array_append(%t3, %t9) : bool
+    %t10 = const i32 2
+    %t11 = alloca union {i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, str, byte, bool}
+    %t12 = ptr_add i32 %t11, 0
+    %t13 = const i32 2
+    store %t12, %t13
+    %t14 = ptr_add i32 %t11, 4
+    store %t14, %t10
+    %t15 = alloca Printable
+    store %t15, %t11
+    call ferret_array_append(%t3, %t15) : bool
+    %t16 = const i32 3
+    %t17 = alloca union {i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, str, byte, bool}
+    %t18 = ptr_add i32 %t17, 0
+    %t19 = const i32 2
+    store %t18, %t19
+    %t20 = ptr_add i32 %t17, 4
+    store %t20, %t16
+    %t21 = alloca Printable
+    store %t21, %t17
+    call ferret_array_append(%t3, %t21) : bool
+    call io::Println(%t3) : void
+    ret
+}

@@ -1,0 +1,25 @@
+import "std/io";
+
+fn main() {
+    // Test basic types
+    io::Print(1, 2, 3);
+    io::Println();
+    
+    // Test mixed types
+    io::Println(42, 3.14, "hello");
+    
+    // Test single argument
+    io::Println("world");
+    
+    // Test no arguments
+    io::Println();
+    
+    // Test different integer sizes
+    let x: i8 = 127 as i8;
+    let y: i16 = 32000 as i16;
+    let z: i64 = 9000000000;
+    io::Println(x, y, z);
+    
+    // Test floats
+    io::Println(2.5, 3.14159);
+}

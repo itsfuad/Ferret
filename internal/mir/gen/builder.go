@@ -2119,12 +2119,25 @@ func (b *functionBuilder) lowerDynamicArrayLiteral(arrType *types.ArrayType, lit
 		if value == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		temp := b.emitAlloca(arrType.Element, lit.Location)
-		b.emitStore(temp, value, lit.Location)
+		// Box into union if element type is union
+		eltType := b.exprType(elt)
+		value = b.coerceValueForAssign(value, eltType, arrType.Element, lit.Location)
+		
+		// ferret_array_append expects a pointer to the element
+		// For unions, coerceValueForAssign already returns a pointer
+		// For primitives, we need to allocate storage and store the value
+		valuePtr := value
+		if _, isUnion := types.UnwrapType(arrType.Element).(*types.UnionType); !isUnion {
+			// Allocate storage for the element
+			temp := b.emitAlloca(arrType.Element, lit.Location)
+			b.emitStore(temp, value, lit.Location)
+			valuePtr = temp
+		}
+		
 		b.emitInstr(&mir.Call{
 			Result:   mir.InvalidValue,
 			Target:   "ferret_array_append",
-			Args:     []mir.ValueID{arr, temp},
+			Args:     []mir.ValueID{arr, valuePtr},
 			Type:     types.TypeBool,
 			Location: lit.Location,
 		})
@@ -2204,6 +2217,9 @@ func (b *functionBuilder) lowerArrayLiteralInto(addr mir.ValueID, arrType *types
 		if value == mir.InvalidValue {
 			return
 		}
+		// Box into union if element type is union
+		eltType := b.exprType(elt)
+		value = b.coerceValueForAssign(value, eltType, arrType.Element, lit.Location)
 		offset := i * elemSize
 		elemAddr := b.emitPtrAdd(addr, offset, arrType.Element, lit.Location)
 		b.emitStore(elemAddr, value, lit.Location)

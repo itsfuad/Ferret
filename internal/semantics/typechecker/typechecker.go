@@ -48,6 +48,13 @@ func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 	for _, param := range params {
 		if param.Name != nil {
 			paramType := TypeFromTypeNodeWithContext(ctx, mod, param.Type)
+			
+			// Convert variadic parameters (...T) to slice type ([]T)
+			// This allows the function body to iterate over the parameter
+			if param.IsVariadic {
+				paramType = types.NewArray(paramType, -1) // []T
+			}
+			
 			psym, ok := scope.GetSymbol(param.Name.Name)
 			if !ok {
 				continue // should not happen but safe side
