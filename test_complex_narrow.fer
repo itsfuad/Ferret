@@ -6,11 +6,9 @@ fn main() {
     let u: Com = 42;
     if !(u is i32) {
         // narrowed to union { str, bool }
-        //let x : bool = u;
         io::Println("not i32");
     } else {
         // narrowed to i32
-        let x : i32 = u;
-        io::Println(x);
+        io::Println(u);  // u is now i32
     }
 }

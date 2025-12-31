@@ -1529,6 +1529,9 @@ func (g *Generator) loadOp(typ types.SemType) (string, error) {
 		return "loadw", nil
 	}
 	typ = types.UnwrapType(typ)
+	if _, ok := typ.(*types.UnionType); ok {
+		return "loadl", nil // unions as pointers
+	}
 	if prim, ok := typ.(*types.PrimitiveType); ok {
 		switch prim.GetName() {
 		case types.TYPE_I8:

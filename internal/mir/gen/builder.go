@@ -735,14 +735,26 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		return b.lowerResultUnwrap(e)
 	case *hir.BinaryExpr:
 		left := b.lowerExpr(e.X)
-		right := b.lowerExpr(e.Y)
-		if left == mir.InvalidValue || right == mir.InvalidValue {
+		if left == mir.InvalidValue {
 			return mir.InvalidValue
 		}
 		leftType := b.exprType(e.X)
-		rightType := b.exprType(e.Y)
 		left, leftType = b.derefValueIfNeeded(left, leftType, e.Location)
-		right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
+
+		var right mir.ValueID
+		var rightType types.SemType
+		if e.Op.Kind == tokens.IS_TOKEN {
+			// Y is a type name, not a value
+			right = mir.InvalidValue
+			rightType = nil
+		} else {
+			right = b.lowerExpr(e.Y)
+			if right == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+			rightType = b.exprType(e.Y)
+			right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
+		}
 		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) && b.isStringType(e.Y) {
 			result := b.gen.nextValueID()
 			b.emitInstr(&mir.Call{
@@ -3503,6 +3515,17 @@ func (b *functionBuilder) emitLargeToString(typeName string, value mir.ValueID, 
 }
 
 func (b *functionBuilder) emitBinary(op tokens.TOKEN, left, right mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
+	if op == tokens.IS_TOKEN {
+		// Temporary: always return true
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.Const{
+			Result:   id,
+			Type:     types.TypeBool,
+			Value:    "1", // true
+			Location: loc,
+		})
+		return id
+	}
 	if isLargePrimitiveType(typ) {
 		return b.emitLargeBinary(op, left, right, typ, loc)
 	}
