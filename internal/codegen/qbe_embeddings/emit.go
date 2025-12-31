@@ -1818,24 +1818,128 @@ func (g *Generator) resolvePrintFuncValue(funcName string, fnType *types.Functio
 }
 
 func (g *Generator) resolvePrint(funcName string, args []callArg, loc *source.Location) (string, []callArg, error) {
+	// Handle zero arguments - pass empty string
 	if len(args) == 0 {
 		empty := g.stringSymbol("")
 		return "ferret_io_" + funcName, []callArg{{name: empty, typ: "l", sem: types.TypeString}}, nil
 	}
-	if len(args) != 1 {
-		return "", args, fmt.Errorf("qbe: %s expects 0 or 1 argument", funcName)
+
+	// Handle single argument - use type-specific function
+	if len(args) == 1 {
+		arg := args[0]
+		printName, err := g.printFunctionName(funcName, arg.sem)
+		if err != nil {
+			return "", args, err
+		}
+		if printName == "ferret_io_"+funcName {
+			arg.typ = "l"
+			args[0] = arg
+		}
+		return printName, args, nil
 	}
 
-	arg := args[0]
-	printName, err := g.printFunctionName(funcName, arg.sem)
+	// Handle multiple arguments - box into Printable union slice
+	sliceArgs, err := g.createPrintableUnionSlice(args)
 	if err != nil {
 		return "", args, err
 	}
-	if printName == "ferret_io_"+funcName {
-		arg.typ = "l"
-		args[0] = arg
+
+	return "ferret_io_" + funcName + "_slice", sliceArgs, nil
+}
+
+// createPrintableUnionSlice boxes multiple arguments into a Printable union slice
+// Returns slice arguments: [pointer, length, capacity]
+func (g *Generator) createPrintableUnionSlice(args []callArg) ([]callArg, error) {
+	// Union layout: [4-byte tag][8-byte data] = 12 bytes, aligned to 16 bytes
+	unionSize := 16
+	numArgs := len(args)
+	totalSize := unionSize * numArgs
+
+	// Allocate array on stack for unions
+	arrayTmp := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l alloc8 %d", arrayTmp, totalSize))
+
+	// Box each argument into a union and store in array
+	for i, arg := range args {
+		if err := g.boxValueIntoUnion(arrayTmp, i*unionSize, arg); err != nil {
+			return nil, err
+		}
 	}
-	return printName, args, nil
+
+	// Pass array pointer, length, and capacity
+	lengthTmp := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l copy %d", lengthTmp, numArgs))
+
+	return []callArg{
+		{name: arrayTmp, typ: "l", sem: types.TypeU64},
+		{name: lengthTmp, typ: "l", sem: types.TypeI64},
+		{name: lengthTmp, typ: "l", sem: types.TypeI64}, // cap same as len
+	}, nil
+}
+
+// boxValueIntoUnion boxes a single value into a union at the given offset
+func (g *Generator) boxValueIntoUnion(arrayPtr string, offset int, arg callArg) error {
+	// Get the union tag for this type
+	tag := g.getPrintableUnionTag(arg.sem)
+	if tag < 0 {
+		return fmt.Errorf("qbe: unsupported type %s for Printable union", arg.sem.String())
+	}
+
+	// Store tag at offset
+	tagPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, %d", tagPtr, arrayPtr, offset))
+	g.emitLine(fmt.Sprintf("storew %d, %s", tag, tagPtr))
+
+	// Store value at offset+4 (after tag)
+	dataPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, %d", dataPtr, arrayPtr, offset+4))
+	g.emitLine(fmt.Sprintf("store%s %s, %s", string(arg.typ[0]), arg.name, dataPtr))
+
+	return nil
+}
+
+// getPrintableUnionTag returns the tag index for a type in the Printable union
+func (g *Generator) getPrintableUnionTag(typ types.SemType) int {
+	if typ == nil {
+		return -1
+	}
+	typ = types.UnwrapType(typ)
+
+	prim, ok := typ.(*types.PrimitiveType)
+	if !ok {
+		return -1
+	}
+
+	switch prim.GetName() {
+	case types.TYPE_I8:
+		return 0
+	case types.TYPE_I16:
+		return 1
+	case types.TYPE_I32:
+		return 2
+	case types.TYPE_I64:
+		return 3
+	case types.TYPE_U8:
+		return 4
+	case types.TYPE_U16:
+		return 5
+	case types.TYPE_U32:
+		return 6
+	case types.TYPE_U64:
+		return 7
+	case types.TYPE_F32:
+		return 8
+	case types.TYPE_F64:
+		return 9
+	case types.TYPE_STRING:
+		return 10
+	case types.TYPE_BYTE:
+		return 11
+	case types.TYPE_BOOL:
+		return 12
+	default:
+		return -1
+	}
 }
 
 func (g *Generator) printFunctionName(funcName string, typ types.SemType) (string, error) {

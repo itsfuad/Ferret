@@ -1,10 +1,27 @@
 // Native IO module - implementations are in Go/C
 // This file provides type declarations for type checking
 
+// Printable union defines all types that can be printed
+type Printable union {
+    i8,
+    i16,
+    i32,
+    i64,
+    u8,
+    u16,
+    u32,
+    u64,
+    f32,
+    f64,
+    str,
+    byte,
+    bool
+};
+
 // @extern
-fn Println(values: ...interface {}) -> void;
+fn Println(values: ...Printable);
 // @extern
-fn Print(values: ...interface {}) -> void;
+fn Print(values: ...Printable);
 // @extern
 fn ReadInt() -> str ! i32;
 // @extern
