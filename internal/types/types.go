@@ -560,7 +560,7 @@ func NewInterface(methods []InterfaceMethod) *InterfaceType {
 
 func (i *InterfaceType) String() string {
 	if len(i.Methods) == 0 {
-		return "any" // Empty interface (any type)
+		return "interface{}" // Empty interface
 	}
 	methodStrs := make([]string, len(i.Methods))
 	for j, m := range i.Methods {

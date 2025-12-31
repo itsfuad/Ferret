@@ -1,3 +1,12 @@
+
+type Indexable union {
+    str,
+    []interface{},
+    map[interface{}]interface{}
+};
+
 fn main() {
-    let u: union { i32, str } = 42;
+    //let u: union { i32, str } = 42;
+    let idx: Indexable = "hi";
+    let arr: []interface{} = [1,2,4];
 }
