@@ -734,6 +734,11 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 	case *hir.ResultUnwrap:
 		return b.lowerResultUnwrap(e)
 	case *hir.BinaryExpr:
+		// Special handling for 'is' operator
+		if e.Op.Kind == tokens.IS_TOKEN {
+			return b.emitUnionTypeCheck(e)
+		}
+
 		left := b.lowerExpr(e.X)
 		if left == mir.InvalidValue {
 			return mir.InvalidValue
@@ -741,20 +746,12 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		leftType := b.exprType(e.X)
 		left, leftType = b.derefValueIfNeeded(left, leftType, e.Location)
 
-		var right mir.ValueID
-		var rightType types.SemType
-		if e.Op.Kind == tokens.IS_TOKEN {
-			// Y is a type name, not a value
-			right = mir.InvalidValue
-			rightType = nil
-		} else {
-			right = b.lowerExpr(e.Y)
-			if right == mir.InvalidValue {
-				return mir.InvalidValue
-			}
-			rightType = b.exprType(e.Y)
-			right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
+		right := b.lowerExpr(e.Y)
+		if right == mir.InvalidValue {
+			return mir.InvalidValue
 		}
+		rightType := b.exprType(e.Y)
+		right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
 		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) && b.isStringType(e.Y) {
 			result := b.gen.nextValueID()
 			b.emitInstr(&mir.Call{
@@ -894,7 +891,10 @@ func (b *functionBuilder) coerceValueForAssign(val mir.ValueID, fromType, toType
 		val = b.emitLoad(val, ref.Inner, loc)
 		fromType = ref.Inner
 	}
-	if interfaceTypeOf(toType) != nil {
+	// Handle union type assignment
+	if unionType, ok := types.UnwrapType(toType).(*types.UnionType); ok {
+		val = b.boxUnionValue(val, fromType, unionType, loc)
+	} else if interfaceTypeOf(toType) != nil {
 		val = b.boxInterfaceValue(val, fromType, toType, loc)
 	}
 	return val
@@ -1397,6 +1397,103 @@ func (b *functionBuilder) boxInterfaceValue(value mir.ValueID, valueType, ifaceT
 	b.emitStore(vtSlot, vtablePtr, loc)
 
 	return ifaceAddr
+}
+
+// boxUnionValue creates a tagged union value from a variant value.
+// Union layout: [4-byte discriminant/tag][variant data]
+func (b *functionBuilder) boxUnionValue(value mir.ValueID, valueType types.SemType, unionType *types.UnionType, loc source.Location) mir.ValueID {
+	if value == mir.InvalidValue || unionType == nil {
+		return mir.InvalidValue
+	}
+
+	// Find which variant this value matches
+	variantIndex := -1
+	for i, variant := range unionType.Variants {
+		if valueType.Equals(variant) {
+			variantIndex = i
+			break
+		}
+	}
+
+	if variantIndex < 0 {
+		// Type checker should have caught this
+		b.reportUnsupported("union variant mismatch", &loc)
+		return mir.InvalidValue
+	}
+
+	// Allocate space for the union (tag + max variant size)
+	unionAddr := b.emitAlloca(unionType, loc)
+
+	// Store the discriminant (tag) at offset 0
+	tagSlot := b.emitPtrAdd(unionAddr, 0, types.TypeI32, loc)
+	tagValue := b.emitConst(types.TypeI32, strconv.Itoa(variantIndex), loc)
+	b.emitStore(tagSlot, tagValue, loc)
+
+	// Store the actual value at offset 4 (after the tag)
+	dataSlot := b.emitPtrAdd(unionAddr, 4, valueType, loc)
+	b.emitStore(dataSlot, value, loc)
+
+	return unionAddr
+}
+
+// emitUnionTypeCheck generates code for the 'is' operator to check union variant type.
+// Returns a boolean indicating if the union contains the expected variant.
+func (b *functionBuilder) emitUnionTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
+	if expr == nil || expr.TargetType == nil {
+		// Fallback: return false if no target type
+		return b.emitConst(types.TypeBool, "0", expr.Location)
+	}
+
+	// Lower the union value (LHS)
+	unionVal := b.lowerExpr(expr.X)
+	if unionVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	unionType := b.exprType(expr.X)
+	unionVal, unionType = b.derefValueIfNeeded(unionVal, unionType, expr.Location)
+
+	// Get the union type
+	unwrappedUnionType := types.UnwrapType(unionType)
+	unionTypeStruct, ok := unwrappedUnionType.(*types.UnionType)
+	if !ok {
+		// Not a union type - should have been caught by type checker
+		b.reportUnsupported("non-union 'is' check", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	// Find the variant index for the target type
+	variantIndex := -1
+	for i, variant := range unionTypeStruct.Variants {
+		if expr.TargetType.Equals(variant) {
+			variantIndex = i
+			break
+		}
+	}
+
+	if variantIndex < 0 {
+		// Target type is not a variant - should have been caught by type checker
+		b.reportUnsupported("invalid union variant", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	// Load the discriminant (tag) from the union at offset 0
+	tagSlot := b.emitPtrAdd(unionVal, 0, types.TypeI32, expr.Location)
+	tagValue := b.emitLoad(tagSlot, types.TypeI32, expr.Location)
+
+	// Compare the tag with the expected variant index
+	expectedTag := b.emitConst(types.TypeI32, strconv.Itoa(variantIndex), expr.Location)
+	result := b.gen.nextValueID()
+	b.emitInstr(&mir.Binary{
+		Result:   result,
+		Op:       tokens.DOUBLE_EQUAL_TOKEN,
+		Left:     tagValue,
+		Right:    expectedTag,
+		Type:     types.TypeBool,
+		Location: expr.Location,
+	})
+
+	return result
 }
 
 func builtinNameFromIdent(ident *hir.Ident) (string, bool) {
@@ -3521,17 +3618,6 @@ func (b *functionBuilder) emitLargeToString(typeName string, value mir.ValueID, 
 }
 
 func (b *functionBuilder) emitBinary(op tokens.TOKEN, left, right mir.ValueID, typ types.SemType, loc source.Location) mir.ValueID {
-	if op == tokens.IS_TOKEN {
-		// Temporary: always return true
-		id := b.gen.nextValueID()
-		b.emitInstr(&mir.Const{
-			Result:   id,
-			Type:     types.TypeBool,
-			Value:    "1", // true
-			Location: loc,
-		})
-		return id
-	}
 	if isLargePrimitiveType(typ) {
 		return b.emitLargeBinary(op, left, right, typ, loc)
 	}

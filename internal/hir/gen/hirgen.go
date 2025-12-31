@@ -8,6 +8,7 @@ import (
 	"compiler/internal/semantics/table"
 	"compiler/internal/semantics/typechecker"
 	"compiler/internal/source"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
 )
 
@@ -116,13 +117,24 @@ func (g *Generator) lowerExpr(expr ast.Expression) hir.Expr {
 	case *ast.IdentifierExpr:
 		return g.lowerIdentExpr(e)
 	case *ast.BinaryExpr:
-		return &hir.BinaryExpr{
+		binExpr := &hir.BinaryExpr{
 			X:        g.lowerExpr(e.X),
 			Op:       e.Op,
 			Y:        g.lowerExpr(e.Y),
 			Type:     g.exprType(expr),
 			Location: locFromNode(e),
 		}
+		// For 'is' operator, extract the target type from the TypeExpr on the RHS
+		if e.Op.Kind == tokens.IS_TOKEN {
+			if typeExpr, ok := e.Y.(*ast.TypeExpr); ok {
+				binExpr.TargetType = g.exprType(e.Y)
+				// Also try to get the type from the TypeNode itself
+				if binExpr.TargetType == nil && typeExpr.Type != nil {
+					binExpr.TargetType = typechecker.TypeFromTypeNodeWithContext(g.ctx, g.mod, typeExpr.Type)
+				}
+			}
+		}
+		return binExpr
 	case *ast.UnaryExpr:
 		return &hir.UnaryExpr{
 			Op:       e.Op,

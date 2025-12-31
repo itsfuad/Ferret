@@ -180,11 +180,12 @@ func (r *ResultUnwrap) Loc() *source.Location { return &r.Location }
 
 // BinaryExpr represents a binary operation.
 type BinaryExpr struct {
-	X        Expr
-	Op       tokens.Token
-	Y        Expr
-	Type     types.SemType
-	Location source.Location
+	X          Expr
+	Op         tokens.Token
+	Y          Expr
+	Type       types.SemType
+	TargetType types.SemType // For 'is' operator: the type being checked against
+	Location   source.Location
 }
 
 func (b *BinaryExpr) hirNode()              {}
