@@ -2207,6 +2207,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	switch e := expr.(type) {
 	case *ast.IdentifierExpr:
 		checkModuleScopeUseBeforeDecl(ctx, mod, e)
+		sym, ok := mod.CurrentScope.Lookup(e.Name)
+		if ok && sym != nil {
+			mod.SetExprType(expr, sym.Type)
+			return sym.Type
+		}
+		return types.TypeUnknown
 	case *ast.EnumType:
 		for _, variant := range e.Variants {
 			if variant.Value != nil {
@@ -2223,6 +2229,13 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		if e.Catch != nil {
 			checkCatchClause(ctx, mod, e)
 		}
+		// Compute return type
+		funType := inferExprType(ctx, mod, e.Fun)
+		if funcType, ok := funType.(*types.FunctionType); ok {
+			mod.SetExprType(expr, funcType.Return)
+			return funcType.Return
+		}
+		return types.TypeUnknown
 
 	case *ast.SelectorExpr:
 		// Validate base expression first
@@ -2239,6 +2252,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 		if e.Op.Kind == tokens.IS_TOKEN {
 			// Special handling for 'is' operator
+			mod.SetExprType(expr, types.TypeBool)
 			lhsUnwrapped := types.UnwrapType(lhsType)
 			if unionType, ok := lhsUnwrapped.(*types.UnionType); ok {
 				// rhsType should be a type that matches a variant
@@ -2265,8 +2279,21 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		} else {
 			// Validate operand type compatibility for regular binary ops
 			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
-			// Return the result type (placeholder)
-			return types.TypeUnknown
+			// Return the result type - for most binary ops, it's the same as lhsType
+			// TODO: Handle cases where result type differs (e.g., comparison ops return bool)
+			var resultType types.SemType
+			switch e.Op.Kind {
+			case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
+				tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN:
+				resultType = lhsType
+			case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN, tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN,
+				tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN, tokens.AND_TOKEN, tokens.OR_TOKEN:
+				resultType = types.TypeBool
+			default:
+				resultType = types.TypeUnknown
+			}
+			mod.SetExprType(expr, resultType)
+			return resultType
 		}
 
 	case *ast.UnaryExpr:
@@ -2274,21 +2301,54 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		operandType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		if e.Op.Kind == tokens.BIT_AND_TOKEN || e.Op.Kind == tokens.MUT_REF_TOKEN {
 			checkBorrowExpr(ctx, mod, e, operandType)
+			// Return reference type
+			refType := types.NewReference(operandType)
+			if e.Op.Kind == tokens.MUT_REF_TOKEN {
+				refType.Mutable = true
+			}
+			mod.SetExprType(expr, refType)
+			return refType
+		} else {
+			// For other unary ops like -, return operand type
+			mod.SetExprType(expr, operandType)
+			return operandType
 		}
+
+	case *ast.BasicLit:
+		// Return the inferred literal type
+		litType := inferLiteralType(e, expected)
+		mod.SetExprType(expr, litType)
+		return litType
 	case *ast.PrefixExpr:
 		// Validate ++/-- target and operand type
 		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
+		// Return the target type
+		mod.SetExprType(expr, targetType)
+		return targetType
 	case *ast.PostfixExpr:
 		// Validate ++/-- target and operand type
 		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
+		// Return the target type
+		mod.SetExprType(expr, targetType)
+		return targetType
 
 	case *ast.IndexExpr:
 		// Check both array and index expressions
 		baseType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		indexType := checkExpr(ctx, mod, e.Index, types.TypeUnknown)
 		checkIndexExpr(ctx, mod, e, baseType, indexType)
+		// Return element type
+		if arrType, ok := types.UnwrapType(baseType).(*types.ArrayType); ok {
+			mod.SetExprType(expr, arrType.Element)
+			return arrType.Element
+		}
+		if mapType, ok := types.UnwrapType(baseType).(*types.MapType); ok {
+			mod.SetExprType(expr, mapType.Value)
+			return mapType.Value
+		}
+		return types.TypeUnknown
 
 	case *ast.ParenExpr:
 		// Check inner expression
@@ -2304,6 +2364,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// For composite literals, provide target type as context to allow untyped literal contextualization
 		sourceType := checkExpr(ctx, mod, e.X, targetType)
 		checkCastExpr(ctx, mod, e, sourceType, targetType)
+		mod.SetExprType(expr, targetType)
+		return targetType
 
 	case *ast.CompositeLit:
 		// Determine target type for validation
@@ -2324,6 +2386,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		if !targetType.Equals(types.TypeUnknown) {
 			checkCompositeLit(ctx, mod, e, targetType)
 		}
+		mod.SetExprType(expr, targetType)
+		return targetType
 	}
 
 	// First, infer the type based on the expression structure

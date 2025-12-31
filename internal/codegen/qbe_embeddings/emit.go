@@ -1524,6 +1524,10 @@ func (g *Generator) compareOp(op tokens.TOKEN, typ types.SemType) (string, error
 }
 
 func (g *Generator) loadOp(typ types.SemType) (string, error) {
+	if typ.Equals(types.TypeUnknown) {
+		// Temporary fix: assume word load for unknown
+		return "loadw", nil
+	}
 	typ = types.UnwrapType(typ)
 	if prim, ok := typ.(*types.PrimitiveType); ok {
 		switch prim.GetName() {
@@ -1629,6 +1633,10 @@ func (g *Generator) qbeType(typ types.SemType) (string, error) {
 	if typ == nil {
 		return "", fmt.Errorf("qbe: missing type")
 	}
+	if typ.Equals(types.TypeUnknown) {
+		// Temporary fix: assume word type for unknown
+		return "w", nil
+	}
 	typ = types.UnwrapType(typ)
 
 	if prim, ok := typ.(*types.PrimitiveType); ok {
@@ -1673,6 +1681,8 @@ func (g *Generator) qbeType(typ types.SemType) (string, error) {
 		return "l", nil
 	case *types.ResultType:
 		return "l", nil
+	case *types.UnionType:
+		return "l", nil // Represent unions as pointers for now
 	}
 
 	return "", fmt.Errorf("qbe: unsupported type %s", typ.String())

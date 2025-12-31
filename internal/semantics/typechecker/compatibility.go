@@ -166,6 +166,11 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Identical
 	}
 
+	// Any type can be assigned to empty interface (any)
+	if iface, ok := types.UnwrapType(target).(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+		return ImplicitCastable
+	}
+
 	// Special handling for none
 	// none can be assigned to any optional type (T?) or empty interface (any)
 	if source.Equals(types.TypeNone) {
