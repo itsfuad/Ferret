@@ -161,6 +161,11 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	source = dereferenceType(source)
 	target = dereferenceType(target)
 
+	// Identical types
+	if source.Equals(target) {
+		return Identical
+	}
+
 	// Special handling for none
 	// none can be assigned to any optional type (T?) or empty interface (any)
 	if source.Equals(types.TypeNone) {
@@ -192,7 +197,16 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 					return ImplicitCastable
 				}
 			}
+		} else {
+			// Untyped literals can be assigned to compatible primitive types
+			if types.IsUntypedInt(source) && types.IsInteger(target) {
+				return ImplicitCastable
+			}
+			if types.IsUntypedFloat(source) && types.IsFloat(target) {
+				return ImplicitCastable
+			}
 		}
+		return Incompatible
 	}
 
 	// Check numeric conversions
