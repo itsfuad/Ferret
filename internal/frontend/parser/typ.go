@@ -317,11 +317,35 @@ func (p *Parser) parseInterfaceType() *ast.InterfaceType {
 
 	methods := []ast.Field{}
 
+	// Check for empty interface: interface{}
+	if p.match(tokens.CLOSE_CURLY) {
+		// Empty interface, no methods
+		end := p.advance().End
+		return &ast.InterfaceType{
+			Methods:  methods,
+			Location: *source.NewLocation(&p.filepath, &tok.Start, &end),
+		}
+	}
+
 	for !(p.match(tokens.CLOSE_CURLY) || p.isAtEnd()) {
 
 		// funcname (...) -> ...
 
 		name := p.parseIdentifier()
+
+		// Check if parseIdentifier failed (Name is "<error>" and Location not set)
+		if name.Name == "<error>" || name.Start == nil {
+			// Parser already reported the error, skip to recovery point
+			// Try to find next comma or closing brace
+			for !p.isAtEnd() && !p.match(tokens.COMMA_TOKEN) && !p.match(tokens.CLOSE_CURLY) {
+				p.advance()
+			}
+			if p.match(tokens.COMMA_TOKEN) {
+				p.advance()
+				continue
+			}
+			break
+		}
 
 		functype := p.parseFuncType(*name.Start)
 

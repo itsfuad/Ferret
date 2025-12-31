@@ -736,7 +736,7 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 	case *hir.BinaryExpr:
 		// Special handling for 'is' operator
 		if e.Op.Kind == tokens.IS_TOKEN {
-			return b.emitUnionTypeCheck(e)
+			return b.emitTypeCheck(e)
 		}
 
 		left := b.lowerExpr(e.X)
@@ -1377,24 +1377,30 @@ func (b *functionBuilder) boxInterfaceValue(value mir.ValueID, valueType, ifaceT
 		dataPtr = box
 	}
 
-	if isEmptyInterface(ifaceType) {
-		return b.emitCast(dataPtr, ifaceType, loc)
-	}
-
-	vtableName, ok := b.gen.ensureInterfaceVTable(valueType, ifaceType, loc)
-	if !ok || vtableName == "" {
-		return mir.InvalidValue
-	}
-
-	vtablePtr := b.emitConst(types.NewReference(types.TypeU8), "$"+vtableName, loc)
 	ifaceAddr := b.emitAlloca(ifaceType, loc)
 	ptrType := types.NewReference(types.TypeU8)
 
+	// Store data pointer at offset 0
 	dataSlot := b.emitPtrAdd(ifaceAddr, 0, ptrType, loc)
 	b.emitStore(dataSlot, dataPtr, loc)
 
-	vtSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
-	b.emitStore(vtSlot, vtablePtr, loc)
+	if isEmptyInterface(ifaceType) {
+		// For empty interface{}, store type ID string pointer at offset PointerSize
+		typeID := typeIDString(valueType)
+		typeIDGlobal := b.gen.ensureTypeIDGlobal(typeID)
+		typeIDPtr := b.emitConst(ptrType, "$"+typeIDGlobal, loc)
+		typeIDSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
+		b.emitStore(typeIDSlot, typeIDPtr, loc)
+	} else {
+		// For interfaces with methods, store vtable pointer at offset PointerSize
+		vtableName, ok := b.gen.ensureInterfaceVTable(valueType, ifaceType, loc)
+		if !ok || vtableName == "" {
+			return mir.InvalidValue
+		}
+		vtablePtr := b.emitConst(ptrType, "$"+vtableName, loc)
+		vtSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
+		b.emitStore(vtSlot, vtablePtr, loc)
+	}
 
 	return ifaceAddr
 }
@@ -1436,36 +1442,47 @@ func (b *functionBuilder) boxUnionValue(value mir.ValueID, valueType types.SemTy
 	return unionAddr
 }
 
-// emitUnionTypeCheck generates code for the 'is' operator to check union variant type.
-// Returns a boolean indicating if the union contains the expected variant.
-func (b *functionBuilder) emitUnionTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
+// emitTypeCheck generates code for the 'is' operator to check type at runtime.
+// Handles both union types and interface{} types.
+// Returns a boolean indicating if the value is of the expected type.
+func (b *functionBuilder) emitTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
 	if expr == nil || expr.TargetType == nil {
 		// Fallback: return false if no target type
 		return b.emitConst(types.TypeBool, "0", expr.Location)
 	}
 
-	// Lower the union value (LHS)
-	unionVal := b.lowerExpr(expr.X)
-	if unionVal == mir.InvalidValue {
+	// Lower the value (LHS)
+	val := b.lowerExpr(expr.X)
+	if val == mir.InvalidValue {
 		return mir.InvalidValue
 	}
 
-	unionType := b.exprType(expr.X)
-	unionVal, unionType = b.derefValueIfNeeded(unionVal, unionType, expr.Location)
+	valType := b.exprType(expr.X)
+	val, valType = b.derefValueIfNeeded(val, valType, expr.Location)
 
-	// Get the union type
-	unwrappedUnionType := types.UnwrapType(unionType)
-	unionTypeStruct, ok := unwrappedUnionType.(*types.UnionType)
-	if !ok {
-		// Not a union type - should have been caught by type checker
-		b.reportUnsupported("non-union 'is' check", expr.Loc())
-		return mir.InvalidValue
+	unwrappedType := types.UnwrapType(valType)
+
+	// Check if it's a union type
+	if unionTypeStruct, ok := unwrappedType.(*types.UnionType); ok {
+		return b.emitUnionTypeCheckImpl(val, unionTypeStruct, expr.TargetType, expr.Location)
 	}
 
+	// Check if it's an interface{} type
+	if isEmptyInterface(valType) {
+		return b.emitInterfaceTypeCheck(val, expr.TargetType, expr.Location)
+	}
+
+	// Not a union or interface - should have been caught by type checker
+	b.reportUnsupported("'is' check on non-union/non-interface type", expr.Loc())
+	return mir.InvalidValue
+}
+
+// emitUnionTypeCheckImpl implements union variant checking.
+func (b *functionBuilder) emitUnionTypeCheckImpl(unionVal mir.ValueID, unionType *types.UnionType, targetType types.SemType, loc source.Location) mir.ValueID {
 	// Find the variant index for the target type
 	variantIndex := -1
-	for i, variant := range unionTypeStruct.Variants {
-		if expr.TargetType.Equals(variant) {
+	for i, variant := range unionType.Variants {
+		if targetType.Equals(variant) {
 			variantIndex = i
 			break
 		}
@@ -1473,16 +1490,16 @@ func (b *functionBuilder) emitUnionTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
 
 	if variantIndex < 0 {
 		// Target type is not a variant - should have been caught by type checker
-		b.reportUnsupported("invalid union variant", expr.Loc())
+		b.reportUnsupported("invalid union variant", &loc)
 		return mir.InvalidValue
 	}
 
 	// Load the discriminant (tag) from the union at offset 0
-	tagSlot := b.emitPtrAdd(unionVal, 0, types.TypeI32, expr.Location)
-	tagValue := b.emitLoad(tagSlot, types.TypeI32, expr.Location)
+	tagSlot := b.emitPtrAdd(unionVal, 0, types.TypeI32, loc)
+	tagValue := b.emitLoad(tagSlot, types.TypeI32, loc)
 
 	// Compare the tag with the expected variant index
-	expectedTag := b.emitConst(types.TypeI32, strconv.Itoa(variantIndex), expr.Location)
+	expectedTag := b.emitConst(types.TypeI32, strconv.Itoa(variantIndex), loc)
 	result := b.gen.nextValueID()
 	b.emitInstr(&mir.Binary{
 		Result:   result,
@@ -1490,10 +1507,48 @@ func (b *functionBuilder) emitUnionTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
 		Left:     tagValue,
 		Right:    expectedTag,
 		Type:     types.TypeBool,
-		Location: expr.Location,
+		Location: loc,
 	})
 
 	return result
+}
+
+// emitInterfaceTypeCheck implements interface{} type checking.
+// Compares the stored type ID string with the expected type ID.
+func (b *functionBuilder) emitInterfaceTypeCheck(ifaceVal mir.ValueID, targetType types.SemType, loc source.Location) mir.ValueID {
+	// Load the type ID pointer from the interface at offset PointerSize
+	ptrType := types.NewReference(types.TypeU8)
+	typeIDSlot := b.emitPtrAdd(ifaceVal, b.gen.layout.PointerSize, ptrType, loc)
+	storedTypeIDPtr := b.emitLoad(typeIDSlot, ptrType, loc)
+
+	// Get the expected type ID
+	expectedTypeID := typeIDString(targetType)
+	expectedTypeIDGlobal := b.gen.ensureTypeIDGlobal(expectedTypeID)
+	expectedTypeIDPtr := b.emitConst(ptrType, "$"+expectedTypeIDGlobal, loc)
+
+	// Compare the two type ID string pointers using strcmp
+	result := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   result,
+		Target:   "ferret_strcmp",
+		Args:     []mir.ValueID{storedTypeIDPtr, expectedTypeIDPtr},
+		Type:     types.TypeI32,
+		Location: loc,
+	})
+
+	// strcmp returns 0 if equal, so we need to compare result == 0
+	zero := b.emitConst(types.TypeI32, "0", loc)
+	isEqual := b.gen.nextValueID()
+	b.emitInstr(&mir.Binary{
+		Result:   isEqual,
+		Op:       tokens.DOUBLE_EQUAL_TOKEN,
+		Left:     result,
+		Right:    zero,
+		Type:     types.TypeBool,
+		Location: loc,
+	})
+
+	return isEqual
 }
 
 func builtinNameFromIdent(ident *hir.Ident) (string, bool) {

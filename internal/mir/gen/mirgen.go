@@ -25,17 +25,19 @@ type closureInfo struct {
 
 // Generator lowers lowered HIR into MIR.
 type Generator struct {
-	ctx       *context_v2.CompilerContext
-	mod       *context_v2.Module
-	layout    *mir.DataLayout
-	nextValue mir.ValueID
-	nextBlock mir.BlockID
-	funcLits  map[string]*closureInfo
-	extraFns  []*mir.Function
-	funcWraps map[string]string
-	wrapID    int
-	vtableSeq int
-	vtables   map[string]*mir.VTable
+	ctx           *context_v2.CompilerContext
+	mod           *context_v2.Module
+	layout        *mir.DataLayout
+	nextValue     mir.ValueID
+	nextBlock     mir.BlockID
+	funcLits      map[string]*closureInfo
+	extraFns      []*mir.Function
+	funcWraps     map[string]string
+	wrapID        int
+	vtableSeq     int
+	vtables       map[string]*mir.VTable
+	typeIDGlobals map[string]string // Maps type ID string to global name
+	typeIDSeq     int               // Counter for generating unique type ID global names
 }
 
 // New creates a new MIR generator for a module.
@@ -45,12 +47,13 @@ func New(ctx *context_v2.CompilerContext, mod *context_v2.Module) *Generator {
 		pointerSize = ctx.Config.PointerSize
 	}
 	return &Generator{
-		ctx:       ctx,
-		mod:       mod,
-		layout:    mir.NewDataLayout(pointerSize),
-		funcLits:  make(map[string]*closureInfo),
-		funcWraps: make(map[string]string),
-		vtables:   make(map[string]*mir.VTable),
+		ctx:           ctx,
+		mod:           mod,
+		layout:        mir.NewDataLayout(pointerSize),
+		funcLits:      make(map[string]*closureInfo),
+		funcWraps:     make(map[string]string),
+		vtables:       make(map[string]*mir.VTable),
+		typeIDGlobals: make(map[string]string),
 	}
 }
 
@@ -87,6 +90,12 @@ func (g *Generator) GenerateModule(hirMod *hir.Module) *mir.Module {
 				continue
 			}
 			mirMod.VTables = append(mirMod.VTables, *table)
+		}
+	}
+	if len(g.typeIDGlobals) > 0 {
+		mirMod.TypeIDs = make(map[string]string, len(g.typeIDGlobals))
+		for typeID, globalName := range g.typeIDGlobals {
+			mirMod.TypeIDs[globalName] = typeID
 		}
 	}
 

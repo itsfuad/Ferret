@@ -7,12 +7,12 @@ type Indexable union {
 };
 
 fn loop(iter: Indexable) {
-    if iter is []interface {
+    if iter is str {
         for v in iter {
             io::Println(v);
         }
     } else {
-        io::Println("loop not executed");
+        io::Println("Not a string");
     }
 }
 

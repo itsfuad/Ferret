@@ -56,6 +56,7 @@ func (g *Generator) Emit() (string, error) {
 	}
 
 	g.emitVTables()
+	g.emitTypeIDs()
 	for _, fn := range g.mirMod.Functions {
 		g.emitFunction(fn)
 	}
@@ -88,6 +89,23 @@ func (g *Generator) emitVTables() {
 			entries = append(entries, fmt.Sprintf("l $%s", name))
 		}
 		g.data.WriteString(fmt.Sprintf("data $%s = { %s }\n", table.Name, strings.Join(entries, ", ")))
+	}
+}
+
+func (g *Generator) emitTypeIDs() {
+	if g == nil || g.mirMod == nil || len(g.mirMod.TypeIDs) == 0 {
+		return
+	}
+
+	// Emit each type ID as a null-terminated string constant
+	for globalName, typeIDString := range g.mirMod.TypeIDs {
+		// Emit as byte array with null terminator
+		bytes := make([]string, 0, len(typeIDString)+1)
+		for _, ch := range []byte(typeIDString) {
+			bytes = append(bytes, fmt.Sprintf("b %d", ch))
+		}
+		bytes = append(bytes, "b 0") // null terminator
+		g.data.WriteString(fmt.Sprintf("data $%s = { %s }\n", globalName, strings.Join(bytes, ", ")))
 	}
 }
 

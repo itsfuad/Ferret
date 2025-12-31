@@ -65,6 +65,8 @@ func analyzeIsCondition(mod *context_v2.Module, binExpr *ast.BinaryExpr, parent 
 
 	if ident, ok := binExpr.X.(*ast.IdentifierExpr); ok {
 		varName := ident.Name
+
+		// First check for union types
 		if unionType := getUnionVarType(mod, varName); unionType != nil {
 			// Get the target type from RHS
 			var targetType types.SemType
@@ -99,6 +101,28 @@ func analyzeIsCondition(mod *context_v2.Module, binExpr *ast.BinaryExpr, parent 
 					}
 				}
 			}
+			return thenNarrowing, elseNarrowing
+		}
+
+		// Then check for interface{} types
+		if interfaceType := getInterfaceVarType(mod, varName); interfaceType != nil && isEmptyInterface(interfaceType) {
+			// Get the target type from RHS
+			var targetType types.SemType
+
+			// Handle TypeExpr (new parser format: val is i32)
+			if typeExpr, ok := binExpr.Y.(*ast.TypeExpr); ok {
+				targetType = getTypeFromTypeNode(mod, typeExpr.Type)
+			} else if rhsIdent, ok := binExpr.Y.(*ast.IdentifierExpr); ok {
+				// Handle IdentifierExpr (old format: val is str)
+				targetType = getPrimitiveTypeByName(rhsIdent.Name)
+			}
+
+			// In the 'then' branch, narrow to the target type
+			if targetType != nil {
+				thenNarrowing.Narrow(varName, targetType)
+			}
+			// In the 'else' branch, we can't narrow (still interface{})
+			return thenNarrowing, elseNarrowing
 		}
 	}
 	return thenNarrowing, elseNarrowing
@@ -352,4 +376,59 @@ func getUnionVarType(mod *context_v2.Module, varName string) *types.UnionType {
 	}
 
 	return nil
+}
+
+// getInterfaceVarType gets the interface type of a variable if it exists
+func getInterfaceVarType(mod *context_v2.Module, varName string) *types.InterfaceType {
+	sym, ok := mod.CurrentScope.Lookup(varName)
+	if !ok {
+		return nil
+	}
+
+	unwrapped := types.UnwrapType(sym.Type)
+	if interfaceType, ok := unwrapped.(*types.InterfaceType); ok {
+		return interfaceType
+	}
+
+	return nil
+}
+
+// isEmptyInterface checks if an interface type has no methods (is interface{})
+func isEmptyInterface(interfaceType *types.InterfaceType) bool {
+	return interfaceType != nil && len(interfaceType.Methods) == 0
+}
+
+// getPrimitiveTypeByName returns a primitive type by its name string
+func getPrimitiveTypeByName(name string) types.SemType {
+	typeName := types.TYPE_NAME(name)
+	switch typeName {
+	case types.TYPE_I8:
+		return types.TypeI8
+	case types.TYPE_I16:
+		return types.TypeI16
+	case types.TYPE_I32:
+		return types.TypeI32
+	case types.TYPE_I64:
+		return types.TypeI64
+	case types.TYPE_U8:
+		return types.TypeU8
+	case types.TYPE_U16:
+		return types.TypeU16
+	case types.TYPE_U32:
+		return types.TypeU32
+	case types.TYPE_U64:
+		return types.TypeU64
+	case types.TYPE_F32:
+		return types.TypeF32
+	case types.TYPE_F64:
+		return types.TypeF64
+	case types.TYPE_STRING:
+		return types.TypeString
+	case types.TYPE_BOOL:
+		return types.TypeBool
+	case types.TYPE_BYTE:
+		return types.TypeByte
+	default:
+		return nil
+	}
 }

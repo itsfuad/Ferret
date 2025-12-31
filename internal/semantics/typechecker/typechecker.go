@@ -2296,10 +2296,14 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 						WithSecondaryLabel(e.X.Loc(), "union type"),
 				)
 				return types.TypeBool // Still return bool, error reported
+			} else if ifaceType, ok := lhsUnwrapped.(*types.InterfaceType); ok && len(ifaceType.Methods) == 0 {
+				// Allow 'is' on empty interface{} - can check for any type at runtime
+				// No need to validate rhsType - any type is valid
+				return types.TypeBool
 			} else {
 				ctx.Diagnostics.Add(
-					diagnostics.NewError("'is' operator requires left operand to be a union type").
-						WithPrimaryLabel(e.X.Loc(), "expected union type"),
+					diagnostics.NewError("'is' operator requires left operand to be a union type or interface{}").
+						WithPrimaryLabel(e.X.Loc(), "expected union or interface{}"),
 				)
 				return types.TypeBool
 			}
