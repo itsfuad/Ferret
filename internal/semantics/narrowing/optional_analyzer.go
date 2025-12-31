@@ -255,7 +255,8 @@ func getUnionVarType(mod *context_v2.Module, varName string) *types.UnionType {
 		return nil
 	}
 
-	if unionType, ok := sym.Type.(*types.UnionType); ok {
+	unwrapped := types.UnwrapType(sym.Type)
+	if unionType, ok := unwrapped.(*types.UnionType); ok {
 		return unionType
 	}
 

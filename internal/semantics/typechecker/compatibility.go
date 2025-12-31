@@ -251,6 +251,15 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	srcUnwrapped := types.UnwrapType(source)
 	tgtUnwrapped := types.UnwrapType(target)
 
+	// Check if target unwrapped is union and source matches one of the variants
+	if unionType, ok := tgtUnwrapped.(*types.UnionType); ok {
+		for _, variant := range unionType.Variants {
+			if source.Equals(variant) {
+				return ImplicitCastable
+			}
+		}
+	}
+
 	// If underlying types are compatible, it's explicitly castable (not implicitly)
 	if types.IsNumeric(srcUnwrapped) && types.IsNumeric(tgtUnwrapped) {
 		// Both are numeric, can be explicitly cast

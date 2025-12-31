@@ -2239,7 +2239,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 		if e.Op.Kind == tokens.IS_TOKEN {
 			// Special handling for 'is' operator
-			if unionType, ok := lhsType.(*types.UnionType); ok {
+			lhsUnwrapped := types.UnwrapType(lhsType)
+			if unionType, ok := lhsUnwrapped.(*types.UnionType); ok {
 				// rhsType should be a type that matches a variant
 				for _, variant := range unionType.Variants {
 					if rhsType.Equals(variant) {
