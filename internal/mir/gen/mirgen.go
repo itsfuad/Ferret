@@ -424,6 +424,8 @@ func (g *Generator) inferFuncLitCaptures(lit *hir.FuncLit) []*hir.Ident {
 			visitExpr(e.Incr)
 		case *hir.ArrayLenExpr:
 			visitExpr(e.X)
+		case *hir.StringLenExpr:
+			visitExpr(e.X)
 		case *hir.MapIterInitExpr:
 			visitExpr(e.Map)
 		case *hir.MapIterNextExpr:

@@ -106,6 +106,85 @@ func implementsInterface(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	return true
 }
 
+// checkCompositeTypeCompatibility handles composite type compatibility (arrays, maps, optionals)
+// Returns the compatibility level between source and target composite types
+func checkCompositeTypeCompatibility(source, target types.SemType) TypeCompatibility {
+	// Check array compatibility: []T -> []U
+	if srcArray, srcIsArray := source.(*types.ArrayType); srcIsArray {
+		if tgtArray, tgtIsArray := target.(*types.ArrayType); tgtIsArray {
+			// Check lengths match (for fixed-size arrays)
+			if srcArray.Length != tgtArray.Length {
+				return Incompatible
+			}
+			// Recursively check element compatibility
+			elemCompat := checkTypeCompatibility(srcArray.Element, tgtArray.Element)
+			return elemCompat
+		}
+		return Incompatible
+	}
+
+	// Check map compatibility: map[K1]V1 -> map[K2]V2
+	if srcMap, srcIsMap := source.(*types.MapType); srcIsMap {
+		if tgtMap, tgtIsMap := target.(*types.MapType); tgtIsMap {
+			// Keys must be compatible
+			keyCompat := checkTypeCompatibility(srcMap.Key, tgtMap.Key)
+			if keyCompat == Incompatible {
+				return Incompatible
+			}
+			// Values must be compatible
+			valCompat := checkTypeCompatibility(srcMap.Value, tgtMap.Value)
+			if valCompat == Incompatible {
+				return Incompatible
+			}
+			// Return the weaker compatibility level
+			if keyCompat == Identical && valCompat == Identical {
+				return Identical
+			}
+			if keyCompat == ExplicitCastable || valCompat == ExplicitCastable {
+				return ExplicitCastable
+			}
+			return ImplicitCastable
+		}
+		return Incompatible
+	}
+
+	// Check optional compatibility: T? -> U?
+	if srcOpt, srcIsOpt := source.(*types.OptionalType); srcIsOpt {
+		if tgtOpt, tgtIsOpt := target.(*types.OptionalType); tgtIsOpt {
+			// Recursively check inner type compatibility
+			return checkTypeCompatibility(srcOpt.Inner, tgtOpt.Inner)
+		}
+		return Incompatible
+	}
+
+	// Check result type compatibility: E1!T1 -> E2!T2
+	if srcRes, srcIsRes := source.(*types.ResultType); srcIsRes {
+		if tgtRes, tgtIsRes := target.(*types.ResultType); tgtIsRes {
+			// Both Ok and Err types must be compatible
+			okCompat := checkTypeCompatibility(srcRes.Ok, tgtRes.Ok)
+			if okCompat == Incompatible {
+				return Incompatible
+			}
+			errCompat := checkTypeCompatibility(srcRes.Err, tgtRes.Err)
+			if errCompat == Incompatible {
+				return Incompatible
+			}
+			// Return the weaker compatibility level
+			if okCompat == Identical && errCompat == Identical {
+				return Identical
+			}
+			if okCompat == ExplicitCastable || errCompat == ExplicitCastable {
+				return ExplicitCastable
+			}
+			return ImplicitCastable
+		}
+		return Incompatible
+	}
+
+	// Not a composite type or types don't match structure
+	return Incompatible
+}
+
 // checkTypeCompatibilityWithContext determines if source type can be used where target type is expected
 // This version includes context for interface satisfaction checking
 func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, source, target types.SemType) TypeCompatibility {
@@ -169,6 +248,12 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	// Any type can be assigned to empty interface (any)
 	if iface, ok := types.UnwrapType(target).(*types.InterfaceType); ok && len(iface.Methods) == 0 {
 		return ImplicitCastable
+	}
+
+	// Check composite type compatibility (arrays, maps, optionals, etc.)
+	// This handles cases like []T -> []interface{}, map[K]V -> map[interface{}]interface{}, etc.
+	if compat := checkCompositeTypeCompatibility(source, target); compat != Incompatible {
+		return compat
 	}
 
 	// Special handling for none

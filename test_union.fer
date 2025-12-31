@@ -1,3 +1,4 @@
+import "std/io";
 
 type Indexable union {
     str,
@@ -5,8 +6,28 @@ type Indexable union {
     map[interface{}]interface{}
 };
 
+fn loop(iter: Indexable) {
+    if iter is str {
+        for v in iter {
+            io::Println(v);
+        }
+    } else {
+        io::Println("Not a string");
+    }
+}
+
 fn main() {
     //let u: union { i32, str } = 42;
     let idx: Indexable = "hi";
+    let ii: interface{} = 42;
     let arr: []interface{} = [1,2,4];
+
+    let string := "hello world";
+    for c in string {
+        io::Println(c);
+    }
+    
+    io::Println("-----------");
+    
+    loop(arr);
 }

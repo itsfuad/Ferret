@@ -288,6 +288,17 @@ func (a *ArrayLenExpr) hirNode()              {}
 func (a *ArrayLenExpr) hirExpr()              {}
 func (a *ArrayLenExpr) Loc() *source.Location { return &a.Location }
 
+// StringLenExpr represents getting the length of a string expression.
+type StringLenExpr struct {
+	X        Expr
+	Type     types.SemType
+	Location source.Location
+}
+
+func (s *StringLenExpr) hirNode()              {}
+func (s *StringLenExpr) hirExpr()              {}
+func (s *StringLenExpr) Loc() *source.Location { return &s.Location }
+
 // MapIterInitExpr represents initializing a map iterator.
 type MapIterInitExpr struct {
 	Map      Expr

@@ -840,6 +840,12 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			return b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), e.Location)
 		}
 		return b.emitArrayLen(arrVal, e.Location)
+	case *hir.StringLenExpr:
+		strVal := b.lowerExpr(e.X)
+		if strVal == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		return b.emitStringLen(strVal, e.Location)
 	case *hir.MapIterInitExpr:
 		return b.lowerMapIterInit(e)
 	case *hir.MapIterNextExpr:
@@ -3665,6 +3671,18 @@ func (b *functionBuilder) emitArrayLen(arrVal mir.ValueID, loc source.Location) 
 		Result:   id,
 		Target:   "ferret_array_len",
 		Args:     []mir.ValueID{arrVal},
+		Type:     types.TypeI32,
+		Location: loc,
+	})
+	return id
+}
+
+func (b *functionBuilder) emitStringLen(strVal mir.ValueID, loc source.Location) mir.ValueID {
+	id := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   id,
+		Target:   "ferret_string_len",
+		Args:     []mir.ValueID{strVal},
 		Type:     types.TypeI32,
 		Location: loc,
 	})

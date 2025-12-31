@@ -86,7 +86,7 @@ func walkDeclItemsConstEval(ctx *context_v2.CompilerContext, mod *context_v2.Mod
 	for _, item := range items {
 		walkExprConstEval(ctx, mod, item.Value)
 		updateConstValue(item.Name, consteval.EvaluateHIRExpr(ctx, mod, item.Value))
-		
+
 		// Track array literal lengths for dynamic arrays
 		if item.Name != nil && item.Name.Symbol != nil {
 			if lit, ok := item.Value.(*hir.CompositeLit); ok {
@@ -119,7 +119,7 @@ func walkAssignConstEval(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	}
 
 	updateConstValue(ident, consteval.EvaluateHIRExpr(ctx, mod, stmt.Rhs))
-	
+
 	// Track array literal lengths for dynamic arrays
 	if lit, ok := stmt.Rhs.(*hir.CompositeLit); ok {
 		if arrType := arrayTypeOf(stmt.Rhs); arrType != nil && arrType.Length < 0 {
@@ -210,6 +210,8 @@ func walkExprConstEval(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		walkExprConstEval(ctx, mod, e.Incr)
 	case *hir.ArrayLenExpr:
 		walkExprConstEval(ctx, mod, e.X)
+	case *hir.StringLenExpr:
+		walkExprConstEval(ctx, mod, e.X)
 	case *hir.MapIterInitExpr:
 		walkExprConstEval(ctx, mod, e.Map)
 	case *hir.MapIterNextExpr:
@@ -283,7 +285,7 @@ func checkArrayBounds(ctx *context_v2.CompilerContext, mod *context_v2.Module, i
 				lengthKnown = true
 			}
 		}
-		
+
 		if !lengthKnown {
 			// Can't determine length at compile time
 			return
@@ -385,6 +387,8 @@ func exprType(expr hir.Expr) types.SemType {
 	case *hir.RangeExpr:
 		return e.Type
 	case *hir.ArrayLenExpr:
+		return e.Type
+	case *hir.StringLenExpr:
 		return e.Type
 	case *hir.MapIterInitExpr:
 		return e.Type

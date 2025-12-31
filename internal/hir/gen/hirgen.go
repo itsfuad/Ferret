@@ -197,6 +197,11 @@ func (g *Generator) lowerExpr(expr ast.Expression) hir.Expr {
 		}
 	case *ast.FuncLit:
 		return g.lowerFuncLit(e)
+	case *ast.TypeExpr:
+		// TypeExpr is used in 'is' operator with union types
+		// For HIR, we convert the type to an identifier expression
+		// The type information is preserved through the module's type system
+		return g.lowerTypeExprToIdent(e)
 	case *ast.Invalid:
 		return &hir.Invalid{Location: locFromNode(e)}
 	default:
@@ -760,6 +765,8 @@ func (g *Generator) collectFuncLitCaptures(body *hir.Block, scope ast.SymbolTabl
 			visitExpr(e.Incr)
 		case *hir.ArrayLenExpr:
 			visitExpr(e.X)
+		case *hir.StringLenExpr:
+			visitExpr(e.X)
 		case *hir.MapIterInitExpr:
 			visitExpr(e.Map)
 		case *hir.MapIterNextExpr:
@@ -986,6 +993,57 @@ func (g *Generator) reportUnsupported(kind string, node ast.Node) {
 		return
 	}
 	g.ctx.ReportError("hir/gen: unsupported "+kind, node.Loc())
+}
+
+func (g *Generator) lowerTypeExprToIdent(e *ast.TypeExpr) hir.Expr {
+	// TypeExpr wraps a type node for use in expression context (e.g., 'is' operator)
+	// For HIR, we convert it to an identifier that represents the type
+	// The actual type checking is already done, so we just need a placeholder
+
+	// Try to get a string representation of the type
+	typeName := g.getTypeNodeName(e.Type)
+
+	return &hir.Ident{
+		Name:     typeName,
+		Symbol:   nil, // This is a type name, not a variable
+		Type:     g.exprType(e),
+		Location: locFromNode(e),
+	}
+}
+
+func (g *Generator) getTypeNodeName(typeNode ast.TypeNode) string {
+	if typeNode == nil {
+		return "unknown"
+	}
+
+	switch t := typeNode.(type) {
+	case *ast.IdentifierExpr:
+		return t.Name
+	case *ast.ArrayType:
+		elemName := g.getTypeNodeName(t.ElType)
+		if t.Len != nil {
+			return "[N]" + elemName
+		}
+		return "[]" + elemName
+	case *ast.MapType:
+		keyName := g.getTypeNodeName(t.Key)
+		valName := g.getTypeNodeName(t.Value)
+		return "map[" + keyName + "]" + valName
+	case *ast.InterfaceType:
+		if len(t.Methods) == 0 {
+			return "interface{}"
+		}
+		return "interface"
+	case *ast.OptionalType:
+		baseName := g.getTypeNodeName(t.Base)
+		return baseName + "?"
+	case *ast.UnionType:
+		return "union"
+	case *ast.StructType:
+		return "struct"
+	default:
+		return "type"
+	}
 }
 
 func lowerLiteralKind(kind ast.LiteralKind) hir.LiteralKind {

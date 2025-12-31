@@ -66,10 +66,28 @@ func analyzeIsCondition(mod *context_v2.Module, binExpr *ast.BinaryExpr, parent 
 	if ident, ok := binExpr.X.(*ast.IdentifierExpr); ok {
 		varName := ident.Name
 		if unionType := getUnionVarType(mod, varName); unionType != nil {
-			if rhsIdent, ok := binExpr.Y.(*ast.IdentifierExpr); ok {
+			// Get the target type from RHS
+			var targetType types.SemType
+
+			// Handle TypeExpr (new parser format: iter is []interface{})
+			if typeExpr, ok := binExpr.Y.(*ast.TypeExpr); ok {
+				targetType = getTypeFromTypeNode(mod, typeExpr.Type)
+			} else if rhsIdent, ok := binExpr.Y.(*ast.IdentifierExpr); ok {
+				// Handle IdentifierExpr (old format: iter is str)
 				variantName := rhsIdent.Name
-				for i, variant := range unionType.Variants {
+				// Try to match by primitive type name
+				for _, variant := range unionType.Variants {
 					if name, ok := types.GetPrimitiveName(variant); ok && string(name) == variantName {
+						targetType = variant
+						break
+					}
+				}
+			}
+
+			// If we found a target type, check if it matches a variant
+			if targetType != nil {
+				for i, variant := range unionType.Variants {
+					if targetType.Equals(variant) {
 						thenNarrowing.Narrow(varName, variant)
 						otherVariants := excludeVariant(unionType.Variants, i)
 						if len(otherVariants) == 1 {
@@ -84,6 +102,79 @@ func analyzeIsCondition(mod *context_v2.Module, binExpr *ast.BinaryExpr, parent 
 		}
 	}
 	return thenNarrowing, elseNarrowing
+}
+
+// getTypeFromTypeNode converts an AST type node to a semantic type
+func getTypeFromTypeNode(mod *context_v2.Module, typeNode ast.TypeNode) types.SemType {
+	if typeNode == nil {
+		return nil
+	}
+
+	// This is a simplified version - in production, you'd use the full TypeFromTypeNodeWithContext
+	// For now, handle the common cases
+	switch t := typeNode.(type) {
+	case *ast.IdentifierExpr:
+		// Type name like "str", "i32", etc.
+		typeName := types.TYPE_NAME(t.Name)
+		switch typeName {
+		case types.TYPE_I8:
+			return types.TypeI8
+		case types.TYPE_I16:
+			return types.TypeI16
+		case types.TYPE_I32:
+			return types.TypeI32
+		case types.TYPE_I64:
+			return types.TypeI64
+		case types.TYPE_U8:
+			return types.TypeU8
+		case types.TYPE_U16:
+			return types.TypeU16
+		case types.TYPE_U32:
+			return types.TypeU32
+		case types.TYPE_U64:
+			return types.TypeU64
+		case types.TYPE_F32:
+			return types.TypeF32
+		case types.TYPE_F64:
+			return types.TypeF64
+		case types.TYPE_BOOL:
+			return types.TypeBool
+		case types.TYPE_STRING:
+			return types.TypeString
+		case types.TYPE_BYTE:
+			return types.TypeByte
+		}
+		// Could be a named type - look it up in the module
+		if sym, ok := mod.CurrentScope.Lookup(t.Name); ok {
+			return sym.Type
+		}
+	case *ast.ArrayType:
+		// Array type like []T
+		elemType := getTypeFromTypeNode(mod, t.ElType)
+		if elemType != nil {
+			length := -1 // dynamic array
+			if t.Len != nil {
+				// Fixed-size array - would need to evaluate the length expression
+				// For now, assume dynamic
+			}
+			return types.NewArray(elemType, length)
+		}
+	case *ast.MapType:
+		// Map type like map[K]V
+		keyType := getTypeFromTypeNode(mod, t.Key)
+		valueType := getTypeFromTypeNode(mod, t.Value)
+		if keyType != nil && valueType != nil {
+			return types.NewMap(keyType, valueType)
+		}
+	case *ast.InterfaceType:
+		// Interface type
+		if len(t.Methods) == 0 {
+			// Empty interface
+			return types.NewInterface(nil)
+		}
+	}
+
+	return nil
 }
 
 // analyzeEqualityCondition handles 'a == none' or 'a != none' narrowing

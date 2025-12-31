@@ -467,6 +467,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 						WithPrimaryLabel(n.Range.Loc(), "this array is empty").
 						WithNote("Remove this loop or use a non-empty array"))
 				}
+			} else if prim, ok := unwrappedRange.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+				// Strings are iterable - element type is byte
+				rangeElemType = types.TypeByte
 			} else if _, ok := unwrappedRange.(*types.MapType); !ok {
 				isIterable = false
 				ctx.Diagnostics.Add(
@@ -544,6 +547,15 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 							} else {
 								// Second variable or single variable: gets array element type (value)
 								inferredType = rangeElemType
+							}
+						} else if prim, ok := types.UnwrapType(rangeType).(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+							// String iteration: index (i32) and character (byte)
+							if len(varDecl.Decls) == 2 && idx == 0 {
+								// First variable in dual-iterator: index is always i32
+								inferredType = types.TypeI32
+							} else {
+								// Second variable or single variable: gets byte type
+								inferredType = types.TypeByte
 							}
 						} else {
 							// Numeric range: all variables get range element type
@@ -2205,6 +2217,12 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	// Recursively validate subexpressions before type inference
 	switch e := expr.(type) {
+	case *ast.TypeExpr:
+		// TypeExpr wraps a type node for use in expression context (e.g., 'is' operator)
+		// Return the semantic type directly
+		semType := TypeFromTypeNodeWithContext(ctx, mod, e.Type)
+		mod.SetExprType(expr, semType)
+		return semType
 	case *ast.IdentifierExpr:
 		checkModuleScopeUseBeforeDecl(ctx, mod, e)
 		sym, ok := mod.CurrentScope.Lookup(e.Name)
@@ -2248,11 +2266,20 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.BinaryExpr:
 		// Recursively check operands
 		lhsType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
-		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
 
 		if e.Op.Kind == tokens.IS_TOKEN {
-			// Special handling for 'is' operator
+			// Special handling for 'is' operator - RHS is a TypeExpr
 			mod.SetExprType(expr, types.TypeBool)
+
+			// Extract the actual type from TypeExpr
+			var rhsType types.SemType
+			if typeExpr, ok := e.Y.(*ast.TypeExpr); ok {
+				rhsType = TypeFromTypeNodeWithContext(ctx, mod, typeExpr.Type)
+			} else {
+				// Fallback: try to infer type from expression (for backward compatibility)
+				rhsType = checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+			}
+
 			lhsUnwrapped := types.UnwrapType(lhsType)
 			if unionType, ok := lhsUnwrapped.(*types.UnionType); ok {
 				// rhsType should be a type that matches a variant
@@ -2276,7 +2303,11 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 				)
 				return types.TypeBool
 			}
-		} else {
+		}
+
+		// For non-'is' operators, check RHS normally
+		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+		{
 			// Validate operand type compatibility for regular binary ops
 			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
 			// Return the result type - for most binary ops, it's the same as lhsType

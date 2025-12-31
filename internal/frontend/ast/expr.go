@@ -180,3 +180,13 @@ type ParenExpr struct {
 func (p *ParenExpr) INode()                {} // Implements Node interface
 func (p *ParenExpr) Expr()                 {} // Expr is a marker interface for all expressions
 func (p *ParenExpr) Loc() *source.Location { return &p.Location }
+
+// TypeExpr represents a type used in expression context (e.g., in 'is' operator)
+type TypeExpr struct {
+	Type TypeNode // the type node
+	source.Location
+}
+
+func (t *TypeExpr) INode()                {} // Implements Node interface
+func (t *TypeExpr) Expr()                 {} // Expr is a marker interface for all expressions
+func (t *TypeExpr) Loc() *source.Location { return &t.Location }
