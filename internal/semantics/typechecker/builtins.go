@@ -129,7 +129,7 @@ func checkBuiltinAppend(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 					elemType.String(),
 					argTypeDesc.String(),
 				)
-				diag = addExplicitCastHint(ctx, diag, valueType, elemType, compatibility, expr.Args[1])
+				diag = addExplicitCastHint(ctx, diag, elemType, compatibility, expr.Args[1])
 				ctx.Diagnostics.Add(diag)
 			}
 		}

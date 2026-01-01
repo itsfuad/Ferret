@@ -371,7 +371,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 								WithCode(diagnostics.ErrTypeMismatch).
 								WithPrimaryLabel(n.Result.Loc(),
 									fmt.Sprintf("expected error type %s, found %s", resultType.Err.String(), returnedDesc))
-							diag = addExplicitCastHint(ctx, diag, returnedType, resultType.Err, compatibility, n.Result)
+							diag = addExplicitCastHint(ctx, diag, resultType.Err, compatibility, n.Result)
 							ctx.Diagnostics.Add(diag)
 						}
 					}
@@ -395,7 +395,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 								WithCode(diagnostics.ErrTypeMismatch).
 								WithPrimaryLabel(n.Result.Loc(),
 									fmt.Sprintf("expected %s, found %s", resultType.Ok.String(), returnedType.String()))
-							diag = addExplicitCastHint(ctx, diag, returnedType, resultType.Ok, compatibility, n.Result)
+							diag = addExplicitCastHint(ctx, diag, resultType.Ok, compatibility, n.Result)
 							ctx.Diagnostics.Add(diag)
 						}
 					}
@@ -417,7 +417,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 								WithCode(diagnostics.ErrTypeMismatch).
 								WithPrimaryLabel(n.Result.Loc(),
 									fmt.Sprintf("expected %s, found %s", expectedReturnType.String(), returnedType.String()))
-							diag = addExplicitCastHint(ctx, diag, returnedType, expectedReturnType, compatibility, n.Result)
+							diag = addExplicitCastHint(ctx, diag, expectedReturnType, compatibility, n.Result)
 							ctx.Diagnostics.Add(diag)
 						}
 					}
@@ -621,7 +621,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 							WithPrimaryLabel(caseClause.Pattern.Loc(), "incompatible pattern type").
 							WithCode(diagnostics.ErrTypeMismatch).
 							WithNote(fmt.Sprintf("match expression has type '%s'", matchType.String()))
-						diag = addExplicitCastHint(ctx, diag, patternType, matchType, compat, caseClause.Pattern)
+						diag = addExplicitCastHint(ctx, diag, matchType, compat, caseClause.Pattern)
 						ctx.Diagnostics.Add(diag)
 					}
 				}
@@ -1168,7 +1168,7 @@ func isNumericOrBool(typ types.SemType) bool {
 	return types.IsNumericType(typ)
 }
 
-func checkIndexExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.IndexExpr, baseType, indexType types.SemType) {
+func checkIndexExpr(ctx *context_v2.CompilerContext, expr *ast.IndexExpr, baseType, indexType types.SemType) {
 	if ctx == nil || expr == nil {
 		return
 	}
@@ -1257,53 +1257,6 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	return nil
 }
 
-// checkStructLiteral validates struct literal elements
-// It checks elements with field type context AND validates consistency
-// Returns missing fields if any, nil otherwise
-func checkStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType) []string {
-	// Build a map of provided fields and check elements with context
-	providedFields := make(map[string]bool)
-	for _, elem := range lit.Elts {
-		if kv, ok := elem.(*ast.KeyValueExpr); ok {
-			if key, ok := kv.Key.(*ast.IdentifierExpr); ok {
-				fieldName := key.Name
-				providedFields[fieldName] = true
-
-				// Check value with field type as context
-				if kv.Value != nil {
-					fieldExpected := types.TypeUnknown
-					for _, field := range structType.Fields {
-						if field.Name == fieldName {
-							fieldExpected = field.Type
-							break
-						}
-					}
-					valueType := checkExpr(ctx, mod, kv.Value, fieldExpected)
-					if isReferenceType(fieldExpected) && !valueType.Equals(types.TypeUnknown) && !isReferenceType(valueType) {
-						ctx.Diagnostics.Add(
-							diagnostics.NewError("reference field must be initialized with a reference").
-								WithCode(diagnostics.ErrInvalidAssignment).
-								WithPrimaryLabel(kv.Value.Loc(), "expected a reference value").
-								WithHelp("use '&' to bind the field"),
-						)
-					}
-				}
-			}
-		}
-	}
-
-	// Check for missing required fields
-	var missingFields []string
-	for _, field := range structType.Fields {
-		if !providedFields[field.Name] {
-			missingFields = append(missingFields, field.Name)
-		}
-	}
-
-	// Return missing fields - error will be reported in checkAssignLike with better context
-	return missingFields
-}
-
 // validateArrayLiteral validates that all array elements match the element type
 func validateArrayLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, arrayType *types.ArrayType) {
 	for _, elem := range lit.Elts {
@@ -1323,7 +1276,7 @@ func validateArrayLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 					WithCode(diagnostics.ErrTypeMismatch).
 					WithPrimaryLabel(elem.Loc(), fmt.Sprintf("type %s", elemTypeStr)).
 					WithHelp(fmt.Sprintf("all array elements must be %s", arrayType.Element.String()))
-				diag = addExplicitCastHint(ctx, diag, elemType, arrayType.Element, compat, elem)
+				diag = addExplicitCastHint(ctx, diag, arrayType.Element, compat, elem)
 				ctx.Diagnostics.Add(diag)
 			}
 		}
@@ -1349,7 +1302,7 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 				WithCode(diagnostics.ErrTypeMismatch).
 				WithPrimaryLabel(kv.Key.Loc(), fmt.Sprintf("type %s", keyTypeStr)).
 				WithHelp(fmt.Sprintf("all map keys must be %s", mapType.Key.String()))
-			diag = addExplicitCastHint(ctx, diag, keyType, mapType.Key, compat, kv.Key)
+			diag = addExplicitCastHint(ctx, diag, mapType.Key, compat, kv.Key)
 			ctx.Diagnostics.Add(diag)
 		}
 
@@ -1369,7 +1322,7 @@ func checkMapLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, li
 				WithCode(diagnostics.ErrTypeMismatch).
 				WithPrimaryLabel(kv.Value.Loc(), fmt.Sprintf("type %s", valueTypeStr)).
 				WithHelp(fmt.Sprintf("all map values must be %s", mapType.Value.String()))
-			diag = addExplicitCastHint(ctx, diag, valueType, mapType.Value, compat, kv.Value)
+			diag = addExplicitCastHint(ctx, diag, mapType.Value, compat, kv.Value)
 			ctx.Diagnostics.Add(diag)
 		}
 	}
@@ -1729,6 +1682,15 @@ func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, st
 		}
 	}
 
+	// Check if we're trying to mutate through an immutable reference receiver
+	if checkImmutableReceiverMutation(ctx, mod, stmt.Lhs) {
+		// Error already reported, but continue checking RHS for additional errors
+		if stmt.Rhs != nil {
+			checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+		}
+		return
+	}
+
 	warnValueReceiverMutation(ctx, mod, stmt.Lhs)
 
 	// Get the type of the LHS
@@ -2074,16 +2036,6 @@ func isReferenceType(typ types.SemType) bool {
 	return false
 }
 
-func isMutableReferenceType(typ types.SemType) bool {
-	if typ == nil {
-		return false
-	}
-	if ref, ok := types.UnwrapType(typ).(*types.ReferenceType); ok {
-		return ref.Mutable
-	}
-	return false
-}
-
 func receiverSymbolFromExpr(mod *context_v2.Module, expr ast.Expression) *symbols.Symbol {
 	if mod == nil || mod.CurrentScope == nil || expr == nil {
 		return nil
@@ -2101,6 +2053,94 @@ func receiverSymbolFromExpr(mod *context_v2.Module, expr ast.Expression) *symbol
 		return receiverSymbolFromExpr(mod, e.X)
 	}
 	return nil
+}
+
+// findImmutableRefInChain traverses an expression chain (e.g., p.X, arr[i].field)
+// and returns the first immutable reference found, along with its symbol and location.
+// Returns nil if no immutable reference is found.
+func findImmutableRefInChain(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) (*symbols.Symbol, *source.Location) {
+	if ctx == nil || mod == nil || expr == nil {
+		return nil, nil
+	}
+
+	switch e := expr.(type) {
+	case *ast.IdentifierExpr:
+		// Check if this identifier is an immutable reference
+		if sym, found := mod.CurrentScope.Lookup(e.Name); found {
+			if refType, ok := sym.Type.(*types.ReferenceType); ok && !refType.Mutable {
+				return sym, e.Loc()
+			}
+		}
+		return nil, nil
+
+	case *ast.SelectorExpr:
+		// Check base expression first
+		if sym, loc := findImmutableRefInChain(ctx, mod, e.X); sym != nil {
+			return sym, loc
+		}
+		// Check the base type itself
+		baseType := inferExprType(ctx, mod, e.X)
+		if refType, ok := types.UnwrapType(baseType).(*types.ReferenceType); ok && !refType.Mutable {
+			// The base expression is an immutable reference
+			// Return nil sym but with location - we'll get the sym from further traversal
+			return nil, nil
+		}
+		return nil, nil
+
+	case *ast.IndexExpr:
+		// Check base expression
+		return findImmutableRefInChain(ctx, mod, e.X)
+
+	case *ast.ParenExpr:
+		return findImmutableRefInChain(ctx, mod, e.X)
+
+	default:
+		return nil, nil
+	}
+}
+
+// checkImmutableRefMutation checks if we're trying to mutate through an immutable reference.
+// This handles both receiver parameters and regular function parameters.
+// Returns true if mutation is blocked (error reported), false if mutation is allowed.
+func checkImmutableRefMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) bool {
+	if ctx == nil || mod == nil || target == nil {
+		return false
+	}
+
+	sym, _ := findImmutableRefInChain(ctx, mod, target)
+	if sym == nil {
+		return false
+	}
+
+	// Found an immutable reference - mutation is NOT allowed
+	var declLoc *source.Location
+	if sym.Decl != nil {
+		declLoc = sym.Decl.Loc()
+	}
+
+	var kindLabel string
+	if sym.Kind == symbols.SymbolReceiver {
+		kindLabel = "receiver"
+	} else {
+		kindLabel = "parameter"
+	}
+
+	diag := diagnostics.NewError(fmt.Sprintf("cannot modify through immutable %s '%s'", kindLabel, sym.Name)).
+		WithCode(diagnostics.ErrInvalidAssignment).
+		WithPrimaryLabel(target.Loc(), "modification through immutable reference").
+		WithHelp("use a mutable reference '&'' to allow modification")
+	if declLoc != nil {
+		diag = diag.WithSecondaryLabel(declLoc, fmt.Sprintf("%s declared as immutable reference '&' here", kindLabel))
+	}
+	ctx.Diagnostics.Add(diag)
+	return true
+}
+
+// checkImmutableReceiverMutation checks if we're trying to mutate through an immutable reference receiver.
+// Returns true if mutation is blocked (error reported), false if mutation is allowed.
+// Deprecated: Use checkImmutableRefMutation which handles both receivers and parameters.
+func checkImmutableReceiverMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) bool {
+	return checkImmutableRefMutation(ctx, mod, target)
 }
 
 func warnValueReceiverMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) {
@@ -2172,6 +2212,11 @@ func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 				return
 			}
 		}
+	}
+
+	// Check if we're trying to mutate through an immutable reference receiver
+	if checkImmutableReceiverMutation(ctx, mod, target) {
+		return
 	}
 
 	warnValueReceiverMutation(ctx, mod, target)
@@ -2378,7 +2423,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Check both array and index expressions
 		baseType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		indexType := checkExpr(ctx, mod, e.Index, types.TypeUnknown)
-		checkIndexExpr(ctx, mod, e, baseType, indexType)
+		checkIndexExpr(ctx, e, baseType, indexType)
 		// Return element type
 		if arrType, ok := types.UnwrapType(baseType).(*types.ArrayType); ok {
 			mod.SetExprType(expr, arrType.Element)
@@ -2569,7 +2614,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility)).
 			WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
 			WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
-		diag = addExplicitCastHint(ctx, diag, rhsType, leftType, compatibility, rightNode)
+		diag = addExplicitCastHint(ctx, diag, leftType, compatibility, rightNode)
 		ctx.Diagnostics.Add(diag)
 
 	case Incompatible:
@@ -2633,7 +2678,7 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 	}
 }
 
-func addExplicitCastHint(ctx *context_v2.CompilerContext, diag *diagnostics.Diagnostic, source, target types.SemType, compatibility TypeCompatibility, expr ast.Expression) *diagnostics.Diagnostic {
+func addExplicitCastHint(ctx *context_v2.CompilerContext, diag *diagnostics.Diagnostic, target types.SemType, compatibility TypeCompatibility, expr ast.Expression) *diagnostics.Diagnostic {
 	if diag == nil || compatibility != ExplicitCastable {
 		return diag
 	}
@@ -2641,7 +2686,7 @@ func addExplicitCastHint(ctx *context_v2.CompilerContext, diag *diagnostics.Diag
 	if expr != nil {
 		exprText = expr.Loc().GetText(ctx.Diagnostics.GetSourceCache())
 	}
-	hint := getConversionHint(source, target, compatibility, exprText)
+	hint := getConversionHint(target, compatibility, exprText)
 	if hint == "" {
 		return diag
 	}
@@ -3105,7 +3150,7 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 				param.Type.String(),
 				argTypeDesc.String(),
 			)
-			diag = addExplicitCastHint(ctx, diag, argType, param.Type, compatibility, arg)
+			diag = addExplicitCastHint(ctx, diag, param.Type, compatibility, arg)
 			ctx.Diagnostics.Add(diag)
 		}
 	}
@@ -3164,7 +3209,7 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 					variadicElemType.String(),
 					argTypeDesc.String(),
 				)
-				diag = addExplicitCastHint(ctx, diag, argType, variadicElemType, compatibility, arg)
+				diag = addExplicitCastHint(ctx, diag, variadicElemType, compatibility, arg)
 				ctx.Diagnostics.Add(diag)
 			}
 		}
@@ -3503,164 +3548,4 @@ func inferTypeFromEmptyLiteral(ctx *context_v2.CompilerContext, mod *context_v2.
 	}
 
 	return ""
-}
-
-// findEmptyArrayInitializer searches for a variable declaration with the given name
-// and returns its initializer if it's an empty array literal (or cast to empty array)
-// Returns nil if the variable is not found or doesn't have an empty array initializer
-func findEmptyArrayInitializer(ctx *context_v2.CompilerContext, mod *context_v2.Module, varName string) *ast.CompositeLit {
-	if mod.AST == nil {
-		return nil
-	}
-
-	// First, try to find the symbol to verify it exists and get its scope
-	sym, found := mod.CurrentScope.Lookup(varName)
-	if !found || sym == nil {
-		return nil
-	}
-
-	// Helper function to check if a DeclItem has an empty array initializer
-	checkDeclItem := func(item ast.DeclItem) *ast.CompositeLit {
-		if item.Name.Name == varName && item.Value != nil {
-			// Check if initializer is an empty array literal
-			if compLit, ok := item.Value.(*ast.CompositeLit); ok {
-				if len(compLit.Elts) == 0 {
-					return compLit
-				}
-			} else if castExpr, ok := item.Value.(*ast.CastExpr); ok {
-				// Check if cast contains an empty array literal: [] as []i32
-				if compLit, ok := castExpr.X.(*ast.CompositeLit); ok {
-					if len(compLit.Elts) == 0 {
-						return compLit
-					}
-				}
-			}
-		}
-		return nil
-	}
-
-	// Search through the module's AST nodes to find VarDecl or ConstDecl
-	// We need to search all function bodies to find where the variable was declared
-	var searchNode func(ast.Node) *ast.CompositeLit
-	searchNode = func(node ast.Node) *ast.CompositeLit {
-		if node == nil {
-			return nil
-		}
-
-		switch n := node.(type) {
-		case *ast.VarDecl:
-			for _, decl := range n.Decls {
-				if result := checkDeclItem(decl); result != nil {
-					return result
-				}
-			}
-		case *ast.ConstDecl:
-			for _, decl := range n.Decls {
-				if result := checkDeclItem(decl); result != nil {
-					return result
-				}
-			}
-		case *ast.Block:
-			// Search in block statements
-			for _, stmt := range n.Nodes {
-				if result := searchNode(stmt); result != nil {
-					return result
-				}
-			}
-		case *ast.DeclStmt:
-			// Unwrap DeclStmt to get the actual declaration
-			return searchNode(n.Decl)
-		case *ast.FuncDecl:
-			// Search in function body
-			if n.Body != nil {
-				if result := searchNode(n.Body); result != nil {
-					return result
-				}
-			}
-		case *ast.MethodDecl:
-			// Search in method body
-			if n.Body != nil {
-				if result := searchNode(n.Body); result != nil {
-					return result
-				}
-			}
-		case *ast.IfStmt:
-			// Search in if/else branches
-			if n.Body != nil {
-				if result := searchNode(n.Body); result != nil {
-					return result
-				}
-			}
-			if n.Else != nil {
-				if result := searchNode(n.Else); result != nil {
-					return result
-				}
-			}
-		case *ast.WhileStmt:
-			// Search in while loop body
-			if n.Body != nil {
-				if result := searchNode(n.Body); result != nil {
-					return result
-				}
-			}
-		case *ast.ForStmt:
-			// Search in for loop body
-			if n.Body != nil {
-				if result := searchNode(n.Body); result != nil {
-					return result
-				}
-			}
-		}
-
-		return nil
-	}
-
-	// Search in module-level nodes (includes function declarations)
-	for _, node := range mod.AST.Nodes {
-		if result := searchNode(node); result != nil {
-			return result
-		}
-	}
-
-	// Also search in the current function body if we're inside a function
-	// This handles cases where the variable is declared in the same function as the for loop
-	// We need to search backwards from the current position, but since we don't have that context,
-	// we search all function bodies. The module-level search above should have caught it,
-	// but let's also try searching by walking up the scope chain to find the function.
-	if mod.CurrentScope != nil {
-		// Try to find the function that contains the current scope
-		// by searching for functions and checking if their scope matches
-		for _, node := range mod.AST.Nodes {
-			if funcDecl, ok := node.(*ast.FuncDecl); ok && funcDecl.Body != nil {
-				// Check if this function's scope contains our variable
-				if funcDecl.Scope != nil {
-					if st, ok := funcDecl.Scope.(*table.SymbolTable); ok {
-						// Check if the variable exists in this function's scope
-						if _, found := st.Lookup(varName); found {
-							// Search this function's body
-							if result := searchNode(funcDecl.Body); result != nil {
-								return result
-							}
-						}
-					}
-				}
-			}
-			if methodDecl, ok := node.(*ast.MethodDecl); ok && methodDecl.Body != nil {
-				// Check if this method's scope contains our variable
-				if methodDecl.Scope != nil {
-					if st, ok := methodDecl.Scope.(*table.SymbolTable); ok {
-						// Check if the variable exists in this method's scope
-						if _, found := st.Lookup(varName); found {
-							// Search this method's body
-							if result := searchNode(methodDecl.Body); result != nil {
-								return result
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return nil
 }

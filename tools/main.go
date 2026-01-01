@@ -221,7 +221,7 @@ func copyToolchain(libsDir string) error {
 		return fmt.Errorf("copy ld: %w", err)
 	}
 
-	if err := copyToolchainDeps(toolchainDir, libDir, asPath, ldPath); err != nil {
+	if err := copyToolchainDeps(libDir, asPath, ldPath); err != nil {
 		return err
 	}
 
@@ -299,7 +299,7 @@ func shouldBundleToolchain() bool {
 	return runtime.GOOS != "darwin"
 }
 
-func copyToolchainDeps(toolchainDir, libDir, asPath, ldPath string) error {
+func copyToolchainDeps(libDir, asPath, ldPath string) error {
 	switch runtime.GOOS {
 	case "linux":
 		return copyLinuxToolchain(libDir, asPath, ldPath)

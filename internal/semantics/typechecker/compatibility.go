@@ -460,7 +460,7 @@ func getExplicitCastHint(exprText string, targetType types.SemType) string {
 
 // getConversionHint returns a hint message based on compatibility result
 // Returns empty string if no hint is needed (Identical, ImplicitCastable) or incompatible
-func getConversionHint(source, target types.SemType, compatibility TypeCompatibility, exprText string) string {
+func getConversionHint(target types.SemType, compatibility TypeCompatibility, exprText string) string {
 	switch compatibility {
 	case Identical, ImplicitCastable:
 		// No hint needed - these work implicitly
