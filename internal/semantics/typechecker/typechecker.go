@@ -876,8 +876,24 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 			return
 		}
 
-		// Both numeric - valid arithmetic
+		// Both numeric - check for strict type match
 		if lhsNumericOrUntyped && rhsNumericOrUntyped {
+			// Allow untyped operands - they will be contextualized
+			if types.IsUntyped(lhsBase) || types.IsUntyped(rhsBase) {
+				return
+			}
+
+			// Require exact type match (strict typing - no automatic promotion)
+			if !lhsType.Equals(rhsType) {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("mismatched types in arithmetic: %s and %s", lhsType.String(), rhsType.String())).
+						WithCode(diagnostics.ErrTypeMismatch).
+						WithPrimaryLabel(expr.Loc(), "operands must have the same type").
+						WithHelp(fmt.Sprintf("cast one operand to match: `a as %s` or `b as %s`",
+							rhsType.String(), lhsType.String())),
+				)
+				return
+			}
 			return
 		}
 
@@ -904,6 +920,18 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 				diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
 					WithCode(diagnostics.ErrTypeMismatch).
 					WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '%s' operator with %s and %s", expr.Op.Value, lhsType.String(), rhsType.String())),
+			)
+			return
+		}
+
+		// Require exact type match (strict typing - no automatic promotion)
+		if !lhsType.Equals(rhsType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError(fmt.Sprintf("mismatched types in arithmetic: %s and %s", lhsType.String(), rhsType.String())).
+					WithCode(diagnostics.ErrTypeMismatch).
+					WithPrimaryLabel(expr.Loc(), "operands must have the same type").
+					WithHelp(fmt.Sprintf("cast one operand to match: `%s as %s` or `%s as %s`",
+						"value", lhsType.String(), "value", rhsType.String())),
 			)
 			return
 		}
@@ -2310,14 +2338,23 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			// Validate operand type compatibility for regular binary ops
 			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
 			// Return the result type - for most binary ops, it's the same as lhsType
-			// TODO: Handle cases where result type differs (e.g., comparison ops return bool)
 			var resultType types.SemType
 			switch e.Op.Kind {
-			case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
+			case tokens.PLUS_TOKEN:
+				// PLUS can be string concatenation or arithmetic
+				// String concatenation: str + anything → str
+				if types.UnwrapType(lhsType).Equals(types.TypeString) {
+					resultType = types.TypeString
+				} else {
+					// Arithmetic: result is lhsType
+					resultType = lhsType
+				}
+			case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
 				tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN:
 				resultType = lhsType
 			case tokens.EXP_TOKEN:
-				resultType = types.TypeF64
+				// Power operator: use the larger type for large primitives, f64 otherwise
+				resultType = types.GetPowerResultType(lhsType, rhsType)
 			case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN, tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN,
 				tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN, tokens.AND_TOKEN, tokens.OR_TOKEN:
 				resultType = types.TypeBool

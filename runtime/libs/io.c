@@ -8,13 +8,15 @@
 #include <stdbool.h>
 #include <limits.h>
 #include "../core/array.h"
+#include "../core/bigint.h"
 
 // For ssize_t on non-POSIX systems
 #ifdef _WIN32
 typedef long long ssize_t;
 #endif
-// Printable union layout: [4-byte tag][12 bytes padding/data] = 16 bytes total
-// Tags: 0=i8, 1=i16, 2=i32, 3=i64, 4=u8, 5=u16, 6=u32, 7=u64, 8=f32, 9=f64, 10=str, 11=byte, 12=bool
+// Printable union layout: [4-byte tag][32 bytes data] = 36 bytes total (to accommodate 256-bit types)
+// Tags: 0=i8, 1=i16, 2=i32, 3=i64, 4=i128, 5=i256, 6=u8, 7=u16, 8=u32, 9=u64, 10=u128, 11=u256,
+//       12=f32, 13=f64, 14=f128, 15=f256, 16=str, 17=byte, 18=bool
 
 // Print a float/double with at least one decimal place (e.g., 8.0 not 8)
 static void print_float(double val, int precision) {
@@ -47,19 +49,55 @@ static void print_union(const void* union_ptr) {
         case 1: printf("%d", *(int16_t*)data); break;     // i16
         case 2: printf("%d", *(int32_t*)data); break;     // i32
         case 3: printf("%ld", *(int64_t*)data); break;    // i64
-        case 4: printf("%u", *(uint8_t*)data); break;     // u8
-        case 5: printf("%u", *(uint16_t*)data); break;    // u16
-        case 6: printf("%u", *(uint32_t*)data); break;    // u32
-        case 7: printf("%lu", *(uint64_t*)data); break;   // u64
-        case 8: print_float(*(float*)data, 6); break;     // f32
-        case 9: print_float(*(double*)data, 15); break;   // f64
-        case 10: {  // str
+        case 4: {  // i128
+            char* s = ferret_i128_to_string_ptr((const ferret_i128*)data);
+            printf("%s", s);
+            free(s);
+            break;
+        }
+        case 5: {  // i256
+            char* s = ferret_i256_to_string_ptr((const ferret_i256*)data);
+            printf("%s", s);
+            free(s);
+            break;
+        }
+        case 6: printf("%u", *(uint8_t*)data); break;     // u8
+        case 7: printf("%u", *(uint16_t*)data); break;    // u16
+        case 8: printf("%u", *(uint32_t*)data); break;    // u32
+        case 9: printf("%lu", *(uint64_t*)data); break;   // u64
+        case 10: {  // u128
+            char* s = ferret_u128_to_string_ptr((const ferret_u128*)data);
+            printf("%s", s);
+            free(s);
+            break;
+        }
+        case 11: {  // u256
+            char* s = ferret_u256_to_string_ptr((const ferret_u256*)data);
+            printf("%s", s);
+            free(s);
+            break;
+        }
+        case 12: print_float(*(float*)data, 6); break;     // f32
+        case 13: print_float(*(double*)data, 15); break;   // f64
+        case 14: {  // f128
+            char* s = ferret_f128_to_string_ptr((const ferret_f128*)data);
+            printf("%s", s);
+            free(s);
+            break;
+        }
+        case 15: {  // f256
+            char* s = ferret_f256_to_string_ptr((const ferret_f256*)data);
+            printf("%s", s);
+            free(s);
+            break;
+        }
+        case 16: {  // str
             const char* str = *(const char**)data;
             printf("%s", str ? str : "(null)");
             break;
         }
-        case 11: printf("%c", *(uint8_t*)data); break;    // byte
-        case 12: printf("%s", *(bool*)data ? "true" : "false"); break; // bool
+        case 17: printf("%c", *(uint8_t*)data); break;    // byte
+        case 18: printf("%s", *(bool*)data ? "true" : "false"); break; // bool
         default: printf("<invalid union tag %d>", tag); break;
     }
 }

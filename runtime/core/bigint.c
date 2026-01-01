@@ -657,6 +657,116 @@ bool ferret_u256_gt(ferret_u256 a, ferret_u256 b) {
     return ferret_cmp_u_limbs(a.words, b.words, FERRET_U256_LIMBS) > 0;
 }
 
+// Power functions using binary exponentiation (exponentiation by squaring)
+// For integer bases: base^exp where exp is treated as unsigned
+
+// Helper: check if lowest bit is set
+static bool ferret_is_odd_limbs(const ferret_limb_t* v) {
+    return (v[0] & 1) != 0;
+}
+
+// Helper: shift right by 1 bit
+static void ferret_shr1_limbs(ferret_limb_t* v, int n) {
+    for (int i = 0; i < n - 1; i++) {
+        v[i] = (v[i] >> 1) | (v[i + 1] << (FERRET_LIMB_BITS - 1));
+    }
+    v[n - 1] >>= 1;
+}
+
+ferret_i128 ferret_i128_pow(ferret_i128 base, ferret_i128 exp) {
+    // Handle negative exponent: return 0 (integer division truncates toward zero)
+    ferret_i128 zero;
+    ferret_zero_limbs(zero.words, FERRET_U128_LIMBS);
+    if (ferret_cmp_s_limbs(exp.words, zero.words, FERRET_U128_LIMBS) < 0) {
+        return zero;
+    }
+    
+    // result = 1
+    ferret_i128 result;
+    ferret_limbs_from_i64(result.words, FERRET_U128_LIMBS, 1);
+    
+    // exp_copy for iteration
+    ferret_i128 exp_copy = exp;
+    
+    // Binary exponentiation
+    while (!ferret_is_zero_limbs(exp_copy.words, FERRET_U128_LIMBS)) {
+        if (ferret_is_odd_limbs(exp_copy.words)) {
+            result = ferret_i128_mul(result, base);
+        }
+        base = ferret_i128_mul(base, base);
+        ferret_shr1_limbs(exp_copy.words, FERRET_U128_LIMBS);
+    }
+    
+    return result;
+}
+
+ferret_u128 ferret_u128_pow(ferret_u128 base, ferret_u128 exp) {
+    // result = 1
+    ferret_u128 result;
+    ferret_limbs_from_u64(result.words, FERRET_U128_LIMBS, 1);
+    
+    // exp_copy for iteration
+    ferret_u128 exp_copy = exp;
+    
+    // Binary exponentiation
+    while (!ferret_is_zero_limbs(exp_copy.words, FERRET_U128_LIMBS)) {
+        if (ferret_is_odd_limbs(exp_copy.words)) {
+            result = ferret_u128_mul(result, base);
+        }
+        base = ferret_u128_mul(base, base);
+        ferret_shr1_limbs(exp_copy.words, FERRET_U128_LIMBS);
+    }
+    
+    return result;
+}
+
+ferret_i256 ferret_i256_pow(ferret_i256 base, ferret_i256 exp) {
+    // Handle negative exponent: return 0
+    ferret_i256 zero;
+    ferret_zero_limbs(zero.words, FERRET_U256_LIMBS);
+    if (ferret_cmp_s_limbs(exp.words, zero.words, FERRET_U256_LIMBS) < 0) {
+        return zero;
+    }
+    
+    // result = 1
+    ferret_i256 result;
+    ferret_limbs_from_i64(result.words, FERRET_U256_LIMBS, 1);
+    
+    // exp_copy for iteration
+    ferret_i256 exp_copy = exp;
+    
+    // Binary exponentiation
+    while (!ferret_is_zero_limbs(exp_copy.words, FERRET_U256_LIMBS)) {
+        if (ferret_is_odd_limbs(exp_copy.words)) {
+            result = ferret_i256_mul(result, base);
+        }
+        base = ferret_i256_mul(base, base);
+        ferret_shr1_limbs(exp_copy.words, FERRET_U256_LIMBS);
+    }
+    
+    return result;
+}
+
+ferret_u256 ferret_u256_pow(ferret_u256 base, ferret_u256 exp) {
+    // result = 1
+    ferret_u256 result;
+    ferret_limbs_from_u64(result.words, FERRET_U256_LIMBS, 1);
+    
+    // exp_copy for iteration
+    ferret_u256 exp_copy = exp;
+    
+    // Binary exponentiation
+    while (!ferret_is_zero_limbs(exp_copy.words, FERRET_U256_LIMBS)) {
+        if (ferret_is_odd_limbs(exp_copy.words)) {
+            result = ferret_u256_mul(result, base);
+        }
+        base = ferret_u256_mul(base, base);
+        ferret_shr1_limbs(exp_copy.words, FERRET_U256_LIMBS);
+    }
+    
+    return result;
+}
+
 ferret_i128 ferret_i128_and(ferret_i128 a, ferret_i128 b) {
     ferret_i128 result;
     for (int i = 0; i < FERRET_U128_LIMBS; i++) {
@@ -1015,6 +1125,19 @@ bool ferret_f256_gt(ferret_f256 a, ferret_f256 b) {
     return ferret_f256_lt(b, a);
 }
 
+// Floating point power functions - use C's pow()
+ferret_f128 ferret_f128_pow(ferret_f128 base, ferret_f128 exp) {
+    double base_val = ferret_f128_to_f64(base);
+    double exp_val = ferret_f128_to_f64(exp);
+    return ferret_f128_from_f64(pow(base_val, exp_val));
+}
+
+ferret_f256 ferret_f256_pow(ferret_f256 base, ferret_f256 exp) {
+    double base_val = ferret_f256_to_f64(base);
+    double exp_val = ferret_f256_to_f64(exp);
+    return ferret_f256_from_f64(pow(base_val, exp_val));
+}
+
 // Conversion functions for floating point
 ferret_f128 ferret_f128_from_f64(double val) {
 #ifdef FERRET_HAS_FLOAT128
@@ -1207,6 +1330,7 @@ FERRET_PTR_CMP_OP(ferret_i128, ferret_i128_gt)
 FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_and)
 FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_or)
 FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_xor)
+FERRET_PTR_BIN_OP(ferret_i128, ferret_i128_pow)
 
 FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_add)
 FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_sub)
@@ -1219,6 +1343,7 @@ FERRET_PTR_CMP_OP(ferret_u128, ferret_u128_gt)
 FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_and)
 FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_or)
 FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_xor)
+FERRET_PTR_BIN_OP(ferret_u128, ferret_u128_pow)
 
 FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_add)
 FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_sub)
@@ -1232,6 +1357,7 @@ FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_and)
 FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_or)
 FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_xor)
 FERRET_PTR_UNARY_OP(ferret_i256, ferret_i256_not)
+FERRET_PTR_BIN_OP(ferret_i256, ferret_i256_pow)
 
 FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_add)
 FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_sub)
@@ -1245,6 +1371,7 @@ FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_and)
 FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_or)
 FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_xor)
 FERRET_PTR_UNARY_OP(ferret_u256, ferret_u256_not)
+FERRET_PTR_BIN_OP(ferret_u256, ferret_u256_pow)
 
 FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_add)
 FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_sub)
@@ -1253,6 +1380,7 @@ FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_div)
 FERRET_PTR_CMP_OP(ferret_f128, ferret_f128_eq)
 FERRET_PTR_CMP_OP(ferret_f128, ferret_f128_lt)
 FERRET_PTR_CMP_OP(ferret_f128, ferret_f128_gt)
+FERRET_PTR_BIN_OP(ferret_f128, ferret_f128_pow)
 
 FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_add)
 FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_sub)
@@ -1261,6 +1389,7 @@ FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_div)
 FERRET_PTR_CMP_OP(ferret_f256, ferret_f256_eq)
 FERRET_PTR_CMP_OP(ferret_f256, ferret_f256_lt)
 FERRET_PTR_CMP_OP(ferret_f256, ferret_f256_gt)
+FERRET_PTR_BIN_OP(ferret_f256, ferret_f256_pow)
 
 void ferret_i128_from_i64_ptr(int64_t val, ferret_i128* out) {
     if (!out) return;

@@ -61,3 +61,66 @@ func IsFloatTypeName(typeName TYPE_NAME) bool {
 		return false
 	}
 }
+
+// IsLargePrimitiveTypeName checks if a type name is a 128-bit or 256-bit type
+func IsLargePrimitiveTypeName(typeName TYPE_NAME) bool {
+	switch typeName {
+	case TYPE_I128, TYPE_U128, TYPE_I256, TYPE_U256, TYPE_F128, TYPE_F256:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsLargePrimitive checks if a SemType is a 128-bit or 256-bit primitive type
+func IsLargePrimitive(typ SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = UnwrapType(typ)
+	prim, ok := typ.(*PrimitiveType)
+	if !ok {
+		return false
+	}
+	return IsLargePrimitiveTypeName(prim.GetName())
+}
+
+// GetPowerResultType determines the result type for a power operation.
+// For large primitives: returns the larger of the two operand types (by bit size)
+// For floats: returns f64
+// For integers: returns the larger type, or f64 if exponent is float
+func GetPowerResultType(left, right SemType) SemType {
+	if left == nil || right == nil {
+		return TypeF64
+	}
+	left = UnwrapType(left)
+	right = UnwrapType(right)
+
+	leftPrim, leftOk := left.(*PrimitiveType)
+	rightPrim, rightOk := right.(*PrimitiveType)
+
+	if !leftOk || !rightOk {
+		return TypeF64
+	}
+
+	leftName := leftPrim.GetName()
+	rightName := rightPrim.GetName()
+	leftSize := GetNumberBitSize(leftName)
+	rightSize := GetNumberBitSize(rightName)
+
+	// For large primitives, return the larger type
+	if IsLargePrimitiveTypeName(leftName) || IsLargePrimitiveTypeName(rightName) {
+		if leftSize >= rightSize {
+			return left
+		}
+		return right
+	}
+
+	// For floats, always return f64
+	if IsFloatTypeName(leftName) || IsFloatTypeName(rightName) {
+		return TypeF64
+	}
+
+	// For regular integers, return f64 (since power can produce non-integer results)
+	return TypeF64
+}

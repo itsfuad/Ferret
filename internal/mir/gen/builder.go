@@ -3854,6 +3854,22 @@ func (b *functionBuilder) emitStringConcat(left, right mir.ValueID, rightType ty
 		rightTypeName = pt.GetName()
 	}
 
+	// Handle large primitive types (i128, u128, i256, u256, f128, f256)
+	// by converting to string first, then concatenating
+	if typeName, ok := largePrimitiveName(rightBase); ok {
+		rightStr := b.emitLargeToString(typeName, right, loc)
+		args = []mir.ValueID{left, rightStr}
+		target = "ferret_io_ConcatStrings"
+		b.emitInstr(&mir.Call{
+			Result:   result,
+			Target:   target,
+			Args:     args,
+			Type:     types.TypeString,
+			Location: loc,
+		})
+		return result
+	}
+
 	switch {
 	case rightBase.Equals(types.TypeString):
 		target = "ferret_io_ConcatStrings"
@@ -4127,6 +4143,8 @@ func largeBinaryFunc(op tokens.TOKEN, typeName string) (string, bool) {
 		return "ferret_" + typeName + "_mul_ptr", true
 	case tokens.DIV_TOKEN:
 		return "ferret_" + typeName + "_div_ptr", true
+	case tokens.EXP_TOKEN:
+		return "ferret_" + typeName + "_pow_ptr", true
 	case tokens.MOD_TOKEN:
 		if isLargeIntName(typeName) {
 			return "ferret_" + typeName + "_mod_ptr", true
