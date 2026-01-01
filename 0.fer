@@ -1,5 +1,6 @@
 import "std/io";
 import "std/fs";
+import "math";
 
 fn main() {
     // Write to file
@@ -10,12 +11,12 @@ fn main() {
     // io::Println("File written!");
     
     // Check if exists
-    if fs::Exists("test11.txt") {
+    if fs::Exists("test.txt") {
         io::Println("File exists!");
     }
     
     // Read entire file
-    let content := fs::ReadFile("test1.txt") catch e {
+    let content := fs::ReadFile("test.txt") catch e {
         io::Println("Read error: " + e);
         return;
     };
@@ -26,4 +27,6 @@ fn main() {
     //     io::Println("Remove error: " + e);
     // } false;
     io::Println("Test complete!");
+
+    io::Println("Math test: Floor(3.7) = " + math::Floor(3.7));
 }

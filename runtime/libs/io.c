@@ -16,6 +16,28 @@ typedef long long ssize_t;
 // Printable union layout: [4-byte tag][12 bytes padding/data] = 16 bytes total
 // Tags: 0=i8, 1=i16, 2=i32, 3=i64, 4=u8, 5=u16, 6=u32, 7=u64, 8=f32, 9=f64, 10=str, 11=byte, 12=bool
 
+// Print a float/double with at least one decimal place (e.g., 8.0 not 8)
+static void print_float(double val, int precision) {
+    // Use %g to get compact representation, but ensure decimal point
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.*g", precision, val);
+    
+    // Check if there's a decimal point or exponent
+    bool has_decimal = false;
+    bool has_exponent = false;
+    for (char* p = buf; *p; p++) {
+        if (*p == '.') has_decimal = true;
+        if (*p == 'e' || *p == 'E') has_exponent = true;
+    }
+    
+    // If no decimal point and no exponent, append .0
+    if (!has_decimal && !has_exponent) {
+        printf("%s.0", buf);
+    } else {
+        printf("%s", buf);
+    }
+}
+
 static void print_union(const void* union_ptr) {
     int32_t tag = *(int32_t*)union_ptr;
     const uint8_t* data = (const uint8_t*)union_ptr + 4;
@@ -29,8 +51,8 @@ static void print_union(const void* union_ptr) {
         case 5: printf("%u", *(uint16_t*)data); break;    // u16
         case 6: printf("%u", *(uint32_t*)data); break;    // u32
         case 7: printf("%lu", *(uint64_t*)data); break;   // u64
-        case 8: printf("%.6g", *(float*)data); break;     // f32
-        case 9: printf("%.15g", *(double*)data); break;   // f64
+        case 8: print_float(*(float*)data, 6); break;     // f32
+        case 9: print_float(*(double*)data, 15); break;   // f64
         case 10: {  // str
             const char* str = *(const char**)data;
             printf("%s", str ? str : "(null)");

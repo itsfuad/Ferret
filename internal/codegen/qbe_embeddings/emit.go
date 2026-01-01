@@ -59,6 +59,11 @@ func (g *Generator) emitBinary(b *mir.Binary) {
 		}
 		g.emitLine(fmt.Sprintf("%s =%s %s %s, %s", resultName, qbeType, op, left, right))
 		g.valueTypes[b.Result] = b.Type
+	case tokens.EXP_TOKEN:
+		// Power operator - just call ferret_pow(d, d) -> d
+		// Pass values as doubles, C handles the math
+		g.emitLine(fmt.Sprintf("%s =d call $ferret_pow(d %s, d %s)", resultName, left, right))
+		g.valueTypes[b.Result] = types.TypeF64
 	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN,
 		tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
 		// Get operand types to determine comparison type

@@ -59,6 +59,20 @@ char* ferret_string_concat_u64(const char* s, uint64_t n) {
 char* ferret_string_concat_f64(const char* s, double n) {
     char buf[64];
     snprintf(buf, sizeof(buf), "%.15g", n);
+    
+    // Ensure decimal point is present (e.g., "8" becomes "8.0")
+    int has_decimal = 0, has_exponent = 0;
+    for (char* p = buf; *p; p++) {
+        if (*p == '.') has_decimal = 1;
+        if (*p == 'e' || *p == 'E') has_exponent = 1;
+    }
+    if (!has_decimal && !has_exponent) {
+        size_t len = strlen(buf);
+        buf[len] = '.';
+        buf[len + 1] = '0';
+        buf[len + 2] = '\0';
+    }
+    
     return ferret_io_ConcatStrings(s, buf);
 }
 
