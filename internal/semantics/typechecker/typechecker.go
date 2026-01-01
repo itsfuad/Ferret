@@ -2619,7 +2619,7 @@ func addExplicitCastHint(ctx *context_v2.CompilerContext, diag *diagnostics.Diag
 		return diag
 	}
 	exprText := ""
-	if expr != nil {
+	if expr != nil && expr.Loc() != nil {
 		exprText = expr.Loc().GetText(ctx.Diagnostics.GetSourceCache())
 	}
 	hint := getConversionHint(target, compatibility, exprText)

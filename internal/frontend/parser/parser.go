@@ -129,7 +129,7 @@ func (p *Parser) parseAnnonType() *ast.TypeDecl {
 
 	p.diagnostics.Add(
 		diagnostics.NewWarning("annonymous type defined").
-			WithPrimaryLabel(typ.Loc(), "remove this type").
+			WithPrimaryLabel(p.safeLoc(typ), "remove this type").
 			WithNote("types has to be declared with a name to be used"),
 	)
 
@@ -138,7 +138,7 @@ func (p *Parser) parseAnnonType() *ast.TypeDecl {
 	return &ast.TypeDecl{
 		Name:     &ast.IdentifierExpr{Name: "<anonymous>"},
 		Type:     typ,
-		Location: *source.NewLocation(&p.filepath, typ.Loc().Start, typ.Loc().End),
+		Location: *source.NewLocation(&p.filepath, p.safeLoc(typ).Start, p.safeLoc(typ).End),
 	}
 }
 
@@ -309,8 +309,8 @@ func (p *Parser) parseReturnStmt() *ast.ReturnStmt {
 
 	// Calculate end position - use result if available, otherwise use semicolon
 	var endPos *source.Position
-	if result != nil && result.Loc() != nil && result.Loc().End != nil {
-		endPos = result.Loc().End
+	if result != nil && p.safeLoc(result) != nil && p.safeLoc(result).End != nil {
+		endPos = p.safeLoc(result).End
 	} else {
 		endPos = &endToken.End
 	}
@@ -371,6 +371,11 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 
 	lhs := p.parseExpr()
 
+	// Handle nil expression (parsing error occurred)
+	if lhs == nil {
+		lhs = p.invalidExpr()
+	}
+
 	// Check for increment/decrement operators (x++, x--)
 	if p.match(tokens.PLUS_PLUS_TOKEN, tokens.MINUS_MINUS_TOKEN) {
 		op := p.advance()
@@ -380,7 +385,7 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 			Lhs:      lhs,
 			Rhs:      nil, // No RHS for ++/--
 			Op:       &op,
-			Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, &op.End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(lhs).Start, &op.End),
 		}
 	}
 
@@ -399,6 +404,9 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 	if p.match(compoundOps...) {
 		op := p.advance()
 		rhs := p.parseExpr()
+		if rhs == nil {
+			rhs = p.invalidExpr()
+		}
 
 		p.expect(tokens.SEMICOLON_TOKEN)
 
@@ -406,7 +414,7 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 			Lhs:      lhs,
 			Rhs:      rhs,
 			Op:       &op,
-			Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, rhs.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(lhs).Start, p.safeLoc(rhs).End),
 		}
 	}
 
@@ -415,7 +423,7 @@ func (p *Parser) parseExprOrAssign() ast.Node {
 
 	return &ast.ExprStmt{
 		X:        lhs,
-		Location: p.makeLocation(*lhs.Loc().Start),
+		Location: p.makeLocation(*p.safeLoc(lhs).Start),
 	}
 }
 
@@ -428,14 +436,20 @@ func (p *Parser) parseExpr() ast.Expression {
 // Coalescing has lower precedence than logical operators and is right-associative
 func (p *Parser) parseCoalescing() ast.Expression {
 	left := p.parseLogicalOr()
+	if left == nil {
+		return nil
+	}
 
 	if p.match(tokens.COALESCING_TOKEN) {
 		p.advance()                  // consume ??
 		right := p.parseCoalescing() // Right-associative: recursively parse coalescing on the right
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		return &ast.CoalescingExpr{
 			Cond:     left,
 			Default:  right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -444,15 +458,21 @@ func (p *Parser) parseCoalescing() ast.Expression {
 
 func (p *Parser) parseLogicalOr() ast.Expression {
 	left := p.parseLogicalAnd()
+	if left == nil {
+		return nil
+	}
 
 	for p.match(tokens.OR_TOKEN) {
 		op := p.advance()
 		right := p.parseLogicalAnd()
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -461,15 +481,21 @@ func (p *Parser) parseLogicalOr() ast.Expression {
 
 func (p *Parser) parseLogicalAnd() ast.Expression {
 	left := p.parseEquality()
+	if left == nil {
+		return nil
+	}
 
 	for p.match(tokens.AND_TOKEN) {
 		op := p.advance()
 		right := p.parseEquality()
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -478,6 +504,9 @@ func (p *Parser) parseLogicalAnd() ast.Expression {
 
 func (p *Parser) parseEquality() ast.Expression {
 	left := p.parseComparison()
+	if left == nil {
+		return nil
+	}
 
 	for p.match(tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN, tokens.IS_TOKEN) {
 		op := p.advance()
@@ -489,17 +518,20 @@ func (p *Parser) parseEquality() ast.Expression {
 			// Wrap the type in a TypeExpr (which implements Expression interface)
 			right = &ast.TypeExpr{
 				Type:     typeNode,
-				Location: *typeNode.Loc(),
+				Location: *p.safeLoc(typeNode),
 			}
 		} else {
 			right = p.parseComparison()
+			if right == nil {
+				right = p.invalidExpr()
+			}
 		}
 
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -508,15 +540,21 @@ func (p *Parser) parseEquality() ast.Expression {
 
 func (p *Parser) parseComparison() ast.Expression {
 	left := p.parseRange()
+	if left == nil {
+		return nil
+	}
 
 	for p.match(tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN) {
 		op := p.advance()
 		right := p.parseRange()
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -527,23 +565,32 @@ func (p *Parser) parseComparison() ast.Expression {
 // This allows ranges to be used as standalone expressions: let arr := 0..10 or 0..=10
 func (p *Parser) parseRange() ast.Expression {
 	left := p.parseAdditive()
+	if left == nil {
+		return nil
+	}
 
 	// Check for range operators '..' or '..='
 	if p.match(tokens.RANGE_TOKEN, tokens.RANGE_INCLUSIVE_TOKEN) {
 		inclusive := p.match(tokens.RANGE_INCLUSIVE_TOKEN)
 		p.advance()
 		end := p.parseAdditive()
+		if end == nil {
+			end = p.invalidExpr()
+		}
 
 		// Check for optional increment (:incr)
 		var incr ast.Expression
 		if p.match(tokens.COLON_TOKEN) {
 			p.advance()
 			incr = p.parseAdditive()
+			if incr == nil {
+				incr = p.invalidExpr()
+			}
 		}
 
-		endPos := end.Loc().End
+		endPos := p.safeLoc(end).End
 		if incr != nil {
-			endPos = incr.Loc().End
+			endPos = p.safeLoc(incr).End
 		}
 
 		return &ast.RangeExpr{
@@ -551,7 +598,7 @@ func (p *Parser) parseRange() ast.Expression {
 			End:       end,
 			Incr:      incr,
 			Inclusive: inclusive,
-			Location:  *source.NewLocation(&p.filepath, left.Loc().Start, endPos),
+			Location:  *source.NewLocation(&p.filepath, p.safeLoc(left).Start, endPos),
 		}
 	}
 
@@ -560,15 +607,21 @@ func (p *Parser) parseRange() ast.Expression {
 
 func (p *Parser) parseAdditive() ast.Expression {
 	left := p.parseMultiplicative()
+	if left == nil {
+		return nil
+	}
 
 	for p.match(tokens.PLUS_TOKEN, tokens.MINUS_TOKEN) {
 		op := p.advance()
 		right := p.parseMultiplicative()
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -577,15 +630,21 @@ func (p *Parser) parseAdditive() ast.Expression {
 
 func (p *Parser) parseMultiplicative() ast.Expression {
 	left := p.parseExponentiation()
+	if left == nil {
+		return nil
+	}
 
 	for p.match(tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN) {
 		op := p.advance()
 		right := p.parseExponentiation()
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -594,16 +653,22 @@ func (p *Parser) parseMultiplicative() ast.Expression {
 
 func (p *Parser) parseExponentiation() ast.Expression {
 	left := p.parseUnary()
+	if left == nil {
+		return nil
+	}
 
 	// Right-associative: 2 ** 3 ** 2 = 2 ** (3 ** 2) = 512
 	if p.match(tokens.EXP_TOKEN) {
 		op := p.advance()
 		right := p.parseExponentiation() // Recursive call for right-associativity
+		if right == nil {
+			right = p.invalidExpr()
+		}
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,
 			Y:        right,
-			Location: *source.NewLocation(&p.filepath, left.Loc().Start, right.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(left).Start, p.safeLoc(right).End),
 		}
 	}
 
@@ -631,10 +696,13 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 	if p.match(tokens.NOT_TOKEN, tokens.MINUS_TOKEN, tokens.BIT_AND_TOKEN, tokens.MUT_REF_TOKEN) {
 		op := p.advance()
 		expr := p.parseUnaryDepth(depth + 1)
+		if expr == nil {
+			expr = p.invalidExpr()
+		}
 		return &ast.UnaryExpr{
 			Op:       op,
 			X:        expr,
-			Location: *source.NewLocation(&p.filepath, &op.Start, expr.Loc().End),
+			Location: *source.NewLocation(&p.filepath, &op.Start, p.safeLoc(expr).End),
 		}
 	}
 
@@ -642,10 +710,13 @@ func (p *Parser) parseUnaryDepth(depth int) ast.Expression {
 	if p.match(tokens.PLUS_PLUS_TOKEN, tokens.MINUS_MINUS_TOKEN) {
 		op := p.advance()
 		expr := p.parseUnaryDepth(depth + 1)
+		if expr == nil {
+			expr = p.invalidExpr()
+		}
 		return &ast.PrefixExpr{
 			Op:       op,
 			X:        expr,
-			Location: *source.NewLocation(&p.filepath, &op.Start, expr.Loc().End),
+			Location: *source.NewLocation(&p.filepath, &op.Start, p.safeLoc(expr).End),
 		}
 	}
 
@@ -678,7 +749,7 @@ func (p *Parser) parsePostfix() ast.Expression {
 			expr = &ast.PostfixExpr{
 				X:        expr,
 				Op:       op,
-				Location: *source.NewLocation(&p.filepath, expr.Loc().Start, &op.End),
+				Location: *source.NewLocation(&p.filepath, p.safeLoc(expr).Start, &op.End),
 			}
 		} else {
 			break
@@ -713,7 +784,7 @@ func (p *Parser) parseCallExpr(fun ast.Expression) *ast.CallExpr {
 		Fun:      fun,
 		Args:     args,
 		Catch:    catchClause,
-		Location: *source.NewLocation(&p.filepath, fun.Loc().Start, &end),
+		Location: *source.NewLocation(&p.filepath, p.safeLoc(fun).Start, &end),
 	}
 }
 
@@ -758,6 +829,9 @@ func (p *Parser) parseCatchClause() *ast.CatchClause {
 func (p *Parser) parseIndexExpr(x ast.Expression) *ast.IndexExpr {
 	start := p.advance().Start // consume '['
 	index := p.parseExpr()
+	if index == nil {
+		index = p.invalidExpr()
+	}
 	end := p.expect(tokens.CLOSE_BRACKET).End
 
 	return &ast.IndexExpr{
@@ -773,7 +847,7 @@ func (p *Parser) parseSelectorExpr(x ast.Expression) *ast.SelectorExpr {
 	return &ast.SelectorExpr{
 		X:        x,
 		Field:    sel,
-		Location: *source.NewLocation(&p.filepath, x.Loc().Start, sel.Loc().End),
+		Location: *source.NewLocation(&p.filepath, p.safeLoc(x).Start, p.safeLoc(sel).End),
 	}
 }
 
@@ -783,7 +857,7 @@ func (p *Parser) parseScopeResolutionExpr(x ast.Expression) *ast.ScopeResolution
 	return &ast.ScopeResolutionExpr{
 		X:        x,
 		Selector: member,
-		Location: *source.NewLocation(&p.filepath, x.Loc().Start, member.Loc().End),
+		Location: *source.NewLocation(&p.filepath, p.safeLoc(x).Start, p.safeLoc(member).End),
 	}
 }
 
@@ -793,7 +867,7 @@ func (p *Parser) parseCastExpr(x ast.Expression) *ast.CastExpr {
 	return &ast.CastExpr{
 		X:        x,
 		Type:     targetType,
-		Location: *source.NewLocation(&p.filepath, x.Loc().Start, targetType.Loc().End),
+		Location: *source.NewLocation(&p.filepath, p.safeLoc(x).Start, p.safeLoc(targetType).End),
 	}
 }
 
@@ -860,7 +934,7 @@ func (p *Parser) parseCompositeLiteralElement() ast.Expression {
 		return &ast.KeyValueExpr{
 			Key:      name,
 			Value:    val,
-			Location: *source.NewLocation(&p.filepath, name.Start, val.Loc().End),
+			Location: *source.NewLocation(&p.filepath, name.Start, p.safeLoc(val).End),
 		}
 	}
 
@@ -871,7 +945,7 @@ func (p *Parser) parseCompositeLiteralElement() ast.Expression {
 		return &ast.KeyValueExpr{
 			Key:      key,
 			Value:    val,
-			Location: *source.NewLocation(&p.filepath, key.Loc().Start, val.Loc().End),
+			Location: *source.NewLocation(&p.filepath, p.safeLoc(key).Start, p.safeLoc(val).End),
 		}
 	}
 
@@ -1191,6 +1265,23 @@ func (p *Parser) error(msg string) {
 	)
 }
 
+// safeLoc safely gets the location from an expression, returning a fallback if nil
+func (p *Parser) safeLoc(expr ast.Node) *source.Location {
+	if expr == nil || expr.Loc() == nil {
+		tok := p.peek()
+		return source.NewLocation(&p.filepath, &tok.Start, &tok.End)
+	}
+	return expr.Loc()
+}
+
+// invalidExpr creates an Invalid expression node at the current position
+func (p *Parser) invalidExpr() *ast.Invalid {
+	tok := p.peek()
+	return &ast.Invalid{
+		Location: *source.NewLocation(&p.filepath, &tok.Start, &tok.End),
+	}
+}
+
 func (p *Parser) nextNonCommentIndex(start int) int {
 	idx := start
 	for idx < len(p.tokens) && p.tokens[idx].Kind == tokens.COMMENT_TOKEN {
@@ -1382,13 +1473,13 @@ func (p *Parser) parseMatchStmt() *ast.MatchStmt {
 				stmt = &ast.AssignStmt{
 					Lhs:      lhs,
 					Rhs:      rhs,
-					Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, rhs.Loc().End),
+					Location: *source.NewLocation(&p.filepath, p.safeLoc(lhs).Start, p.safeLoc(rhs).End),
 				}
 			} else {
 				// It's just an expression statement
 				stmt = &ast.ExprStmt{
 					X:        lhs,
-					Location: *source.NewLocation(&p.filepath, lhs.Loc().Start, lhs.Loc().End),
+					Location: *source.NewLocation(&p.filepath, p.safeLoc(lhs).Start, p.safeLoc(lhs).End),
 				}
 			}
 
@@ -1400,7 +1491,7 @@ func (p *Parser) parseMatchStmt() *ast.MatchStmt {
 			// Wrap in a Block
 			body = &ast.Block{
 				Nodes:    []ast.Node{stmt},
-				Location: *source.NewLocation(&p.filepath, stmt.Loc().Start, stmt.Loc().End),
+				Location: *source.NewLocation(&p.filepath, p.safeLoc(stmt).Start, p.safeLoc(stmt).End),
 			}
 		}
 
