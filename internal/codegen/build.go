@@ -327,6 +327,9 @@ func applyLdDefaults(opts *BuildOptions) error {
 	case "android":
 		return fmt.Errorf("android builds are not supported here; use install-termux.sh")
 	case "windows":
+		// Windows uses PE format - no dynamic linker needed (unlike ELF on Linux).
+		// The C runtime is provided by libmsvcrt (linked in DefaultBuildOptions).
+		// We don't add -lc because Windows doesn't have a separate libc.
 		crt2, crtbegin, crtend := findWindowsCrtObjects()
 		if crt2 == "" || crtbegin == "" || crtend == "" {
 			return fmt.Errorf("ld: missing C runtime objects; set FERRET_LD_CRT2, FERRET_LD_CRTBEGIN, and FERRET_LD_CRTEND")
@@ -491,6 +494,26 @@ func windowsLibDirs() []string {
 	if tc := toolchainLibDir(); tc != "" {
 		dirs = append(dirs, tc)
 	}
+
+	// Try to get library directories from gcc
+	if cc := resolveCCompiler(); cc != "" {
+		dirs = append(dirs, gccLibDirs(cc)...)
+	}
+
+	// Fallback paths for common MinGW installations
+	fallbacks := []string{
+		"C:\\msys64\\mingw64\\lib",
+		"C:\\msys64\\mingw32\\lib",
+		"C:\\mingw64\\lib",
+		"C:\\mingw32\\lib",
+		"C:\\MinGW\\lib",
+	}
+	for _, dir := range fallbacks {
+		if utilsfs.IsDir(dir) {
+			dirs = append(dirs, dir)
+		}
+	}
+
 	seen := make(map[string]struct{}, len(dirs))
 	unique := make([]string, 0, len(dirs))
 	for _, dir := range dirs {

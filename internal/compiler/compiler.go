@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"compiler/colors"
 	"compiler/internal/context_v2"
@@ -86,6 +88,10 @@ func Compile(opts *Options) Result {
 	outputPath := opts.OutputExecutable
 	if outputPath == "" {
 		outputPath = filepath.Join(projectRoot, projectName)
+	}
+	// Ensure .exe suffix on Windows
+	if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(outputPath), ".exe") {
+		outputPath += ".exe"
 	}
 
 	config := &context_v2.Config{
