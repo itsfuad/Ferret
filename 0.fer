@@ -1,0 +1,10 @@
+import "std/io";
+
+type Point struct {
+    .X: f64,
+    .Y: f64
+};
+
+fn main() {
+    let empty : Point = { .X = 1.2 };
+}

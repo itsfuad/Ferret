@@ -4,11 +4,11 @@ type Counter struct {
     .Value: i32
 };
 
-fn (c: &Counter) inc() {
+fn (c: &'Counter) inc() {
     c.Value++;
 }
 
-fn (c: Counter) get() -> i32 {
+fn (c: &Counter) get() -> i32 {
     return c.Value;
 }
 

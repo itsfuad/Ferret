@@ -1,5 +1,0 @@
-import "std/io";
-
-fn main() {
-    io::Println(42, 3.14, "hello");
-}

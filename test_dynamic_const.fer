@@ -1,7 +1,0 @@
-import "std/io";
-fn main() {
-    let dynamic := [100, 200];
-    let idx := 10;
-    io::Println(dynamic[idx]);  // Should error at compile time
-}
-

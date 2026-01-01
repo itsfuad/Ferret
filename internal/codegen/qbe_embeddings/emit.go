@@ -138,9 +138,10 @@ func (g *Generator) emitCast(c *mir.Cast) {
 		zero := "0"
 		if g.isFloat(fromType) {
 			if fromQ, err := g.qbeType(fromType); err == nil {
-				if fromQ == "s" {
+				switch fromQ {
+				case "s":
 					zero = "s_0"
-				} else if fromQ == "d" {
+				case "d":
 					zero = "d_0"
 				}
 			}
@@ -199,7 +200,7 @@ func (g *Generator) emitCast(c *mir.Cast) {
 
 	if g.isInteger(fromType) && g.isFloat(toType) {
 		if g.isUnsigned(fromType) {
-			if g.emitUnsignedIntToFloat(resultName, operand, fromType, toType, fromQ, toQ) {
+			if g.emitUnsignedIntToFloat(resultName, operand, fromType, fromQ, toQ) {
 				g.valueTypes[c.Result] = toType
 				return
 			}
@@ -224,7 +225,7 @@ func (g *Generator) emitCast(c *mir.Cast) {
 
 	if g.isFloat(fromType) && g.isInteger(toType) {
 		if g.isUnsigned(toType) {
-			if g.emitFloatToUnsigned(resultName, operand, fromType, toType, fromQ, toQ) {
+			if g.emitFloatToUnsigned(resultName, operand, toType, fromQ, toQ) {
 				g.valueTypes[c.Result] = toType
 				return
 			}
@@ -295,7 +296,7 @@ func (g *Generator) handleIntegerCast(resultName, operand, fromQ string, fromTyp
 	return false
 }
 
-func (g *Generator) emitUnsignedIntToFloat(resultName, operand string, fromType, toType types.SemType, fromQ, toQ string) bool {
+func (g *Generator) emitUnsignedIntToFloat(resultName, operand string, fromType types.SemType, fromQ, toQ string) bool {
 	fromBits := intBitSize(fromType)
 	if fromBits == 0 || fromBits <= 16 {
 		return false
@@ -323,7 +324,7 @@ func (g *Generator) emitUnsignedIntToFloat(resultName, operand string, fromType,
 	return true
 }
 
-func (g *Generator) emitFloatToUnsigned(resultName, operand string, fromType, toType types.SemType, fromQ, toQ string) bool {
+func (g *Generator) emitFloatToUnsigned(resultName, operand string, toType types.SemType, fromQ, toQ string) bool {
 	toBits := intBitSize(toType)
 	if toBits == 0 {
 		return false
@@ -492,7 +493,7 @@ func (g *Generator) emitCall(c *mir.Call) {
 		args = append(args, callArg{name: g.valueName(arg), typ: qbeType, sem: semType})
 	}
 
-	target, args, err := g.resolveCallTarget(c.Target, args, &c.Location)
+	target, args, err := g.resolveCallTarget(c.Target, args)
 	if err != nil {
 		g.reportError(err.Error(), &c.Location)
 		return
@@ -1384,8 +1385,8 @@ func (g *Generator) constValue(typ types.SemType, value string) (string, error) 
 		}
 		return val, nil
 	}
-	if fn, ok := typ.(*types.FunctionType); ok {
-		name, err := g.resolveFuncSymbol(value, fn, nil)
+	if _, ok := typ.(*types.FunctionType); ok {
+		name, err := g.resolveFuncSymbol(value)
 		if err != nil {
 			return "", err
 		}
@@ -1787,7 +1788,7 @@ func (g *Generator) qbeReturnType(name string, typ types.SemType) (string, bool)
 	return retType, false
 }
 
-func (g *Generator) resolveCallTarget(target string, args []callArg, loc *source.Location) (string, []callArg, error) {
+func (g *Generator) resolveCallTarget(target string, args []callArg) (string, []callArg, error) {
 	if strings.HasPrefix(target, "ferret_") {
 		return target, args, nil
 	}
@@ -1828,7 +1829,7 @@ func (g *Generator) resolveCallTarget(target string, args []callArg, loc *source
 	return g.qbeFuncName(target, g.moduleImportPath()), args, nil
 }
 
-func (g *Generator) resolveFuncSymbol(target string, fnType *types.FunctionType, loc *source.Location) (string, error) {
+func (g *Generator) resolveFuncSymbol(target string) (string, error) {
 	if target == "" {
 		return "", fmt.Errorf("qbe: invalid function symbol")
 	}
@@ -1870,203 +1871,6 @@ func (g *Generator) resolveFuncSymbol(target string, fnType *types.FunctionType,
 	}
 
 	return g.qbeFuncName(target, g.moduleImportPath()), nil
-}
-
-func (g *Generator) resolvePrintFuncValue(funcName string, fnType *types.FunctionType, loc *source.Location) (string, error) {
-	if fnType == nil {
-		return "", fmt.Errorf("qbe: %s value requires function type", funcName)
-	}
-	if len(fnType.Params) != 1 {
-		return "", fmt.Errorf("qbe: %s value expects exactly one argument", funcName)
-	}
-	name, err := g.printFunctionName(funcName, fnType.Params[0].Type)
-	if err != nil {
-		return "", err
-	}
-	return name, nil
-}
-
-func (g *Generator) resolvePrint(funcName string, args []callArg, loc *source.Location) (string, []callArg, error) {
-	// Handle zero arguments - pass empty string
-	if len(args) == 0 {
-		empty := g.stringSymbol("")
-		return "ferret_io_" + funcName, []callArg{{name: empty, typ: "l", sem: types.TypeString}}, nil
-	}
-
-	// Handle single argument - use type-specific function
-	if len(args) == 1 {
-		arg := args[0]
-		printName, err := g.printFunctionName(funcName, arg.sem)
-		if err != nil {
-			return "", args, err
-		}
-		if printName == "ferret_io_"+funcName {
-			arg.typ = "l"
-			args[0] = arg
-		}
-		return printName, args, nil
-	}
-
-	// Handle multiple arguments - box into Printable union slice
-	sliceArgs, err := g.createPrintableUnionSlice(args)
-	if err != nil {
-		return "", args, err
-	}
-
-	return "ferret_io_" + funcName + "_slice", sliceArgs, nil
-}
-
-// createPrintableUnionSlice boxes multiple arguments into a Printable union slice
-// Returns slice arguments: [pointer, length, capacity]
-func (g *Generator) createPrintableUnionSlice(args []callArg) ([]callArg, error) {
-	// Union layout: [4-byte tag][8-byte data] = 12 bytes, aligned to 16 bytes
-	unionSize := 16
-	numArgs := len(args)
-	totalSize := unionSize * numArgs
-
-	// Allocate array on stack for unions
-	arrayTmp := g.newTemp()
-	g.emitLine(fmt.Sprintf("%s =l alloc8 %d", arrayTmp, totalSize))
-
-	// Box each argument into a union and store in array
-	for i, arg := range args {
-		if err := g.boxValueIntoUnion(arrayTmp, i*unionSize, arg); err != nil {
-			return nil, err
-		}
-	}
-
-	// Pass array pointer, length, and capacity
-	lengthTmp := g.newTemp()
-	g.emitLine(fmt.Sprintf("%s =l copy %d", lengthTmp, numArgs))
-
-	return []callArg{
-		{name: arrayTmp, typ: "l", sem: types.TypeU64},
-		{name: lengthTmp, typ: "l", sem: types.TypeI64},
-		{name: lengthTmp, typ: "l", sem: types.TypeI64}, // cap same as len
-	}, nil
-}
-
-// boxValueIntoUnion boxes a single value into a union at the given offset
-func (g *Generator) boxValueIntoUnion(arrayPtr string, offset int, arg callArg) error {
-	// Get the union tag for this type
-	tag := g.getPrintableUnionTag(arg.sem)
-	if tag < 0 {
-		return fmt.Errorf("qbe: unsupported type %s for Printable union", arg.sem.String())
-	}
-
-	// Store tag at offset
-	tagPtr := g.newTemp()
-	g.emitLine(fmt.Sprintf("%s =l add %s, %d", tagPtr, arrayPtr, offset))
-	g.emitLine(fmt.Sprintf("storew %d, %s", tag, tagPtr))
-
-	// Store value at offset+4 (after tag)
-	dataPtr := g.newTemp()
-	g.emitLine(fmt.Sprintf("%s =l add %s, %d", dataPtr, arrayPtr, offset+4))
-	g.emitLine(fmt.Sprintf("store%s %s, %s", string(arg.typ[0]), arg.name, dataPtr))
-
-	return nil
-}
-
-// getPrintableUnionTag returns the tag index for a type in the Printable union
-func (g *Generator) getPrintableUnionTag(typ types.SemType) int {
-	if typ == nil {
-		return -1
-	}
-	typ = types.UnwrapType(typ)
-
-	prim, ok := typ.(*types.PrimitiveType)
-	if !ok {
-		return -1
-	}
-
-	switch prim.GetName() {
-	case types.TYPE_I8:
-		return 0
-	case types.TYPE_I16:
-		return 1
-	case types.TYPE_I32:
-		return 2
-	case types.TYPE_I64:
-		return 3
-	case types.TYPE_U8:
-		return 4
-	case types.TYPE_U16:
-		return 5
-	case types.TYPE_U32:
-		return 6
-	case types.TYPE_U64:
-		return 7
-	case types.TYPE_F32:
-		return 8
-	case types.TYPE_F64:
-		return 9
-	case types.TYPE_STRING:
-		return 10
-	case types.TYPE_BYTE:
-		return 11
-	case types.TYPE_BOOL:
-		return 12
-	default:
-		return -1
-	}
-}
-
-func (g *Generator) printFunctionName(funcName string, typ types.SemType) (string, error) {
-	if typ == nil {
-		return "", fmt.Errorf("qbe: print requires typed argument")
-	}
-	if ref, ok := typ.(*types.ReferenceType); ok {
-		typ = ref.Inner
-	}
-	typ = types.UnwrapType(typ)
-
-	if prim, ok := typ.(*types.PrimitiveType); ok {
-		switch prim.GetName() {
-		case types.TYPE_STRING:
-			return "ferret_io_" + funcName, nil
-		case types.TYPE_BOOL:
-			return "ferret_io_" + funcName + "_bool", nil
-		case types.TYPE_I8:
-			return "ferret_io_" + funcName + "_i8", nil
-		case types.TYPE_I16:
-			return "ferret_io_" + funcName + "_i16", nil
-		case types.TYPE_I32:
-			return "ferret_io_" + funcName + "_i32", nil
-		case types.TYPE_I64:
-			return "ferret_io_" + funcName + "_i64", nil
-		case types.TYPE_I128:
-			return "ferret_io_" + funcName + "_i128_ptr", nil
-		case types.TYPE_I256:
-			return "ferret_io_" + funcName + "_i256_ptr", nil
-		case types.TYPE_U8, types.TYPE_BYTE:
-			if prim.GetName() == types.TYPE_BYTE {
-				return "ferret_io_" + funcName + "_byte", nil
-			}
-			return "ferret_io_" + funcName + "_u8", nil
-		case types.TYPE_U16:
-			return "ferret_io_" + funcName + "_u16", nil
-		case types.TYPE_U32:
-			return "ferret_io_" + funcName + "_u32", nil
-		case types.TYPE_U64:
-			return "ferret_io_" + funcName + "_u64", nil
-		case types.TYPE_U128:
-			return "ferret_io_" + funcName + "_u128_ptr", nil
-		case types.TYPE_U256:
-			return "ferret_io_" + funcName + "_u256_ptr", nil
-		case types.TYPE_F32:
-			return "ferret_io_" + funcName + "_f32", nil
-		case types.TYPE_F64:
-			return "ferret_io_" + funcName + "_f64", nil
-		case types.TYPE_F128:
-			return "ferret_io_" + funcName + "_f128_ptr", nil
-		case types.TYPE_F256:
-			return "ferret_io_" + funcName + "_f256_ptr", nil
-		}
-	}
-	if _, ok := typ.(*types.EnumType); ok {
-		return "ferret_io_" + funcName, nil
-	}
-	return "", fmt.Errorf("qbe: unsupported print arg type %s", typ.String())
 }
 
 func (g *Generator) qbeFuncName(name, importPath string) string {
