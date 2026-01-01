@@ -27,3 +27,5 @@ bin
 libs
 !runtime/libs
 xcode
+*.d2
+*.d2.*
