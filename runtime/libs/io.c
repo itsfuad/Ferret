@@ -13,6 +13,49 @@
 // For ssize_t on non-POSIX systems
 #ifdef _WIN32
 typedef long long ssize_t;
+
+// Windows doesn't have getline, implement using standard C functions
+static ssize_t getline(char** lineptr, size_t* n, FILE* stream) {
+    if (lineptr == NULL || n == NULL || stream == NULL) {
+        return -1;
+    }
+
+    if (*lineptr == NULL || *n == 0) {
+        *n = 128;
+        *lineptr = (char*)malloc(*n);
+        if (*lineptr == NULL) {
+            return -1;
+        }
+    }
+
+    size_t pos = 0;
+    int c;
+
+    while ((c = getc(stream)) != EOF) {
+        // Need space for character + null terminator
+        if (pos + 2 > *n) {
+            size_t new_size = *n * 2;
+            char* new_ptr = (char*)realloc(*lineptr, new_size);
+            if (new_ptr == NULL) {
+                return -1;
+            }
+            *lineptr = new_ptr;
+            *n = new_size;
+        }
+
+        (*lineptr)[pos++] = (char)c;
+        if (c == '\n') {
+            break;
+        }
+    }
+
+    if (pos == 0 && c == EOF) {
+        return -1;
+    }
+
+    (*lineptr)[pos] = '\0';
+    return (ssize_t)pos;
+}
 #endif
 // Printable union layout: [4-byte tag][32 bytes data] = 36 bytes total (to accommodate 256-bit types)
 // Tags: 0=i8, 1=i16, 2=i32, 3=i64, 4=i128, 5=i256, 6=u8, 7=u16, 8=u32, 9=u64, 10=u128, 11=u256,
