@@ -803,6 +803,8 @@ func extractVariablesFromExpr(expr hir.Expr) []string {
 		}
 	case *hir.ArrayLenExpr:
 		vars = append(vars, extractVariablesFromExpr(e.X)...)
+	case *hir.StringLenExpr:
+		vars = append(vars, extractVariablesFromExpr(e.X)...)
 	case *hir.MapIterInitExpr:
 		vars = append(vars, extractVariablesFromExpr(e.Map)...)
 	case *hir.MapIterNextExpr:

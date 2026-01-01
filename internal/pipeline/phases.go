@@ -152,6 +152,14 @@ func (p *Pipeline) runCFGAnalysisPhase() error {
 			continue
 		}
 
+		// Skip the global prelude module (synthetic, has no HIR)
+		if importPath == context_v2.GlobalModuleImport {
+			if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseCFGAnalyzed) {
+				p.ctx.SetModulePhase(importPath, phase.PhaseCFGAnalyzed)
+			}
+			continue
+		}
+
 		hirMod := hir.ModuleFromModule(module)
 		if hirMod == nil {
 			p.ctx.ReportError(fmt.Sprintf("HIR module missing for %s during CFG analysis", importPath), nil)

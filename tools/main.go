@@ -111,10 +111,20 @@ func syncFerretLibs(srcDir, destDir string) error {
 }
 
 func buildRuntimeLib(runtimeDir, libsDir string) error {
-	cFiles, err := filepath.Glob(filepath.Join(runtimeDir, "*.c"))
+	// Collect C files from both core and libs subdirectories
+	coreDir := filepath.Join(runtimeDir, "core")
+	libsRuntimeDir := filepath.Join(runtimeDir, "libs")
+	
+	coreFiles, err := filepath.Glob(filepath.Join(coreDir, "*.c"))
 	if err != nil {
-		return fmt.Errorf("scan runtime sources: %w", err)
+		return fmt.Errorf("scan core runtime sources: %w", err)
 	}
+	libsFiles, err := filepath.Glob(filepath.Join(libsRuntimeDir, "*.c"))
+	if err != nil {
+		return fmt.Errorf("scan libs runtime sources: %w", err)
+	}
+	
+	cFiles := append(coreFiles, libsFiles...)
 	if len(cFiles) == 0 {
 		return fmt.Errorf("no runtime C files found in %s", runtimeDir)
 	}
@@ -140,7 +150,8 @@ func buildRuntimeLib(runtimeDir, libsDir string) error {
 		if runtime.GOOS == "linux" {
 			args = append(args, "-fno-pie")
 		}
-		args = append(args, "-I", runtimeDir, "-c", src, "-o", obj)
+		// Add both core and libs directories to include path so headers can be found
+		args = append(args, "-I", coreDir, "-I", libsRuntimeDir, "-c", src, "-o", obj)
 
 		cmd := exec.Command(cc, args...)
 		cmd.Stdout = os.Stdout

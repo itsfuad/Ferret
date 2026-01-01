@@ -1,0 +1,7 @@
+fn empty_variadic(values: ...i32) {
+    // Do nothing
+}
+
+fn main() {
+    empty_variadic();
+}

@@ -276,6 +276,54 @@ func (o *OptionalType) Equals(other SemType) bool {
 	return false
 }
 
+// UnionType represents union types: union { T1, T2, ..., TN }
+type UnionType struct {
+	Variants []SemType
+}
+
+func NewUnion(variants []SemType) *UnionType {
+	return &UnionType{Variants: variants}
+}
+
+func (u *UnionType) String() string {
+	if len(u.Variants) == 0 {
+		return "union {}"
+	}
+	parts := make([]string, len(u.Variants))
+	for i, v := range u.Variants {
+		parts[i] = v.String()
+	}
+	return fmt.Sprintf("union {%s}", strings.Join(parts, ", "))
+}
+
+func (u *UnionType) Size() int {
+	// Union size is the max size of variants
+	maxSize := 0
+	for _, v := range u.Variants {
+		if s := v.Size(); s > maxSize {
+			maxSize = s
+		}
+	}
+	return maxSize + 4 // max size + discriminant (assuming 4 bytes for tag)
+}
+
+func (u *UnionType) isType() {}
+
+func (u *UnionType) Equals(other SemType) bool {
+	if ut, ok := other.(*UnionType); ok {
+		if len(u.Variants) != len(ut.Variants) {
+			return false
+		}
+		for i, v := range u.Variants {
+			if !v.Equals(ut.Variants[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // ReferenceType represents reference types: &T
 type ReferenceType struct {
 	Inner   SemType
@@ -512,7 +560,7 @@ func NewInterface(methods []InterfaceMethod) *InterfaceType {
 
 func (i *InterfaceType) String() string {
 	if len(i.Methods) == 0 {
-		return "any" // Empty interface (any type)
+		return "interface{}" // Empty interface
 	}
 	methodStrs := make([]string, len(i.Methods))
 	for j, m := range i.Methods {

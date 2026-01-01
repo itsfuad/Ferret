@@ -403,6 +403,8 @@ func (b *borrowChecker) checkExpr(expr hir.Expr) {
 		}
 	case *hir.ArrayLenExpr:
 		b.checkExpr(e.X)
+	case *hir.StringLenExpr:
+		b.checkExpr(e.X)
 	case *hir.MapIterInitExpr:
 		b.checkExpr(e.Map)
 	case *hir.MapIterNextExpr:
@@ -917,6 +919,8 @@ func collectRefUsesExpr(expr hir.Expr, refs map[*symbols.Symbol]struct{}, uses m
 			collectRefUsesExpr(elt, refs, uses)
 		}
 	case *hir.ArrayLenExpr:
+		collectRefUsesExpr(e.X, refs, uses)
+	case *hir.StringLenExpr:
 		collectRefUsesExpr(e.X, refs, uses)
 	case *hir.MapIterInitExpr:
 		collectRefUsesExpr(e.Map, refs, uses)

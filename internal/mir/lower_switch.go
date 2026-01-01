@@ -165,6 +165,10 @@ func collectValueTypes(fn *Function) map[ValueID]types.SemType {
 				valueTypes[i.Result] = types.TypeBool
 			case *OptionalUnwrap:
 				valueTypes[i.Result] = i.Type
+			case *UnionVariantCheck:
+				valueTypes[i.Result] = types.TypeBool
+			case *UnionExtract:
+				valueTypes[i.Result] = i.Type
 			case *ResultOk:
 				valueTypes[i.Result] = i.Type
 			case *ResultErr:
@@ -267,6 +271,10 @@ func instrResultID(instr Instr) ValueID {
 	case *OptionalIsSome:
 		return i.Result
 	case *OptionalUnwrap:
+		return i.Result
+	case *UnionVariantCheck:
+		return i.Result
+	case *UnionExtract:
 		return i.Result
 	case *ResultOk:
 		return i.Result

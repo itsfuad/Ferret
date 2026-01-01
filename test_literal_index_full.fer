@@ -1,0 +1,17 @@
+import "std/io";
+
+fn main() {
+    // Test direct indexing of array literal - optimized to just use the value
+    io::Println([1, 2, 3, 4][1]);  // Should print: 2
+    io::Println([1, 2, 3, 4][0]);  // Should print: 1
+    io::Println([1, 2, 3, 4][3]);  // Should print: 4
+    
+    // Test with fixed array literal
+    let fixed: [4]i32 = [10, 20, 30, 40];
+    io::Println(fixed[2]);  // Should print: 30
+    
+    // Test with variable index (will materialize array)
+    let idx := 1;
+    io::Println([100, 200, 300][idx]);  // Should print: 200
+}
+

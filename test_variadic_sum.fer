@@ -1,0 +1,37 @@
+import "std/io";
+
+fn sum(nums: ...i32) -> str ! i32 {
+
+    if len(nums) == 0 {
+        return "No numbers provided"!;
+    }
+
+    let total: i32 = 0;
+    let i: i32 = 0;
+    while i < len(nums) {
+        total = total + nums[i];
+        i = i + 1;
+    }
+    return total;
+}
+
+fn test(items: ...i32) {
+    // print length of items
+    io::Println("Number of items: ", len(items));
+    // add 1 item
+    append(items, 42);
+    io::Println("New number of items: ", len(items));
+}
+
+fn main() {
+    let result: i32 = sum() catch err {
+        io::Println("Error: ", err);
+        //return;
+    } 0 ;
+
+    io::Println("The sum is: ", result);
+
+    test(10, 20, 30);
+
+    return;
+}

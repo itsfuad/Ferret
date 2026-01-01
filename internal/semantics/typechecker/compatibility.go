@@ -106,6 +106,117 @@ func implementsInterface(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	return true
 }
 
+// checkCompositeTypeCompatibility handles composite type compatibility (arrays, maps, optionals)
+// Returns the compatibility level between source and target composite types
+func checkCompositeTypeCompatibility(source, target types.SemType) TypeCompatibility {
+	// Check array compatibility: []T -> []U
+	if srcArray, srcIsArray := source.(*types.ArrayType); srcIsArray {
+		if tgtArray, tgtIsArray := target.(*types.ArrayType); tgtIsArray {
+			// Check lengths match (for fixed-size arrays)
+			// Allow dynamic arrays (Length=-1) to be compatible with fixed-size arrays
+			// The actual element count validation happens in validateArrayLiteral
+			if srcArray.Length >= 0 && tgtArray.Length >= 0 && srcArray.Length != tgtArray.Length {
+				return Incompatible
+			}
+			// Don't allow fixed-size array to be assigned to dynamic array variable
+			// (would lose length information)
+			if srcArray.Length >= 0 && tgtArray.Length < 0 {
+				return Incompatible
+			}
+			// Recursively check element compatibility
+			elemCompat := checkTypeCompatibility(srcArray.Element, tgtArray.Element)
+			return elemCompat
+		}
+		return Incompatible
+	}
+
+	// Check map compatibility: map[K1]V1 -> map[K2]V2
+	if srcMap, srcIsMap := source.(*types.MapType); srcIsMap {
+		if tgtMap, tgtIsMap := target.(*types.MapType); tgtIsMap {
+			// Keys must be compatible
+			keyCompat := checkTypeCompatibility(srcMap.Key, tgtMap.Key)
+			if keyCompat == Incompatible {
+				return Incompatible
+			}
+			// Values must be compatible
+			valCompat := checkTypeCompatibility(srcMap.Value, tgtMap.Value)
+			if valCompat == Incompatible {
+				return Incompatible
+			}
+			// Return the weaker compatibility level
+			if keyCompat == Identical && valCompat == Identical {
+				return Identical
+			}
+			if keyCompat == ExplicitCastable || valCompat == ExplicitCastable {
+				return ExplicitCastable
+			}
+			return ImplicitCastable
+		}
+		return Incompatible
+	}
+
+	// Check optional compatibility: T? -> U?
+	if srcOpt, srcIsOpt := source.(*types.OptionalType); srcIsOpt {
+		if tgtOpt, tgtIsOpt := target.(*types.OptionalType); tgtIsOpt {
+			// Recursively check inner type compatibility
+			return checkTypeCompatibility(srcOpt.Inner, tgtOpt.Inner)
+		}
+		return Incompatible
+	}
+
+	// Check result type compatibility: E1!T1 -> E2!T2
+	if srcRes, srcIsRes := source.(*types.ResultType); srcIsRes {
+		if tgtRes, tgtIsRes := target.(*types.ResultType); tgtIsRes {
+			// Both Ok and Err types must be compatible
+			okCompat := checkTypeCompatibility(srcRes.Ok, tgtRes.Ok)
+			if okCompat == Incompatible {
+				return Incompatible
+			}
+			errCompat := checkTypeCompatibility(srcRes.Err, tgtRes.Err)
+			if errCompat == Incompatible {
+				return Incompatible
+			}
+			// Return the weaker compatibility level
+			if okCompat == Identical && errCompat == Identical {
+				return Identical
+			}
+			if okCompat == ExplicitCastable || errCompat == ExplicitCastable {
+				return ExplicitCastable
+			}
+			return ImplicitCastable
+		}
+		return Incompatible
+	}
+
+	// Not a composite type or types don't match structure
+	return Incompatible
+}
+
+// checkTypeCompatibilityWithContext determines if source type can be used where target type is expected
+// This version includes context for interface satisfaction checking
+func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, source, target types.SemType) TypeCompatibility {
+	// First try the basic compatibility
+	compatibility := checkTypeCompatibility(source, target)
+	if compatibility != Incompatible {
+		return compatibility
+	}
+
+	// Handle interface compatibility
+	if targetIface, ok := target.(*types.InterfaceType); ok {
+		if implementsInterface(ctx, mod, source, targetIface) {
+			return ImplicitCastable
+		}
+	} else if named, ok := target.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
+			if implementsInterface(ctx, mod, source, iface) {
+				return ImplicitCastable
+			}
+		}
+	}
+
+	return Incompatible
+}
+
 // checkTypeCompatibility determines if source type can be used where target type is expected
 func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	// Handle unknown types
@@ -136,6 +247,22 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 	source = dereferenceType(source)
 	target = dereferenceType(target)
 
+	// Identical types
+	if source.Equals(target) {
+		return Identical
+	}
+
+	// Any type can be assigned to empty interface (any)
+	if iface, ok := types.UnwrapType(target).(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+		return ImplicitCastable
+	}
+
+	// Check composite type compatibility (arrays, maps, optionals, etc.)
+	// This handles cases like []T -> []interface{}, map[K]V -> map[interface{}]interface{}, etc.
+	if compat := checkCompositeTypeCompatibility(source, target); compat != Incompatible {
+		return compat
+	}
+
 	// Special handling for none
 	// none can be assigned to any optional type (T?) or empty interface (any)
 	if source.Equals(types.TypeNone) {
@@ -155,184 +282,28 @@ func checkTypeCompatibility(source, target types.SemType) TypeCompatibility {
 		return Incompatible
 	}
 
-	// Identical types
-	if source.Equals(target) {
-		return Identical
-	}
-
-	// UNTYPED literals can be assigned to compatible concrete types with restrictions
+	// Handle untyped literals with union targets
 	if types.IsUntyped(source) {
-		// Unwrap target if it's a NamedType to check the underlying type
-		targetUnwrapped := types.UnwrapType(target)
-
-		if types.IsUntypedInt(source) && types.IsInteger(targetUnwrapped) {
-			return ImplicitCastable
-		}
-		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
-			return ImplicitCastable
-		}
-		return Incompatible
-	}
-
-	if isEnumType(source) && isIntegerType(target) {
-		return ExplicitCastable
-	}
-	if isBoolType(source) && isIntegerType(target) {
-		return ExplicitCastable
-	}
-
-	// Check numeric conversions
-	if types.IsNumeric(source) && types.IsNumeric(target) {
-		// Special case: byte and u8 are internally the same size but require explicit cast
-		srcName, srcOk := types.GetPrimitiveName(source)
-		tgtName, tgtOk := types.GetPrimitiveName(target)
-		if srcOk && tgtOk {
-			// byte -> u8 or u8 -> byte requires explicit cast
-			if (srcName == types.TYPE_BYTE && tgtName == types.TYPE_U8) || (srcName == types.TYPE_U8 && tgtName == types.TYPE_BYTE) {
-				return ExplicitCastable
-			}
-			if types.IsIntegerTypeName(srcName) && types.IsFloatTypeName(tgtName) {
-				if isLosslessNumericConversion(source, target) {
+		if unionType, ok := target.(*types.UnionType); ok {
+			for _, variant := range unionType.Variants {
+				variantUnwrapped := types.UnwrapType(variant)
+				if types.IsUntypedInt(source) && types.IsInteger(variantUnwrapped) {
 					return ImplicitCastable
 				}
-				return ExplicitCastable
-			}
-
-			if types.IsFloatTypeName(srcName) && types.IsIntegerTypeName(tgtName) {
-				return ExplicitCastable
-			}
-		}
-
-		if isLosslessNumericConversion(source, target) {
-			return ImplicitCastable
-		}
-		return ExplicitCastable
-	}
-
-	// Check interface compatibility
-	// If target is an interface, check if source implements it
-	if targetIface, ok := target.(*types.InterfaceType); ok {
-		// This requires context to look up methods, so we'll handle it in checkTypeCompatibilityWithContext
-		// For now, return a special value that indicates we need context
-		// Actually, we can't do this here without context. Let's handle it differently.
-		// We'll check this in the caller with context.
-		_ = targetIface
-	}
-
-	// Check if target is a NamedType and source matches its underlying type
-	// This allows: i32 -> Integer where type Integer i32;
-	// But NOT: Integer -> i32 (reverse) or Integer1 -> Integer2 (named to named)
-	// These require explicit casting to preserve type safety
-	if targetNamed, ok := target.(*types.NamedType); ok {
-		targetUnderlying := targetNamed.Unwrap()
-		// Only allow if source is NOT a NamedType (i.e., source is the base type)
-		// This ensures we only allow base -> named, not named -> named or named -> base
-		if _, sourceIsNamed := source.(*types.NamedType); !sourceIsNamed {
-			// Source is a base type, check if it matches the underlying type
-			if source.Equals(targetUnderlying) {
-				return ImplicitCastable
-			}
-		}
-	}
-
-	// Check struct compatibility (unwrap NamedType to get underlying structure)
-	srcUnwrapped := types.UnwrapType(source)
-	tgtUnwrapped := types.UnwrapType(target)
-
-	// If target is a NamedType and source matches the underlying structure,
-	// allow assignment (e.g., { .x = 1, .y = 2 } can be assigned to Point if Point wraps struct { .x: i32, .y: i32 })
-	if srcStruct, srcOk := srcUnwrapped.(*types.StructType); srcOk {
-		if tgtStruct, tgtOk := tgtUnwrapped.(*types.StructType); tgtOk {
-			// Check if structs are structurally compatible
-			if areStructsCompatible(srcStruct, tgtStruct) {
-				// If target is a NamedType, this is a structural -> nominal conversion (assignable)
-				// If both are anonymous or both are named and identical, it's identical
-				if source.Equals(target) {
-					return Identical
+				if types.IsUntypedFloat(source) && types.IsFloat(variantUnwrapped) {
+					return ImplicitCastable
 				}
+			}
+		} else {
+			// Untyped literals can be assigned to compatible primitive types
+			if types.IsUntypedInt(source) && types.IsInteger(target) {
 				return ImplicitCastable
 			}
-		}
-	}
-
-	// No implicit conversion available
-	return Incompatible
-}
-
-// checkTypeCompatibilityWithContext determines if source type can be used where target type is expected
-// This version includes context for interface satisfaction checking
-func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, source, target types.SemType) TypeCompatibility {
-	// Handle unknown types
-	if source.Equals(types.TypeUnknown) || target.Equals(types.TypeUnknown) {
-		return Incompatible
-	}
-
-	if srcRef, ok := types.UnwrapType(source).(*types.ReferenceType); ok {
-		if tgtRef, ok := types.UnwrapType(target).(*types.ReferenceType); ok {
-			if !srcRef.Inner.Equals(tgtRef.Inner) {
-				return Incompatible
-			}
-			if tgtRef.Mutable && !srcRef.Mutable {
-				return Incompatible
-			}
-			if srcRef.Mutable == tgtRef.Mutable {
-				return Identical
-			}
-			return ImplicitCastable // &mut -> & (shared)
-		}
-	}
-	if _, ok := types.UnwrapType(target).(*types.ReferenceType); ok {
-		return Incompatible
-	}
-
-	// Automatic dereferencing: &T is compatible with T
-	// This allows reference types to be used transparently
-	source = dereferenceType(source)
-	target = dereferenceType(target)
-
-	// Special handling for none
-	// none can be assigned to any optional type (T?) or empty interface (interface{})
-	if source.Equals(types.TypeNone) {
-		if _, ok := target.(*types.OptionalType); ok {
-			return ImplicitCastable
-		}
-		// Check if target is an empty interface (any)
-		if iface, ok := target.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
-			return ImplicitCastable
-		}
-		// Check if target is a named type wrapping an empty interface
-		if named, ok := target.(*types.NamedType); ok {
-			if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) == 0 {
+			if types.IsUntypedFloat(source) && types.IsFloat(target) {
 				return ImplicitCastable
 			}
 		}
 		return Incompatible
-	}
-
-	// Identical types
-	if source.Equals(target) {
-		return Identical
-	}
-
-	// UNTYPED literals can be assigned to compatible concrete types with restrictions
-	if types.IsUntyped(source) {
-		// Unwrap target if it's a NamedType to check the underlying type
-		targetUnwrapped := types.UnwrapType(target)
-
-		if types.IsUntypedInt(source) && types.IsInteger(targetUnwrapped) {
-			return ImplicitCastable
-		}
-		if types.IsUntypedFloat(source) && types.IsFloat(targetUnwrapped) {
-			return ImplicitCastable
-		}
-		return Incompatible
-	}
-
-	if isEnumType(source) && isIntegerType(target) {
-		return ExplicitCastable
-	}
-	if isBoolType(source) && isIntegerType(target) {
-		return ExplicitCastable
 	}
 
 	// Check numeric conversions
@@ -362,20 +333,12 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 		return ExplicitCastable
 	}
 
-	// Check interface compatibility
-	// If target is an interface, check if source implements it
-	// Handle both direct InterfaceType and NamedType wrapping an InterfaceType
-	var targetIface *types.InterfaceType
-	if iface, ok := target.(*types.InterfaceType); ok {
-		targetIface = iface
-	} else if named, ok := target.(*types.NamedType); ok {
-		if iface, ok := named.Underlying.(*types.InterfaceType); ok {
-			targetIface = iface
-		}
-	}
-	if targetIface != nil {
-		if implementsInterface(ctx, mod, source, targetIface) {
-			return ImplicitCastable
+	// Check if target is union and source matches one of the variants
+	if unionType, ok := target.(*types.UnionType); ok {
+		for _, variant := range unionType.Variants {
+			if source.Equals(variant) {
+				return ImplicitCastable
+			}
 		}
 	}
 
@@ -399,6 +362,15 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 	srcUnwrapped := types.UnwrapType(source)
 	tgtUnwrapped := types.UnwrapType(target)
 
+	// Check if target unwrapped is union and source matches one of the variants
+	if unionType, ok := tgtUnwrapped.(*types.UnionType); ok {
+		for _, variant := range unionType.Variants {
+			if source.Equals(variant) {
+				return ImplicitCastable
+			}
+		}
+	}
+
 	// If underlying types are compatible, it's explicitly castable (not implicitly)
 	if types.IsNumeric(srcUnwrapped) && types.IsNumeric(tgtUnwrapped) {
 		// Both are numeric, can be explicitly cast
@@ -419,11 +391,18 @@ func checkTypeCompatibilityWithContext(ctx *context_v2.CompilerContext, mod *con
 			if areStructsCompatible(srcStruct, tgtStruct) {
 				// If target is a NamedType, this is a structural -> nominal conversion (implicit castable)
 				// If both are anonymous or both are named and identical, it's identical
-				if source.Equals(target) {
+				if source == target || source.Equals(target) {
 					return Identical
 				}
 				return ImplicitCastable
 			}
+		}
+	}
+
+	// Check if target is optional and source matches inner type
+	if optType, ok := target.(*types.OptionalType); ok {
+		if source.Equals(optType.Inner) {
+			return ImplicitCastable
 		}
 	}
 

@@ -1,24 +1,111 @@
 package typechecker
 
 import (
+	str "compiler/internal/utils/strings"
+	"fmt"
+	"strings"
+
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
 	"compiler/internal/hir/consteval"
+	"compiler/internal/semantics/narrowing"
 	"compiler/internal/semantics/symbols"
 	"compiler/internal/semantics/table"
 	"compiler/internal/source"
 	"compiler/internal/tokens"
 	"compiler/internal/types"
 	"compiler/internal/utils"
-	str "compiler/internal/utils/strings"
-
-	"fmt"
-	"strings"
 )
 
+var narrowingAnalyzer = narrowing.NewAnalyzer()
+
+// unwrapOptionalType unwraps optional types: T? -> T
+// Returns the inner type if it's optional, otherwise returns the original type.
+func unwrapOptionalType(typ types.SemType) types.SemType {
+	if optType, ok := typ.(*types.OptionalType); ok {
+		return optType.Inner
+	}
+	return typ
+}
+
+// dereferenceType unwraps reference types: &T -> T
+// Returns the inner type if it's a reference, otherwise returns the original type.
+func dereferenceType(typ types.SemType) types.SemType {
+	if refType, ok := typ.(*types.ReferenceType); ok {
+		return refType.Inner
+	}
+	return typ
+}
+
+// Helper functions
+
+// addParamsToScope adds function/method parameters to the given scope with their types
+func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, params []ast.Field) {
+	if params == nil {
+		return
+	}
+	for _, param := range params {
+		if param.Name != nil {
+			paramType := TypeFromTypeNodeWithContext(ctx, mod, param.Type)
+
+			// Convert variadic parameters (...T) to slice type ([]T)
+			// This allows the function body to iterate over the parameter
+			if param.IsVariadic {
+				paramType = types.NewArray(paramType, -1) // []T
+			}
+
+			psym, ok := scope.GetSymbol(param.Name.Name)
+			if !ok {
+				continue // should not happen but safe side
+			}
+			psym.Type = paramType
+		}
+	}
+}
+
+// setupFunctionContext sets up function scope and return type tracking.
+// Returns a cleanup function that should be deferred.
+func setupFunctionContext(ctx *context_v2.CompilerContext, mod *context_v2.Module, scope *table.SymbolTable, funcType *ast.FuncType) func() {
+	// Enter function scope and get restore function
+	restoreScope := mod.EnterScope(scope)
+
+	// Set expected return type for validation
+	var expectedReturnType types.SemType = types.TypeVoid
+	if funcType != nil && funcType.Result != nil {
+		expectedReturnType = TypeFromTypeNodeWithContext(ctx, mod, funcType.Result)
+	}
+	oldReturnType := mod.CurrentFunctionReturnType
+	mod.CurrentFunctionReturnType = expectedReturnType
+
+	// Return cleanup function that restores both scope and return type
+	return func() {
+		restoreScope()
+		mod.CurrentFunctionReturnType = oldReturnType
+	}
+}
+
+// lookupTypeSymbol finds a type symbol by name, checking current module first, then imported modules.
+// Returns the symbol and true if found, nil and false otherwise.
+func lookupTypeSymbol(ctx *context_v2.CompilerContext, mod *context_v2.Module, typeName string) (*symbols.Symbol, bool) {
+	// First check current module's scope
+	if sym, found := mod.ModuleScope.Lookup(typeName); found {
+		return sym, true
+	}
+
+	// Not in current module, search imported modules
+	for _, importPath := range mod.ImportAliasMap {
+		if importedMod, exists := ctx.GetModule(importPath); exists {
+			if sym, ok := importedMod.ModuleScope.GetSymbol(typeName); ok && sym.Kind == symbols.SymbolType {
+				return sym, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
 // TypeCheckTopLevelSignatures resolves types, method signatures, and function signatures.
-// This must run before CheckModule so forward references to functions work at module scope.
 func TypeCheckTopLevelSignatures(ctx *context_v2.CompilerContext, mod *context_v2.Module) {
 	if mod.AST == nil {
 		return
@@ -277,7 +364,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					}
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Err.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, resultType.Err)
+						compatibility := checkTypeCompatibility(returnedType, resultType.Err)
 						if !isImplicitlyCompatible(compatibility) {
 							returnedDesc := resolveType(returnedType, resultType.Err)
 							diag := diagnostics.NewError("error return type mismatch").
@@ -302,7 +389,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					}
 
 					if !returnedType.Equals(types.TypeUnknown) && !resultType.Ok.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, resultType.Ok)
+						compatibility := checkTypeCompatibility(returnedType, resultType.Ok)
 						if !isImplicitlyCompatible(compatibility) {
 							diag := diagnostics.NewError("return type mismatch").
 								WithCode(diagnostics.ErrTypeMismatch).
@@ -324,7 +411,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Normal return type checking
 					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
 					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
-						compatibility := checkTypeCompatibilityWithContext(ctx, mod, returnedType, expectedReturnType)
+						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
 						if !isImplicitlyCompatible(compatibility) {
 							diag := diagnostics.NewError("type mismatch in return statement").
 								WithCode(diagnostics.ErrTypeMismatch).
@@ -349,7 +436,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Dead code detection (constant conditions) is done in control flow analysis phase
 
 		// Analyze condition for type narrowing
-		thenNarrowing, elseNarrowing := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+		thenNarrowing, elseNarrowing := narrowingAnalyzer.AnalyzeCondition(ctx, mod, n.Cond, nil)
 
 		// Check then branch with narrowing
 		if n.Body != nil {
@@ -387,6 +474,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 						WithPrimaryLabel(n.Range.Loc(), "this array is empty").
 						WithNote("Remove this loop or use a non-empty array"))
 				}
+			} else if prim, ok := unwrappedRange.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+				// Strings are iterable - element type is byte
+				rangeElemType = types.TypeByte
 			} else if _, ok := unwrappedRange.(*types.MapType); !ok {
 				isIterable = false
 				ctx.Diagnostics.Add(
@@ -465,6 +555,15 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 								// Second variable or single variable: gets array element type (value)
 								inferredType = rangeElemType
 							}
+						} else if prim, ok := types.UnwrapType(rangeType).(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+							// String iteration: index (i32) and character (byte)
+							if len(varDecl.Decls) == 2 && idx == 0 {
+								// First variable in dual-iterator: index is always i32
+								inferredType = types.TypeI32
+							} else {
+								// Second variable or single variable: gets byte type
+								inferredType = types.TypeByte
+							}
 						} else {
 							// Numeric range: all variables get range element type
 							inferredType = rangeElemType
@@ -501,7 +600,7 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 		// Dead code detection (constant conditions) is done in control flow analysis phase
 
 		// Analyze condition for narrowing in loop body
-		loopNarrowing, _ := analyzeConditionForNarrowing(ctx, mod, n.Cond, nil)
+		loopNarrowing, _ := narrowingAnalyzer.AnalyzeCondition(ctx, mod, n.Cond, nil)
 		applyNarrowingToBlock(ctx, mod, n.Body, loopNarrowing)
 	case *ast.MatchStmt:
 		// Check the match expression
@@ -929,7 +1028,7 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	}
 
 	// Check if cast is valid
-	compatibility := checkTypeCompatibilityWithContext(ctx, mod, sourceType, targetType)
+	compatibility := checkTypeCompatibility(sourceType, targetType)
 
 	// For struct types, check structural compatibility (unwrap NamedType on both sides)
 	srcUnwrapped := types.UnwrapType(sourceType)
@@ -1133,11 +1232,6 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 	if arrayType, ok := underlyingType.(*types.ArrayType); ok {
 		validateArrayLiteral(ctx, mod, lit, arrayType)
 		return nil
-	}
-
-	// Handle struct literals
-	if structType, ok := underlyingType.(*types.StructType); ok {
-		return checkStructLiteral(ctx, mod, lit, structType)
 	}
 
 	// Handle map literals
@@ -2130,8 +2224,20 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 
 	// Recursively validate subexpressions before type inference
 	switch e := expr.(type) {
+	case *ast.TypeExpr:
+		// TypeExpr wraps a type node for use in expression context (e.g., 'is' operator)
+		// Return the semantic type directly
+		semType := TypeFromTypeNodeWithContext(ctx, mod, e.Type)
+		mod.SetExprType(expr, semType)
+		return semType
 	case *ast.IdentifierExpr:
 		checkModuleScopeUseBeforeDecl(ctx, mod, e)
+		sym, ok := mod.CurrentScope.Lookup(e.Name)
+		if ok && sym != nil {
+			mod.SetExprType(expr, sym.Type)
+			return sym.Type
+		}
+		return types.TypeUnknown
 	case *ast.EnumType:
 		for _, variant := range e.Variants {
 			if variant.Value != nil {
@@ -2148,6 +2254,11 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		if e.Catch != nil {
 			checkCatchClause(ctx, mod, e)
 		}
+		// Compute return type using inferExprType which handles Result type unwrapping
+		// when a catch clause is present
+		callReturnType := inferExprType(ctx, mod, e)
+		mod.SetExprType(expr, callReturnType)
+		return callReturnType
 
 	case *ast.SelectorExpr:
 		// Validate base expression first
@@ -2160,30 +2271,124 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 	case *ast.BinaryExpr:
 		// Recursively check operands
 		lhsType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
+
+		if e.Op.Kind == tokens.IS_TOKEN {
+			// Special handling for 'is' operator - RHS is a TypeExpr
+			mod.SetExprType(expr, types.TypeBool)
+
+			// Extract the actual type from TypeExpr
+			var rhsType types.SemType
+			if typeExpr, ok := e.Y.(*ast.TypeExpr); ok {
+				rhsType = TypeFromTypeNodeWithContext(ctx, mod, typeExpr.Type)
+			} else {
+				// Fallback: try to infer type from expression (for backward compatibility)
+				rhsType = checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+			}
+
+			lhsUnwrapped := types.UnwrapType(lhsType)
+			if unionType, ok := lhsUnwrapped.(*types.UnionType); ok {
+				// rhsType should be a type that matches a variant
+				for _, variant := range unionType.Variants {
+					if rhsType.Equals(variant) {
+						// Valid, return bool
+						return types.TypeBool
+					}
+				}
+				// Not a valid variant
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("'is' operator: type '%s' is not a variant of union '%s'", rhsType.String(), lhsType.String())).
+						WithPrimaryLabel(e.Y.Loc(), "not a variant").
+						WithSecondaryLabel(e.X.Loc(), "union type"),
+				)
+				return types.TypeBool // Still return bool, error reported
+			} else if ifaceType, ok := lhsUnwrapped.(*types.InterfaceType); ok && len(ifaceType.Methods) == 0 {
+				// Allow 'is' on empty interface{} - can check for any type at runtime
+				// No need to validate rhsType - any type is valid
+				return types.TypeBool
+			} else {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError("'is' operator requires left operand to be a union type or interface{}").
+						WithPrimaryLabel(e.X.Loc(), "expected union or interface{}"),
+				)
+				return types.TypeBool
+			}
+		}
+
+		// For non-'is' operators, check RHS normally
 		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
-		// Validate operand type compatibility
-		checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
+		{
+			// Validate operand type compatibility for regular binary ops
+			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
+			// Return the result type - for most binary ops, it's the same as lhsType
+			// TODO: Handle cases where result type differs (e.g., comparison ops return bool)
+			var resultType types.SemType
+			switch e.Op.Kind {
+			case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
+				tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN:
+				resultType = lhsType
+			case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN, tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN,
+				tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN, tokens.AND_TOKEN, tokens.OR_TOKEN:
+				resultType = types.TypeBool
+			default:
+				resultType = types.TypeUnknown
+			}
+			mod.SetExprType(expr, resultType)
+			return resultType
+		}
 
 	case *ast.UnaryExpr:
 		// Recursively check operand
 		operandType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		if e.Op.Kind == tokens.BIT_AND_TOKEN || e.Op.Kind == tokens.MUT_REF_TOKEN {
 			checkBorrowExpr(ctx, mod, e, operandType)
+			// Return reference type
+			refType := types.NewReference(operandType)
+			if e.Op.Kind == tokens.MUT_REF_TOKEN {
+				refType.Mutable = true
+			}
+			mod.SetExprType(expr, refType)
+			return refType
+		} else {
+			// For other unary ops like -, return operand type
+			mod.SetExprType(expr, operandType)
+			return operandType
 		}
+
+	case *ast.BasicLit:
+		// Return the inferred literal type
+		litType := inferLiteralType(e, expected)
+		mod.SetExprType(expr, litType)
+		return litType
 	case *ast.PrefixExpr:
 		// Validate ++/-- target and operand type
 		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
+		// Return the target type
+		mod.SetExprType(expr, targetType)
+		return targetType
 	case *ast.PostfixExpr:
 		// Validate ++/-- target and operand type
 		targetType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		checkIncDecTarget(ctx, mod, e.X, targetType, e.Op)
+		// Return the target type
+		mod.SetExprType(expr, targetType)
+		return targetType
 
 	case *ast.IndexExpr:
 		// Check both array and index expressions
 		baseType := checkExpr(ctx, mod, e.X, types.TypeUnknown)
 		indexType := checkExpr(ctx, mod, e.Index, types.TypeUnknown)
 		checkIndexExpr(ctx, mod, e, baseType, indexType)
+		// Return element type
+		if arrType, ok := types.UnwrapType(baseType).(*types.ArrayType); ok {
+			mod.SetExprType(expr, arrType.Element)
+			return arrType.Element
+		}
+		if mapType, ok := types.UnwrapType(baseType).(*types.MapType); ok {
+			mod.SetExprType(expr, mapType.Value)
+			return mapType.Value
+		}
+		return types.TypeUnknown
 
 	case *ast.ParenExpr:
 		// Check inner expression
@@ -2199,6 +2404,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// For composite literals, provide target type as context to allow untyped literal contextualization
 		sourceType := checkExpr(ctx, mod, e.X, targetType)
 		checkCastExpr(ctx, mod, e, sourceType, targetType)
+		mod.SetExprType(expr, targetType)
+		return targetType
 
 	case *ast.CompositeLit:
 		// Determine target type for validation
@@ -2219,6 +2426,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		if !targetType.Equals(types.TypeUnknown) {
 			checkCompositeLit(ctx, mod, e, targetType)
 		}
+		mod.SetExprType(expr, targetType)
+		return targetType
 	}
 
 	// First, infer the type based on the expression structure
@@ -2317,7 +2526,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 // valueExpr: the value expression being assigned
 // targetType: the expected/target type
 func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, leftType types.SemType, leftNode ast.Node, rightNode ast.Expression) {
-	rhsType := checkExpr(ctx, mod, rightNode, leftType)
+	rhsType := checkExpr(ctx, mod, rightNode, types.TypeUnknown)
 
 	// Special check for integer literals: ensure they fit in the target type
 	if ok := checkFitness(ctx, leftType, rightNode, leftNode); !ok {
@@ -2327,22 +2536,39 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 	// Check type compatibility (use context-aware version for interface checking)
 	compatibility := checkTypeCompatibilityWithContext(ctx, mod, rhsType, leftType)
 
+	// Try breaking narrowing if incompatible or explicit
+	breakNarrowing := false
+	if compatibility == Incompatible || compatibility == ExplicitCastable {
+		if ident, ok := leftNode.(*ast.IdentifierExpr); ok {
+			if sym, found := mod.CurrentScope.Lookup(ident.Name); found && sym.OriginalType != nil {
+				origCompat := checkTypeCompatibilityWithContext(ctx, mod, rhsType, sym.OriginalType)
+				if origCompat == Identical || origCompat == ImplicitCastable {
+					// Break narrowing
+					sym.Type = sym.OriginalType
+					sym.OriginalType = nil
+					breakNarrowing = true
+				}
+			}
+		}
+	}
+
+	if breakNarrowing {
+		return
+	}
+
 	switch compatibility {
 	case Identical, ImplicitCastable:
 		return
 
 	case ExplicitCastable:
-		// Requires explicit cast - use centralized hint system
-		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility))
-
-		// Add dual labels if we have type node location
-		if leftNode != nil {
-			diag = diag.WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
-				WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
-		} else {
-			diag = diag.WithPrimaryLabel(rightNode.Loc(), "implicit conversion not allowed")
+		// For identical types, don't require explicit cast
+		if rhsType.Equals(leftType) {
+			return
 		}
-
+		// Requires explicit cast - use centralized hint system
+		diag := diagnostics.NewError(getConversionError(rhsType, leftType, compatibility)).
+			WithPrimaryLabel(rightNode.Loc(), fmt.Sprintf("type '%s'", rhsType.String())).
+			WithSecondaryLabel(leftNode.Loc(), fmt.Sprintf("type '%s'", leftType.String()))
 		diag = addExplicitCastHint(ctx, diag, rhsType, leftType, compatibility, rightNode)
 		ctx.Diagnostics.Add(diag)
 
@@ -2607,6 +2833,14 @@ func TypeFromTypeNodeWithContext(ctx *context_v2.CompilerContext, mod *context_v
 		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
 		return types.NewOptional(innerType)
 
+	case *ast.UnionType:
+		// Union type: union { T1, T2, ..., TN }
+		variants := make([]types.SemType, len(t.Variants))
+		for i, variant := range t.Variants {
+			variants[i] = TypeFromTypeNodeWithContext(ctx, mod, variant)
+		}
+		return types.NewUnion(variants)
+
 	case *ast.ReferenceType:
 		// Reference type: &T
 		innerType := TypeFromTypeNodeWithContext(ctx, mod, t.Base)
@@ -2859,7 +3093,7 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 		}
 
 		// Check compatibility (use WithContext to handle interfaces properly)
-		compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, param.Type)
+		compatibility := checkTypeCompatibility(argType, param.Type)
 
 		if !isImplicitlyCompatible(compatibility) {
 			// Format the argument type in a user-friendly way
@@ -2918,7 +3152,7 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 			}
 
 			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)
-			compatibility := checkTypeCompatibilityWithContext(ctx, mod, argType, variadicElemType)
+			compatibility := checkTypeCompatibility(argType, variadicElemType)
 
 			if !isImplicitlyCompatible(compatibility) {
 				// Format the argument type in a user-friendly way
@@ -3018,24 +3252,28 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 
 // applyNarrowingToBlock temporarily overrides symbol types based on narrowing context
 // and checks the block. Uses defer to automatically restore original types.
-func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, narrowing *NarrowingContext) {
+// Also stores narrowing info in module artifacts for HIR/MIR code generation.
+func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, nc *narrowing.NarrowingContext) {
 	if block == nil {
 		return
 	}
 
-	if narrowing == nil {
+	if nc == nil {
 		checkBlock(ctx, mod, block)
 		return
 	}
 
 	// Collect all narrowed variables from this context and parent chain
 	narrowedVars := make(map[string]types.SemType)
-	collectNarrowedTypes(narrowing, narrowedVars)
+	collectNarrowedTypes(nc, narrowedVars)
 
 	if len(narrowedVars) == 0 {
 		checkBlock(ctx, mod, block)
 		return
 	}
+
+	// Store narrowing info in artifacts for code generation
+	storeNarrowingArtifacts(mod, block, narrowedVars)
 
 	// Apply narrowing using defer for automatic restoration
 	defer restoreSymbolTypes(mod, narrowedVars)()
@@ -3043,6 +3281,9 @@ func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	// Apply narrowed types
 	for varName, narrowedType := range narrowedVars {
 		if sym, ok := mod.CurrentScope.Lookup(varName); ok {
+			if sym.OriginalType == nil {
+				sym.OriginalType = sym.Type
+			}
 			sym.Type = narrowedType
 		}
 	}
@@ -3051,20 +3292,77 @@ func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 	checkBlock(ctx, mod, block)
 }
 
+// storeNarrowingArtifacts stores narrowing information in module artifacts
+// so it can be used during HIR/MIR code generation.
+func storeNarrowingArtifacts(mod *context_v2.Module, block *ast.Block, narrowedVars map[string]types.SemType) {
+	if mod == nil || block == nil || len(narrowedVars) == 0 {
+		return
+	}
+
+	info := narrowing.GetOrCreateNarrowingInfo(mod)
+	scopeKey := narrowing.ScopeKeyFromLocation(mod.FilePath, block.Location.Start.Line, block.Location.Start.Column)
+	scope := info.GetOrCreateScope(scopeKey)
+
+	for varName, narrowedType := range narrowedVars {
+		// Look up the symbol to get original type and determine narrowing kind
+		sym, ok := mod.CurrentScope.Lookup(varName)
+		if !ok {
+			continue
+		}
+
+		originalType := sym.Type
+		if sym.OriginalType != nil {
+			originalType = sym.OriginalType
+		}
+
+		entry := &narrowing.NarrowingEntry{
+			VarName:      varName,
+			OriginalType: originalType,
+			NarrowedType: narrowedType,
+			VariantIndex: -1,
+		}
+
+		// Determine narrowing kind and variant index
+		unwrapped := types.UnwrapType(originalType)
+		switch t := unwrapped.(type) {
+		case *types.UnionType:
+			entry.Kind = narrowing.NarrowingUnion
+			// Find the variant index
+			for i, variant := range t.Variants {
+				if narrowedType.Equals(variant) {
+					entry.VariantIndex = i
+					break
+				}
+			}
+		case *types.OptionalType:
+			entry.Kind = narrowing.NarrowingOptional
+		case *types.InterfaceType:
+			entry.Kind = narrowing.NarrowingInterface
+		}
+
+		scope.Add(entry)
+	}
+}
+
 // collectNarrowedTypes walks the narrowing context chain and collects all narrowed types
 // Child contexts override parent contexts for the same variable
-func collectNarrowedTypes(nc *NarrowingContext, result map[string]types.SemType) {
+func collectNarrowedTypes(nc *narrowing.NarrowingContext, result map[string]types.SemType) {
 	if nc == nil {
 		return
 	}
 
 	// First collect from parent (so child can override)
-	if nc.parent != nil {
-		collectNarrowedTypes(nc.parent, result)
+	if nc.Parent != nil {
+		collectNarrowedTypes(nc.Parent, result)
 	}
 
 	// Then add/override with current level
-	for varName, narrowedType := range nc.narrowedTypes {
+	for varName, narrowedType := range nc.NarrowedTypes {
+		result[varName] = narrowedType
+	}
+
+	// Then add/override with current level
+	for varName, narrowedType := range nc.NarrowedTypes {
 		result[varName] = narrowedType
 	}
 }
@@ -3086,13 +3384,14 @@ func restoreSymbolTypes(mod *context_v2.Module, narrowedVars map[string]types.Se
 		for varName, origType := range originalTypes {
 			if sym, ok := mod.CurrentScope.Lookup(varName); ok {
 				sym.Type = origType
+				sym.OriginalType = nil
 			}
 		}
 	}
 }
 
 // applyNarrowingToElse handles else and else-if branches with narrowing
-func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Module, elseNode ast.Node, elseNarrowing *NarrowingContext) {
+func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Module, elseNode ast.Node, elseNarrowing *narrowing.NarrowingContext) {
 	if elseNode == nil {
 		return
 	}
@@ -3101,7 +3400,7 @@ func applyNarrowingToElse(ctx *context_v2.CompilerContext, mod *context_v2.Modul
 	switch e := elseNode.(type) {
 	case *ast.IfStmt:
 		// For else-if, re-analyze the condition with parent narrowing from else branch
-		elseIfThenNarrowing, elseIfElseNarrowing := analyzeConditionForNarrowing(ctx, mod, e.Cond, elseNarrowing)
+		elseIfThenNarrowing, elseIfElseNarrowing := narrowingAnalyzer.AnalyzeCondition(ctx, mod, e.Cond, elseNarrowing)
 
 		// Enter scope if exists
 		if e.Scope != nil {

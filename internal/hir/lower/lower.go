@@ -137,6 +137,8 @@ func (l *Lowerer) lowerFuncDecl(decl *hir.FuncDecl) *hir.FuncDecl {
 	body := l.lowerBlock(decl.Body)
 	l.currentReturnType = prevReturn
 
+	// Keep function type as-is (with IsVariadic flag) for call sites
+	// Parameter symbols were already converted from ...T to []T during type checking
 	return &hir.FuncDecl{
 		Name:     decl.Name,
 		Type:     decl.Type,
@@ -159,6 +161,8 @@ func (l *Lowerer) lowerMethodDecl(decl *hir.MethodDecl) *hir.MethodDecl {
 	body := l.lowerBlock(decl.Body)
 	l.currentReturnType = prevReturn
 
+	// Keep method type as-is (with IsVariadic flag) for call sites
+	// Parameter symbols were already converted from ...T to []T during type checking
 	return &hir.MethodDecl{
 		Receiver: decl.Receiver,
 		Name:     decl.Name,
@@ -306,6 +310,10 @@ func (l *Lowerer) lowerForStmt(stmt *hir.ForStmt) hir.Node {
 	}
 	if mapType, ok := rangeType.(*types.MapType); ok {
 		return l.lowerMapFor(stmt, mapType)
+	}
+	// Check if iterating over a string
+	if prim, ok := rangeType.(*types.PrimitiveType); ok && prim.GetName() == types.TYPE_STRING {
+		return l.lowerStringFor(stmt)
 	}
 
 	return &hir.ForStmt{
@@ -688,6 +696,116 @@ func (l *Lowerer) lowerMapFor(stmt *hir.ForStmt, mapType *types.MapType) hir.Nod
 	return &hir.Block{Nodes: prelude, Location: loc}
 }
 
+func (l *Lowerer) lowerStringFor(stmt *hir.ForStmt) hir.Node {
+	loc := stmt.Location
+	stringExpr := l.lowerExpr(stmt.Range, types.TypeUnknown)
+
+	stringSemType := l.exprType(stmt.Range)
+	if stringSemType == nil {
+		stringSemType = types.TypeString
+	}
+
+	prelude := []hir.Node{}
+	rangeValue := stringExpr
+	if !isSimpleValue(stringExpr) {
+		stringIdent := l.newTempIdent("__for_str_", stringSemType, loc)
+		prelude = append(prelude, newVarDecl(stringIdent, stringSemType, stringExpr, loc))
+		rangeValue = stringIdent
+	}
+
+	// Get string length
+	lenIdent := l.newTempIdent("__for_len_", types.TypeI32, loc)
+	lenExpr := &hir.StringLenExpr{
+		X:        rangeValue,
+		Type:     types.TypeI32,
+		Location: loc,
+	}
+	prelude = append(prelude, newVarDecl(lenIdent, types.TypeI32, lenExpr, loc))
+
+	items, iterLoc, isDecl := iteratorItems(stmt.Iterator)
+	if len(items) == 0 {
+		return &hir.ForStmt{
+			Iterator: l.lowerNode(stmt.Iterator),
+			Range:    l.lowerExpr(stmt.Range, types.TypeUnknown),
+			Body:     l.lowerBlock(stmt.Body),
+			Location: stmt.Location,
+		}
+	}
+
+	elemType := types.TypeByte // Strings iterate over bytes
+
+	var indexIdent *hir.Ident
+	var valueIdent *hir.Ident
+
+	if len(items) == 1 {
+		// Single iterator: value only
+		valueItem := items[0]
+		if !isDiscardIdent(valueItem.Name) {
+			valueIdent = valueItem.Name
+			if isDecl {
+				valueType := declItemType(valueItem)
+				if valueType == nil || valueType.Equals(types.TypeUnknown) {
+					valueType = elemType
+				}
+				prelude = append(prelude, newVarDecl(valueIdent, valueType, nil, iterLoc))
+			}
+		}
+
+		indexIdent = l.newTempIdent("__str_idx_", types.TypeI32, loc)
+		prelude = append(prelude, newVarDecl(indexIdent, types.TypeI32, intLiteral(0, types.TypeI32, loc), iterLoc))
+	} else {
+		// Dual iterator: index and value
+		indexItem := items[0]
+		valueItem := items[1]
+
+		indexIdent = indexItem.Name
+		indexNeedsDecl := isDecl
+		if isDiscardIdent(indexIdent) {
+			indexIdent = l.newTempIdent("__str_idx_", types.TypeI32, loc)
+			indexNeedsDecl = true
+		}
+		zero := intLiteral(0, types.TypeI32, loc)
+		if indexNeedsDecl {
+			prelude = append(prelude, newVarDecl(indexIdent, types.TypeI32, zero, iterLoc))
+		} else {
+			prelude = append(prelude, newAssign(indexIdent, zero, tokens.EQUALS_TOKEN, iterLoc))
+		}
+
+		if !isDiscardIdent(valueItem.Name) {
+			valueIdent = valueItem.Name
+			if isDecl {
+				valueType := declItemType(valueItem)
+				if valueType == nil || valueType.Equals(types.TypeUnknown) {
+					valueType = elemType
+				}
+				prelude = append(prelude, newVarDecl(valueIdent, valueType, nil, iterLoc))
+			}
+		}
+	}
+
+	firstIdent := l.newTempIdent("__for_first_", types.TypeBool, loc)
+	prelude = append(prelude, newVarDecl(firstIdent, types.TypeBool, boolLiteral(true, loc), loc))
+
+	incrAssign := newAssign(indexIdent, intLiteral(1, types.TypeI32, loc), tokens.PLUS_EQUALS_TOKEN, loc)
+	condExpr := newBinary(indexIdent, lenIdent, tokens.LESS_TOKEN, types.TypeBool, loc)
+
+	var valueAssign hir.Node
+	if valueIdent != nil {
+		// String indexing returns a byte
+		indexExpr := &hir.IndexExpr{
+			X:        rangeValue,
+			Index:    indexIdent,
+			Type:     elemType,
+			Location: loc,
+		}
+		valueAssign = newAssign(valueIdent, indexExpr, tokens.EQUALS_TOKEN, loc)
+	}
+
+	loweredBody := l.lowerBlock(stmt.Body)
+	loopNodes := l.buildLoopBody(firstIdent, incrAssign, condExpr, valueAssign, loweredBody, loc)
+	return l.wrapLoop(prelude, loopNodes, loc)
+}
+
 func (l *Lowerer) lowerMatchStmt(stmt *hir.MatchStmt) *hir.MatchStmt {
 	if stmt == nil {
 		return nil
@@ -818,6 +936,12 @@ func (l *Lowerer) lowerExpr(expr hir.Expr, expected types.SemType) hir.Expr {
 			Type:     e.Type,
 			Location: e.Location,
 		}
+	case *hir.StringLenExpr:
+		lowered = &hir.StringLenExpr{
+			X:        l.lowerExpr(e.X, types.TypeUnknown),
+			Type:     e.Type,
+			Location: e.Location,
+		}
 	case *hir.MapIterInitExpr:
 		lowered = &hir.MapIterInitExpr{
 			Map:      l.lowerExpr(e.Map, types.TypeUnknown),
@@ -891,7 +1015,7 @@ func (l *Lowerer) lowerBinaryExpr(expr *hir.BinaryExpr) hir.Expr {
 		}
 	}
 
-	return &hir.BinaryExpr{X: left, Op: expr.Op, Y: right, Type: expr.Type, Location: expr.Location}
+	return &hir.BinaryExpr{X: left, Op: expr.Op, Y: right, Type: expr.Type, TargetType: expr.TargetType, Location: expr.Location}
 }
 
 func (l *Lowerer) lowerCoalescingExpr(expr *hir.CoalescingExpr) hir.Expr {
@@ -921,10 +1045,54 @@ func (l *Lowerer) lowerCallExpr(expr *hir.CallExpr) hir.Expr {
 	}
 
 	funType := l.getFunctionType(expr.Fun)
-	args := make([]hir.Expr, 0, len(expr.Args))
-	for i, arg := range expr.Args {
-		expected := l.expectedArgType(funType, i)
-		args = append(args, l.lowerExpr(arg, expected))
+
+	// Check if this is a variadic call - bundle args into array literal
+	var args []hir.Expr
+	if funType != nil && len(funType.Params) > 0 {
+		lastParamIdx := len(funType.Params) - 1
+		lastParam := funType.Params[lastParamIdx]
+
+		if lastParam.IsVariadic {
+			// Process regular parameters
+			args = make([]hir.Expr, 0, len(funType.Params))
+			for i := 0; i < lastParamIdx && i < len(expr.Args); i++ {
+				expected := funType.Params[i].Type
+				args = append(args, l.lowerExpr(expr.Args[i], expected))
+			}
+
+			// Bundle variadic args into array literal
+			variadicArgs := expr.Args[lastParamIdx:]
+			elemType := lastParam.Type
+
+			// Create array literal elements
+			litElts := make([]hir.Expr, len(variadicArgs))
+			for i, arg := range variadicArgs {
+				litElts[i] = l.lowerExpr(arg, elemType)
+			}
+
+			// Create []T array literal
+			arrayType := types.NewArray(elemType, -1)
+			sliceLit := &hir.CompositeLit{
+				Type:     arrayType,
+				Elts:     litElts,
+				Location: expr.Location,
+			}
+			args = append(args, sliceLit)
+		} else {
+			// Non-variadic
+			args = make([]hir.Expr, 0, len(expr.Args))
+			for i, arg := range expr.Args {
+				expected := l.expectedArgType(funType, i)
+				args = append(args, l.lowerExpr(arg, expected))
+			}
+		}
+	} else {
+		// No function type info
+		args = make([]hir.Expr, 0, len(expr.Args))
+		for i, arg := range expr.Args {
+			expected := l.expectedArgType(funType, i)
+			args = append(args, l.lowerExpr(arg, expected))
+		}
 	}
 
 	callType := expr.Type
@@ -1138,7 +1306,7 @@ func (l *Lowerer) forceExprType(expr hir.Expr, target types.SemType) hir.Expr {
 	case *hir.Literal:
 		return &hir.Literal{Kind: e.Kind, Value: e.Value, Type: target, Location: e.Location}
 	case *hir.BinaryExpr:
-		return &hir.BinaryExpr{X: e.X, Op: e.Op, Y: e.Y, Type: target, Location: e.Location}
+		return &hir.BinaryExpr{X: e.X, Op: e.Op, Y: e.Y, Type: target, TargetType: e.TargetType, Location: e.Location}
 	case *hir.UnaryExpr:
 		return &hir.UnaryExpr{Op: e.Op, X: e.X, Type: target, Location: e.Location}
 	case *hir.PrefixExpr:
@@ -1243,6 +1411,8 @@ func (l *Lowerer) exprType(expr hir.Expr) types.SemType {
 	case *hir.RangeExpr:
 		return safeType(e.Type)
 	case *hir.ArrayLenExpr:
+		return safeType(e.Type)
+	case *hir.StringLenExpr:
 		return safeType(e.Type)
 	case *hir.MapIterInitExpr:
 		return safeType(e.Type)

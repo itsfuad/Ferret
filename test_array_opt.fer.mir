@@ -1,0 +1,16 @@
+module Ferret/test_array_opt
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca i32
+    %t2 = const i32 1
+    store %t1, %t2
+    %t3 = const i32 200
+    call io::Println(%t3) : void
+    %t4 = alloca i32
+    %t5 = const i32 0
+    store %t4, %t5
+    %t6 = const i32 20
+    call io::Println(%t6) : void
+    ret
+}

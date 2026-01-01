@@ -21,6 +21,7 @@ type Module struct {
 	ImportPath string
 	Functions  []*Function
 	VTables    []VTable
+	TypeIDs    map[string]string // Maps global name to type ID string
 	Location   source.Location
 }
 

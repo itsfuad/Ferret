@@ -71,8 +71,10 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 			if p.ctx.HasModule(importPath) {
 				mod, _ := p.ctx.GetModule(importPath)
 				if mod.Type == context_v2.ModuleBuiltin && mod.AST == nil {
+					// Builtin module with no file - advance through phases like native modules
+					p.ctx.SetModulePhase(importPath, phase.PhaseLexed)
 					if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseParsed) {
-						p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
+						p.ctx.SetModulePhase(importPath, phase.PhaseParsed)
 					}
 					return
 				}
@@ -157,7 +159,10 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 		}
 	}
 
-	imports := p.extractTopLevelImports(astModule)
+	var imports []importInfo
+	if astModule != nil {
+		imports = p.extractTopLevelImports(astModule)
+	}
 
 	for _, imp := range imports {
 		if err := p.ctx.AddDependency(importPath, imp.path); err != nil {
@@ -175,22 +180,50 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 func (p *Pipeline) extractTopLevelImports(astModule *ast.Module) []importInfo {
 	var imports []importInfo
 
+	if astModule == nil {
+		return imports
+	}
+
+	if astModule.Nodes == nil {
+		return imports
+	}
+
 	for _, node := range astModule.Nodes {
+		if node == nil {
+			continue
+		}
+
 		impStmt, ok := node.(*ast.ImportStmt)
 		if !ok {
 			break
 		}
 
-		if impStmt.Path != nil {
-			importPath := strings.Trim(impStmt.Path.Value, "\"")
-			importPath = fs.NormalizePath(importPath)
-			if importPath != "" {
-				imports = append(imports, importInfo{
-					path:     importPath,
-					location: &impStmt.Location,
-				})
-			}
+		if impStmt == nil {
+			p.ctx.ReportError("invalid import statement: nil node", nil)
+			continue
 		}
+
+		if impStmt.Path == nil {
+			p.ctx.ReportError("import statement missing path", &impStmt.Location)
+			continue
+		}
+
+		if impStmt.Path.Value == "" {
+			p.ctx.ReportError("import statement has empty path", &impStmt.Location)
+			continue
+		}
+
+		importPath := strings.Trim(impStmt.Path.Value, "\"")
+		importPath = fs.NormalizePath(importPath)
+		if importPath == "" {
+			p.ctx.ReportError("import path is empty after normalization", &impStmt.Location)
+			continue
+		}
+
+		imports = append(imports, importInfo{
+			path:     importPath,
+			location: &impStmt.Location,
+		})
 	}
 
 	return imports

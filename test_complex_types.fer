@@ -1,0 +1,133 @@
+import "std/io";
+
+// Test 1: Union with interface{} variants
+type Value union {
+    i32,
+    str,
+    []interface{},
+    interface{}
+};
+
+// Test 2: Nested type checking
+fn process_value(v: Value) {
+    if v is i32 {
+        io::Println("Integer:");
+        io::Println(v);
+    } else if v is str {
+        io::Println("String:");
+        for c in v {
+            io::Println(c);
+        }
+    } else if v is []interface{} {
+        io::Println("Array:");
+        for item in v {
+            io::Println(item);
+        }
+    } else if v is interface{} {
+        // Nested narrowing: interface{} inside union
+        io::Println("Interface - checking nested type:");
+        if v is i32 {
+            io::Println("  Nested i32:");
+            io::Println(v);
+        } else if v is str {
+            io::Println("  Nested str:");
+            io::Println(v);
+        } else {
+            io::Println("  Unknown nested type");
+        }
+    } else {
+        io::Println("Unknown type");
+    }
+}
+
+// Test 3: Complex composite types
+fn test_composite_interface() {
+    io::Println("=== Composite Interface Test ===");
+    
+    // Array of integers to interface{}
+    let arr: interface{} = [1, 2, 3];
+    if arr is []i32 {
+        io::Println("Got array of i32:");
+        for n in arr {
+            io::Println(n);
+        }
+    }
+    
+    io::Println("---");
+    
+    // Array of interface{} to interface{}
+    let mixed: []interface{} = [1, 2, 3];
+    let wrapped: interface{} = mixed;
+    if wrapped is []interface{} {
+        io::Println("Got array of interface:");
+        for item in wrapped {
+            io::Println(item);
+        }
+    }
+}
+
+// Test 4: Multiple levels of type narrowing
+fn nested_narrowing(outer: interface{}) {
+    io::Println("=== Nested Narrowing Test ===");
+    
+    if outer is []interface{} {
+        io::Println("Outer is array, checking elements:");
+        for item in outer {
+            if item is i32 {
+                io::Println("  Element is i32:");
+                io::Println(item);
+            } else if item is str {
+                io::Println("  Element is str:");
+                io::Println(item);
+            } else {
+                io::Println("  Element is other type");
+            }
+        }
+    } else if outer is str {
+        io::Println("Outer is string:");
+        io::Println(outer);
+    }
+}
+
+// Test 5: Union assigned from different types
+fn test_union_variants() {
+    io::Println("=== Union Variants Test ===");
+    
+    let v1: Value = 42;
+    process_value(v1);
+    
+    io::Println("---");
+    
+    let v2: Value = "hello";
+    process_value(v2);
+    
+    io::Println("---");
+    
+    let arr: []interface{} = [10, 20, 30];
+    let v3: Value = arr;
+    process_value(v3);
+    
+    io::Println("---");
+    
+    let iface: interface{} = 99;
+    let v4: Value = iface;
+    process_value(v4);
+}
+
+fn main() {
+    io::Println("===== COMPLEX TYPE TESTS =====");
+    io::Println("");
+    
+    test_composite_interface();
+    io::Println("");
+    
+    let test_arr: []interface{} = [1, 2, 3];
+    nested_narrowing(test_arr);
+    io::Println("");
+    
+    test_union_variants();
+    
+    io::Println("");
+    io::Println("===== ALL TESTS COMPLETE =====");
+}
+

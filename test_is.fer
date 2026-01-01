@@ -1,0 +1,12 @@
+import "std/io";
+
+fn main() {
+    let u: union { i32, str } = 42;
+    if u is i32 {
+        // narrowed
+        io::Println(u);
+        let a : i32 = u;
+        //u = "hi";
+        a = u;
+    }
+}

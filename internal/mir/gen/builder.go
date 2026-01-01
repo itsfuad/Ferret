@@ -250,9 +250,13 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 		return
 	}
 
-	if lhsType := b.exprType(stmt.Lhs); lhsType != nil {
-		if ref, ok := types.UnwrapType(lhsType).(*types.ReferenceType); ok {
-			refPtr := b.emitLoad(addr, lhsType, stmt.Location)
+	// Get the storage type for the LHS - this is the actual type of the variable,
+	// not the narrowed type. Important for union/optional assignments after narrowing.
+	lhsStorageType := b.getStorageType(stmt.Lhs)
+
+	if lhsStorageType != nil {
+		if ref, ok := types.UnwrapType(lhsStorageType).(*types.ReferenceType); ok {
+			refPtr := b.emitLoad(addr, lhsStorageType, stmt.Location)
 			if refPtr == mir.InvalidValue {
 				return
 			}
@@ -290,12 +294,12 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 	}
 
 	if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
-		cur := b.emitLoad(addr, b.exprType(stmt.Lhs), stmt.Location)
+		cur := b.emitLoad(addr, lhsStorageType, stmt.Location)
 		rhs := b.lowerExpr(stmt.Rhs)
 		if cur == mir.InvalidValue || rhs == mir.InvalidValue {
 			return
 		}
-		rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+		rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), lhsStorageType, stmt.Location)
 		if rhs == mir.InvalidValue {
 			return
 		}
@@ -304,8 +308,7 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 			b.reportUnsupported("assignment operator", stmt.Loc())
 			return
 		}
-		typ := b.exprType(stmt.Lhs)
-		res := b.emitBinary(op, cur, rhs, typ, stmt.Location)
+		res := b.emitBinary(op, cur, rhs, lhsStorageType, stmt.Location)
 		b.emitStore(addr, res, stmt.Location)
 		return
 	}
@@ -314,7 +317,7 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 	if rhs == mir.InvalidValue {
 		return
 	}
-	rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+	rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), lhsStorageType, stmt.Location)
 	if rhs == mir.InvalidValue {
 		return
 	}
@@ -705,6 +708,37 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			Location:   e.Location,
 		})
 		return id
+	case *hir.UnionVariantCheck:
+		value := b.lowerExpr(e.Value)
+		if value == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		value, _ = b.derefValueIfNeeded(value, b.exprType(e.Value), e.Location)
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.UnionVariantCheck{
+			Result:       id,
+			Value:        value,
+			VariantIndex: e.VariantIndex,
+			UnionType:    e.UnionType,
+			Location:     e.Location,
+		})
+		return id
+	case *hir.UnionExtract:
+		value := b.lowerExpr(e.Value)
+		if value == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		value, _ = b.derefValueIfNeeded(value, b.exprType(e.Value), e.Location)
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.UnionExtract{
+			Result:       id,
+			Value:        value,
+			VariantIndex: e.VariantIndex,
+			UnionType:    e.UnionType,
+			Type:         e.Type,
+			Location:     e.Location,
+		})
+		return id
 	case *hir.ResultOk:
 		value := b.lowerExpr(e.Value)
 		if value == mir.InvalidValue {
@@ -734,14 +768,23 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 	case *hir.ResultUnwrap:
 		return b.lowerResultUnwrap(e)
 	case *hir.BinaryExpr:
+		// Special handling for 'is' operator
+		if e.Op.Kind == tokens.IS_TOKEN {
+			return b.emitTypeCheck(e)
+		}
+
 		left := b.lowerExpr(e.X)
-		right := b.lowerExpr(e.Y)
-		if left == mir.InvalidValue || right == mir.InvalidValue {
+		if left == mir.InvalidValue {
 			return mir.InvalidValue
 		}
 		leftType := b.exprType(e.X)
-		rightType := b.exprType(e.Y)
 		left, leftType = b.derefValueIfNeeded(left, leftType, e.Location)
+
+		right := b.lowerExpr(e.Y)
+		if right == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		rightType := b.exprType(e.Y)
 		right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
 		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) && b.isStringType(e.Y) {
 			result := b.gen.nextValueID()
@@ -828,6 +871,12 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			return b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), e.Location)
 		}
 		return b.emitArrayLen(arrVal, e.Location)
+	case *hir.StringLenExpr:
+		strVal := b.lowerExpr(e.X)
+		if strVal == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		return b.emitStringLen(strVal, e.Location)
 	case *hir.MapIterInitExpr:
 		return b.lowerMapIterInit(e)
 	case *hir.MapIterNextExpr:
@@ -876,7 +925,10 @@ func (b *functionBuilder) coerceValueForAssign(val mir.ValueID, fromType, toType
 		val = b.emitLoad(val, ref.Inner, loc)
 		fromType = ref.Inner
 	}
-	if interfaceTypeOf(toType) != nil {
+	// Handle union type assignment
+	if unionType, ok := types.UnwrapType(toType).(*types.UnionType); ok {
+		val = b.boxUnionValue(val, fromType, unionType, loc)
+	} else if interfaceTypeOf(toType) != nil {
 		val = b.boxInterfaceValue(val, fromType, toType, loc)
 	}
 	return val
@@ -1164,6 +1216,8 @@ func (b *functionBuilder) lowerCall(expr *hir.CallExpr) mir.ValueID {
 				return b.lowerBuiltinLenCall(expr)
 			case "append":
 				return b.lowerBuiltinAppendCall(expr)
+			case "panic":
+				return b.lowerBuiltinPanicCall(expr)
 			}
 		}
 	}
@@ -1357,26 +1411,191 @@ func (b *functionBuilder) boxInterfaceValue(value mir.ValueID, valueType, ifaceT
 		dataPtr = box
 	}
 
-	if isEmptyInterface(ifaceType) {
-		return b.emitCast(dataPtr, ifaceType, loc)
-	}
-
-	vtableName, ok := b.gen.ensureInterfaceVTable(valueType, ifaceType, loc)
-	if !ok || vtableName == "" {
-		return mir.InvalidValue
-	}
-
-	vtablePtr := b.emitConst(types.NewReference(types.TypeU8), "$"+vtableName, loc)
 	ifaceAddr := b.emitAlloca(ifaceType, loc)
 	ptrType := types.NewReference(types.TypeU8)
 
+	// Store data pointer at offset 0
 	dataSlot := b.emitPtrAdd(ifaceAddr, 0, ptrType, loc)
 	b.emitStore(dataSlot, dataPtr, loc)
 
-	vtSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
-	b.emitStore(vtSlot, vtablePtr, loc)
+	if isEmptyInterface(ifaceType) {
+		// For empty interface{}, store type ID string pointer at offset PointerSize
+		typeID := typeIDString(valueType)
+		typeIDGlobal := b.gen.ensureTypeIDGlobal(typeID)
+		typeIDPtr := b.emitConst(ptrType, "$"+typeIDGlobal, loc)
+		typeIDSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
+		b.emitStore(typeIDSlot, typeIDPtr, loc)
+	} else {
+		// For interfaces with methods, store vtable pointer at offset PointerSize
+		vtableName, ok := b.gen.ensureInterfaceVTable(valueType, ifaceType, loc)
+		if !ok || vtableName == "" {
+			return mir.InvalidValue
+		}
+		vtablePtr := b.emitConst(ptrType, "$"+vtableName, loc)
+		vtSlot := b.emitPtrAdd(ifaceAddr, b.gen.layout.PointerSize, ptrType, loc)
+		b.emitStore(vtSlot, vtablePtr, loc)
+	}
 
 	return ifaceAddr
+}
+
+// boxUnionValue creates a tagged union value from a variant value.
+// Union layout: [4-byte discriminant/tag][variant data]
+func (b *functionBuilder) boxUnionValue(value mir.ValueID, valueType types.SemType, unionType *types.UnionType, loc source.Location) mir.ValueID {
+	if value == mir.InvalidValue || unionType == nil {
+		return mir.InvalidValue
+	}
+
+	// Find which variant this value matches
+	variantIndex := -1
+	for i, variant := range unionType.Variants {
+		if valueType.Equals(variant) {
+			variantIndex = i
+			break
+		}
+	}
+
+	if variantIndex < 0 {
+		// Type checker should have caught this
+		b.reportUnsupported("union variant mismatch", &loc)
+		return mir.InvalidValue
+	}
+
+	// Allocate space for the union (tag + max variant size)
+	unionAddr := b.emitAlloca(unionType, loc)
+
+	// Store the discriminant (tag) at offset 0
+	tagSlot := b.emitPtrAdd(unionAddr, 0, types.TypeI32, loc)
+	tagValue := b.emitConst(types.TypeI32, strconv.Itoa(variantIndex), loc)
+	b.emitStore(tagSlot, tagValue, loc)
+
+	// Store the actual value at offset 4 (after the tag)
+	dataSlot := b.emitPtrAdd(unionAddr, 4, valueType, loc)
+	b.emitStore(dataSlot, value, loc)
+
+	return unionAddr
+}
+
+// emitTypeCheck generates code for the 'is' operator to check type at runtime.
+// Handles both union types and interface{} types.
+// Returns a boolean indicating if the value is of the expected type.
+func (b *functionBuilder) emitTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
+	if expr == nil || expr.TargetType == nil {
+		// Fallback: return false if no target type
+		return b.emitConst(types.TypeBool, "0", expr.Location)
+	}
+
+	// Lower the value (LHS)
+	val := b.lowerExpr(expr.X)
+	if val == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	// For 'is' checks, we need the ORIGINAL type of the variable, not the narrowed type.
+	// If the LHS is an identifier with a symbol, check if the symbol has an original type.
+	valType := b.exprType(expr.X)
+
+	// Try to get the original (pre-narrowing) type from the symbol
+	if ident, ok := expr.X.(*hir.Ident); ok && ident.Symbol != nil {
+		if ident.Symbol.OriginalType != nil {
+			valType = ident.Symbol.OriginalType
+		} else if ident.Symbol.Type != nil {
+			// Symbol type might be more accurate than expression type
+			valType = ident.Symbol.Type
+		}
+	}
+
+	val, valType = b.derefValueIfNeeded(val, valType, expr.Location)
+
+	unwrappedType := types.UnwrapType(valType)
+
+	// Check if it's a union type
+	if unionTypeStruct, ok := unwrappedType.(*types.UnionType); ok {
+		return b.emitUnionTypeCheckImpl(val, unionTypeStruct, expr.TargetType, expr.Location)
+	}
+
+	// Check if it's an interface{} type
+	if isEmptyInterface(valType) {
+		return b.emitInterfaceTypeCheck(val, expr.TargetType, expr.Location)
+	}
+
+	// Not a union or interface - should have been caught by type checker
+	b.reportUnsupported("'is' check on non-union/non-interface type", expr.Loc())
+	return mir.InvalidValue
+}
+
+// emitUnionTypeCheckImpl implements union variant checking.
+func (b *functionBuilder) emitUnionTypeCheckImpl(unionVal mir.ValueID, unionType *types.UnionType, targetType types.SemType, loc source.Location) mir.ValueID {
+	// Find the variant index for the target type
+	variantIndex := -1
+	for i, variant := range unionType.Variants {
+		if targetType.Equals(variant) {
+			variantIndex = i
+			break
+		}
+	}
+
+	if variantIndex < 0 {
+		// Target type is not a variant - should have been caught by type checker
+		b.reportUnsupported("invalid union variant", &loc)
+		return mir.InvalidValue
+	}
+
+	// Load the discriminant (tag) from the union at offset 0
+	tagSlot := b.emitPtrAdd(unionVal, 0, types.TypeI32, loc)
+	tagValue := b.emitLoad(tagSlot, types.TypeI32, loc)
+
+	// Compare the tag with the expected variant index
+	expectedTag := b.emitConst(types.TypeI32, strconv.Itoa(variantIndex), loc)
+	result := b.gen.nextValueID()
+	b.emitInstr(&mir.Binary{
+		Result:   result,
+		Op:       tokens.DOUBLE_EQUAL_TOKEN,
+		Left:     tagValue,
+		Right:    expectedTag,
+		Type:     types.TypeBool,
+		Location: loc,
+	})
+
+	return result
+}
+
+// emitInterfaceTypeCheck implements interface{} type checking.
+// Compares the stored type ID string with the expected type ID.
+func (b *functionBuilder) emitInterfaceTypeCheck(ifaceVal mir.ValueID, targetType types.SemType, loc source.Location) mir.ValueID {
+	// Load the type ID pointer from the interface at offset PointerSize
+	ptrType := types.NewReference(types.TypeU8)
+	typeIDSlot := b.emitPtrAdd(ifaceVal, b.gen.layout.PointerSize, ptrType, loc)
+	storedTypeIDPtr := b.emitLoad(typeIDSlot, ptrType, loc)
+
+	// Get the expected type ID
+	expectedTypeID := typeIDString(targetType)
+	expectedTypeIDGlobal := b.gen.ensureTypeIDGlobal(expectedTypeID)
+	expectedTypeIDPtr := b.emitConst(ptrType, "$"+expectedTypeIDGlobal, loc)
+
+	// Compare the two type ID string pointers using strcmp
+	result := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   result,
+		Target:   "ferret_strcmp",
+		Args:     []mir.ValueID{storedTypeIDPtr, expectedTypeIDPtr},
+		Type:     types.TypeI32,
+		Location: loc,
+	})
+
+	// strcmp returns 0 if equal, so we need to compare result == 0
+	zero := b.emitConst(types.TypeI32, "0", loc)
+	isEqual := b.gen.nextValueID()
+	b.emitInstr(&mir.Binary{
+		Result:   isEqual,
+		Op:       tokens.DOUBLE_EQUAL_TOKEN,
+		Left:     result,
+		Right:    zero,
+		Type:     types.TypeBool,
+		Location: loc,
+	})
+
+	return isEqual
 }
 
 func builtinNameFromIdent(ident *hir.Ident) (string, bool) {
@@ -1477,6 +1696,29 @@ func (b *functionBuilder) lowerBuiltinAppendCall(expr *hir.CallExpr) mir.ValueID
 		Location: expr.Location,
 	})
 	return result
+}
+
+func (b *functionBuilder) lowerBuiltinPanicCall(expr *hir.CallExpr) mir.ValueID {
+	if expr == nil || len(expr.Args) != 1 {
+		b.reportUnsupported("panic argument count", expr.Loc())
+		return mir.InvalidValue
+	}
+
+	msgExpr := expr.Args[0]
+	msgVal := b.lowerExpr(msgExpr)
+	if msgVal == mir.InvalidValue {
+		return mir.InvalidValue
+	}
+
+	// Call ferret_panic with the message string
+	b.emitInstr(&mir.Call{
+		Result:   mir.InvalidValue,
+		Target:   "ferret_panic",
+		Args:     []mir.ValueID{msgVal},
+		Type:     types.TypeVoid,
+		Location: expr.Location,
+	})
+	return mir.InvalidValue // panic never returns
 }
 
 func (b *functionBuilder) emitCall(target string, args []mir.ValueID, expr *hir.CallExpr) mir.ValueID {
@@ -1643,8 +1885,62 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return mir.InvalidValue
 	}
 
+	// Special handling for builtin constants: true, false, none
+	if ident.Name == "true" {
+		return b.emitConst(types.TypeBool, "1", ident.Location)
+	}
+	if ident.Name == "false" {
+		return b.emitConst(types.TypeBool, "0", ident.Location)
+	}
+	if ident.Name == "none" {
+		id := b.gen.nextValueID()
+		optType := &types.OptionalType{Inner: types.TypeNone}
+		b.emitInstr(&mir.OptionalNone{Result: id, Type: optType, Location: ident.Location})
+		return id
+	}
+
 	if ident.Symbol != nil && ident.Symbol.Kind == symbols.SymbolFunction {
 		return b.makeFuncValue(ident.Name, ident.Type, ident.Location)
+	}
+
+	// Check for narrowed union access: if ident.Type differs from the storage type (Symbol.Type)
+	// and the storage type is a union, we need to extract the variant
+	if ident.Symbol != nil && ident.Type != nil && ident.Symbol.Type != nil {
+		storageType := types.UnwrapType(ident.Symbol.Type)
+		accessType := types.UnwrapType(ident.Type)
+
+		if unionType, ok := storageType.(*types.UnionType); ok {
+			// Storage is a union but we're accessing a narrowed variant type
+			if !accessType.Equals(storageType) {
+				// Find the variant index
+				variantIndex := -1
+				for i, variant := range unionType.Variants {
+					if accessType.Equals(variant) {
+						variantIndex = i
+						break
+					}
+				}
+
+				if variantIndex >= 0 {
+					// Load the union pointer, then extract the variant
+					if addr, ok := b.slots[ident.Symbol]; ok {
+						unionVal := b.emitLoad(addr, ident.Symbol.Type, ident.Location)
+
+						// Emit union extract - get data at offset 4 with the narrowed type
+						result := b.gen.nextValueID()
+						b.emitInstr(&mir.UnionExtract{
+							Result:       result,
+							Value:        unionVal,
+							VariantIndex: variantIndex,
+							UnionType:    storageType,
+							Type:         accessType,
+							Location:     ident.Location,
+						})
+						return result
+					}
+				}
+			}
+		}
 	}
 
 	if ident.Symbol != nil && b.captures != nil {
@@ -1916,12 +2212,25 @@ func (b *functionBuilder) lowerDynamicArrayLiteral(arrType *types.ArrayType, lit
 		if value == mir.InvalidValue {
 			return mir.InvalidValue
 		}
-		temp := b.emitAlloca(arrType.Element, lit.Location)
-		b.emitStore(temp, value, lit.Location)
+		// Box into union if element type is union
+		eltType := b.exprType(elt)
+		value = b.coerceValueForAssign(value, eltType, arrType.Element, lit.Location)
+
+		// ferret_array_append expects a pointer to the element
+		// For unions, coerceValueForAssign already returns a pointer
+		// For primitives, we need to allocate storage and store the value
+		valuePtr := value
+		if _, isUnion := types.UnwrapType(arrType.Element).(*types.UnionType); !isUnion {
+			// Allocate storage for the element
+			temp := b.emitAlloca(arrType.Element, lit.Location)
+			b.emitStore(temp, value, lit.Location)
+			valuePtr = temp
+		}
+
 		b.emitInstr(&mir.Call{
 			Result:   mir.InvalidValue,
 			Target:   "ferret_array_append",
-			Args:     []mir.ValueID{arr, temp},
+			Args:     []mir.ValueID{arr, valuePtr},
 			Type:     types.TypeBool,
 			Location: lit.Location,
 		})
@@ -2001,6 +2310,9 @@ func (b *functionBuilder) lowerArrayLiteralInto(addr mir.ValueID, arrType *types
 		if value == mir.InvalidValue {
 			return
 		}
+		// Box into union if element type is union
+		eltType := b.exprType(elt)
+		value = b.coerceValueForAssign(value, eltType, arrType.Element, lit.Location)
 		offset := i * elemSize
 		elemAddr := b.emitPtrAdd(addr, offset, arrType.Element, lit.Location)
 		b.emitStore(elemAddr, value, lit.Location)
@@ -2020,8 +2332,112 @@ func (b *functionBuilder) lowerIndexValue(expr *hir.IndexExpr) mir.ValueID {
 		return b.lowerMapIndexValue(expr, mapType)
 	}
 
-	if arrType := b.arrayTypeOf(expr.X); arrType != nil && arrType.Length < 0 {
-		return b.lowerDynamicIndexValue(expr, arrType)
+	// Check if it's an array literal first (before arrayTypeOf, which might fail for untyped literals)
+	if lit, ok := expr.X.(*hir.CompositeLit); ok {
+		// Try to get array type from the literal's type
+		var arrType *types.ArrayType
+		if lit.Type != nil {
+			baseType := types.UnwrapType(lit.Type)
+			if ref, ok := baseType.(*types.ReferenceType); ok {
+				baseType = types.UnwrapType(ref.Inner)
+			}
+			if arr, ok := baseType.(*types.ArrayType); ok {
+				arrType = arr
+			}
+		}
+		// If type not set, infer from elements (dynamic array)
+		if arrType == nil && len(lit.Elts) > 0 {
+			// Infer as dynamic array
+			elemType := b.exprType(lit.Elts[0])
+			if elemType != nil {
+				arrType = types.NewArray(elemType, -1)
+			}
+		}
+
+		if arrType != nil {
+			// Evaluate index as constant if possible (works for both literals and constant variables)
+			var index int
+			var indexOk bool
+			if arrType.Length >= 0 {
+				// Fixed array - use constArrayIndex
+				index, indexOk = b.constArrayIndex(expr, arrType)
+			} else {
+				// Dynamic array literal - evaluate index directly (supports constant variables too)
+				if b.gen != nil && b.gen.ctx != nil && b.gen.mod != nil {
+					val := consteval.EvaluateHIRExpr(b.gen.ctx, b.gen.mod, expr.Index)
+					if val != nil {
+						if idx, ok := val.AsInt64(); ok {
+							// Handle negative indices
+							if idx < 0 {
+								idx = int64(len(lit.Elts)) + idx
+							}
+							if idx >= 0 && idx < int64(len(lit.Elts)) {
+								index = int(idx)
+								indexOk = true
+							}
+						}
+					}
+				}
+			}
+
+			if indexOk && index >= 0 && index < len(lit.Elts) {
+				// Constant index within bounds - just extract the element directly
+				elt := lit.Elts[index]
+				return b.lowerExpr(elt)
+			}
+
+			// Non-constant index or out of bounds - need to materialize array
+			// Get the index value
+			indexVal := b.lowerExpr(expr.Index)
+			if indexVal == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+
+			// Non-constant index or out of bounds - need to materialize array
+			// (bounds checking will catch out-of-bounds at compile time in HIR analysis)
+			arrVal := b.lowerCompositeLit(lit)
+			if arrVal == mir.InvalidValue {
+				return mir.InvalidValue
+			}
+
+			indexVal = b.castValue(indexVal, b.exprType(expr.Index), types.TypeI32, expr.Location)
+
+			// For fixed arrays, we still need runtime bounds checking
+			if arrType.Length >= 0 {
+				lenVal := b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), expr.Location)
+				indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, expr.Location)
+				if indexVal == mir.InvalidValue {
+					return mir.InvalidValue
+				}
+			} else {
+				// Dynamic array: bounds check using runtime length
+				lenVal := b.emitArrayLen(arrVal, expr.Location)
+				indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, expr.Location)
+				if indexVal == mir.InvalidValue {
+					return mir.InvalidValue
+				}
+			}
+
+			// Use ArrayGet to get the element
+			result := b.gen.nextValueID()
+			b.emitInstr(&mir.ArrayGet{
+				Result:   result,
+				Array:    arrVal,
+				Index:    indexVal,
+				Type:     expr.Type,
+				Location: expr.Location,
+			})
+			return result
+		}
+	}
+
+	// Not a literal or not an array - try normal array handling
+	arrType := b.arrayTypeOf(expr.X)
+	if arrType != nil {
+		// Not a literal - handle normally
+		if arrType.Length < 0 {
+			return b.lowerDynamicIndexValue(expr, arrType)
+		}
 	}
 
 	addr := b.lowerIndexAddr(expr)
@@ -2117,16 +2533,75 @@ func (b *functionBuilder) lowerIndexAssign(expr *hir.IndexExpr, rhs hir.Expr, op
 	}
 
 	arrType := b.arrayTypeOf(expr.X)
-	if arrType == nil {
-		b.reportUnsupported("index base", expr.Loc())
+	if arrType != nil {
+		// Use ArraySet MIR instruction for both fixed and dynamic arrays
+		// This ensures consistent bounds checking and panicking behavior
+		arrVal := b.lowerExpr(expr.X)
+		if arrVal == mir.InvalidValue {
+			return
+		}
+
+		indexVal := b.lowerExpr(expr.Index)
+		if indexVal == mir.InvalidValue {
+			return
+		}
+
+		indexVal = b.castValue(indexVal, b.exprType(expr.Index), types.TypeI32, loc)
+
+		// For fixed arrays, we still need runtime bounds checking
+		if arrType.Length >= 0 {
+			lenVal := b.emitConst(types.TypeI32, strconv.Itoa(arrType.Length), loc)
+			indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, loc)
+			if indexVal == mir.InvalidValue {
+				return
+			}
+		} else {
+			// Dynamic array: bounds check using runtime length
+			lenVal := b.emitArrayLen(arrVal, loc)
+			indexVal = b.emitBoundsCheckedIndex(indexVal, lenVal, types.TypeI32, loc)
+			if indexVal == mir.InvalidValue {
+				return
+			}
+		}
+
+		value := b.lowerExpr(rhs)
+		if value == mir.InvalidValue {
+			return
+		}
+		value = b.coerceValueForAssign(value, b.exprType(rhs), arrType.Element, loc)
+		if value == mir.InvalidValue {
+			return
+		}
+
+		// Handle compound assignment operators (e.g., +=, -=)
+		if op != nil && op.Kind != tokens.EQUALS_TOKEN {
+			cur := b.gen.nextValueID()
+			b.emitInstr(&mir.ArrayGet{
+				Result:   cur,
+				Array:    arrVal,
+				Index:    indexVal,
+				Type:     arrType.Element,
+				Location: loc,
+			})
+			opKind := assignTokenToBinary(op.Kind)
+			if opKind == "" {
+				b.reportUnsupported("assignment operator", &loc)
+				return
+			}
+			value = b.emitBinary(opKind, cur, value, arrType.Element, loc)
+		}
+
+		// Emit ArraySet instruction
+		b.emitInstr(&mir.ArraySet{
+			Array:    arrVal,
+			Index:    indexVal,
+			Value:    value,
+			Location: loc,
+		})
 		return
 	}
 
-	if arrType.Length < 0 {
-		b.lowerDynamicIndexAssign(expr, rhs, op, loc, arrType)
-		return
-	}
-
+	// Non-array indexing - use old code path for compatibility
 	addr := b.lowerIndexAddr(expr)
 	if addr == mir.InvalidValue {
 		return
@@ -3073,6 +3548,19 @@ func (b *functionBuilder) exprType(expr hir.Expr) types.SemType {
 	}
 }
 
+// getStorageType returns the actual storage type for an expression.
+// For identifiers, this returns the Symbol's type (which is the storage type),
+// not the narrowed expression type. This is important for assignments to
+// narrowed union/optional variables.
+func (b *functionBuilder) getStorageType(expr hir.Expr) types.SemType {
+	if ident, ok := expr.(*hir.Ident); ok && ident.Symbol != nil {
+		// Use Symbol.Type which is the actual storage type
+		return ident.Symbol.Type
+	}
+	// For other expressions, fall back to expression type
+	return b.exprType(expr)
+}
+
 func isAddressableExpr(expr hir.Expr) bool {
 	switch expr.(type) {
 	case *hir.Ident, *hir.SelectorExpr, *hir.IndexExpr:
@@ -3446,6 +3934,18 @@ func (b *functionBuilder) emitArrayLen(arrVal mir.ValueID, loc source.Location) 
 		Result:   id,
 		Target:   "ferret_array_len",
 		Args:     []mir.ValueID{arrVal},
+		Type:     types.TypeI32,
+		Location: loc,
+	})
+	return id
+}
+
+func (b *functionBuilder) emitStringLen(strVal mir.ValueID, loc source.Location) mir.ValueID {
+	id := b.gen.nextValueID()
+	b.emitInstr(&mir.Call{
+		Result:   id,
+		Target:   "ferret_string_len",
+		Args:     []mir.ValueID{strVal},
 		Type:     types.TypeI32,
 		Location: loc,
 	})

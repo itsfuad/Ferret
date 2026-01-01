@@ -674,27 +674,217 @@ func (g *Generator) emitMapGet(m *mir.MapGet) {
 		g.reportUnsupported("map_get map", &m.Location)
 		return
 	}
-	optType, ok := g.optionalType(m.Type)
-	if !ok || optType == nil {
-		g.reportUnsupported("map_get optional", &m.Location)
-		return
-	}
-	optSize := g.layout.SizeOf(optType)
-	if optSize <= 0 {
-		g.reportUnsupported("map_get optional size", &m.Location)
-		return
-	}
-	align := g.layout.AlignOf(optType)
-	g.emitLine(fmt.Sprintf("%s =l %s %d", g.valueName(m.Result), g.allocOp(align), optSize))
 
 	keyPtr := g.valueAddr(m.Key, mapType.Key, &m.Location)
 	if keyPtr == "" {
 		return
 	}
 
-	g.emitLine(fmt.Sprintf("call $ferret_map_get_optional_out(l %s, l %s, l %s)",
-		g.valueName(m.Map), keyPtr, g.valueName(m.Result)))
-	g.valueTypes[m.Result] = m.Type
+	// Check if return type is optional or direct value
+	optType, isOptional := g.optionalType(m.Type)
+	if isOptional && optType != nil {
+		// Optional return type: use ferret_map_get_optional_out
+		optSize := g.layout.SizeOf(optType)
+		if optSize <= 0 {
+			g.reportUnsupported("map_get optional size", &m.Location)
+			return
+		}
+		align := g.layout.AlignOf(optType)
+		g.emitLine(fmt.Sprintf("%s =l %s %d", g.valueName(m.Result), g.allocOp(align), optSize))
+		g.emitLine(fmt.Sprintf("call $ferret_map_get_optional_out(l %s, l %s, l %s)",
+			g.valueName(m.Map), keyPtr, g.valueName(m.Result)))
+		g.valueTypes[m.Result] = m.Type
+	} else {
+		// Direct value type: call ferret_map_get and panic if NULL
+		valueType := m.Type
+		valueSize := g.layout.SizeOf(valueType)
+		if valueSize <= 0 {
+			g.reportUnsupported("map_get value size", &m.Location)
+			return
+		}
+		valuePtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l call $ferret_map_get(l %s, l %s)", valuePtr, g.valueName(m.Map), keyPtr))
+
+		// Check for NULL and panic if key not found
+		nullCheck := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w ceql %s, 0", nullCheck, valuePtr))
+		panicLabel := fmt.Sprintf("map_get_panic_%d", m.Result)
+		okLabel := fmt.Sprintf("map_get_ok_%d", m.Result)
+		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", nullCheck, panicLabel, okLabel))
+		g.emitLine(fmt.Sprintf("@%s", panicLabel))
+		msgSym := g.stringSymbol("key not found in map")
+		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine("ret") // Unreachable after panic, but QBE needs it
+		g.emitLine(fmt.Sprintf("@%s", okLabel))
+
+		// Load the value from the pointer
+		loadOp, err := g.loadOp(valueType)
+		if err != nil {
+			g.reportError(err.Error(), &m.Location)
+			return
+		}
+		qbeType, err := g.qbeType(valueType)
+		if err != nil {
+			g.reportError(err.Error(), &m.Location)
+			return
+		}
+		loadResult := g.valueName(m.Result)
+		g.emitLine(fmt.Sprintf("%s =%s %s %s", loadResult, qbeType, loadOp, valuePtr))
+		g.valueTypes[m.Result] = valueType
+	}
+}
+
+func (g *Generator) emitArrayGet(a *mir.ArrayGet) {
+	if a == nil {
+		return
+	}
+	arrType, ok := g.arrayTypeOf(a.Array)
+	if !ok || arrType == nil {
+		g.reportUnsupported("array_get array", &a.Location)
+		return
+	}
+
+	elemType := a.Type
+	elemSize := g.layout.SizeOf(elemType)
+	if elemSize <= 0 {
+		g.reportUnsupported("array_get element size", &a.Location)
+		return
+	}
+
+	if arrType.Length >= 0 {
+		// Fixed-size array: calculate offset and load directly
+		// Bounds checking was done in MIR lowering
+		arrPtr := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		// Calculate offset: index * elemSize
+		// Convert index to long for multiplication
+		indexLong := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l extsw %s", indexLong, indexVal))
+		offset := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l mul %s, %d", offset, indexLong, elemSize))
+
+		// Add offset to array pointer
+		elemPtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l add %s, %s", elemPtr, arrPtr, offset))
+
+		// Load the element
+		loadOp, err := g.loadOp(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		qbeType, err := g.qbeType(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		result := g.valueName(a.Result)
+		g.emitLine(fmt.Sprintf("%s =%s %s %s", result, qbeType, loadOp, elemPtr))
+		g.valueTypes[a.Result] = elemType
+	} else {
+		// Dynamic array: call ferret_array_get and check for NULL
+		arrVal := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		valuePtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l call $ferret_array_get(l %s, w %s)", valuePtr, arrVal, indexVal))
+
+		// Check for NULL and panic if out of bounds
+		nullCheck := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w ceql %s, 0", nullCheck, valuePtr))
+		panicLabel := fmt.Sprintf("array_get_panic_%d", a.Result)
+		okLabel := fmt.Sprintf("array_get_ok_%d", a.Result)
+		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", nullCheck, panicLabel, okLabel))
+		g.emitLine(fmt.Sprintf("@%s", panicLabel))
+		msgSym := g.stringSymbol("index out of bounds")
+		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine("ret") // Unreachable after panic
+		g.emitLine(fmt.Sprintf("@%s", okLabel))
+
+		// Load the value from the pointer
+		loadOp, err := g.loadOp(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		qbeType, err := g.qbeType(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		result := g.valueName(a.Result)
+		g.emitLine(fmt.Sprintf("%s =%s %s %s", result, qbeType, loadOp, valuePtr))
+		g.valueTypes[a.Result] = elemType
+	}
+}
+
+func (g *Generator) emitArraySet(a *mir.ArraySet) {
+	if a == nil {
+		return
+	}
+	arrType, ok := g.arrayTypeOf(a.Array)
+	if !ok || arrType == nil {
+		g.reportUnsupported("array_set array", &a.Location)
+		return
+	}
+
+	elemType := arrType.Element
+	elemSize := g.layout.SizeOf(elemType)
+	if elemSize <= 0 {
+		g.reportUnsupported("array_set element size", &a.Location)
+		return
+	}
+
+	valuePtr := g.valueAddr(a.Value, elemType, &a.Location)
+	if valuePtr == "" {
+		return
+	}
+
+	if arrType.Length >= 0 {
+		// Fixed-size array: calculate offset and store directly
+		// Bounds checking was done in MIR lowering
+		arrPtr := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		// Calculate offset: index * elemSize
+		// Convert index to long for multiplication
+		indexLong := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l extsw %s", indexLong, indexVal))
+		offset := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l mul %s, %d", offset, indexLong, elemSize))
+
+		// Add offset to array pointer
+		elemPtr := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =l add %s, %s", elemPtr, arrPtr, offset))
+
+		// Store the element
+		storeOp, err := g.storeOp(elemType)
+		if err != nil {
+			g.reportError(err.Error(), &a.Location)
+			return
+		}
+		g.emitLine(fmt.Sprintf("%s %s, %s", storeOp, valuePtr, elemPtr))
+	} else {
+		// Dynamic array: call ferret_array_set and check return value
+		arrVal := g.valueName(a.Array)
+		indexVal := g.valueName(a.Index)
+
+		result := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w call $ferret_array_set(l %s, w %s, l %s)", result, arrVal, indexVal, valuePtr))
+
+		// Check return value and panic if false (out of bounds)
+		zeroCheck := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w ceqw %s, 0", zeroCheck, result))
+		panicLabel := fmt.Sprintf("array_set_panic_%d", a.Array)
+		okLabel := fmt.Sprintf("array_set_ok_%d", a.Array)
+		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", zeroCheck, panicLabel, okLabel))
+		g.emitLine(fmt.Sprintf("@%s", panicLabel))
+		msgSym := g.stringSymbol("index out of bounds")
+		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine("ret") // Unreachable after panic
+		g.emitLine(fmt.Sprintf("@%s", okLabel))
+	}
 }
 
 func (g *Generator) emitMapSet(m *mir.MapSet) {
@@ -884,6 +1074,83 @@ func (g *Generator) emitOptionalUnwrap(o *mir.OptionalUnwrap) {
 	}
 	g.emitLine(fmt.Sprintf("%s =%s %s %s", g.valueName(o.Result), qbeType, op, g.valueName(o.Value)))
 	g.valueTypes[o.Result] = inner
+}
+
+// emitUnionVariantCheck checks if a union value holds a specific variant.
+// Union layout: [4-byte tag at offset 0][variant data at offset 4]
+func (g *Generator) emitUnionVariantCheck(u *mir.UnionVariantCheck) {
+	if u == nil {
+		return
+	}
+
+	// Load the tag from offset 0 of the union
+	tagPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, 0", tagPtr, g.valueName(u.Value)))
+	tagValue := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =w loadsw %s", tagValue, tagPtr))
+
+	// Compare with expected variant index
+	g.emitLine(fmt.Sprintf("%s =w ceqw %s, %d", g.valueName(u.Result), tagValue, u.VariantIndex))
+	g.valueTypes[u.Result] = types.TypeBool
+}
+
+// emitUnionExtract extracts the inner value from a union.
+// Union layout: [4-byte tag at offset 0][variant data at offset 4]
+func (g *Generator) emitUnionExtract(u *mir.UnionExtract) {
+	if u == nil {
+		return
+	}
+
+	variantType := u.Type
+	if variantType == nil {
+		g.reportUnsupported("union_extract nil type", &u.Location)
+		return
+	}
+
+	variantSize := g.layout.SizeOf(variantType)
+	if variantSize < 0 {
+		g.reportUnsupported("union_extract variant size", &u.Location)
+		return
+	}
+
+	// Calculate pointer to variant data (at offset 4 after the tag)
+	dataPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, 4", dataPtr, g.valueName(u.Value)))
+
+	// Determine if we need to return by reference or by value
+	byRef := g.needsByRefType(variantType)
+	if !byRef {
+		if _, ok := g.optionalType(variantType); ok {
+			byRef = true
+		} else if _, ok := g.resultType(variantType); ok {
+			byRef = true
+		} else if _, ok := variantType.(*types.UnionType); ok {
+			byRef = true
+		}
+	}
+
+	if byRef {
+		// For reference types, allocate space and copy
+		align := g.layout.AlignOf(variantType)
+		g.emitLine(fmt.Sprintf("%s =l %s %d", g.valueName(u.Result), g.allocOp(align), variantSize))
+		g.emitMemcpy(g.valueName(u.Result), dataPtr, variantSize, &u.Location)
+		g.valueTypes[u.Result] = types.NewReference(variantType)
+		return
+	}
+
+	// For value types, load directly
+	op, err := g.loadOp(variantType)
+	if err != nil {
+		g.reportError(err.Error(), &u.Location)
+		return
+	}
+	qbeType, err := g.qbeType(variantType)
+	if err != nil {
+		g.reportError(err.Error(), &u.Location)
+		return
+	}
+	g.emitLine(fmt.Sprintf("%s =%s %s %s", g.valueName(u.Result), qbeType, op, dataPtr))
+	g.valueTypes[u.Result] = variantType
 }
 
 func (g *Generator) emitResultOk(r *mir.ResultOk) {
@@ -1334,7 +1601,14 @@ func (g *Generator) compareOp(op tokens.TOKEN, typ types.SemType) (string, error
 }
 
 func (g *Generator) loadOp(typ types.SemType) (string, error) {
+	if typ.Equals(types.TypeUnknown) {
+		// Temporary fix: assume word load for unknown
+		return "loadw", nil
+	}
 	typ = types.UnwrapType(typ)
+	if _, ok := typ.(*types.UnionType); ok {
+		return "loadl", nil // unions as pointers
+	}
 	if prim, ok := typ.(*types.PrimitiveType); ok {
 		switch prim.GetName() {
 		case types.TYPE_I8:
@@ -1439,6 +1713,10 @@ func (g *Generator) qbeType(typ types.SemType) (string, error) {
 	if typ == nil {
 		return "", fmt.Errorf("qbe: missing type")
 	}
+	if typ.Equals(types.TypeUnknown) {
+		// Temporary fix: assume word type for unknown
+		return "w", nil
+	}
 	typ = types.UnwrapType(typ)
 
 	if prim, ok := typ.(*types.PrimitiveType); ok {
@@ -1483,6 +1761,8 @@ func (g *Generator) qbeType(typ types.SemType) (string, error) {
 		return "l", nil
 	case *types.ResultType:
 		return "l", nil
+	case *types.UnionType:
+		return "l", nil // Represent unions as pointers for now
 	}
 
 	return "", fmt.Errorf("qbe: unsupported type %s", typ.String())
@@ -1526,10 +1806,6 @@ func (g *Generator) resolveCallTarget(target string, args []callArg, loc *source
 		}
 		if importPath == "" {
 			return "", args, fmt.Errorf("qbe: unknown module alias %q", moduleAlias)
-		}
-
-		if importPath == "std/io" && (funcName == "Print" || funcName == "Println") {
-			return g.resolvePrint(funcName, args, loc)
 		}
 
 		if g.ctx != nil {
@@ -1576,10 +1852,6 @@ func (g *Generator) resolveFuncSymbol(target string, fnType *types.FunctionType,
 			return "", fmt.Errorf("qbe: unknown module alias %q", moduleAlias)
 		}
 
-		if importPath == "std/io" && (funcName == "Print" || funcName == "Println") {
-			return g.resolvePrintFuncValue(funcName, fnType, loc)
-		}
-
 		if g.ctx != nil {
 			if imported, ok := g.ctx.GetModule(importPath); ok && imported.ModuleScope != nil {
 				if sym, ok := imported.ModuleScope.GetSymbol(funcName); ok && sym.IsNative && sym.NativeName != "" {
@@ -1615,24 +1887,128 @@ func (g *Generator) resolvePrintFuncValue(funcName string, fnType *types.Functio
 }
 
 func (g *Generator) resolvePrint(funcName string, args []callArg, loc *source.Location) (string, []callArg, error) {
+	// Handle zero arguments - pass empty string
 	if len(args) == 0 {
 		empty := g.stringSymbol("")
 		return "ferret_io_" + funcName, []callArg{{name: empty, typ: "l", sem: types.TypeString}}, nil
 	}
-	if len(args) != 1 {
-		return "", args, fmt.Errorf("qbe: %s expects 0 or 1 argument", funcName)
+
+	// Handle single argument - use type-specific function
+	if len(args) == 1 {
+		arg := args[0]
+		printName, err := g.printFunctionName(funcName, arg.sem)
+		if err != nil {
+			return "", args, err
+		}
+		if printName == "ferret_io_"+funcName {
+			arg.typ = "l"
+			args[0] = arg
+		}
+		return printName, args, nil
 	}
 
-	arg := args[0]
-	printName, err := g.printFunctionName(funcName, arg.sem)
+	// Handle multiple arguments - box into Printable union slice
+	sliceArgs, err := g.createPrintableUnionSlice(args)
 	if err != nil {
 		return "", args, err
 	}
-	if printName == "ferret_io_"+funcName {
-		arg.typ = "l"
-		args[0] = arg
+
+	return "ferret_io_" + funcName + "_slice", sliceArgs, nil
+}
+
+// createPrintableUnionSlice boxes multiple arguments into a Printable union slice
+// Returns slice arguments: [pointer, length, capacity]
+func (g *Generator) createPrintableUnionSlice(args []callArg) ([]callArg, error) {
+	// Union layout: [4-byte tag][8-byte data] = 12 bytes, aligned to 16 bytes
+	unionSize := 16
+	numArgs := len(args)
+	totalSize := unionSize * numArgs
+
+	// Allocate array on stack for unions
+	arrayTmp := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l alloc8 %d", arrayTmp, totalSize))
+
+	// Box each argument into a union and store in array
+	for i, arg := range args {
+		if err := g.boxValueIntoUnion(arrayTmp, i*unionSize, arg); err != nil {
+			return nil, err
+		}
 	}
-	return printName, args, nil
+
+	// Pass array pointer, length, and capacity
+	lengthTmp := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l copy %d", lengthTmp, numArgs))
+
+	return []callArg{
+		{name: arrayTmp, typ: "l", sem: types.TypeU64},
+		{name: lengthTmp, typ: "l", sem: types.TypeI64},
+		{name: lengthTmp, typ: "l", sem: types.TypeI64}, // cap same as len
+	}, nil
+}
+
+// boxValueIntoUnion boxes a single value into a union at the given offset
+func (g *Generator) boxValueIntoUnion(arrayPtr string, offset int, arg callArg) error {
+	// Get the union tag for this type
+	tag := g.getPrintableUnionTag(arg.sem)
+	if tag < 0 {
+		return fmt.Errorf("qbe: unsupported type %s for Printable union", arg.sem.String())
+	}
+
+	// Store tag at offset
+	tagPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, %d", tagPtr, arrayPtr, offset))
+	g.emitLine(fmt.Sprintf("storew %d, %s", tag, tagPtr))
+
+	// Store value at offset+4 (after tag)
+	dataPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, %d", dataPtr, arrayPtr, offset+4))
+	g.emitLine(fmt.Sprintf("store%s %s, %s", string(arg.typ[0]), arg.name, dataPtr))
+
+	return nil
+}
+
+// getPrintableUnionTag returns the tag index for a type in the Printable union
+func (g *Generator) getPrintableUnionTag(typ types.SemType) int {
+	if typ == nil {
+		return -1
+	}
+	typ = types.UnwrapType(typ)
+
+	prim, ok := typ.(*types.PrimitiveType)
+	if !ok {
+		return -1
+	}
+
+	switch prim.GetName() {
+	case types.TYPE_I8:
+		return 0
+	case types.TYPE_I16:
+		return 1
+	case types.TYPE_I32:
+		return 2
+	case types.TYPE_I64:
+		return 3
+	case types.TYPE_U8:
+		return 4
+	case types.TYPE_U16:
+		return 5
+	case types.TYPE_U32:
+		return 6
+	case types.TYPE_U64:
+		return 7
+	case types.TYPE_F32:
+		return 8
+	case types.TYPE_F64:
+		return 9
+	case types.TYPE_STRING:
+		return 10
+	case types.TYPE_BYTE:
+		return 11
+	case types.TYPE_BOOL:
+		return 12
+	default:
+		return -1
+	}
 }
 
 func (g *Generator) printFunctionName(funcName string, typ types.SemType) (string, error) {
@@ -1875,6 +2251,21 @@ func (g *Generator) mapTypeOf(id mir.ValueID) (*types.MapType, bool) {
 	}
 	if mapType, ok := typ.(*types.MapType); ok {
 		return mapType, true
+	}
+	return nil, false
+}
+
+func (g *Generator) arrayTypeOf(id mir.ValueID) (*types.ArrayType, bool) {
+	typ := g.valueTypes[id]
+	if typ == nil {
+		return nil, false
+	}
+	typ = types.UnwrapType(typ)
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = types.UnwrapType(ref.Inner)
+	}
+	if arrType, ok := typ.(*types.ArrayType); ok {
+		return arrType, true
 	}
 	return nil, false
 }

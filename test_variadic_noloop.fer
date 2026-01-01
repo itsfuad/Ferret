@@ -1,0 +1,7 @@
+fn simple(values: ...i32) {
+    // Do nothing with values
+}
+
+fn main() {
+    simple(1, 2, 3);
+}

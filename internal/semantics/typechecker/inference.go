@@ -415,9 +415,8 @@ func inferIndexExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 		return bt.Element
 
 	case *types.MapType:
-		// Map indexing: map[key] returns optional value type V?
-		// This forces handling of missing keys at compile time
-		return types.NewOptional(bt.Value)
+		// Map indexing: map[key] returns value type V (panics if key not found)
+		return bt.Value
 	case *types.PrimitiveType:
 		if bt.GetName() == types.TYPE_STRING {
 			// String indexing returns a byte

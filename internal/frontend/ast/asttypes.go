@@ -52,6 +52,16 @@ func (o *OptionalType) INode()                {} // Implements Node interface
 func (o *OptionalType) TypeExpr()             {} // Type nodes implement TypeExpr
 func (o *OptionalType) Loc() *source.Location { return &o.Location }
 
+// UnionType represents union type union { T1, T2, ..., TN }
+type UnionType struct {
+	Variants []TypeNode // The types in the union
+	source.Location
+}
+
+func (u *UnionType) INode()                {} // Implements Node interface
+func (u *UnionType) TypeExpr()             {} // Type nodes implement TypeExpr
+func (u *UnionType) Loc() *source.Location { return &u.Location }
+
 // ReferenceType represents reference type &T (C#-style reference)
 type ReferenceType struct {
 	Base    TypeNode // The base type being referenced

@@ -1,0 +1,7 @@
+import "std/io";
+
+fn main() {
+    // Test direct indexing of array literal
+    io::Println([1, 2, 3, 4][1]);  // Should work: 2
+}
+

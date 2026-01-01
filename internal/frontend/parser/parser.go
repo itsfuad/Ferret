@@ -479,9 +479,22 @@ func (p *Parser) parseLogicalAnd() ast.Expression {
 func (p *Parser) parseEquality() ast.Expression {
 	left := p.parseComparison()
 
-	for p.match(tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN) {
+	for p.match(tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN, tokens.IS_TOKEN) {
 		op := p.advance()
-		right := p.parseComparison()
+		var right ast.Expression
+
+		// For 'is' operator, parse the right side as a type
+		if op.Kind == tokens.IS_TOKEN {
+			typeNode := p.parseType()
+			// Wrap the type in a TypeExpr (which implements Expression interface)
+			right = &ast.TypeExpr{
+				Type:     typeNode,
+				Location: *typeNode.Loc(),
+			}
+		} else {
+			right = p.parseComparison()
+		}
+
 		left = &ast.BinaryExpr{
 			X:        left,
 			Op:       op,

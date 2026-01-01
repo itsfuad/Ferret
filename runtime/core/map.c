@@ -1,0 +1,443 @@
+// Ferret runtime: Map Library Implementation
+// Hash table with chaining for collision resolution
+
+#include "map.h"
+#include <string.h>
+
+#define FERRET_MAP_INITIAL_BUCKETS 16
+#define FERRET_MAP_LOAD_FACTOR 0.75
+
+// FNV-1a hash function for integers
+static uint32_t fnv1a_hash(const void* data, size_t len) {
+    const uint8_t* bytes = (const uint8_t*)data;
+    uint32_t hash = 2166136261u; // FNV offset basis
+    for (size_t i = 0; i < len; i++) {
+        hash ^= bytes[i];
+        hash *= 16777619u; // FNV prime
+    }
+    return hash;
+}
+
+// FNV-1a hash for strings (null-terminated)
+static uint32_t fnv1a_hash_str(const char* str) {
+    uint32_t hash = 2166136261u;
+    while (*str) {
+        hash ^= (uint8_t)(*str++);
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+ferret_map_t* ferret_map_new(
+    size_t key_size,
+    size_t value_size,
+    uint32_t (*hash_fn)(const void* key, size_t key_size),
+    bool (*equals_fn)(const void* key1, const void* key2, size_t key_size)
+) {
+    ferret_map_t* map = (ferret_map_t*)malloc(sizeof(ferret_map_t));
+    if (map == NULL) {
+        return NULL;
+    }
+
+    map->bucket_count = FERRET_MAP_INITIAL_BUCKETS;
+    map->buckets = (ferret_map_entry_t**)calloc(map->bucket_count, sizeof(ferret_map_entry_t*));
+    if (map->buckets == NULL) {
+        free(map);
+        return NULL;
+    }
+
+    map->size = 0;
+    map->key_size = key_size;
+    map->value_size = value_size;
+    map->hash_fn = hash_fn;
+    map->equals_fn = equals_fn;
+
+    return map;
+}
+
+// Resize map to new bucket count
+static bool ferret_map_resize(ferret_map_t* map, size_t new_bucket_count) {
+    ferret_map_entry_t** new_buckets = (ferret_map_entry_t**)calloc(new_bucket_count, sizeof(ferret_map_entry_t*));
+    if (new_buckets == NULL) {
+        return false;
+    }
+
+    // Rehash all entries
+    for (size_t i = 0; i < map->bucket_count; i++) {
+        ferret_map_entry_t* entry = map->buckets[i];
+        while (entry != NULL) {
+            ferret_map_entry_t* next = entry->next;
+            
+            // Rehash and insert into new bucket
+            uint32_t hash = map->hash_fn(entry->key, map->key_size);
+            size_t new_bucket = hash % new_bucket_count;
+            entry->hash = hash;
+            entry->next = new_buckets[new_bucket];
+            new_buckets[new_bucket] = entry;
+            
+            entry = next;
+        }
+    }
+
+    free(map->buckets);
+    map->buckets = new_buckets;
+    map->bucket_count = new_bucket_count;
+
+    return true;
+}
+
+ferret_map_t* ferret_map_from_pairs(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count,
+    uint32_t (*hash_fn)(const void* key, size_t key_size),
+    bool (*equals_fn)(const void* key1, const void* key2, size_t key_size)
+) {
+    ferret_map_t* map = ferret_map_new(key_size, value_size, hash_fn, equals_fn);
+    if (map == NULL) {
+        return NULL;
+    }
+
+    // Pre-allocate enough buckets if needed
+    size_t needed_buckets = (size_t)(count / FERRET_MAP_LOAD_FACTOR) + 1;
+    if (needed_buckets > map->bucket_count) {
+        // Round up to next power of 2
+        size_t new_buckets = FERRET_MAP_INITIAL_BUCKETS;
+        while (new_buckets < needed_buckets) {
+            new_buckets *= 2;
+        }
+        if (!ferret_map_resize(map, new_buckets)) {
+            ferret_map_destroy(map);
+            return NULL;
+        }
+    }
+
+    // Insert all pairs
+    const uint8_t* key_ptr = (const uint8_t*)keys;
+    const uint8_t* value_ptr = (const uint8_t*)values;
+    for (size_t i = 0; i < count; i++) {
+        if (!ferret_map_set(map, key_ptr + i * key_size, value_ptr + i * value_size)) {
+            ferret_map_destroy(map);
+            return NULL;
+        }
+    }
+
+    return map;
+}
+
+ferret_map_t* ferret_map_new_i32(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_i32, ferret_map_equals_i32);
+}
+
+ferret_map_t* ferret_map_new_i64(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_i64, ferret_map_equals_i64);
+}
+
+ferret_map_t* ferret_map_new_str(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_str, ferret_map_equals_str);
+}
+
+ferret_map_t* ferret_map_new_bytes(size_t key_size, size_t value_size) {
+    return ferret_map_new(key_size, value_size, ferret_map_hash_bytes, ferret_map_equals_bytes);
+}
+
+ferret_map_t* ferret_map_from_pairs_i32(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_i32, ferret_map_equals_i32);
+}
+
+ferret_map_t* ferret_map_from_pairs_i64(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_i64, ferret_map_equals_i64);
+}
+
+ferret_map_t* ferret_map_from_pairs_str(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_str, ferret_map_equals_str);
+}
+
+ferret_map_t* ferret_map_from_pairs_bytes(
+    size_t key_size,
+    size_t value_size,
+    const void* keys,
+    const void* values,
+    size_t count
+) {
+    return ferret_map_from_pairs(key_size, value_size, keys, values, count, ferret_map_hash_bytes, ferret_map_equals_bytes);
+}
+
+void* ferret_map_get(const ferret_map_t* map, const void* key) {
+    if (map == NULL || key == NULL) {
+        return NULL;
+    }
+
+    uint32_t hash = map->hash_fn(key, map->key_size);
+    size_t bucket = hash % map->bucket_count;
+
+    ferret_map_entry_t* entry = map->buckets[bucket];
+    while (entry != NULL) {
+        if (entry->hash == hash && map->equals_fn(entry->key, key, map->key_size)) {
+            return entry->value;
+        }
+        entry = entry->next;
+    }
+
+    return NULL;
+}
+
+ferret_map_get_result_t ferret_map_get_optional(const ferret_map_t* map, const void* key) {
+    ferret_map_get_result_t result = {.value_ptr = NULL, .is_some = 0};
+    
+    if (map == NULL || key == NULL) {
+        return result;
+    }
+
+    void* value_ptr = ferret_map_get(map, key);
+    if (value_ptr != NULL) {
+        result.value_ptr = value_ptr;
+        result.is_some = 1;
+    }
+    
+    return result;
+}
+
+void ferret_map_get_optional_out(const ferret_map_t* map, const void* key, void* out_optional) {
+    if (out_optional == NULL) {
+        return;
+    }
+    uint8_t* out_bytes = (uint8_t*)out_optional;
+    size_t value_size = 0;
+    if (map != NULL) {
+        value_size = map->value_size;
+    }
+    uint8_t* flag_ptr = out_bytes + value_size;
+
+    ferret_map_get_result_t result = ferret_map_get_optional(map, key);
+    if (result.is_some && result.value_ptr != NULL) {
+        if (value_size > 0) {
+            memcpy(out_bytes, result.value_ptr, value_size);
+        }
+        *flag_ptr = 1;
+    } else {
+        *flag_ptr = 0;
+    }
+}
+
+bool ferret_map_set(ferret_map_t* map, const void* key, const void* value) {
+    if (map == NULL || key == NULL) {
+        return false;
+    }
+
+    // Resize if needed
+    if (map->size >= (size_t)(map->bucket_count * FERRET_MAP_LOAD_FACTOR)) {
+        if (!ferret_map_resize(map, map->bucket_count * 2)) {
+            return false;
+        }
+    }
+
+    uint32_t hash = map->hash_fn(key, map->key_size);
+    size_t bucket = hash % map->bucket_count;
+
+    // Check if key already exists
+    ferret_map_entry_t* entry = map->buckets[bucket];
+    while (entry != NULL) {
+        if (entry->hash == hash && map->equals_fn(entry->key, key, map->key_size)) {
+            // Update existing entry
+            memcpy(entry->value, value, map->value_size);
+            return true;
+        }
+        entry = entry->next;
+    }
+
+    // Create new entry
+    entry = (ferret_map_entry_t*)malloc(sizeof(ferret_map_entry_t));
+    if (entry == NULL) {
+        return false;
+    }
+
+    entry->key = malloc(map->key_size);
+    entry->value = malloc(map->value_size);
+    if (entry->key == NULL || entry->value == NULL) {
+        free(entry->key);
+        free(entry->value);
+        free(entry);
+        return false;
+    }
+
+    memcpy(entry->key, key, map->key_size);
+    memcpy(entry->value, value, map->value_size);
+    entry->hash = hash;
+    entry->next = map->buckets[bucket];
+    map->buckets[bucket] = entry;
+    map->size++;
+
+    return true;
+}
+
+bool ferret_map_has(const ferret_map_t* map, const void* key) {
+    return ferret_map_get(map, key) != NULL;
+}
+
+size_t ferret_map_size(const ferret_map_t* map) {
+    return map == NULL ? 0 : map->size;
+}
+
+void ferret_map_free(ferret_map_t* map) {
+    if (map == NULL) {
+        return;
+    }
+
+    for (size_t i = 0; i < map->bucket_count; i++) {
+        ferret_map_entry_t* entry = map->buckets[i];
+        while (entry != NULL) {
+            ferret_map_entry_t* next = entry->next;
+            free(entry->key);
+            free(entry->value);
+            free(entry);
+            entry = next;
+        }
+    }
+
+    free(map->buckets);
+    map->buckets = NULL;
+    map->size = 0;
+    map->bucket_count = 0;
+}
+
+void ferret_map_destroy(ferret_map_t* map) {
+    if (map != NULL) {
+        ferret_map_free(map);
+        free(map);
+    }
+}
+
+// Hash functions
+uint32_t ferret_map_hash_i32(const void* key, size_t key_size) {
+    (void)key_size; // Unused
+    return fnv1a_hash(key, sizeof(int32_t));
+}
+
+uint32_t ferret_map_hash_i64(const void* key, size_t key_size) {
+    (void)key_size; // Unused
+    return fnv1a_hash(key, sizeof(int64_t));
+}
+
+uint32_t ferret_map_hash_str(const void* key, size_t key_size) {
+    (void)key_size; // Unused
+    // key is a pointer to const char*, so we need to dereference it
+    const char** str_ptr = (const char**)key;
+    if (str_ptr == NULL || *str_ptr == NULL) {
+        return 0;
+    }
+    return fnv1a_hash_str(*str_ptr);
+}
+
+uint32_t ferret_map_hash_bytes(const void* key, size_t key_size) {
+    if (key == NULL) {
+        return 0;
+    }
+    return fnv1a_hash(key, key_size);
+}
+
+// Equality functions
+bool ferret_map_equals_i32(const void* key1, const void* key2, size_t key_size) {
+    (void)key_size; // Unused
+    return *(const int32_t*)key1 == *(const int32_t*)key2;
+}
+
+bool ferret_map_equals_i64(const void* key1, const void* key2, size_t key_size) {
+    (void)key_size; // Unused
+    return *(const int64_t*)key1 == *(const int64_t*)key2;
+}
+
+bool ferret_map_equals_str(const void* key1, const void* key2, size_t key_size) {
+    (void)key_size; // Unused
+    // keys are pointers to const char*, so we need to dereference them
+    const char** str1_ptr = (const char**)key1;
+    const char** str2_ptr = (const char**)key2;
+    if (str1_ptr == NULL || str2_ptr == NULL) {
+        return str1_ptr == str2_ptr;
+    }
+    if (*str1_ptr == NULL || *str2_ptr == NULL) {
+        return *str1_ptr == *str2_ptr;
+    }
+    return strcmp(*str1_ptr, *str2_ptr) == 0;
+}
+
+bool ferret_map_equals_bytes(const void* key1, const void* key2, size_t key_size) {
+    if (key1 == NULL || key2 == NULL) {
+        return key1 == key2;
+    }
+    return memcmp(key1, key2, key_size) == 0;
+}
+
+bool ferret_map_iter_begin(const ferret_map_t* map, ferret_map_iter_t* iter) {
+    if (map == NULL || iter == NULL || map->size == 0) {
+        return false;
+    }
+
+    iter->bucket_index = 0;
+    iter->entry = NULL;
+
+    // Find first non-empty bucket
+    while (iter->bucket_index < map->bucket_count) {
+        if (map->buckets[iter->bucket_index] != NULL) {
+            iter->entry = map->buckets[iter->bucket_index];
+            return true;
+        }
+        iter->bucket_index++;
+    }
+
+    return false;
+}
+
+bool ferret_map_iter_next(const ferret_map_t* map, ferret_map_iter_t* iter, void** key_out, void** value_out) {
+    if (map == NULL || iter == NULL || key_out == NULL || value_out == NULL) {
+        return false;
+    }
+
+    if (iter->entry == NULL) {
+        return false;
+    }
+
+    // Current entry
+    *key_out = iter->entry->key;
+    *value_out = iter->entry->value;
+
+    // Move to next entry
+    if (iter->entry->next != NULL) {
+        iter->entry = iter->entry->next;
+        return true;
+    }
+
+    // Move to next bucket
+    iter->bucket_index++;
+    while (iter->bucket_index < map->bucket_count) {
+        if (map->buckets[iter->bucket_index] != NULL) {
+            iter->entry = map->buckets[iter->bucket_index];
+            return true;
+        }
+        iter->bucket_index++;
+    }
+
+    // End of map
+    iter->entry = NULL;
+    return true;
+}

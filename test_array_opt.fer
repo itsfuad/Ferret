@@ -1,0 +1,11 @@
+import "std/io";
+
+fn main() {
+    // Test with constant variable index - should be optimized
+    let idx := 1;
+    io::Println([100, 200, 300][idx]);  // Should print: 200 (optimized, no array materialization)
+    
+    // Test with constant expression
+    let i := 0;
+    io::Println([10, 20, 30][i + 1]);  // Should print: 20 (optimized)
+}

@@ -1,0 +1,32 @@
+module Ferret/test_union_simple
+
+fn main() -> void {
+  block b1 entry:
+    %t1 = alloca MyUnion
+    %t2 = const str hello
+    %t3 = alloca union {i32, str}
+    %t4 = ptr_add i32 %t3, 0
+    %t5 = const i32 1
+    store %t4, %t5
+    %t6 = ptr_add str %t3, 4
+    store %t6, %t2
+    store %t1, %t3
+    %t7 = const bool 0
+    br_if %t7, b2, b3
+  block b2 if.then:
+    %t8 = const i64 20
+    %t9 = const i32 1
+    %t10 = call ferret_array_new(%t8, %t9) : []Printable
+    %t11 = load str %t1
+    %t12 = alloca union {i8, i16, i32, i64, u8, u16, u32, u64, f32, f64, str, byte, bool}
+    %t13 = ptr_add i32 %t12, 0
+    %t14 = const i32 10
+    store %t13, %t14
+    %t15 = ptr_add str %t12, 4
+    store %t15, %t11
+    call ferret_array_append(%t10, %t12) : bool
+    call io::Println(%t10) : void
+    br b3
+  block b3 if.end:
+    ret
+}

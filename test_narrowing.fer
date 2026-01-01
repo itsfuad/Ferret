@@ -1,0 +1,14 @@
+fn main() {
+    let a: i32? = 42;
+
+    if a != none {
+        // a is narrowed to i32
+        a = none;  // Should this be rejected?
+    }
+
+    let b: i32? = none;
+    if b == none {
+        // b is narrowed to none
+        b = 42;  // Should this be rejected?
+    }
+}
