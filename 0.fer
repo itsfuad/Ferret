@@ -1,26 +1,29 @@
 import "std/io";
+import "std/fs";
 
 fn main() {
-    // str + str
-    io::Println("Hello " + "world!");
+    // Write to file
+    // fs::WriteFile("test.txt", "Hello from Ferret!") catch e {
+    //     io::Println("Write error: " + e);
+    //     return;
+    // };
+    // io::Println("File written!");
     
-    // str + i32
-    let age: i32 = 25;
-    io::Println("Age: " + age);
+    // Check if exists
+    if fs::Exists("test11.txt") {
+        io::Println("File exists!");
+    }
     
-    // str + f64
-    let pi: f64 = 3.14159;
-    io::Println("Pi: " + pi);
+    // Read entire file
+    let content := fs::ReadFile("test1.txt") catch e {
+        io::Println("Read error: " + e);
+        return;
+    };
+    io::Println("Content: " + content);
     
-    // str + bool
-    let flag: bool = true;
-    io::Println("Flag: " + flag);
-    
-    // str + byte (char)
-    let ch: byte = 65;  // 'A'
-    io::Println("Char: " + ch);
-    
-    // str + untyped literal
-    io::Println("Number: " + 42);
-    io::Println("Float: " + 3.14);
+    // Clean up
+    // fs::Remove("test.txt") catch e {
+    //     io::Println("Remove error: " + e);
+    // } false;
+    io::Println("Test complete!");
 }

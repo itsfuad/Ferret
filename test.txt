@@ -1,0 +1,7 @@
+Hello from Ferret!
+
+This is some emoji: 😄🚀🐱‍👤
+
+This is a test file to demonstrate recent edits in the Ferret Language project.
+
+Have a great day coding in Ferret!

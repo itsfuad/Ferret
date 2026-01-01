@@ -160,7 +160,77 @@ func stringHandler(lex *Lexer, regex *regexp.Regexp) {
 	start := lex.Position
 	lex.advance(match)
 	end := lex.Position
-	lex.push(tokens.NewToken(tokens.STRING_TOKEN, stringLiteral, start, end))
+
+	// Process escape sequences
+	processed := processStringEscapes(stringLiteral)
+	lex.push(tokens.NewToken(tokens.STRING_TOKEN, processed, start, end))
+}
+
+// processStringEscapes processes escape sequences in string literals
+// Supports: \n, \r, \t, \0, \\, \", \xHH (hex)
+func processStringEscapes(s string) string {
+	var result []byte
+	i := 0
+	for i < len(s) {
+		if s[i] == '\\' && i+1 < len(s) {
+			switch s[i+1] {
+			case 'n':
+				result = append(result, '\n')
+				i += 2
+			case 'r':
+				result = append(result, '\r')
+				i += 2
+			case 't':
+				result = append(result, '\t')
+				i += 2
+			case '0':
+				result = append(result, 0)
+				i += 2
+			case '\\':
+				result = append(result, '\\')
+				i += 2
+			case '"':
+				result = append(result, '"')
+				i += 2
+			case 'x':
+				// Hex escape: \xHH
+				if i+3 < len(s) {
+					hexStr := s[i+2 : i+4]
+					value := 0
+					valid := true
+					for _, ch := range hexStr {
+						value *= 16
+						if ch >= '0' && ch <= '9' {
+							value += int(ch - '0')
+						} else if ch >= 'a' && ch <= 'f' {
+							value += int(ch - 'a' + 10)
+						} else if ch >= 'A' && ch <= 'F' {
+							value += int(ch - 'A' + 10)
+						} else {
+							valid = false
+							break
+						}
+					}
+					if valid {
+						result = append(result, byte(value))
+						i += 4
+						continue
+					}
+				}
+				// Invalid hex escape, keep as-is
+				result = append(result, s[i])
+				i++
+			default:
+				// Unknown escape, keep as-is
+				result = append(result, s[i])
+				i++
+			}
+		} else {
+			result = append(result, s[i])
+			i++
+		}
+	}
+	return string(result)
 }
 
 func byteHandler(lex *Lexer, regex *regexp.Regexp) {

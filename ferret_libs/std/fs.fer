@@ -1,0 +1,138 @@
+// This file provides type declarations for type checking
+
+// FileInfo contains metadata about a file
+type FileInfo struct {
+    .path: str,      // Full path to file
+    .size: i64,      // Size in bytes
+    .isDir: bool,    // True if directory
+    .isFile: bool,   // True if regular file
+    .exists: bool    // True if file exists
+};
+
+// File handle for reading/writing
+type File struct {
+    .handle: i64,    // Internal file handle (FILE* cast to i64)
+    .path: str,      // Path that was opened
+    .mode: str       // Mode: "r", "w", "a"
+};
+
+// Read entire file as string - simplest way to read a file
+// Example: let content := fs::ReadFile("config.txt") catch |err| { ... };
+// @extern
+fn ReadFile(path: str) -> str ! str;
+
+// Write string to file (creates or overwrites)
+// Example: fs::WriteFile("output.txt", "Hello!") catch |err| { ... };
+// @extern
+fn WriteFile(path: str, content: str) -> str ! bool;
+
+// Append string to end of file
+// Example: fs::AppendFile("log.txt", "New line\n") catch |err| { ... };
+// @extern
+fn AppendFile(path: str, content: str) -> str ! bool;
+
+// ============================================
+// File info functions
+// ============================================
+
+// Check if file or directory exists
+// Example: if fs::Exists("config.txt") { ... }
+// @extern
+fn Exists(path: str) -> bool;
+
+// Get file/directory information
+// Example: let info := fs::Stat("myfile.txt") catch |err| { ... };
+// @extern
+fn Stat(path: str) -> str ! FileInfo;
+
+// Get file size in bytes (convenience wrapper)
+// Example: let size := fs::Size("data.bin") catch |err| { ... };
+// @extern
+fn Size(path: str) -> str ! i64;
+
+// ============================================
+// File handle operations (for large files)
+// ============================================
+
+// Open file for reading
+// Example: let file := fs::Open("data.txt") catch |err| { ... };
+// @extern
+fn Open(path: str) -> str ! File;
+
+// Create/truncate file for writing
+// Example: let file := fs::Create("output.txt") catch |err| { ... };
+// @extern
+fn Create(path: str) -> str ! File;
+
+// Open file for appending
+// Example: let file := fs::OpenAppend("log.txt") catch |err| { ... };
+// @extern
+fn OpenAppend(path: str) -> str ! File;
+
+// Close file handle
+// Example: fs::Close(file);
+// @extern
+fn Close(file: File);
+
+// Read a line from file
+// Example: let line := fs::ReadLine(file) catch |err| { break; };
+// @extern
+fn ReadLine(file: File) -> str ! str;
+
+// Write string to file handle
+// Example: fs::Write(file, "data") catch |err| { ... };
+// @extern
+fn Write(file: File, content: str) -> str ! bool;
+
+// Write string with newline to file handle
+// Example: fs::WriteLine(file, "line of text") catch |err| { ... };
+// @extern
+fn WriteLine(file: File, content: str) -> str ! bool;
+
+// ============================================
+// Directory operations
+// ============================================
+
+// Delete a file
+// Example: fs::Remove("temp.txt") catch |err| { ... };
+// @extern
+fn Remove(path: str) -> str ! bool;
+
+// Create a directory
+// Example: fs::Mkdir("new_folder") catch |err| { ... };
+// @extern  
+fn Mkdir(path: str) -> str ! bool;
+
+// Remove empty directory
+// Example: fs::Rmdir("empty_folder") catch |err| { ... };
+// @extern
+fn Rmdir(path: str) -> str ! bool;
+
+// ============================================
+// Path utilities
+// ============================================
+
+// Get current working directory
+// Example: let cwd := fs::Cwd() catch |err| { ... };
+// @extern
+fn Cwd() -> str ! str;
+
+// Join path components
+// Example: let path := fs::Join("folder", "file.txt");  // -> "folder/file.txt"
+// @extern
+fn Join(base: str, path: str) -> str;
+
+// Get file extension (including dot)
+// Example: fs::Ext("file.txt")  // -> ".txt"
+// @extern
+fn Ext(path: str) -> str;
+
+// Get base name (filename without directory)
+// Example: fs::Base("/path/to/file.txt")  // -> "file.txt"
+// @extern
+fn Base(path: str) -> str;
+
+// Get directory part of path
+// Example: fs::Dir("/path/to/file.txt")  // -> "/path/to"
+// @extern
+fn Dir(path: str) -> str;
