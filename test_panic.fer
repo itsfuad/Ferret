@@ -1,9 +1,0 @@
-import "std/io";
-
-fn main() {
-    // Test panic function - should abort with message
-    io::Println("About to panic...");
-    panic("This is a test panic message");
-    io::Println("This should not be printed");
-}
-
