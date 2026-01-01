@@ -292,6 +292,33 @@ type OptionalUnwrap struct {
 func (o *OptionalUnwrap) mirInstr()             {}
 func (o *OptionalUnwrap) Loc() *source.Location { return &o.Location }
 
+// UnionVariantCheck checks if a union value holds a specific variant.
+// Emits code to compare the union's tag against the expected variant index.
+type UnionVariantCheck struct {
+	Result       ValueID       // Boolean result
+	Value        ValueID       // The union value
+	VariantIndex int           // Expected variant index
+	UnionType    types.SemType // The union type
+	Location     source.Location
+}
+
+func (u *UnionVariantCheck) mirInstr()             {}
+func (u *UnionVariantCheck) Loc() *source.Location { return &u.Location }
+
+// UnionExtract extracts the inner value from a union.
+// Assumes the union holds the specified variant (caller must verify).
+type UnionExtract struct {
+	Result       ValueID       // The extracted value
+	Value        ValueID       // The union value
+	VariantIndex int           // Variant index to extract
+	UnionType    types.SemType // The union type
+	Type         types.SemType // The extracted variant type
+	Location     source.Location
+}
+
+func (u *UnionExtract) mirInstr()             {}
+func (u *UnionExtract) Loc() *source.Location { return &u.Location }
+
 // ResultOk wraps a success value.
 type ResultOk struct {
 	Result   ValueID

@@ -18,7 +18,7 @@ import (
 	"compiler/internal/utils"
 )
 
-var narrowingAnalyzer narrowing.NarrowingAnalyzer = narrowing.NewOptionalNarrowingAnalyzer()
+var narrowingAnalyzer = narrowing.NewAnalyzer()
 
 // unwrapOptionalType unwraps optional types: T? -> T
 // Returns the inner type if it's optional, otherwise returns the original type.
@@ -48,13 +48,13 @@ func addParamsToScope(ctx *context_v2.CompilerContext, mod *context_v2.Module, s
 	for _, param := range params {
 		if param.Name != nil {
 			paramType := TypeFromTypeNodeWithContext(ctx, mod, param.Type)
-			
+
 			// Convert variadic parameters (...T) to slice type ([]T)
 			// This allows the function body to iterate over the parameter
 			if param.IsVariadic {
 				paramType = types.NewArray(paramType, -1) // []T
 			}
-			
+
 			psym, ok := scope.GetSymbol(param.Name.Name)
 			if !ok {
 				continue // should not happen but safe side
@@ -3254,24 +3254,28 @@ func checkCatchClause(ctx *context_v2.CompilerContext, mod *context_v2.Module, c
 
 // applyNarrowingToBlock temporarily overrides symbol types based on narrowing context
 // and checks the block. Uses defer to automatically restore original types.
-func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, narrowing *narrowing.NarrowingContext) {
+// Also stores narrowing info in module artifacts for HIR/MIR code generation.
+func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Module, block *ast.Block, nc *narrowing.NarrowingContext) {
 	if block == nil {
 		return
 	}
 
-	if narrowing == nil {
+	if nc == nil {
 		checkBlock(ctx, mod, block)
 		return
 	}
 
 	// Collect all narrowed variables from this context and parent chain
 	narrowedVars := make(map[string]types.SemType)
-	collectNarrowedTypes(narrowing, narrowedVars)
+	collectNarrowedTypes(nc, narrowedVars)
 
 	if len(narrowedVars) == 0 {
 		checkBlock(ctx, mod, block)
 		return
 	}
+
+	// Store narrowing info in artifacts for code generation
+	storeNarrowingArtifacts(mod, block, narrowedVars)
 
 	// Apply narrowing using defer for automatic restoration
 	defer restoreSymbolTypes(mod, narrowedVars)()
@@ -3288,6 +3292,58 @@ func applyNarrowingToBlock(ctx *context_v2.CompilerContext, mod *context_v2.Modu
 
 	// Check the block with narrowed types
 	checkBlock(ctx, mod, block)
+}
+
+// storeNarrowingArtifacts stores narrowing information in module artifacts
+// so it can be used during HIR/MIR code generation.
+func storeNarrowingArtifacts(mod *context_v2.Module, block *ast.Block, narrowedVars map[string]types.SemType) {
+	if mod == nil || block == nil || len(narrowedVars) == 0 {
+		return
+	}
+
+	info := narrowing.GetOrCreateNarrowingInfo(mod)
+	scopeKey := narrowing.ScopeKeyFromLocation(mod.FilePath, block.Location.Start.Line, block.Location.Start.Column)
+	scope := info.GetOrCreateScope(scopeKey)
+
+	for varName, narrowedType := range narrowedVars {
+		// Look up the symbol to get original type and determine narrowing kind
+		sym, ok := mod.CurrentScope.Lookup(varName)
+		if !ok {
+			continue
+		}
+
+		originalType := sym.Type
+		if sym.OriginalType != nil {
+			originalType = sym.OriginalType
+		}
+
+		entry := &narrowing.NarrowingEntry{
+			VarName:      varName,
+			OriginalType: originalType,
+			NarrowedType: narrowedType,
+			VariantIndex: -1,
+		}
+
+		// Determine narrowing kind and variant index
+		unwrapped := types.UnwrapType(originalType)
+		switch t := unwrapped.(type) {
+		case *types.UnionType:
+			entry.Kind = narrowing.NarrowingUnion
+			// Find the variant index
+			for i, variant := range t.Variants {
+				if narrowedType.Equals(variant) {
+					entry.VariantIndex = i
+					break
+				}
+			}
+		case *types.OptionalType:
+			entry.Kind = narrowing.NarrowingOptional
+		case *types.InterfaceType:
+			entry.Kind = narrowing.NarrowingInterface
+		}
+
+		scope.Add(entry)
+	}
 }
 
 // collectNarrowedTypes walks the narrowing context chain and collects all narrowed types

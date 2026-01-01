@@ -1076,6 +1076,83 @@ func (g *Generator) emitOptionalUnwrap(o *mir.OptionalUnwrap) {
 	g.valueTypes[o.Result] = inner
 }
 
+// emitUnionVariantCheck checks if a union value holds a specific variant.
+// Union layout: [4-byte tag at offset 0][variant data at offset 4]
+func (g *Generator) emitUnionVariantCheck(u *mir.UnionVariantCheck) {
+	if u == nil {
+		return
+	}
+
+	// Load the tag from offset 0 of the union
+	tagPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, 0", tagPtr, g.valueName(u.Value)))
+	tagValue := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =w loadsw %s", tagValue, tagPtr))
+
+	// Compare with expected variant index
+	g.emitLine(fmt.Sprintf("%s =w ceqw %s, %d", g.valueName(u.Result), tagValue, u.VariantIndex))
+	g.valueTypes[u.Result] = types.TypeBool
+}
+
+// emitUnionExtract extracts the inner value from a union.
+// Union layout: [4-byte tag at offset 0][variant data at offset 4]
+func (g *Generator) emitUnionExtract(u *mir.UnionExtract) {
+	if u == nil {
+		return
+	}
+
+	variantType := u.Type
+	if variantType == nil {
+		g.reportUnsupported("union_extract nil type", &u.Location)
+		return
+	}
+
+	variantSize := g.layout.SizeOf(variantType)
+	if variantSize < 0 {
+		g.reportUnsupported("union_extract variant size", &u.Location)
+		return
+	}
+
+	// Calculate pointer to variant data (at offset 4 after the tag)
+	dataPtr := g.newTemp()
+	g.emitLine(fmt.Sprintf("%s =l add %s, 4", dataPtr, g.valueName(u.Value)))
+
+	// Determine if we need to return by reference or by value
+	byRef := g.needsByRefType(variantType)
+	if !byRef {
+		if _, ok := g.optionalType(variantType); ok {
+			byRef = true
+		} else if _, ok := g.resultType(variantType); ok {
+			byRef = true
+		} else if _, ok := variantType.(*types.UnionType); ok {
+			byRef = true
+		}
+	}
+
+	if byRef {
+		// For reference types, allocate space and copy
+		align := g.layout.AlignOf(variantType)
+		g.emitLine(fmt.Sprintf("%s =l %s %d", g.valueName(u.Result), g.allocOp(align), variantSize))
+		g.emitMemcpy(g.valueName(u.Result), dataPtr, variantSize, &u.Location)
+		g.valueTypes[u.Result] = types.NewReference(variantType)
+		return
+	}
+
+	// For value types, load directly
+	op, err := g.loadOp(variantType)
+	if err != nil {
+		g.reportError(err.Error(), &u.Location)
+		return
+	}
+	qbeType, err := g.qbeType(variantType)
+	if err != nil {
+		g.reportError(err.Error(), &u.Location)
+		return
+	}
+	g.emitLine(fmt.Sprintf("%s =%s %s %s", g.valueName(u.Result), qbeType, op, dataPtr))
+	g.valueTypes[u.Result] = variantType
+}
+
 func (g *Generator) emitResultOk(r *mir.ResultOk) {
 	if r == nil {
 		return

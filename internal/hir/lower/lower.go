@@ -1015,7 +1015,7 @@ func (l *Lowerer) lowerBinaryExpr(expr *hir.BinaryExpr) hir.Expr {
 		}
 	}
 
-	return &hir.BinaryExpr{X: left, Op: expr.Op, Y: right, Type: expr.Type, Location: expr.Location}
+	return &hir.BinaryExpr{X: left, Op: expr.Op, Y: right, Type: expr.Type, TargetType: expr.TargetType, Location: expr.Location}
 }
 
 func (l *Lowerer) lowerCoalescingExpr(expr *hir.CoalescingExpr) hir.Expr {
@@ -1306,7 +1306,7 @@ func (l *Lowerer) forceExprType(expr hir.Expr, target types.SemType) hir.Expr {
 	case *hir.Literal:
 		return &hir.Literal{Kind: e.Kind, Value: e.Value, Type: target, Location: e.Location}
 	case *hir.BinaryExpr:
-		return &hir.BinaryExpr{X: e.X, Op: e.Op, Y: e.Y, Type: target, Location: e.Location}
+		return &hir.BinaryExpr{X: e.X, Op: e.Op, Y: e.Y, Type: target, TargetType: e.TargetType, Location: e.Location}
 	case *hir.UnaryExpr:
 		return &hir.UnaryExpr{Op: e.Op, X: e.X, Type: target, Location: e.Location}
 	case *hir.PrefixExpr:

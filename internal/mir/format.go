@@ -134,6 +134,10 @@ func formatInstr(instr Instr) string {
 		return formatAssign(i.Result, fmt.Sprintf("optional_is_some %s", formatValue(i.Value)))
 	case *OptionalUnwrap:
 		return formatAssign(i.Result, fmt.Sprintf("optional_unwrap %s %s%s", formatType(i.Type), formatValue(i.Value), formatDefault(i.Default, i.HasDefault)))
+	case *UnionVariantCheck:
+		return formatAssign(i.Result, fmt.Sprintf("union_variant_check %s variant=%d", formatValue(i.Value), i.VariantIndex))
+	case *UnionExtract:
+		return formatAssign(i.Result, fmt.Sprintf("union_extract %s %s variant=%d", formatType(i.Type), formatValue(i.Value), i.VariantIndex))
 	case *ResultOk:
 		return formatAssign(i.Result, fmt.Sprintf("result_ok %s %s", formatType(i.Type), formatValue(i.Value)))
 	case *ResultErr:

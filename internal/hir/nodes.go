@@ -144,6 +144,34 @@ func (o *OptionalUnwrap) hirNode()              {}
 func (o *OptionalUnwrap) hirExpr()              {}
 func (o *OptionalUnwrap) Loc() *source.Location { return &o.Location }
 
+// UnionVariantCheck checks if a union value holds a specific variant.
+// Returns a boolean indicating if the union's tag matches the expected variant.
+type UnionVariantCheck struct {
+	Value        Expr          // The union value to check
+	VariantIndex int           // Index of the variant to check for
+	UnionType    types.SemType // The union type
+	VariantType  types.SemType // The expected variant type
+	Location     source.Location
+}
+
+func (u *UnionVariantCheck) hirNode()              {}
+func (u *UnionVariantCheck) hirExpr()              {}
+func (u *UnionVariantCheck) Loc() *source.Location { return &u.Location }
+
+// UnionExtract extracts the value from a union assuming it holds a specific variant.
+// This is used after a successful UnionVariantCheck (e.g., inside an `if u is T` block).
+type UnionExtract struct {
+	Value        Expr          // The union value to extract from
+	VariantIndex int           // Index of the variant to extract
+	UnionType    types.SemType // The union type
+	Type         types.SemType // The extracted variant type (result type)
+	Location     source.Location
+}
+
+func (u *UnionExtract) hirNode()              {}
+func (u *UnionExtract) hirExpr()              {}
+func (u *UnionExtract) Loc() *source.Location { return &u.Location }
+
 // ResultOk wraps a value into the ok variant of a result.
 type ResultOk struct {
 	Value    Expr

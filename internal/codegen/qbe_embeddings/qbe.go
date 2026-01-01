@@ -291,6 +291,10 @@ func (g *Generator) emitInstr(instr mir.Instr) {
 		g.emitOptionalIsSome(i)
 	case *mir.OptionalUnwrap:
 		g.emitOptionalUnwrap(i)
+	case *mir.UnionVariantCheck:
+		g.emitUnionVariantCheck(i)
+	case *mir.UnionExtract:
+		g.emitUnionExtract(i)
 	case *mir.ResultOk:
 		g.emitResultOk(i)
 	case *mir.ResultErr:

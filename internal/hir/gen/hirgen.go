@@ -126,11 +126,12 @@ func (g *Generator) lowerExpr(expr ast.Expression) hir.Expr {
 		}
 		// For 'is' operator, extract the target type from the TypeExpr on the RHS
 		if e.Op.Kind == tokens.IS_TOKEN {
-			if typeExpr, ok := e.Y.(*ast.TypeExpr); ok {
-				binExpr.TargetType = g.exprType(e.Y)
-				// Also try to get the type from the TypeNode itself
-				if binExpr.TargetType == nil && typeExpr.Type != nil {
-					binExpr.TargetType = typechecker.TypeFromTypeNodeWithContext(g.ctx, g.mod, typeExpr.Type)
+			if typeExpr, ok := e.Y.(*ast.TypeExpr); ok && typeExpr.Type != nil {
+				// Try to resolve the type from the TypeNode
+				binExpr.TargetType = typechecker.TypeFromTypeNodeWithContext(g.ctx, g.mod, typeExpr.Type)
+				// Fallback to expr type inference if needed
+				if binExpr.TargetType == nil || binExpr.TargetType.Equals(types.TypeUnknown) {
+					binExpr.TargetType = g.exprType(e.Y)
 				}
 			}
 		}

@@ -250,9 +250,13 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 		return
 	}
 
-	if lhsType := b.exprType(stmt.Lhs); lhsType != nil {
-		if ref, ok := types.UnwrapType(lhsType).(*types.ReferenceType); ok {
-			refPtr := b.emitLoad(addr, lhsType, stmt.Location)
+	// Get the storage type for the LHS - this is the actual type of the variable,
+	// not the narrowed type. Important for union/optional assignments after narrowing.
+	lhsStorageType := b.getStorageType(stmt.Lhs)
+
+	if lhsStorageType != nil {
+		if ref, ok := types.UnwrapType(lhsStorageType).(*types.ReferenceType); ok {
+			refPtr := b.emitLoad(addr, lhsStorageType, stmt.Location)
 			if refPtr == mir.InvalidValue {
 				return
 			}
@@ -290,12 +294,12 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 	}
 
 	if stmt.Op != nil && stmt.Op.Kind != tokens.EQUALS_TOKEN {
-		cur := b.emitLoad(addr, b.exprType(stmt.Lhs), stmt.Location)
+		cur := b.emitLoad(addr, lhsStorageType, stmt.Location)
 		rhs := b.lowerExpr(stmt.Rhs)
 		if cur == mir.InvalidValue || rhs == mir.InvalidValue {
 			return
 		}
-		rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+		rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), lhsStorageType, stmt.Location)
 		if rhs == mir.InvalidValue {
 			return
 		}
@@ -304,8 +308,7 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 			b.reportUnsupported("assignment operator", stmt.Loc())
 			return
 		}
-		typ := b.exprType(stmt.Lhs)
-		res := b.emitBinary(op, cur, rhs, typ, stmt.Location)
+		res := b.emitBinary(op, cur, rhs, lhsStorageType, stmt.Location)
 		b.emitStore(addr, res, stmt.Location)
 		return
 	}
@@ -314,7 +317,7 @@ func (b *functionBuilder) lowerAssign(stmt *hir.AssignStmt) {
 	if rhs == mir.InvalidValue {
 		return
 	}
-	rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), b.exprType(stmt.Lhs), stmt.Location)
+	rhs = b.coerceValueForAssign(rhs, b.exprType(stmt.Rhs), lhsStorageType, stmt.Location)
 	if rhs == mir.InvalidValue {
 		return
 	}
@@ -703,6 +706,37 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 			HasDefault: hasDefault,
 			Type:       e.Type,
 			Location:   e.Location,
+		})
+		return id
+	case *hir.UnionVariantCheck:
+		value := b.lowerExpr(e.Value)
+		if value == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		value, _ = b.derefValueIfNeeded(value, b.exprType(e.Value), e.Location)
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.UnionVariantCheck{
+			Result:       id,
+			Value:        value,
+			VariantIndex: e.VariantIndex,
+			UnionType:    e.UnionType,
+			Location:     e.Location,
+		})
+		return id
+	case *hir.UnionExtract:
+		value := b.lowerExpr(e.Value)
+		if value == mir.InvalidValue {
+			return mir.InvalidValue
+		}
+		value, _ = b.derefValueIfNeeded(value, b.exprType(e.Value), e.Location)
+		id := b.gen.nextValueID()
+		b.emitInstr(&mir.UnionExtract{
+			Result:       id,
+			Value:        value,
+			VariantIndex: e.VariantIndex,
+			UnionType:    e.UnionType,
+			Type:         e.Type,
+			Location:     e.Location,
 		})
 		return id
 	case *hir.ResultOk:
@@ -1457,7 +1491,20 @@ func (b *functionBuilder) emitTypeCheck(expr *hir.BinaryExpr) mir.ValueID {
 		return mir.InvalidValue
 	}
 
+	// For 'is' checks, we need the ORIGINAL type of the variable, not the narrowed type.
+	// If the LHS is an identifier with a symbol, check if the symbol has an original type.
 	valType := b.exprType(expr.X)
+
+	// Try to get the original (pre-narrowing) type from the symbol
+	if ident, ok := expr.X.(*hir.Ident); ok && ident.Symbol != nil {
+		if ident.Symbol.OriginalType != nil {
+			valType = ident.Symbol.OriginalType
+		} else if ident.Symbol.Type != nil {
+			// Symbol type might be more accurate than expression type
+			valType = ident.Symbol.Type
+		}
+	}
+
 	val, valType = b.derefValueIfNeeded(val, valType, expr.Location)
 
 	unwrappedType := types.UnwrapType(valType)
@@ -1856,6 +1903,46 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return b.makeFuncValue(ident.Name, ident.Type, ident.Location)
 	}
 
+	// Check for narrowed union access: if ident.Type differs from the storage type (Symbol.Type)
+	// and the storage type is a union, we need to extract the variant
+	if ident.Symbol != nil && ident.Type != nil && ident.Symbol.Type != nil {
+		storageType := types.UnwrapType(ident.Symbol.Type)
+		accessType := types.UnwrapType(ident.Type)
+
+		if unionType, ok := storageType.(*types.UnionType); ok {
+			// Storage is a union but we're accessing a narrowed variant type
+			if !accessType.Equals(storageType) {
+				// Find the variant index
+				variantIndex := -1
+				for i, variant := range unionType.Variants {
+					if accessType.Equals(variant) {
+						variantIndex = i
+						break
+					}
+				}
+
+				if variantIndex >= 0 {
+					// Load the union pointer, then extract the variant
+					if addr, ok := b.slots[ident.Symbol]; ok {
+						unionVal := b.emitLoad(addr, ident.Symbol.Type, ident.Location)
+
+						// Emit union extract - get data at offset 4 with the narrowed type
+						result := b.gen.nextValueID()
+						b.emitInstr(&mir.UnionExtract{
+							Result:       result,
+							Value:        unionVal,
+							VariantIndex: variantIndex,
+							UnionType:    storageType,
+							Type:         accessType,
+							Location:     ident.Location,
+						})
+						return result
+					}
+				}
+			}
+		}
+	}
+
 	if ident.Symbol != nil && b.captures != nil {
 		if _, ok := b.captures[ident.Symbol]; ok {
 			if addr := b.addrForIdent(ident); addr != mir.InvalidValue {
@@ -2128,7 +2215,7 @@ func (b *functionBuilder) lowerDynamicArrayLiteral(arrType *types.ArrayType, lit
 		// Box into union if element type is union
 		eltType := b.exprType(elt)
 		value = b.coerceValueForAssign(value, eltType, arrType.Element, lit.Location)
-		
+
 		// ferret_array_append expects a pointer to the element
 		// For unions, coerceValueForAssign already returns a pointer
 		// For primitives, we need to allocate storage and store the value
@@ -2139,7 +2226,7 @@ func (b *functionBuilder) lowerDynamicArrayLiteral(arrType *types.ArrayType, lit
 			b.emitStore(temp, value, lit.Location)
 			valuePtr = temp
 		}
-		
+
 		b.emitInstr(&mir.Call{
 			Result:   mir.InvalidValue,
 			Target:   "ferret_array_append",
@@ -3459,6 +3546,19 @@ func (b *functionBuilder) exprType(expr hir.Expr) types.SemType {
 	default:
 		return nil
 	}
+}
+
+// getStorageType returns the actual storage type for an expression.
+// For identifiers, this returns the Symbol's type (which is the storage type),
+// not the narrowed expression type. This is important for assignments to
+// narrowed union/optional variables.
+func (b *functionBuilder) getStorageType(expr hir.Expr) types.SemType {
+	if ident, ok := expr.(*hir.Ident); ok && ident.Symbol != nil {
+		// Use Symbol.Type which is the actual storage type
+		return ident.Symbol.Type
+	}
+	// For other expressions, fall back to expression type
+	return b.exprType(expr)
 }
 
 func isAddressableExpr(expr hir.Expr) bool {

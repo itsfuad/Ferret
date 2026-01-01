@@ -1,0 +1,23 @@
+import "std/io";
+
+type MyUnion union {
+    i32,
+    str
+};
+
+fn main() {
+    let u: MyUnion = "hello";
+    
+    // Basic narrowing - should print "hello"
+    if u is str {
+        io::Println(u);
+    }
+    
+    // Try with integer
+    let u2: MyUnion = 42;
+    if u2 is i32 {
+        io::Println(u2);  // Should print 42
+    }
+    
+    io::Println("Done!");
+}
