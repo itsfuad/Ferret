@@ -1652,46 +1652,23 @@ func checkTypeDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl
 
 // checkAssignStmt type checks an assignment statement
 func checkAssignStmt(ctx *context_v2.CompilerContext, mod *context_v2.Module, stmt *ast.AssignStmt) {
-	// Check if we're trying to reassign a constant
-	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok {
-		if ident.Name == "_" {
-			if stmt.Rhs != nil {
-				checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
-			}
-			return
-		}
-		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-			if sym.Kind == symbols.SymbolConstant {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
-						WithPrimaryLabel(stmt.Lhs.Loc(), "cannot modify constant").
-						WithSecondaryLabel(sym.Decl.Loc(), "declared as constant here").
-						WithHelp("constants are immutable; use 'let' for mutable variables"),
-				)
-				return
-			}
-			if sym.IsReadonly {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot modify read-only variable '%s'", ident.Name)).
-						WithCode(diagnostics.ErrInvalidAssignment).
-						WithPrimaryLabel(stmt.Lhs.Loc(), "read-only variable").
-						WithNote("loop indices and catch errors are read-only"),
-				)
-				return
-			}
-		}
-	}
-
-	// Check if we're trying to mutate through an immutable reference receiver
-	if checkImmutableReceiverMutation(ctx, mod, stmt.Lhs) {
-		// Error already reported, but continue checking RHS for additional errors
+	// Handle blank identifier
+	if ident, ok := stmt.Lhs.(*ast.IdentifierExpr); ok && ident.Name == "_" {
 		if stmt.Rhs != nil {
 			checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
 		}
 		return
 	}
 
-	warnValueReceiverMutation(ctx, mod, stmt.Lhs)
+	// Use unified mutability checking system
+	mutInfo := checkMutability(ctx, mod, stmt.Lhs)
+	if reportMutabilityError(ctx, mutInfo, stmt.Lhs) {
+		// Error reported, but continue checking RHS for additional errors
+		if stmt.Rhs != nil {
+			checkExpr(ctx, mod, stmt.Rhs, types.TypeUnknown)
+		}
+		return
+	}
 
 	// Get the type of the LHS
 	lhsType := checkExpr(ctx, mod, stmt.Lhs, types.TypeUnknown)
@@ -2036,140 +2013,6 @@ func isReferenceType(typ types.SemType) bool {
 	return false
 }
 
-func receiverSymbolFromExpr(mod *context_v2.Module, expr ast.Expression) *symbols.Symbol {
-	if mod == nil || mod.CurrentScope == nil || expr == nil {
-		return nil
-	}
-	switch e := expr.(type) {
-	case *ast.IdentifierExpr:
-		if sym, found := mod.CurrentScope.Lookup(e.Name); found && sym.Kind == symbols.SymbolReceiver {
-			return sym
-		}
-	case *ast.SelectorExpr:
-		return receiverSymbolFromExpr(mod, e.X)
-	case *ast.IndexExpr:
-		return receiverSymbolFromExpr(mod, e.X)
-	case *ast.ParenExpr:
-		return receiverSymbolFromExpr(mod, e.X)
-	}
-	return nil
-}
-
-// findImmutableRefInChain traverses an expression chain (e.g., p.X, arr[i].field)
-// and returns the first immutable reference found, along with its symbol and location.
-// Returns nil if no immutable reference is found.
-func findImmutableRefInChain(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression) (*symbols.Symbol, *source.Location) {
-	if ctx == nil || mod == nil || expr == nil {
-		return nil, nil
-	}
-
-	switch e := expr.(type) {
-	case *ast.IdentifierExpr:
-		// Check if this identifier is an immutable reference
-		if sym, found := mod.CurrentScope.Lookup(e.Name); found {
-			if refType, ok := sym.Type.(*types.ReferenceType); ok && !refType.Mutable {
-				return sym, e.Loc()
-			}
-		}
-		return nil, nil
-
-	case *ast.SelectorExpr:
-		// Check base expression first
-		if sym, loc := findImmutableRefInChain(ctx, mod, e.X); sym != nil {
-			return sym, loc
-		}
-		// Check the base type itself
-		baseType := inferExprType(ctx, mod, e.X)
-		if refType, ok := types.UnwrapType(baseType).(*types.ReferenceType); ok && !refType.Mutable {
-			// The base expression is an immutable reference
-			// Return nil sym but with location - we'll get the sym from further traversal
-			return nil, nil
-		}
-		return nil, nil
-
-	case *ast.IndexExpr:
-		// Check base expression
-		return findImmutableRefInChain(ctx, mod, e.X)
-
-	case *ast.ParenExpr:
-		return findImmutableRefInChain(ctx, mod, e.X)
-
-	default:
-		return nil, nil
-	}
-}
-
-// checkImmutableRefMutation checks if we're trying to mutate through an immutable reference.
-// This handles both receiver parameters and regular function parameters.
-// Returns true if mutation is blocked (error reported), false if mutation is allowed.
-func checkImmutableRefMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) bool {
-	if ctx == nil || mod == nil || target == nil {
-		return false
-	}
-
-	sym, _ := findImmutableRefInChain(ctx, mod, target)
-	if sym == nil {
-		return false
-	}
-
-	// Found an immutable reference - mutation is NOT allowed
-	var declLoc *source.Location
-	if sym.Decl != nil {
-		declLoc = sym.Decl.Loc()
-	}
-
-	var kindLabel string
-	if sym.Kind == symbols.SymbolReceiver {
-		kindLabel = "receiver"
-	} else {
-		kindLabel = "parameter"
-	}
-
-	diag := diagnostics.NewError(fmt.Sprintf("cannot modify through immutable %s '%s'", kindLabel, sym.Name)).
-		WithCode(diagnostics.ErrInvalidAssignment).
-		WithPrimaryLabel(target.Loc(), "modification through immutable reference").
-		WithHelp("use a mutable reference '&'' to allow modification")
-	if declLoc != nil {
-		diag = diag.WithSecondaryLabel(declLoc, fmt.Sprintf("%s declared as immutable reference '&' here", kindLabel))
-	}
-	ctx.Diagnostics.Add(diag)
-	return true
-}
-
-// checkImmutableReceiverMutation checks if we're trying to mutate through an immutable reference receiver.
-// Returns true if mutation is blocked (error reported), false if mutation is allowed.
-// Deprecated: Use checkImmutableRefMutation which handles both receivers and parameters.
-func checkImmutableReceiverMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) bool {
-	return checkImmutableRefMutation(ctx, mod, target)
-}
-
-func warnValueReceiverMutation(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression) {
-	if ctx == nil || mod == nil || target == nil {
-		return
-	}
-	sym := receiverSymbolFromExpr(mod, target)
-	if sym == nil || sym.Kind != symbols.SymbolReceiver || sym.Type == nil {
-		return
-	}
-	if _, ok := sym.Type.(*types.ReferenceType); ok {
-		return
-	}
-
-	var declLoc *source.Location
-	if sym.Decl != nil {
-		declLoc = sym.Decl.Loc()
-	}
-
-	diag := diagnostics.NewWarning(fmt.Sprintf("modifying value receiver '%s' does not affect the caller", sym.Name)).
-		WithCode(diagnostics.WarnValueReceiverMutation).
-		WithPrimaryLabel(target.Loc(), "value receiver is a copy").
-		WithHelp("use a '&' receiver to mutate the original value")
-	if declLoc != nil {
-		diag = diag.WithSecondaryLabel(declLoc, "receiver declared here")
-	}
-	ctx.Diagnostics.Add(diag)
-}
-
 func reportExplicitEnumValue(ctx *context_v2.CompilerContext, name string, loc *source.Location) {
 	if ctx == nil || loc == nil {
 		return
@@ -2191,36 +2034,13 @@ func reportExplicitEnumValue(ctx *context_v2.CompilerContext, name string, loc *
 }
 
 func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, target ast.Expression, targetType types.SemType, op tokens.Token) {
-	if ident, ok := target.(*ast.IdentifierExpr); ok {
-		if sym, found := mod.CurrentScope.Lookup(ident.Name); found {
-			if sym.Kind == symbols.SymbolConstant {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot assign to constant '%s'", ident.Name)).
-						WithPrimaryLabel(target.Loc(), "cannot modify constant").
-						WithSecondaryLabel(sym.Decl.Loc(), "declared as constant here").
-						WithHelp("constants are immutable; use 'let' for mutable variables"),
-				)
-				return
-			}
-			if sym.IsReadonly {
-				ctx.Diagnostics.Add(
-					diagnostics.NewError(fmt.Sprintf("cannot modify read-only variable '%s'", ident.Name)).
-						WithCode(diagnostics.ErrInvalidAssignment).
-						WithPrimaryLabel(target.Loc(), "read-only variable").
-						WithNote("loop indices and catch errors are read-only"),
-				)
-				return
-			}
-		}
-	}
-
-	// Check if we're trying to mutate through an immutable reference receiver
-	if checkImmutableReceiverMutation(ctx, mod, target) {
+	// Use unified mutability checking system
+	mutInfo := checkMutability(ctx, mod, target)
+	if reportMutabilityError(ctx, mutInfo, target) {
 		return
 	}
 
-	warnValueReceiverMutation(ctx, mod, target)
-
+	// Also check the targetType for direct immutable reference (for cases like dereferenced refs)
 	if ref, ok := types.UnwrapType(targetType).(*types.ReferenceType); ok {
 		if !ref.Mutable {
 			ctx.Diagnostics.Add(
@@ -2231,6 +2051,7 @@ func checkIncDecTarget(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 			return
 		}
 	}
+
 	targetType = dereferenceType(types.UnwrapType(targetType))
 	if !types.IsNumeric(targetType) {
 		ctx.Diagnostics.Add(
