@@ -125,9 +125,17 @@ func TestFixedArrayBoundsChecking(t *testing.T) {
 			errorContains: "compile-time constant",
 		},
 		{
-			name: "Dynamic array - no bounds checking",
+			name: "Dynamic array with known length - bounds checking",
 			src: `fn test() {
 				let arr: []i32 = [1, 2, 3];
+				let x := arr[10];
+			}`,
+			expectError:   true,
+			errorContains: "array index out of bounds",
+		},
+		{
+			name: "Dynamic array with unknown length - no bounds checking",
+			src: `fn test(arr: []i32) {
 				let x := arr[10];
 				let y := arr[100];
 			}`,

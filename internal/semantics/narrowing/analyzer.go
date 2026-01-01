@@ -67,6 +67,17 @@ func analyzeConditionRecursive(ctx *context_v2.CompilerContext, mod *context_v2.
 // mergeNarrowings merges two narrowing contexts (for OR conditions).
 // Result contains all narrowings from both contexts.
 func mergeNarrowings(a, b *NarrowingContext) *NarrowingContext {
+	// Handle nil inputs
+	if a == nil && b == nil {
+		return NewNarrowingContext(nil)
+	}
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+
 	merged := NewNarrowingContext(nil)
 	for varName := range a.NarrowedTypes {
 		if aType, ok := a.GetNarrowedType(varName); ok {
@@ -90,6 +101,17 @@ func mergeNarrowings(a, b *NarrowingContext) *NarrowingContext {
 // intersectNarrowings intersects two narrowing contexts (for AND conditions).
 // Result only contains narrowings present in both contexts.
 func intersectNarrowings(a, b *NarrowingContext) *NarrowingContext {
+	// Handle nil inputs
+	if a == nil && b == nil {
+		return NewNarrowingContext(nil)
+	}
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+
 	intersected := NewNarrowingContext(nil)
 	for varName := range a.NarrowedTypes {
 		if aType, ok := a.GetNarrowedType(varName); ok {

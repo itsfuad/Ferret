@@ -113,7 +113,14 @@ func checkCompositeTypeCompatibility(source, target types.SemType) TypeCompatibi
 	if srcArray, srcIsArray := source.(*types.ArrayType); srcIsArray {
 		if tgtArray, tgtIsArray := target.(*types.ArrayType); tgtIsArray {
 			// Check lengths match (for fixed-size arrays)
-			if srcArray.Length != tgtArray.Length {
+			// Allow dynamic arrays (Length=-1) to be compatible with fixed-size arrays
+			// The actual element count validation happens in validateArrayLiteral
+			if srcArray.Length >= 0 && tgtArray.Length >= 0 && srcArray.Length != tgtArray.Length {
+				return Incompatible
+			}
+			// Don't allow fixed-size array to be assigned to dynamic array variable
+			// (would lose length information)
+			if srcArray.Length >= 0 && tgtArray.Length < 0 {
 				return Incompatible
 			}
 			// Recursively check element compatibility

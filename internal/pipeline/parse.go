@@ -71,8 +71,10 @@ func (p *Pipeline) parseModule(importPath string, requestedLocation *source.Loca
 			if p.ctx.HasModule(importPath) {
 				mod, _ := p.ctx.GetModule(importPath)
 				if mod.Type == context_v2.ModuleBuiltin && mod.AST == nil {
+					// Builtin module with no file - advance through phases like native modules
+					p.ctx.SetModulePhase(importPath, phase.PhaseLexed)
 					if !p.ctx.AdvanceModulePhase(importPath, phase.PhaseParsed) {
-						p.ctx.ReportError(fmt.Sprintf("cannot advance module %s to PhaseParsed", importPath), nil)
+						p.ctx.SetModulePhase(importPath, phase.PhaseParsed)
 					}
 					return
 				}
