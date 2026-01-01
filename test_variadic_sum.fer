@@ -24,9 +24,9 @@ fn test(items: ...i32) {
 }
 
 fn main() {
-    let result: i32 = sum(1, 2, 3, 4, 5) catch err {
+    let result: i32 = sum() catch err {
         io::Println("Error: ", err);
-        return;
+        //return;
     } 0 ;
 
     io::Println("The sum is: ", result);

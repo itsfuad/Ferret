@@ -2254,13 +2254,11 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		if e.Catch != nil {
 			checkCatchClause(ctx, mod, e)
 		}
-		// Compute return type
-		funType := inferExprType(ctx, mod, e.Fun)
-		if funcType, ok := funType.(*types.FunctionType); ok {
-			mod.SetExprType(expr, funcType.Return)
-			return funcType.Return
-		}
-		return types.TypeUnknown
+		// Compute return type using inferExprType which handles Result type unwrapping
+		// when a catch clause is present
+		callReturnType := inferExprType(ctx, mod, e)
+		mod.SetExprType(expr, callReturnType)
+		return callReturnType
 
 	case *ast.SelectorExpr:
 		// Validate base expression first
