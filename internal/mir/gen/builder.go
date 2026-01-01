@@ -1838,7 +1838,13 @@ func (b *functionBuilder) loadIdent(ident *hir.Ident) mir.ValueID {
 		return mir.InvalidValue
 	}
 
-	// Special handling for none constant
+	// Special handling for builtin constants: true, false, none
+	if ident.Name == "true" {
+		return b.emitConst(types.TypeBool, "1", ident.Location)
+	}
+	if ident.Name == "false" {
+		return b.emitConst(types.TypeBool, "0", ident.Location)
+	}
 	if ident.Name == "none" {
 		id := b.gen.nextValueID()
 		optType := &types.OptionalType{Inner: types.TypeNone}
