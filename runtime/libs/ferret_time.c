@@ -1,6 +1,5 @@
+// Ferret runtime: Time functions
 #define _POSIX_C_SOURCE 200809L
-
-#include "ferret_time.h"
 
 #include <stdint.h>
 #include <time.h>
@@ -13,6 +12,7 @@
 
 #include "alloc.h"
 
+// Get current time as ISO 8601 string
 char* ferret_time_Now(void) {
     time_t raw = time(NULL);
     if (raw == (time_t)-1) {

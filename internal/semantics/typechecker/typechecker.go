@@ -852,22 +852,31 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		rhsString := rhsBase.Equals(types.TypeString)
 		lhsNumericOrUntyped := types.IsNumericType(lhsBase) || types.IsUntyped(lhsBase)
 		rhsNumericOrUntyped := types.IsNumericType(rhsBase) || types.IsUntyped(rhsBase)
+		rhsBool := rhsBase.Equals(types.TypeBool)
 
-		// If one side is string and the other is not, that's an error
-		if (lhsString && !rhsString) || (!lhsString && rhsString) {
+		// String concatenation rules:
+		// str + str -> ok
+		// str + number -> ok (number converted to string)
+		// str + bool -> ok (bool converted to "true"/"false")
+		// number + str -> ERROR (LHS must be string)
+		if lhsString {
+			if rhsString || rhsNumericOrUntyped || rhsBool {
+				return // Valid string concatenation
+			}
+		}
+
+		// If RHS is string but LHS is not, that's an error
+		if rhsString && !lhsString {
 			ctx.Diagnostics.Add(
 				diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
 					WithCode(diagnostics.ErrTypeMismatch).
 					WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '+' with %s and %s", lhsType.String(), rhsType.String())).
-					WithHelp("'+' operator requires both operands to be numeric or both to be strings"),
+					WithHelp("for string concatenation, the left operand must be a string"),
 			)
 			return
 		}
 
-		if lhsString && rhsString {
-			return
-		}
-
+		// Both numeric - valid arithmetic
 		if lhsNumericOrUntyped && rhsNumericOrUntyped {
 			return
 		}
@@ -876,7 +885,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 			diagnostics.NewError(fmt.Sprintf("invalid operation: %s (mismatched types %s and %s)", expr.Op.Value, lhsType.String(), rhsType.String())).
 				WithCode(diagnostics.ErrTypeMismatch).
 				WithPrimaryLabel(expr.Loc(), fmt.Sprintf("cannot use '+' with %s and %s", lhsType.String(), rhsType.String())).
-				WithHelp("'+' operator requires both operands to be numeric or both to be strings"),
+				WithHelp("'+' operator requires both operands to be numeric, or left operand to be string"),
 		)
 		return
 

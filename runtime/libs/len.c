@@ -1,12 +1,13 @@
 // Ferret runtime: len function implementation
 // Public API that calls core functions
 
-#include "len.h"
+#include <stdint.h>
 
 #include "../core/array.h"
 #include "../core/string_runtime.h"
 #include "../core/map.h"
 
+// Get length of array (dynamic arrays)
 int32_t ferret_len_array(void* arr) {
     if (arr == NULL) {
         return 0;

@@ -786,16 +786,10 @@ func (b *functionBuilder) lowerExpr(expr hir.Expr) mir.ValueID {
 		}
 		rightType := b.exprType(e.Y)
 		right, rightType = b.derefValueIfNeeded(right, rightType, e.Location)
-		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) && b.isStringType(e.Y) {
-			result := b.gen.nextValueID()
-			b.emitInstr(&mir.Call{
-				Result:   result,
-				Target:   "ferret_io_ConcatStrings",
-				Args:     []mir.ValueID{left, right},
-				Type:     types.TypeString,
-				Location: e.Location,
-			})
-			return result
+
+		// String concatenation: str + str, str + number, str + bool
+		if e.Op.Kind == tokens.PLUS_TOKEN && b.isStringType(e.X) {
+			return b.emitStringConcat(left, right, rightType, e.Location)
 		}
 		if e.Type != nil && !isCompareOp(e.Op.Kind) {
 			target := types.UnwrapType(e.Type)
@@ -3844,6 +3838,62 @@ func (b *functionBuilder) emitPtrOffset(base mir.ValueID, offset mir.ValueID, el
 	})
 	b.ptrElem[id] = elem
 	return id
+}
+
+func (b *functionBuilder) emitStringConcat(left, right mir.ValueID, rightType types.SemType, loc source.Location) mir.ValueID {
+	result := b.gen.nextValueID()
+	rightBase := types.UnwrapType(rightType)
+
+	// Determine which concat function to use based on RHS type
+	var target string
+	args := []mir.ValueID{left, right}
+
+	// Get primitive type name if available
+	var rightTypeName types.TYPE_NAME
+	if pt, ok := rightBase.(*types.PrimitiveType); ok {
+		rightTypeName = pt.GetName()
+	}
+
+	switch {
+	case rightBase.Equals(types.TypeString):
+		target = "ferret_io_ConcatStrings"
+	case rightBase.Equals(types.TypeBool):
+		target = "ferret_string_concat_bool"
+	case rightBase.Equals(types.TypeByte):
+		target = "ferret_string_concat_byte"
+	case types.IsFloat(rightBase):
+		// Cast to f64 for the concat function
+		if !rightBase.Equals(types.TypeF64) {
+			right = b.castValue(right, rightType, types.TypeF64, loc)
+		}
+		target = "ferret_string_concat_f64"
+	case types.IsUnsigned(rightTypeName):
+		// Cast to u64 for the concat function
+		if !rightBase.Equals(types.TypeU64) {
+			right = b.castValue(right, rightType, types.TypeU64, loc)
+		}
+		target = "ferret_string_concat_u64"
+		args = []mir.ValueID{left, right}
+	case types.IsSigned(rightTypeName) || types.IsUntyped(rightBase):
+		// Cast to i64 for the concat function
+		if !rightBase.Equals(types.TypeI64) {
+			right = b.castValue(right, rightType, types.TypeI64, loc)
+		}
+		target = "ferret_string_concat_i64"
+		args = []mir.ValueID{left, right}
+	default:
+		// Fallback to string concat (shouldn't happen if typechecker is correct)
+		target = "ferret_io_ConcatStrings"
+	}
+
+	b.emitInstr(&mir.Call{
+		Result:   result,
+		Target:   target,
+		Args:     args,
+		Type:     types.TypeString,
+		Location: loc,
+	})
+	return result
 }
 
 func (b *functionBuilder) emitArrayLen(arrVal mir.ValueID, loc source.Location) mir.ValueID {

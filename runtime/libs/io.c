@@ -164,3 +164,12 @@ void ferret_std_io_ReadFloat(void* out) {
     
     if (line) free(line);
 }
+
+// Enum to string conversion helper
+// Used by codegen to convert enum tags to variant names
+const char* ferret_enum_to_string(const char* const* table, uint32_t count, int32_t tag) {
+    if (tag < 0 || (uint32_t)tag >= count) {
+        return "<invalid enum tag>";
+    }
+    return table[tag];
+}

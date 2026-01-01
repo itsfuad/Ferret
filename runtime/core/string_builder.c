@@ -1,16 +1,24 @@
 // Ferret runtime: String Builder Library Implementation
-// Optimized string concatenation with exponential growth
+// Efficient string concatenation and manipulation (avoids repeated malloc)
 
 #define _POSIX_C_SOURCE 200809L
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdarg.h>
-#include "string_builder.h"
+
+// String builder structure (similar to Go's strings.Builder)
+typedef struct {
+    char* data;        // String data buffer
+    int32_t length;    // Current string length
+    int32_t capacity;  // Buffer capacity
+} ferret_string_builder_t;
 
 #define FERRET_STRING_MIN_CAPACITY 16
 #define FERRET_STRING_GROWTH_FACTOR 2
 
+// Create a new string builder with initial capacity
 ferret_string_builder_t* ferret_string_builder_new(int32_t initial_capacity) {
     if (initial_capacity < FERRET_STRING_MIN_CAPACITY) {
         initial_capacity = FERRET_STRING_MIN_CAPACITY;

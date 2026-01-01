@@ -1,10 +1,26 @@
 import "std/io";
 
-type Point struct {
-    .X: f64,
-    .Y: f64
-};
-
 fn main() {
-    let empty : Point = {};
+    // str + str
+    io::Println("Hello " + "world!");
+    
+    // str + i32
+    let age: i32 = 25;
+    io::Println("Age: " + age);
+    
+    // str + f64
+    let pi: f64 = 3.14159;
+    io::Println("Pi: " + pi);
+    
+    // str + bool
+    let flag: bool = true;
+    io::Println("Flag: " + flag);
+    
+    // str + byte (char)
+    let ch: byte = 65;  // 'A'
+    io::Println("Char: " + ch);
+    
+    // str + untyped literal
+    io::Println("Number: " + 42);
+    io::Println("Float: " + 3.14);
 }

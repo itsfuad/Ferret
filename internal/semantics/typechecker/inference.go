@@ -286,7 +286,11 @@ func inferBinaryExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module
 	switch expr.Op.Kind {
 	case tokens.PLUS_TOKEN:
 		// PLUS can be numeric addition or string concatenation
-		if lhsType.Equals(types.TypeString) && rhsType.Equals(types.TypeString) {
+		// String concatenation: str + str, str + number, str + bool -> str
+		if lhsType.Equals(types.TypeString) {
+			return types.TypeString
+		}
+		if rhsType.Equals(types.TypeString) {
 			return types.TypeString
 		}
 		// Otherwise numeric addition: result is the wider of the two types

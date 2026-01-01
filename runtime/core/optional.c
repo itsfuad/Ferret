@@ -1,7 +1,10 @@
 // Ferret runtime: Optional helpers
-#include "optional.h"
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 
+// Unwrap optional into out buffer using default when none.
+// Layout: value bytes followed by 1-byte is_some flag at offset val_size.
 void ferret_optional_unwrap_or(const void* opt, const void* default_val, void* out, uint64_t val_size) {
     if (out == NULL) {
         return;

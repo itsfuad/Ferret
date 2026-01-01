@@ -1,4 +1,6 @@
-#include "cast.h"
+// Ferret runtime: Type casting helpers
+
+#include <stdint.h>
 
 float ferret_cast_u32_to_f32(uint32_t value) {
     return (float)value;
