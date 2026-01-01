@@ -29,7 +29,8 @@
 #define FERRET_LIMB_MAX ((ferret_limb_t)~(ferret_limb_t)0)
 
 // Feature detection for 128-bit floating point support
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__) || defined(__powerpc__) || defined(__powerpc64__))
+// Note: __float128 is NOT supported on macOS (Apple Clang), only on Linux with GCC/Clang
+#if defined(__GNUC__) && !defined(__APPLE__) && (defined(__x86_64__) || defined(__i386__) || defined(__powerpc__) || defined(__powerpc64__))
     #ifndef FERRET_HAS_FLOAT128
         #define FERRET_HAS_FLOAT128 1
     #endif
