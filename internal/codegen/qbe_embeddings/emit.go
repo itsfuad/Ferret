@@ -61,7 +61,64 @@ func (g *Generator) emitBinary(b *mir.Binary) {
 		g.valueTypes[b.Result] = b.Type
 	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN,
 		tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
-		op, err := g.compareOp(b.Op, b.Type)
+		// Get operand types to determine comparison type
+		leftType := g.valueTypes[b.Left]
+		rightType := g.valueTypes[b.Right]
+
+		// Determine the comparison type - prefer the wider type
+		operandType := leftType
+		if operandType == nil {
+			operandType = rightType
+		}
+		if operandType == nil {
+			operandType = b.Type // fallback
+		}
+
+		// String comparison needs special handling - call strcmp
+		if operandType != nil && operandType.Equals(types.TypeString) {
+			// Call ferret_strcmp(left, right) and check if result == 0
+			cmpResult := g.newTemp()
+			g.emitLine(fmt.Sprintf("%s =w call $ferret_strcmp(l %s, l %s)", cmpResult, left, right))
+			if b.Op == tokens.DOUBLE_EQUAL_TOKEN {
+				g.emitLine(fmt.Sprintf("%s =w ceqw %s, 0", resultName, cmpResult))
+			} else if b.Op == tokens.NOT_EQUAL_TOKEN {
+				g.emitLine(fmt.Sprintf("%s =w cnew %s, 0", resultName, cmpResult))
+			} else {
+				g.reportError("string comparison only supports == and !=", &b.Location)
+			}
+			g.valueTypes[b.Result] = types.TypeBool
+			return
+		}
+
+		// For integer comparisons, ensure both operands have the same QBE type
+		// When one operand is i64 and other is i32, extend the narrower one
+		if leftType != nil && rightType != nil {
+			leftQbe, _ := g.qbeType(leftType)
+			rightQbe, _ := g.qbeType(rightType)
+			if leftQbe == "l" && rightQbe == "w" {
+				// Extend right operand from word to long
+				extRight := g.newTemp()
+				if g.isSigned(rightType) {
+					g.emitLine(fmt.Sprintf("%s =l extsw %s", extRight, right))
+				} else {
+					g.emitLine(fmt.Sprintf("%s =l extuw %s", extRight, right))
+				}
+				right = extRight
+				operandType = leftType
+			} else if leftQbe == "w" && rightQbe == "l" {
+				// Extend left operand from word to long
+				extLeft := g.newTemp()
+				if g.isSigned(leftType) {
+					g.emitLine(fmt.Sprintf("%s =l extsw %s", extLeft, left))
+				} else {
+					g.emitLine(fmt.Sprintf("%s =l extuw %s", extLeft, left))
+				}
+				left = extLeft
+				operandType = rightType
+			}
+		}
+
+		op, err := g.compareOp(b.Op, operandType)
 		if err != nil {
 			g.reportError(err.Error(), &b.Location)
 			return
@@ -574,6 +631,16 @@ func (g *Generator) emitCall(c *mir.Call) {
 	}
 
 	g.emitLine(fmt.Sprintf("%scall $%s(%s)", result, target, strings.Join(argParts, ", ")))
+
+	// For bool return types, mask to 1 byte to handle C ABI differences
+	// C's bool is 1 byte, but QBE uses word (4 bytes) - upper bytes may contain garbage
+	if c.Result != mir.InvalidValue && c.Type != nil && c.Type.Equals(types.TypeBool) {
+		resultName := g.valueName(c.Result)
+		masked := g.newTemp()
+		g.emitLine(fmt.Sprintf("%s =w and %s, 1", masked, resultName))
+		// Replace the result value with the masked one
+		g.emitLine(fmt.Sprintf("%s =w copy %s", resultName, masked))
+	}
 }
 
 func (g *Generator) emitCallIndirect(c *mir.CallIndirect) {
