@@ -126,7 +126,7 @@ func buildRuntimeLib(runtimeDir, libsDir string) error {
 	
 	cFiles := append(coreFiles, libsFiles...)
 	if len(cFiles) == 0 {
-		return fmt.Errorf("no runtime C files found in %s", runtimeDir)
+		return fmt.Errorf("no runtime C files found in %s/core or %s/libs", runtimeDir, runtimeDir)
 	}
 
 	cc, err := resolveTool("FERRET_CC", "CC", defaultCompiler())
