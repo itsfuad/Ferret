@@ -25,4 +25,5 @@
 .tmp
 bin
 libs
+!runtime/libs
 xcode
