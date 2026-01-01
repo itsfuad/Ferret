@@ -6,5 +6,5 @@ type Point struct {
 };
 
 fn main() {
-    let empty : Point = { .X = 1.2 };
+    let empty : Point = {};
 }

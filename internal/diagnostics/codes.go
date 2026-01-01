@@ -53,6 +53,8 @@ const (
 	ErrMissingCatch            = "T0026"
 	ErrUseBeforeDecl           = "T0027"
 	ErrArrayIndexNotConst      = "T0028"
+	ErrMissingField            = "T0029"
+	ErrUnknownField            = "T0030"
 
 	// Module/Import errors (M prefix)
 	ErrModuleNotFound    = "M0001"

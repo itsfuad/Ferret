@@ -1061,25 +1061,14 @@ func checkCastExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	if srcStruct, ok := srcUnwrapped.(*types.StructType); ok {
 		if dstStruct, ok := dstUnwrapped.(*types.StructType); ok {
 			// Check if struct types are compatible by structure
-			if missingFields, mismatchedFields := analyzeStructCompatibility(srcStruct, dstStruct); len(missingFields) > 0 || len(mismatchedFields) > 0 {
-				// Build detailed error message
-				diag := diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
-					WithCode(diagnostics.ErrInvalidCast).
-					WithPrimaryLabel(expr.Loc(), "invalid cast")
-
-				// Add help message with field details
-				var helpParts []string
-				if len(missingFields) > 0 {
-					helpParts = append(helpParts, fmt.Sprintf("missing %s: %s", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", ")))
-				}
-				if len(mismatchedFields) > 0 {
-					helpParts = append(helpParts, fmt.Sprintf("type mismatch in %s: %s", str.Pluralize("field", "fields", len(mismatchedFields)), strings.Join(mismatchedFields, ", ")))
-				}
-				if len(helpParts) > 0 {
-					diag = diag.WithHelp(strings.Join(helpParts, "; "))
-				}
-
-				ctx.Diagnostics.Add(diag)
+			missingFields, mismatchedFields := analyzeStructCompatibility(srcStruct, dstStruct)
+			if note := formatStructCompatibilityNote(missingFields, mismatchedFields, false); note != "" {
+				ctx.Diagnostics.Add(
+					diagnostics.NewError(fmt.Sprintf("cannot cast %s to %s", sourceType.String(), targetType.String())).
+						WithCode(diagnostics.ErrInvalidCast).
+						WithPrimaryLabel(expr.Loc(), "invalid cast").
+						WithNote(note),
+				)
 			}
 			return
 		}
@@ -1254,7 +1243,105 @@ func checkCompositeLit(ctx *context_v2.CompilerContext, mod *context_v2.Module, 
 		return nil
 	}
 
+	// Handle struct literals
+	if structType, ok := underlyingType.(*types.StructType); ok {
+		return validateStructLiteral(ctx, mod, lit, structType, targetType)
+	}
+
 	return nil
+}
+
+// validateStructLiteral validates that a struct literal has all required fields and correct types
+// Uses analyzeStructCompatibility for missing/mismatched field detection
+func validateStructLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, lit *ast.CompositeLit, structType *types.StructType, originalType types.SemType) []string {
+	// Build an inferred struct type from the literal's fields
+	// This allows us to reuse analyzeStructCompatibility
+	var inferredFields []types.StructField
+	fieldExprs := make(map[string]ast.Expression) // Track expressions for error reporting
+
+	for _, elem := range lit.Elts {
+		if kv, ok := elem.(*ast.KeyValueExpr); ok {
+			if ident, ok := kv.Key.(*ast.IdentifierExpr); ok {
+				// Find expected field type for contextual type checking
+				var expectedType types.SemType = types.TypeUnknown
+				for _, field := range structType.Fields {
+					if field.Name == ident.Name {
+						expectedType = field.Type
+						break
+					}
+				}
+				// Check the value expression with context
+				valueType := checkExpr(ctx, mod, kv.Value, expectedType)
+				inferredFields = append(inferredFields, types.StructField{
+					Name: ident.Name,
+					Type: valueType,
+				})
+				fieldExprs[ident.Name] = kv.Value
+			}
+		}
+	}
+
+	// Check for unknown fields (fields in literal but not in target struct)
+	for _, elem := range lit.Elts {
+		if kv, ok := elem.(*ast.KeyValueExpr); ok {
+			if ident, ok := kv.Key.(*ast.IdentifierExpr); ok {
+				found := false
+				for _, field := range structType.Fields {
+					if field.Name == ident.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError(fmt.Sprintf("unknown field '.%s' in struct literal", ident.Name)).
+							WithCode(diagnostics.ErrUnknownField).
+							WithPrimaryLabel(kv.Key.Loc(), "unknown field"),
+					)
+				}
+			}
+		}
+	}
+
+	// Use analyzeStructCompatibility to find missing/mismatched fields
+	inferredStruct := types.NewStruct("", inferredFields)
+	missingFields, mismatchedFields := analyzeStructCompatibility(inferredStruct, structType)
+
+	// Report type mismatches with source locations
+	for _, mismatch := range mismatchedFields {
+		// Parse field name from mismatch string "fieldName (expected X, found Y)"
+		fieldName := strings.Split(mismatch, " ")[0]
+		if expr, ok := fieldExprs[fieldName]; ok {
+			// Find expected type
+			var expectedType types.SemType
+			for _, field := range structType.Fields {
+				if field.Name == fieldName {
+					expectedType = field.Type
+					break
+				}
+			}
+			valueType := inferExprType(ctx, mod, expr)
+			compat := checkTypeCompatibility(valueType, expectedType)
+			diag := diagnostics.NewError(fmt.Sprintf("cannot use type '%s' as type '%s' in field '.%s'", valueType.String(), expectedType.String(), fieldName)).
+				WithCode(diagnostics.ErrTypeMismatch).
+				WithPrimaryLabel(expr.Loc(), fmt.Sprintf("type '%s'", valueType.String()))
+			diag = addExplicitCastHint(ctx, diag, expectedType, compat, expr)
+			ctx.Diagnostics.Add(diag)
+		}
+	}
+
+	// Report missing fields with note for details
+	if note := formatStructCompatibilityNote(missingFields, nil, true); note != "" {
+		typeName := originalType.String()
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("struct literal has missing %s", str.Pluralize("field", "fields", len(missingFields)))).
+				WithCode(diagnostics.ErrMissingField).
+				WithPrimaryLabel(lit.Loc(), fmt.Sprintf("type '%s'", typeName)).
+				WithNote(note),
+		)
+	}
+
+	return missingFields
 }
 
 // validateArrayLiteral validates that all array elements match the element type
@@ -1365,6 +1452,34 @@ func analyzeStructCompatibility(src, dst *types.StructType) (missingFields []str
 		}
 	}
 	return missingFields, mismatchedFields
+}
+
+// formatStructCompatibilityNote formats a note string for struct compatibility issues
+// Used by checkCastExpr, checkAssignLike, and validateStructLiteral
+func formatStructCompatibilityNote(missingFields, mismatchedFields []string, addDotPrefix bool) string {
+	if len(missingFields) == 0 && len(mismatchedFields) == 0 {
+		return ""
+	}
+
+	var noteParts []string
+	if len(missingFields) > 0 {
+		displayFields := missingFields
+		if addDotPrefix {
+			displayFields = make([]string, len(missingFields))
+			for i, f := range missingFields {
+				displayFields[i] = "." + f
+			}
+		}
+		noteParts = append(noteParts, fmt.Sprintf("missing %s: %s",
+			str.Pluralize("field", "fields", len(missingFields)),
+			strings.Join(displayFields, ", ")))
+	}
+	if len(mismatchedFields) > 0 {
+		noteParts = append(noteParts, fmt.Sprintf("type mismatch in %s: %s",
+			str.Pluralize("field", "fields", len(mismatchedFields)),
+			strings.Join(mismatchedFields, ", ")))
+	}
+	return strings.Join(noteParts, "; ")
 }
 
 func checkSelectorExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr *ast.SelectorExpr) {
@@ -2349,8 +2464,14 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			// Unwrap expected to get underlying struct or array
 			expectedUnwrapped := types.UnwrapType(expected)
 			if expectedStruct, ok := expectedUnwrapped.(*types.StructType); ok {
-				// Check if inferred struct is compatible with expected
-				if inferredStruct, ok := inferredType.(*types.StructType); ok {
+				// For empty composite literals, adopt the expected struct type
+				// This allows `let p: Point = {}` to work (with missing fields errors)
+				if inferredType.Equals(types.TypeUnknown) {
+					resultType = expected
+					// Validate the composite literal against the expected struct type
+					checkCompositeLit(ctx, mod, compLit, expected)
+				} else if inferredStruct, ok := inferredType.(*types.StructType); ok {
+					// Check if inferred struct is compatible with expected
 					if areStructsCompatible(inferredStruct, expectedStruct) {
 						// Use the expected type (preserves named type)
 						resultType = expected
@@ -2392,7 +2513,8 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 // valueExpr: the value expression being assigned
 // targetType: the expected/target type
 func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, leftType types.SemType, leftNode ast.Node, rightNode ast.Expression) {
-	rhsType := checkExpr(ctx, mod, rightNode, types.TypeUnknown)
+	// Pass leftType as expected type so composite literals can be contextualized
+	rhsType := checkExpr(ctx, mod, rightNode, leftType)
 
 	// Special check for integer literals: ensure they fit in the target type
 	if ok := checkFitness(ctx, leftType, rightNode, leftNode); !ok {
@@ -2482,16 +2604,9 @@ func checkAssignLike(ctx *context_v2.CompilerContext, mod *context_v2.Module, le
 		}
 
 		// Add helpful note for struct compatibility issues
-		if isStructCompatibility && (len(missingFields) > 0 || len(mismatchedFields) > 0) {
-			var noteParts []string
-			if len(missingFields) > 0 {
-				noteParts = append(noteParts, fmt.Sprintf("missing %s (%s)", str.Pluralize("field", "fields", len(missingFields)), strings.Join(missingFields, ", ")))
-			}
-			if len(mismatchedFields) > 0 {
-				noteParts = append(noteParts, fmt.Sprintf("type mismatch in %s: %s", str.Pluralize("field", "fields", len(mismatchedFields)), strings.Join(mismatchedFields, ", ")))
-			}
-			if len(noteParts) > 0 {
-				diag = diag.WithNote(strings.Join(noteParts, "; "))
+		if isStructCompatibility {
+			if note := formatStructCompatibilityNote(missingFields, mismatchedFields, false); note != "" {
+				diag = diag.WithNote(note)
 			}
 		}
 
