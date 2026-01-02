@@ -22,7 +22,7 @@ func Run(ctx *context_v2.CompilerContext, inputPath, outputPath string) error {
 	switch runtime.GOOS {
 	case "windows":
 		args = append(args, "-t", "amd64_win64")
-	case "linux", "freebsd", "openbsd", "netbsd":
+	case "linux", "android", "freebsd", "openbsd", "netbsd":
 		if runtime.GOARCH == "arm64" {
 			args = append(args, "-t", "arm64")
 		} else {
