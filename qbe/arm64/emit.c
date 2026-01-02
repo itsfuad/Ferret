@@ -305,6 +305,12 @@ emitins(Ins *i, E *e)
 			rname(i->to.val, Kl), slot(i->arg[0].val, e)
 		);
 		break;
+	case Osalloc:
+		/* dynamic stack allocation */
+		emitf("sub sp, sp, %L0", i, e);
+		if (!req(i->to, R))
+			fprintf(e->f, "\tmov\t%s, sp\n", rname(i->to.val, Kl));
+		break;
 	}
 }
 
