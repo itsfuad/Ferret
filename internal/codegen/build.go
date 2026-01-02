@@ -100,6 +100,9 @@ func DefaultBuildOptions() *BuildOptions {
 
 	linkLibs := []string{"-lm"}
 	if runtime.GOOS == "windows" {
+		// Add Windows-specific flags
+		// -m i386pep: Use PE+ format for 64-bit Windows
+		linkFlags = append(linkFlags, "-m", "i386pep")
 		linkLibs = []string{
 			"-lmingw32",
 			"-lmingwex",

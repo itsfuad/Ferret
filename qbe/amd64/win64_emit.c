@@ -141,11 +141,29 @@ regtoa(int reg, int sz)
 }
 
 static void emitins(Ins, Fn *, FILE *);
+static void emitcon(Con *con, FILE *f);
 
 static void
 emitcopy(Ref r1, Ref r2, int k, Fn *fn, FILE *f)
 {
 	Ins icp;
+
+	/* Windows PE+ fix: Symbol addresses (CAddr) cannot use immediate addressing
+	 * due to R_X86_64_32S relocation limitations. Use LEA with RIP-relative. */
+	if (rtype(r2) == RCon && fn->con[r2.val].type == CAddr) {
+		/* Load symbol address using LEA: leaq symbol(%rip), temp */
+		fprintf(f, "\tleaq ");
+		emitcon(&fn->con[r2.val], f);
+		fprintf(f, "(%%rip), %%r11\n");
+		
+		/* Now copy from temp register to destination */
+		icp.op = Ocopy;
+		icp.arg[0] = TMP(R11);
+		icp.to = r1;
+		icp.cls = k;
+		emitins(icp, fn, f);
+		return;
+	}
 
 	icp.op = Ocopy;
 	icp.arg[0] = r2;
@@ -360,6 +378,40 @@ emitins(Ins i, Fn *fn, FILE *f)
 		&& rtype(i.arg[1]) == RTmp) {
 			emitf("imul%k %0, %1, %=", &i, fn, f);
 			break;
+		}
+		goto Table;
+	case Ostorel:
+	case Ostorew:
+	case Ostoreh:
+	case Ostoreb:
+	case Ostores:
+	case Ostored:
+		/* Windows PE+ fix: Cannot store symbol addresses directly using
+		 * immediate addressing. Load address into temp register first. */
+		if (rtype(i.arg[0]) == RCon && fn->con[i.arg[0].val].type == CAddr) {
+			/* Load symbol address: leaq symbol(%rip), %r11 */
+			fprintf(f, "\tleaq ");
+			emitcon(&fn->con[i.arg[0].val], f);
+			fprintf(f, "(%%rip), %%r11\n");
+			/* Now do the store with the temp register */
+			i.arg[0] = TMP(R11);
+		}
+		goto Table;
+	case Oxcmp:
+	case Oxtest:
+		/* Windows PE+ fix: Cannot use symbol addresses as immediate in cmp/test.
+		 * Load into temp register if either operand is a symbol address. */
+		if (rtype(i.arg[0]) == RCon && fn->con[i.arg[0].val].type == CAddr) {
+			fprintf(f, "\tleaq ");
+			emitcon(&fn->con[i.arg[0].val], f);
+			fprintf(f, "(%%rip), %%r11\n");
+			i.arg[0] = TMP(R11);
+		}
+		if (rtype(i.arg[1]) == RCon && fn->con[i.arg[1].val].type == CAddr) {
+			fprintf(f, "\tleaq ");
+			emitcon(&fn->con[i.arg[1].val], f);
+			fprintf(f, "(%%rip), %%r10\n");
+			i.arg[1] = TMP(R10);
 		}
 		goto Table;
 	case Osub:
