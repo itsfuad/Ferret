@@ -4,6 +4,7 @@ import (
 	"compiler/internal/context_v2"
 	"compiler/internal/diagnostics"
 	"compiler/internal/frontend/ast"
+	"compiler/internal/tokens"
 	"compiler/internal/types"
 	"fmt"
 )
@@ -67,14 +68,6 @@ func checkBuiltinLen(ctx *context_v2.CompilerContext, mod *context_v2.Module, ex
 	}
 
 	argType := checkExpr(ctx, mod, expr.Args[0], types.TypeUnknown)
-	if isReferenceType(argType) {
-		ctx.Diagnostics.Add(
-			diagnostics.NewError("len expects a value, not a reference").
-				WithCode(diagnostics.ErrInvalidType).
-				WithPrimaryLabel(expr.Args[0].Loc(), "remove '&' to pass the value directly"),
-		)
-		return
-	}
 	baseType := builtinArgBaseType(argType)
 	if baseType != nil && !baseType.Equals(types.TypeUnknown) {
 		if _, ok := baseType.(*types.ArrayType); ok {
@@ -109,19 +102,42 @@ func checkBuiltinAppend(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 
 	elemType := types.TypeUnknown
 	if argCount > 0 {
+		targetExpr := unwrapBorrowTarget(expr.Args[0])
 		arrType := checkExpr(ctx, mod, expr.Args[0], types.TypeUnknown)
-		if isReferenceType(arrType) {
-			ctx.Diagnostics.Add(
-				diagnostics.NewError("append expects a value, not a reference").
-					WithCode(diagnostics.ErrInvalidType).
-					WithPrimaryLabel(expr.Args[0].Loc(), "remove '&' to pass the array directly"),
-			)
-			elemType = types.TypeUnknown
-		}
 		baseType := builtinArgBaseType(arrType)
+
 		if baseType != nil && !baseType.Equals(types.TypeUnknown) {
 			if arr, ok := baseType.(*types.ArrayType); ok && arr.Length < 0 {
 				elemType = arr.Element
+				refType, isRef := types.UnwrapType(arrType).(*types.ReferenceType)
+				if !isRef {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("append requires a mutable reference").
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(expr.Args[0].Loc(), "expected a mutable reference").
+							WithHelp("use \"&'\" to pass a mutable reference"),
+					)
+					elemType = types.TypeUnknown
+				} else if !refType.Mutable {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("append requires a mutable reference").
+							WithCode(diagnostics.ErrInvalidAssignment).
+							WithPrimaryLabel(expr.Args[0].Loc(), "expected a mutable reference").
+							WithHelp("use \"&'\" to pass a mutable reference"),
+					)
+					elemType = types.TypeUnknown
+				} else if targetExpr != nil && !isBorrowableTarget(ctx, mod, targetExpr) {
+					ctx.Diagnostics.Add(
+						diagnostics.NewError("append requires a mutable borrow of an addressable value").
+							WithCode(diagnostics.ErrInvalidOperation).
+							WithPrimaryLabel(expr.Args[0].Loc(), "not an addressable value").
+							WithHelp("assign the array to a variable first, then append"),
+					)
+				} else if targetExpr != nil {
+					if reportMutabilityError(ctx, checkMutability(ctx, mod, targetExpr), targetExpr) {
+						elemType = types.TypeUnknown
+					}
+				}
 			} else {
 				ctx.Diagnostics.Add(
 					diagnostics.NewError("append expects a dynamic array").
@@ -182,4 +198,16 @@ func builtinArgBaseType(typ types.SemType) types.SemType {
 	base = dereferenceType(base)
 	base = types.UnwrapType(base)
 	return base
+}
+
+func unwrapBorrowTarget(expr ast.Expression) ast.Expression {
+	if expr == nil {
+		return nil
+	}
+	if unary, ok := expr.(*ast.UnaryExpr); ok {
+		if unary.Op.Kind == tokens.BIT_AND_TOKEN || unary.Op.Kind == tokens.MUT_REF_TOKEN {
+			return unary.X
+		}
+	}
+	return expr
 }

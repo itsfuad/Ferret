@@ -1613,6 +1613,7 @@ func (b *functionBuilder) lowerBuiltinLenCall(expr *hir.CallExpr) mir.ValueID {
 	if argVal == mir.InvalidValue {
 		return mir.InvalidValue
 	}
+	argVal, _ = b.derefValueIfNeeded(argVal, b.exprType(argExpr), expr.Location)
 
 	if arrType := b.arrayTypeOf(argExpr); arrType != nil {
 		if arrType.Length >= 0 {
@@ -1664,6 +1665,7 @@ func (b *functionBuilder) lowerBuiltinAppendCall(expr *hir.CallExpr) mir.ValueID
 	if arrVal == mir.InvalidValue {
 		return mir.InvalidValue
 	}
+	arrVal, _ = b.derefValueIfNeeded(arrVal, b.exprType(arrExpr), expr.Location)
 	value := b.lowerExpr(valExpr)
 	if value == mir.InvalidValue {
 		return mir.InvalidValue
