@@ -117,6 +117,10 @@ func (p *Pipeline) Run() error {
 		if err := p.runQBECodegenPhase(); err != nil {
 			return err
 		}
+	case "wasm":
+		if err := p.runWasmCodegenPhase(); err != nil {
+			return err
+		}
 	default:
 		p.ctx.ReportError(fmt.Sprintf("unknown codegen backend: %s", backend), nil)
 		return fmt.Errorf("unknown codegen backend: %s", backend)

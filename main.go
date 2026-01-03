@@ -76,8 +76,7 @@ func main() {
 	switch targetValue {
 	case "native":
 	case "wasm":
-		fmt.Fprintln(os.Stderr, "WASM target not yet available")
-		os.Exit(1)
+		codegenBackend = "wasm"
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown target: %s (expected native or wasm)\n", *target)
 		os.Exit(1)

@@ -45,8 +45,9 @@ type Options struct {
 
 // Result of compilation
 type Result struct {
-	Success bool
-	Output  string
+	Success  bool
+	Output   string
+	Artifact []byte
 }
 
 // Compile compiles Ferret code and returns the result
@@ -89,8 +90,11 @@ func Compile(opts *Options) Result {
 	if outputPath == "" {
 		outputPath = filepath.Join(projectRoot, projectName)
 	}
-	// Ensure .exe suffix on Windows
-	if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(outputPath), ".exe") {
+	if opts.CodegenBackend == "wasm" && !strings.HasSuffix(strings.ToLower(outputPath), ".wasm") {
+		outputPath += ".wasm"
+	}
+	// Ensure .exe suffix on Windows for native binaries
+	if opts.CodegenBackend != "wasm" && runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(outputPath), ".exe") {
 		outputPath += ".exe"
 	}
 
@@ -105,9 +109,16 @@ func Compile(opts *Options) Result {
 		KeepGenFiles:       opts.KeepGenFiles,
 		SkipCodegen:        opts.SkipCodegen,
 		CodegenBackend:     opts.CodegenBackend,
+		PointerSize:        0,
+	}
+	if opts.CodegenBackend == "wasm" {
+		config.PointerSize = 4
 	}
 
 	ctx := context_v2.New(config, opts.Debug)
+	if opts.CodegenBackend == "wasm" || opts.Code != "" {
+		loadEmbeddedBuiltins(ctx)
+	}
 
 	// Set entry point
 	var err error
@@ -121,10 +132,10 @@ func Compile(opts *Options) Result {
 		ctx.ReportError(fmt.Sprintf("Failed to set entry point: %v", err), nil)
 		if opts.LogFormat == HTML {
 			output := ctx.Diagnostics.EmitAllToString()
-			return Result{Success: false, Output: colors.ConvertANSIToHTML(output)}
+			return Result{Success: false, Output: colors.ConvertANSIToHTML(output), Artifact: ctx.CodegenOutput}
 		}
 		ctx.EmitDiagnostics()
-		return Result{Success: false}
+		return Result{Success: false, Artifact: ctx.CodegenOutput}
 	}
 
 	// Run pipeline
@@ -134,9 +145,9 @@ func Compile(opts *Options) Result {
 	// Emit diagnostics and return result
 	if opts.LogFormat == HTML {
 		output := ctx.Diagnostics.EmitAllToString()
-		return Result{Success: !ctx.HasErrors(), Output: colors.ConvertANSIToHTML(output)}
+		return Result{Success: !ctx.HasErrors(), Output: colors.ConvertANSIToHTML(output), Artifact: ctx.CodegenOutput}
 	}
 
 	ctx.EmitDiagnostics()
-	return Result{Success: !ctx.HasErrors()}
+	return Result{Success: !ctx.HasErrors(), Artifact: ctx.CodegenOutput}
 }

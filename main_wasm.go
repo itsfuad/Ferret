@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"syscall/js"
 
 	"compiler/internal/compiler"
@@ -24,13 +25,21 @@ func compile(this js.Value, args []js.Value) any {
 	}
 
 	result := compiler.Compile(&compiler.Options{
-		Code:      args[0].String(),
-		Debug:     args[1].Bool(),
-		LogFormat: compiler.HTML,
+		Code:             args[0].String(),
+		Debug:            args[1].Bool(),
+		LogFormat:        compiler.HTML,
+		CodegenBackend:   "wasm",
+		OutputExecutable: "out.wasm",
 	})
+
+	wasm := ""
+	if len(result.Artifact) > 0 {
+		wasm = base64.StdEncoding.EncodeToString(result.Artifact)
+	}
 
 	return map[string]any{
 		"success": result.Success,
 		"output":  result.Output,
+		"wasm":    wasm,
 	}
 }
