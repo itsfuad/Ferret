@@ -292,7 +292,7 @@ export function createFerretRuntime() {
     return resultStrF64(value, null);
   }
 
-  function ferret_panic(msgPtr) {
+  function ferret_global_panic(msgPtr) {
     const msg = msgPtr ? readCString(msgPtr) : "panic";
     throw new Error(msg);
   }
@@ -330,7 +330,7 @@ export function createFerretRuntime() {
         ferret_std_io_ReadUnsafe,
         ferret_std_io_ReadInt,
         ferret_std_io_ReadFloat,
-        ferret_panic,
+        ferret_global_panic,
         ferret_string_len,
         ferret_pow,
       },

@@ -786,7 +786,7 @@ func (g *Generator) emitMapGet(m *mir.MapGet) {
 		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", nullCheck, panicLabel, okLabel))
 		g.emitLine(fmt.Sprintf("@%s", panicLabel))
 		msgSym := g.stringSymbol("key not found in map")
-		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine(fmt.Sprintf("call $ferret_global_panic(l %s)", msgSym))
 		g.emitLine("ret") // Unreachable after panic, but QBE needs it
 		g.emitLine(fmt.Sprintf("@%s", okLabel))
 
@@ -871,7 +871,7 @@ func (g *Generator) emitArrayGet(a *mir.ArrayGet) {
 		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", nullCheck, panicLabel, okLabel))
 		g.emitLine(fmt.Sprintf("@%s", panicLabel))
 		msgSym := g.stringSymbol("index out of bounds")
-		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine(fmt.Sprintf("call $ferret_global_panic(l %s)", msgSym))
 		g.emitLine("ret") // Unreachable after panic
 		g.emitLine(fmt.Sprintf("@%s", okLabel))
 
@@ -954,7 +954,7 @@ func (g *Generator) emitArraySet(a *mir.ArraySet) {
 		g.emitLine(fmt.Sprintf("jnz %s, @%s, @%s", zeroCheck, panicLabel, okLabel))
 		g.emitLine(fmt.Sprintf("@%s", panicLabel))
 		msgSym := g.stringSymbol("index out of bounds")
-		g.emitLine(fmt.Sprintf("call $ferret_panic(l %s)", msgSym))
+		g.emitLine(fmt.Sprintf("call $ferret_global_panic(l %s)", msgSym))
 		g.emitLine("ret") // Unreachable after panic
 		g.emitLine(fmt.Sprintf("@%s", okLabel))
 	}

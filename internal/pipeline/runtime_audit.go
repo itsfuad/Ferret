@@ -29,7 +29,7 @@ func (p *Pipeline) runRuntimeAudit() {
 	}
 
 	for _, mod := range p.ctx.Modules {
-		if mod == nil || mod.Type != context_v2.ModuleBuiltin || mod.ImportPath == context_v2.GlobalModuleImport {
+		if mod == nil || mod.Type != context_v2.ModuleBuiltin {
 			continue
 		}
 		if mod.ModuleScope == nil {

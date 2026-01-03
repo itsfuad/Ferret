@@ -3,12 +3,13 @@ import "math";
 
 fn main() {
     let arr := [1,2,3,4];
-    append(&'[12,4,5], 5);
+    append(&'arr, 5);
     for v in arr {
         io::Println(v);
     }
     io::Println("hello", 123, true);
-    io::ReadUnsafe();
+    
+    io::Println("hi" + io::ReadUnsafe());
 
     let x := 12;
     let y : i32 = io::ReadInt() catch err {

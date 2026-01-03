@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 // Abort the program with a message.
-void ferret_panic(const char* msg) {
+void ferret_global_panic(const char* msg) {
     if (msg != NULL && msg[0] != '\0') {
         fprintf(stderr, "panic: %s\n", msg);
     } else {

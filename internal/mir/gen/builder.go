@@ -1706,10 +1706,10 @@ func (b *functionBuilder) lowerBuiltinPanicCall(expr *hir.CallExpr) mir.ValueID 
 		return mir.InvalidValue
 	}
 
-	// Call ferret_panic with the message string
+	// Call ferret_global_panic with the message string
 	b.emitInstr(&mir.Call{
 		Result:   mir.InvalidValue,
-		Target:   "ferret_panic",
+		Target:   "ferret_global_panic",
 		Args:     []mir.ValueID{msgVal},
 		Type:     types.TypeVoid,
 		Location: expr.Location,
@@ -4009,7 +4009,7 @@ func (b *functionBuilder) emitBoundsCheckedIndex(indexVal, lenVal mir.ValueID, i
 	msg := b.emitConst(types.TypeString, "index out of bounds", loc)
 	b.emitInstr(&mir.Call{
 		Result:   mir.InvalidValue,
-		Target:   "ferret_panic",
+		Target:   "ferret_global_panic",
 		Args:     []mir.ValueID{msg},
 		Type:     types.TypeVoid,
 		Location: loc,
