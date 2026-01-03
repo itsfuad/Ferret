@@ -67,6 +67,14 @@ func checkBuiltinLen(ctx *context_v2.CompilerContext, mod *context_v2.Module, ex
 	}
 
 	argType := checkExpr(ctx, mod, expr.Args[0], types.TypeUnknown)
+	if isReferenceType(argType) {
+		ctx.Diagnostics.Add(
+			diagnostics.NewError("len expects a value, not a reference").
+				WithCode(diagnostics.ErrInvalidType).
+				WithPrimaryLabel(expr.Args[0].Loc(), "remove '&' to pass the value directly"),
+		)
+		return
+	}
 	baseType := builtinArgBaseType(argType)
 	if baseType != nil && !baseType.Equals(types.TypeUnknown) {
 		if _, ok := baseType.(*types.ArrayType); ok {
@@ -102,6 +110,14 @@ func checkBuiltinAppend(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 	elemType := types.TypeUnknown
 	if argCount > 0 {
 		arrType := checkExpr(ctx, mod, expr.Args[0], types.TypeUnknown)
+		if isReferenceType(arrType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("append expects a value, not a reference").
+					WithCode(diagnostics.ErrInvalidType).
+					WithPrimaryLabel(expr.Args[0].Loc(), "remove '&' to pass the array directly"),
+			)
+			elemType = types.TypeUnknown
+		}
 		baseType := builtinArgBaseType(arrType)
 		if baseType != nil && !baseType.Equals(types.TypeUnknown) {
 			if arr, ok := baseType.(*types.ArrayType); ok && arr.Length < 0 {
@@ -118,6 +134,13 @@ func checkBuiltinAppend(ctx *context_v2.CompilerContext, mod *context_v2.Module,
 
 	if argCount > 1 {
 		valueType := checkExpr(ctx, mod, expr.Args[1], elemType)
+		if isReferenceType(valueType) {
+			ctx.Diagnostics.Add(
+				diagnostics.NewError("append expects a value, not a reference").
+					WithCode(diagnostics.ErrInvalidType).
+					WithPrimaryLabel(expr.Args[1].Loc(), "remove '&' to pass the value directly"),
+			)
+		}
 		if elemType != nil && !elemType.Equals(types.TypeUnknown) && valueType != nil {
 			compatibility := checkTypeCompatibilityWithContext(ctx, mod, valueType, elemType)
 			if !isImplicitlyCompatible(compatibility) {

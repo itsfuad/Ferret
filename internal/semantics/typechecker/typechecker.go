@@ -758,6 +758,11 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 			if types.IsUntyped(rhsType) {
 				if lit, ok := item.Value.(*ast.BasicLit); ok {
 					rhsType = inferLiteralType(lit, types.TypeUnknown)
+				} else {
+					rhsType = resolveType(rhsType, types.TypeUnknown)
+				}
+				if mod != nil {
+					mod.SetExprType(item.Value, rhsType)
 				}
 			}
 
@@ -997,6 +1002,68 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 					WithPrimaryLabel(expr.Loc(), "logical operators require bool types"),
 			)
 		}
+	}
+}
+
+func resolveNumericLiteralType(value string, kind ast.LiteralKind) types.SemType {
+	lit := &ast.BasicLit{
+		Kind:  kind,
+		Value: value,
+	}
+	return inferLiteralType(lit, types.TypeUnknown)
+}
+
+func contextualizeUntypedNumericLiteral(op tokens.TOKEN, expr ast.Expression, exprType, otherType types.SemType, mod *context_v2.Module) types.SemType {
+	if !types.IsUntyped(exprType) {
+		return exprType
+	}
+
+	value, kind, ok := numericLiteralValue(expr)
+	if !ok {
+		return exprType
+	}
+
+	resolved := types.TypeUnknown
+	if otherType != nil && !otherType.Equals(types.TypeUnknown) {
+		otherBase := dereferenceType(types.UnwrapType(otherType))
+		if isNumericContextOp(op) &&
+			types.IsNumeric(otherBase) &&
+			!(kind == ast.FLOAT && !types.IsFloat(otherBase)) &&
+			!(isBitwiseOp(op) && !types.IsInteger(otherBase)) &&
+			fitsInType(value, otherBase) {
+			resolved = otherType
+		}
+	}
+
+	if resolved.Equals(types.TypeUnknown) {
+		resolved = resolveNumericLiteralType(value, kind)
+	}
+
+	if mod != nil && !resolved.Equals(types.TypeUnknown) {
+		mod.SetExprType(expr, resolved)
+	}
+	return resolved
+}
+
+func isNumericContextOp(op tokens.TOKEN) bool {
+	switch op {
+	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
+		tokens.EXP_TOKEN,
+		tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN,
+		tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN,
+		tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
+		return true
+	default:
+		return false
+	}
+}
+
+func isBitwiseOp(op tokens.TOKEN) bool {
+	switch op {
+	case tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -2332,8 +2399,26 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			}
 		}
 
-		// For non-'is' operators, check RHS normally
+		// For non-'is' operators, check RHS normally, then contextualize untyped literals.
 		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+
+		lhsWasUntyped := types.IsUntyped(lhsType)
+		rhsWasUntyped := types.IsUntyped(rhsType)
+
+		if lhsWasUntyped {
+			contextType := rhsType
+			if rhsWasUntyped {
+				contextType = types.TypeUnknown
+			}
+			lhsType = contextualizeUntypedNumericLiteral(e.Op.Kind, e.X, lhsType, contextType, mod)
+		}
+		if rhsWasUntyped {
+			contextType := lhsType
+			if lhsWasUntyped {
+				contextType = types.TypeUnknown
+			}
+			rhsType = contextualizeUntypedNumericLiteral(e.Op.Kind, e.Y, rhsType, contextType, mod)
+		}
 		{
 			// Validate operand type compatibility for regular binary ops
 			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
@@ -2377,15 +2462,46 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			}
 			mod.SetExprType(expr, refType)
 			return refType
-		} else {
-			// For other unary ops like -, return operand type
-			mod.SetExprType(expr, operandType)
-			return operandType
 		}
 
+		if types.IsUntyped(operandType) && (e.Op.Kind == tokens.MINUS_TOKEN || e.Op.Kind == tokens.PLUS_TOKEN) {
+			if value, kind, ok := numericLiteralValue(e); ok {
+				resolved := resolveNumericLiteralType(value, kind)
+				if mod != nil && !resolved.Equals(types.TypeUnknown) {
+					mod.SetExprType(expr, resolved)
+				}
+				return operandType
+			}
+		}
+
+		// For other unary ops like -, return operand type
+		mod.SetExprType(expr, operandType)
+		return operandType
+
 	case *ast.BasicLit:
-		// Return the inferred literal type
-		litType := inferLiteralType(e, expected)
+		// Keep numeric literals untyped when there's no expected type,
+		// but still record a concrete type for codegen.
+		if expected.Equals(types.TypeUnknown) && (e.Kind == ast.INT || e.Kind == ast.FLOAT) {
+			var litType types.SemType
+			if e.Kind == ast.INT {
+				litType = types.TypeUntypedInt
+			} else {
+				litType = types.TypeUntypedFloat
+			}
+			if mod != nil {
+				mod.SetExprType(expr, inferLiteralType(e, types.TypeUnknown))
+			}
+			return litType
+		}
+
+		expectedForLit := expected
+		if e.Kind == ast.INT || e.Kind == ast.FLOAT {
+			expectedForLit = unwrapOptionalType(expected)
+		}
+		litType := inferLiteralType(e, expectedForLit)
+		if optType, ok := expected.(*types.OptionalType); ok && litType.Equals(optType.Inner) {
+			litType = expected
+		}
 		mod.SetExprType(expr, litType)
 		return litType
 	case *ast.PrefixExpr:
@@ -2704,18 +2820,41 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 	return fmt.Sprintf("type '%s'", typ.String())
 }
 
+func numericLiteralValue(expr ast.Expression) (string, ast.LiteralKind, bool) {
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		if e.Kind == ast.INT || e.Kind == ast.FLOAT {
+			return e.Value, e.Kind, true
+		}
+	case *ast.UnaryExpr:
+		if e.Op.Kind == tokens.MINUS_TOKEN || e.Op.Kind == tokens.PLUS_TOKEN {
+			if lit, ok := e.X.(*ast.BasicLit); ok {
+				if lit.Kind == ast.INT || lit.Kind == ast.FLOAT {
+					if e.Op.Kind == tokens.MINUS_TOKEN {
+						return "-" + lit.Value, lit.Kind, true
+					}
+					return lit.Value, lit.Kind, true
+				}
+			}
+		}
+	}
+	return "", 0, false
+}
+
 func checkFitness(ctx *context_v2.CompilerContext, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
+	value, kind, ok := numericLiteralValue(valueExpr)
+
 	// Check integer literal overflow
 	// Check literal directly (works for both untyped and already-resolved literals)
-	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
+	if ok && kind == ast.INT {
 		if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
 			// Use big.Int for all range checking (simpler, consistent)
-			if !fitsInType(lit.Value, targetType) {
+			if !fitsInType(value, targetType) {
 				// Get minimum type that can hold this value
-				minType := getMinimumTypeForValue(lit.Value)
+				minType := getMinimumTypeForValue(value)
 
 				// Build error message
-				diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", lit.Value, targetType.String()))
+				diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", value, targetType.String()))
 
 				if typeNode != nil {
 					// Show value location (primary) and type location (secondary)
@@ -2747,11 +2886,11 @@ func checkFitness(ctx *context_v2.CompilerContext, targetType types.SemType, val
 
 	// Check float literal precision
 	// Check literal directly (works for both untyped and already-resolved literals)
-	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.FLOAT {
+	if ok && kind == ast.FLOAT {
 		if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsFloatTypeName(targetName) {
-			if !fitsInType(lit.Value, targetType) {
+			if !fitsInType(value, targetType) {
 				// Get minimum type that can hold this precision
-				digits := countSignificantDigits(lit.Value)
+				digits := countSignificantDigits(value)
 				minType := getMinimumFloatTypeForDigits(digits)
 
 				// Build error message

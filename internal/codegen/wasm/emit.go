@@ -171,6 +171,29 @@ func (g *Generator) collectFunctions() error {
 }
 
 func (g *Generator) collectImports() error {
+	if err := g.ensureImport("ferret_alloc", funcSig{
+		params:  []ValType{valTypeI64},
+		results: []ValType{valTypeI32},
+	}); err != nil {
+		return err
+	}
+	if err := g.ensureImport("ferret_memcpy", funcSig{
+		params: []ValType{valTypeI32, valTypeI32, valTypeI64},
+	}); err != nil {
+		return err
+	}
+	if err := g.ensureImport("ferret_array_get", funcSig{
+		params:  []ValType{valTypeI32, valTypeI32},
+		results: []ValType{valTypeI32},
+	}); err != nil {
+		return err
+	}
+	if err := g.ensureImport("ferret_array_set", funcSig{
+		params:  []ValType{valTypeI32, valTypeI32, valTypeI32},
+		results: []ValType{valTypeI32},
+	}); err != nil {
+		return err
+	}
 	for _, info := range g.funcs {
 		if info == nil || info.fn == nil {
 			continue
@@ -181,9 +204,19 @@ func (g *Generator) collectImports() error {
 			}
 			for _, instr := range block.Instrs {
 				if _, ok := instr.(*mir.Alloca); ok {
-					g.imports["ferret_alloc"] = funcSig{
+					if err := g.ensureImport("ferret_alloc", funcSig{
 						params:  []ValType{valTypeI64},
 						results: []ValType{valTypeI32},
+					}); err != nil {
+						return err
+					}
+				}
+				if bin, ok := instr.(*mir.Binary); ok && bin.Op == tokens.EXP_TOKEN {
+					if err := g.ensureImport("ferret_pow", funcSig{
+						params:  []ValType{valTypeF64, valTypeF64},
+						results: []ValType{valTypeF64},
+					}); err != nil {
+						return err
 					}
 				}
 				call, ok := instr.(*mir.Call)
@@ -202,16 +235,23 @@ func (g *Generator) collectImports() error {
 				if err != nil {
 					return err
 				}
-				if existing, ok := g.imports[target]; ok {
-					if !sigEqual(existing, sig) {
-						return fmt.Errorf("wasm: conflicting signatures for import %s", target)
-					}
-					continue
+				if err := g.ensureImport(target, sig); err != nil {
+					return err
 				}
-				g.imports[target] = sig
 			}
 		}
 	}
+	return nil
+}
+
+func (g *Generator) ensureImport(name string, sig funcSig) error {
+	if existing, ok := g.imports[name]; ok {
+		if !sigEqual(existing, sig) {
+			return fmt.Errorf("wasm: conflicting signatures for import %s", name)
+		}
+		return nil
+	}
+	g.imports[name] = sig
 	return nil
 }
 
@@ -231,7 +271,10 @@ func (g *Generator) emitFunction(info *funcInfo, functionIndex map[string]uint32
 	blockLocal := uint32(paramCount)
 	locals = append(locals, valTypeI32)
 
-	nextLocal := blockLocal + 1
+	scratchLocal := blockLocal + 1
+	locals = append(locals, valTypeI32)
+
+	nextLocal := scratchLocal + 1
 	allocLocal := func(id mir.ValueID, typ types.SemType) error {
 		if id == mir.InvalidValue {
 			return nil
@@ -399,7 +442,7 @@ func (g *Generator) emitFunction(info *funcInfo, functionIndex map[string]uint32
 			if _, ok := instr.(*mir.Phi); ok {
 				continue
 			}
-			insn, err := g.emitInstr(info, instr, localIndex, functionIndex)
+			insn, err := g.emitInstr(info, instr, localIndex, functionIndex, scratchLocal)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -413,18 +456,28 @@ func (g *Generator) emitFunction(info *funcInfo, functionIndex map[string]uint32
 		code = append(code, opcodeEnd)
 	}
 
-	code = append(code, opcodeUnreachable)
+	code = append(code, opcodeBr)
+	code = append(code, encodeU32(0)...)
 	code = append(code, opcodeEnd)
+
+	if info.fn != nil && !isVoidType(info.fn.Return) {
+		defaultVal, err := g.emitDefaultValue(info.fn.Return)
+		if err != nil {
+			return nil, nil, err
+		}
+		code = append(code, defaultVal...)
+		code = append(code, opcodeReturn)
+	}
 
 	return locals, code, nil
 }
 
-func (g *Generator) emitInstr(info *funcInfo, instr mir.Instr, locals map[mir.ValueID]uint32, fnIndex map[string]uint32) ([]byte, error) {
+func (g *Generator) emitInstr(info *funcInfo, instr mir.Instr, locals map[mir.ValueID]uint32, fnIndex map[string]uint32, scratchLocal uint32) ([]byte, error) {
 	switch v := instr.(type) {
 	case *mir.Const:
 		return g.emitConst(v, locals)
 	case *mir.Binary:
-		return g.emitBinary(v, locals)
+		return g.emitBinary(info, v, locals)
 	case *mir.Unary:
 		return g.emitUnary(v, locals)
 	case *mir.Cast:
@@ -447,9 +500,13 @@ func (g *Generator) emitInstr(info *funcInfo, instr mir.Instr, locals map[mir.Va
 	case *mir.MakeStruct, *mir.ExtractField, *mir.InsertField:
 		g.reportUnsupported("struct op", instr.Loc())
 		return []byte{opcodeUnreachable}, nil
-	case *mir.MakeArray, *mir.ArrayGet, *mir.ArraySet:
+	case *mir.MakeArray:
 		g.reportUnsupported("array op", instr.Loc())
 		return []byte{opcodeUnreachable}, nil
+	case *mir.ArrayGet:
+		return g.emitArrayGet(info, v, locals)
+	case *mir.ArraySet:
+		return g.emitArraySet(info, v, locals, scratchLocal)
 	case *mir.MapGet, *mir.MapSet:
 		g.reportUnsupported("map op", instr.Loc())
 		return []byte{opcodeUnreachable}, nil
@@ -501,7 +558,7 @@ func (g *Generator) emitTerm(info *funcInfo, block *mir.Block, locals map[mir.Va
 		out = append(out, encodeU32(blockLocal)...)
 		out = append(out, opcodeEnd)
 		out = append(out, opcodeBr)
-		out = append(out, encodeU32(1)...)
+		out = append(out, encodeU32(0)...)
 		return out, nil
 	case *mir.Switch:
 		g.reportUnsupported("switch", t.Loc())
@@ -522,7 +579,7 @@ func (g *Generator) emitBranch(pred, target mir.BlockID, locals map[mir.ValueID]
 	out = append(out, opcodeLocalSet)
 	out = append(out, encodeU32(blockLocal)...)
 	out = append(out, opcodeBr)
-	out = append(out, encodeU32(1)...)
+	out = append(out, encodeU32(0)...)
 	return out
 }
 
@@ -591,15 +648,47 @@ func (g *Generator) emitConst(c *mir.Const, locals map[mir.ValueID]uint32) ([]by
 	return out, nil
 }
 
-func (g *Generator) emitBinary(b *mir.Binary, locals map[mir.ValueID]uint32) ([]byte, error) {
-	if b == nil {
-		return nil, nil
-	}
-	valType, err := wasmValueType(b.Type)
+func (g *Generator) emitDefaultValue(typ types.SemType) ([]byte, error) {
+	valType, err := wasmValueType(typ)
 	if err != nil {
 		return nil, err
 	}
-	opcode, err := binaryOpcode(b.Op, valType, isUnsignedType(b.Type))
+	switch valType {
+	case valTypeI32:
+		return []byte{opcodeI32Const, 0x00}, nil
+	case valTypeI64:
+		return []byte{opcodeI64Const, 0x00}, nil
+	case valTypeF32:
+		out := []byte{opcodeF32Const}
+		out = append(out, encodeF32(0)...)
+		return out, nil
+	case valTypeF64:
+		out := []byte{opcodeF64Const}
+		out = append(out, encodeF64(0)...)
+		return out, nil
+	default:
+		return nil, fmt.Errorf("wasm: unsupported default value type")
+	}
+}
+
+func (g *Generator) emitBinary(info *funcInfo, b *mir.Binary, locals map[mir.ValueID]uint32) ([]byte, error) {
+	if b == nil {
+		return nil, nil
+	}
+	if b.Op == tokens.EXP_TOKEN {
+		return g.emitPow(info, b, locals)
+	}
+	opType := b.Type
+	if isCompareToken(b.Op) && info != nil {
+		if leftType, ok := info.valueType[b.Left]; ok && leftType != nil {
+			opType = leftType
+		}
+	}
+	valType, err := wasmValueType(opType)
+	if err != nil {
+		return nil, err
+	}
+	opcode, err := binaryOpcode(b.Op, valType, isUnsignedType(opType))
 	if err != nil {
 		g.reportError(err.Error(), b.Loc())
 		return []byte{opcodeUnreachable}, nil
@@ -613,6 +702,73 @@ func (g *Generator) emitBinary(b *mir.Binary, locals map[mir.ValueID]uint32) ([]
 	out = append(out, opcodeLocalSet)
 	out = append(out, encodeU32(locals[b.Result])...)
 	return out, nil
+}
+
+func (g *Generator) emitPow(info *funcInfo, b *mir.Binary, locals map[mir.ValueID]uint32) ([]byte, error) {
+	if b == nil {
+		return nil, nil
+	}
+	if info == nil {
+		return nil, fmt.Errorf("wasm: missing pow context")
+	}
+	leftType := info.valueType[b.Left]
+	rightType := info.valueType[b.Right]
+	if leftType == nil || rightType == nil {
+		return nil, fmt.Errorf("wasm: missing pow operand type")
+	}
+	powID, ok := g.importIDs["ferret_pow"]
+	if !ok {
+		return nil, fmt.Errorf("wasm: missing import ferret_pow")
+	}
+	var out []byte
+	leftBytes, err := g.emitValueAsF64(b.Left, leftType, locals)
+	if err != nil {
+		return nil, err
+	}
+	rightBytes, err := g.emitValueAsF64(b.Right, rightType, locals)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, leftBytes...)
+	out = append(out, rightBytes...)
+	out = append(out, opcodeCall)
+	out = append(out, encodeU32(powID)...)
+	out = append(out, opcodeLocalSet)
+	out = append(out, encodeU32(locals[b.Result])...)
+	return out, nil
+}
+
+func (g *Generator) emitValueAsF64(id mir.ValueID, typ types.SemType, locals map[mir.ValueID]uint32) ([]byte, error) {
+	valType, err := wasmValueType(typ)
+	if err != nil {
+		return nil, err
+	}
+	var out []byte
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(locals[id])...)
+	switch valType {
+	case valTypeF64:
+		return out, nil
+	case valTypeF32:
+		out = append(out, opcodeF64PromoteF32)
+		return out, nil
+	case valTypeI32:
+		if isUnsignedType(typ) {
+			out = append(out, opcodeF64ConvertI32U)
+		} else {
+			out = append(out, opcodeF64ConvertI32S)
+		}
+		return out, nil
+	case valTypeI64:
+		if isUnsignedType(typ) {
+			out = append(out, opcodeF64ConvertI64U)
+		} else {
+			out = append(out, opcodeF64ConvertI64S)
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("wasm: unsupported pow operand type")
+	}
 }
 
 func (g *Generator) emitUnary(u *mir.Unary, locals map[mir.ValueID]uint32) ([]byte, error) {
@@ -720,6 +876,52 @@ func (g *Generator) emitLoad(l *mir.Load, locals map[mir.ValueID]uint32) ([]byte
 	if l == nil {
 		return nil, nil
 	}
+	if optType, ok := g.optionalType(l.Type); ok {
+		size := g.layout.SizeOf(optType)
+		if size <= 0 {
+			return nil, fmt.Errorf("wasm: invalid optional load size")
+		}
+		allocID, ok := g.importIDs["ferret_alloc"]
+		if !ok {
+			return nil, fmt.Errorf("wasm: missing import ferret_alloc")
+		}
+		var out []byte
+		out = append(out, opcodeI64Const)
+		out = append(out, encodeS64(int64(size))...)
+		out = append(out, opcodeCall)
+		out = append(out, encodeU32(allocID)...)
+		out = append(out, opcodeLocalSet)
+		out = append(out, encodeU32(locals[l.Result])...)
+		copyBytes, err := g.emitMemcpy(locals[l.Result], locals[l.Addr], size)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, copyBytes...)
+		return out, nil
+	}
+	if resType, ok := g.resultType(l.Type); ok {
+		size := g.layout.SizeOf(resType)
+		if size <= 0 {
+			return nil, fmt.Errorf("wasm: invalid result load size")
+		}
+		allocID, ok := g.importIDs["ferret_alloc"]
+		if !ok {
+			return nil, fmt.Errorf("wasm: missing import ferret_alloc")
+		}
+		var out []byte
+		out = append(out, opcodeI64Const)
+		out = append(out, encodeS64(int64(size))...)
+		out = append(out, opcodeCall)
+		out = append(out, encodeU32(allocID)...)
+		out = append(out, opcodeLocalSet)
+		out = append(out, encodeU32(locals[l.Result])...)
+		copyBytes, err := g.emitMemcpy(locals[l.Result], locals[l.Addr], size)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, copyBytes...)
+		return out, nil
+	}
 	op, err := loadOpcode(l.Type)
 	if err != nil {
 		return nil, err
@@ -740,20 +942,226 @@ func (g *Generator) emitStore(info *funcInfo, s *mir.Store, locals map[mir.Value
 	if info == nil {
 		return nil, fmt.Errorf("wasm: missing store context")
 	}
-	typ, ok := info.valueType[s.Value]
+	valType, ok := info.valueType[s.Value]
 	if !ok {
 		return nil, fmt.Errorf("wasm: missing store type")
 	}
-	op, err := storeOpcode(typ)
+	return g.emitStoreValueToAddr(info, s.Value, valType, locals[s.Addr], locals)
+}
+
+func (g *Generator) emitStoreValueToAddr(_ *funcInfo, valID mir.ValueID, valType types.SemType, addrLocal uint32, locals map[mir.ValueID]uint32) ([]byte, error) {
+	if valType == nil {
+		return nil, fmt.Errorf("wasm: missing value type")
+	}
+	if optType, ok := g.optionalType(valType); ok {
+		size := g.layout.SizeOf(optType)
+		if size <= 0 {
+			return nil, fmt.Errorf("wasm: invalid optional store size")
+		}
+		return g.emitMemcpy(addrLocal, locals[valID], size)
+	}
+	if resType, ok := g.resultType(valType); ok {
+		size := g.layout.SizeOf(resType)
+		if size <= 0 {
+			return nil, fmt.Errorf("wasm: invalid result store size")
+		}
+		return g.emitMemcpy(addrLocal, locals[valID], size)
+	}
+	if g.needsByRefType(valType) {
+		size := g.layout.SizeOf(valType)
+		if size <= 0 {
+			return nil, fmt.Errorf("wasm: invalid byref store size")
+		}
+		return g.emitMemcpy(addrLocal, locals[valID], size)
+	}
+	op, err := storeOpcode(valType)
 	if err != nil {
 		return nil, err
 	}
 	var out []byte
 	out = append(out, opcodeLocalGet)
-	out = append(out, encodeU32(locals[s.Addr])...)
+	out = append(out, encodeU32(addrLocal)...)
 	out = append(out, opcodeLocalGet)
-	out = append(out, encodeU32(locals[s.Value])...)
+	out = append(out, encodeU32(locals[valID])...)
 	out = append(out, op...)
+	return out, nil
+}
+
+func (g *Generator) emitValueAddr(valID mir.ValueID, valType types.SemType, locals map[mir.ValueID]uint32, scratchLocal uint32) ([]byte, error) {
+	if valType == nil {
+		return nil, fmt.Errorf("wasm: missing value type")
+	}
+	if g.isAddressValueType(valType) {
+		out := []byte{opcodeLocalGet}
+		out = append(out, encodeU32(locals[valID])...)
+		return out, nil
+	}
+	size := g.layout.SizeOf(valType)
+	if size <= 0 {
+		return nil, fmt.Errorf("wasm: invalid value address size")
+	}
+	allocID, ok := g.importIDs["ferret_alloc"]
+	if !ok {
+		return nil, fmt.Errorf("wasm: missing import ferret_alloc")
+	}
+	var out []byte
+	out = append(out, opcodeI64Const)
+	out = append(out, encodeS64(int64(size))...)
+	out = append(out, opcodeCall)
+	out = append(out, encodeU32(allocID)...)
+	out = append(out, opcodeLocalSet)
+	out = append(out, encodeU32(scratchLocal)...)
+	storeBytes, err := g.emitStoreValueToAddr(nil, valID, valType, scratchLocal, locals)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, storeBytes...)
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(scratchLocal)...)
+	return out, nil
+}
+
+func (g *Generator) emitMemcpy(dstLocal, srcLocal uint32, size int) ([]byte, error) {
+	if size <= 0 {
+		return nil, fmt.Errorf("wasm: invalid memcpy size")
+	}
+	memcpyID, ok := g.importIDs["ferret_memcpy"]
+	if !ok {
+		return nil, fmt.Errorf("wasm: missing import ferret_memcpy")
+	}
+	var out []byte
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(dstLocal)...)
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(srcLocal)...)
+	out = append(out, opcodeI64Const)
+	out = append(out, encodeS64(int64(size))...)
+	out = append(out, opcodeCall)
+	out = append(out, encodeU32(memcpyID)...)
+	return out, nil
+}
+
+func (g *Generator) emitArrayGet(info *funcInfo, a *mir.ArrayGet, locals map[mir.ValueID]uint32) ([]byte, error) {
+	if a == nil || info == nil {
+		return nil, nil
+	}
+	arrType, ok := g.arrayTypeOf(info.valueType[a.Array])
+	if !ok || arrType == nil {
+		g.reportUnsupported("array_get array", a.Loc())
+		return []byte{opcodeUnreachable}, nil
+	}
+	elemType := a.Type
+	elemSize := g.layout.SizeOf(elemType)
+	if elemSize <= 0 {
+		return nil, fmt.Errorf("wasm: invalid array element size")
+	}
+	if arrType.Length >= 0 {
+		var out []byte
+		out = append(out, opcodeLocalGet)
+		out = append(out, encodeU32(locals[a.Array])...)
+		out = append(out, opcodeLocalGet)
+		out = append(out, encodeU32(locals[a.Index])...)
+		if elemSize != 1 {
+			out = append(out, opcodeI32Const)
+			out = append(out, encodeS32(int32(elemSize))...)
+			out = append(out, opcodeI32Mul)
+		}
+		out = append(out, opcodeI32Add)
+		if g.isAddressValueType(elemType) {
+			out = append(out, opcodeLocalSet)
+			out = append(out, encodeU32(locals[a.Result])...)
+			return out, nil
+		}
+		op, err := loadOpcode(elemType)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, op...)
+		out = append(out, opcodeLocalSet)
+		out = append(out, encodeU32(locals[a.Result])...)
+		return out, nil
+	}
+
+	callID, ok := g.importIDs["ferret_array_get"]
+	if !ok {
+		return nil, fmt.Errorf("wasm: missing import ferret_array_get")
+	}
+	var out []byte
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(locals[a.Array])...)
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(locals[a.Index])...)
+	out = append(out, opcodeCall)
+	out = append(out, encodeU32(callID)...)
+	if g.isAddressValueType(elemType) {
+		out = append(out, opcodeLocalSet)
+		out = append(out, encodeU32(locals[a.Result])...)
+		return out, nil
+	}
+	op, err := loadOpcode(elemType)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, op...)
+	out = append(out, opcodeLocalSet)
+	out = append(out, encodeU32(locals[a.Result])...)
+	return out, nil
+}
+
+func (g *Generator) emitArraySet(info *funcInfo, a *mir.ArraySet, locals map[mir.ValueID]uint32, scratchLocal uint32) ([]byte, error) {
+	if a == nil || info == nil {
+		return nil, nil
+	}
+	arrType, ok := g.arrayTypeOf(info.valueType[a.Array])
+	if !ok || arrType == nil {
+		g.reportUnsupported("array_set array", a.Loc())
+		return []byte{opcodeUnreachable}, nil
+	}
+	elemType := arrType.Element
+	elemSize := g.layout.SizeOf(elemType)
+	if elemSize <= 0 {
+		return nil, fmt.Errorf("wasm: invalid array element size")
+	}
+
+	if arrType.Length >= 0 {
+		var out []byte
+		out = append(out, opcodeLocalGet)
+		out = append(out, encodeU32(locals[a.Array])...)
+		out = append(out, opcodeLocalGet)
+		out = append(out, encodeU32(locals[a.Index])...)
+		if elemSize != 1 {
+			out = append(out, opcodeI32Const)
+			out = append(out, encodeS32(int32(elemSize))...)
+			out = append(out, opcodeI32Mul)
+		}
+		out = append(out, opcodeI32Add)
+		out = append(out, opcodeLocalSet)
+		out = append(out, encodeU32(scratchLocal)...)
+		storeBytes, err := g.emitStoreValueToAddr(info, a.Value, elemType, scratchLocal, locals)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, storeBytes...)
+		return out, nil
+	}
+
+	callID, ok := g.importIDs["ferret_array_set"]
+	if !ok {
+		return nil, fmt.Errorf("wasm: missing import ferret_array_set")
+	}
+	valueAddr, err := g.emitValueAddr(a.Value, elemType, locals, scratchLocal)
+	if err != nil {
+		return nil, err
+	}
+	var out []byte
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(locals[a.Array])...)
+	out = append(out, opcodeLocalGet)
+	out = append(out, encodeU32(locals[a.Index])...)
+	out = append(out, valueAddr...)
+	out = append(out, opcodeCall)
+	out = append(out, encodeU32(callID)...)
+	out = append(out, opcodeDrop)
 	return out, nil
 }
 
@@ -1070,6 +1478,98 @@ func collectPhiMoves(blocks []*mir.Block) map[mir.BlockID]map[mir.BlockID][]phiM
 		}
 	}
 	return out
+}
+
+func (g *Generator) optionalType(typ types.SemType) (*types.OptionalType, bool) {
+	if typ == nil {
+		return nil, false
+	}
+	typ = types.UnwrapType(typ)
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = types.UnwrapType(ref.Inner)
+	}
+	opt, ok := typ.(*types.OptionalType)
+	return opt, ok
+}
+
+func (g *Generator) resultType(typ types.SemType) (*types.ResultType, bool) {
+	if typ == nil {
+		return nil, false
+	}
+	typ = types.UnwrapType(typ)
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = types.UnwrapType(ref.Inner)
+	}
+	res, ok := typ.(*types.ResultType)
+	return res, ok
+}
+
+func (g *Generator) arrayTypeOf(typ types.SemType) (*types.ArrayType, bool) {
+	if typ == nil {
+		return nil, false
+	}
+	typ = types.UnwrapType(typ)
+	if ref, ok := typ.(*types.ReferenceType); ok {
+		typ = types.UnwrapType(ref.Inner)
+	}
+	arr, ok := typ.(*types.ArrayType)
+	return arr, ok
+}
+
+func (g *Generator) isAddressValueType(typ types.SemType) bool {
+	if g.needsByRefType(typ) {
+		return true
+	}
+	if _, ok := g.optionalType(typ); ok {
+		return true
+	}
+	if _, ok := g.resultType(typ); ok {
+		return true
+	}
+	return false
+}
+
+func (g *Generator) needsByRefType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	if isLargePrimitiveType(typ) {
+		return true
+	}
+	if _, ok := typ.(*types.StructType); ok {
+		return true
+	}
+	if arr, ok := typ.(*types.ArrayType); ok && arr.Length >= 0 {
+		return true
+	}
+	if iface, ok := typ.(*types.InterfaceType); ok && len(iface.Methods) > 0 {
+		return true
+	}
+	if named, ok := typ.(*types.NamedType); ok {
+		if iface, ok := named.Underlying.(*types.InterfaceType); ok && len(iface.Methods) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func isLargePrimitiveType(typ types.SemType) bool {
+	if typ == nil {
+		return false
+	}
+	typ = types.UnwrapType(typ)
+	prim, ok := typ.(*types.PrimitiveType)
+	if !ok {
+		return false
+	}
+	switch prim.GetName() {
+	case types.TYPE_I128, types.TYPE_U128, types.TYPE_I256, types.TYPE_U256,
+		types.TYPE_F128, types.TYPE_F256:
+		return true
+	default:
+		return false
+	}
 }
 
 func wasmValueType(typ types.SemType) (ValType, error) {

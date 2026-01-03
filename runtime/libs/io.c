@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <limits.h>
+#include "../core/alloc.h"
 #include "../core/array.h"
 #include "../core/bigint.h"
 
@@ -165,6 +166,27 @@ void ferret_std_io_Print(void* slice_ptr) {
 void ferret_std_io_Println(void* slice_ptr) {
     ferret_std_io_Print(slice_ptr);
     printf("\n");
+}
+
+// Read a line from stdin, returns str (unsafe, no result wrapper)
+char* ferret_std_io_ReadUnsafe(void) {
+    char* line = NULL;
+    size_t len = 0;
+    ssize_t read = getline(&line, &len, stdin);
+
+    if (read == -1) {
+        if (line) free(line);
+        char* empty = (char*)ferret_alloc(1);
+        if (empty != NULL) {
+            empty[0] = '\0';
+        }
+        return empty;
+    }
+
+    if (read > 0 && line[read - 1] == '\n') {
+        line[read - 1] = '\0';
+    }
+    return line;
 }
 
 // Result type layout for str!str: [union: str (8 bytes)][tag: i32 (4 bytes)] = 12 bytes (+ padding)

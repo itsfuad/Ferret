@@ -2,8 +2,10 @@
 // These are declarations only; implementations are compiler intrinsics.
 
 // @extern
+// Note: builtins take plain values; the compiler optimizes references internally.
 fn len(value: interface {}) -> i32;
 // @extern
+// Note: builtins take plain values; the compiler optimizes references internally.
 fn append(values: []interface {}, value: interface {}) -> bool;
 // @extern
 fn panic(msg: str) -> void;

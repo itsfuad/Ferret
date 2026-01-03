@@ -34,3 +34,5 @@ fn ReadInt() -> str ! i32;
 fn ReadFloat() -> str ! f64;
 // @extern
 fn Read() -> str ! str;
+// @extern
+fn ReadUnsafe() -> str;
