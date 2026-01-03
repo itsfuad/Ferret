@@ -48,7 +48,7 @@
   - [x] QBE support for map indexing/assignment (MapGet/MapSet + optionals).
 - [x] Interfaces (depends on structs/enums + methods)
   - [x] Interface representation (vtable layout + method dispatch).
-- [ ] References + borrowing (design + implementation)
+- [x] References + borrowing (design + implementation)
   - [x] Add unary `&` expression parsing and HIR/MIR lowering (address-of).
   - [x] Enforce borrowable lvalues only; disallow `&&T` and `&` on temporaries.
   - [x] Reference binding rules: `&T` must be initialized with a reference; no rebinding after init.
@@ -60,8 +60,8 @@
   - [x] Function literals and closure capture strategy (if supported in AST).
 - [x] Error flow (depends on large primitive support)
   - [x] MIR lowering for result/catch paths.
-- [ ] Backend targets
+- [x] Backend targets
   - [x] Win64 ABI for QBE (amd64_win64 target + emitter + embedding).
-  - [ ] MIR -> (JS later).
-  - [x] Decide runtime behavior for dynamic array OOB (panic via ferret_panic).
+  - [x] WASM
+  - [x] Decide runtime behavior for dynamic array OOB (panic via ferret_global_panic).
   - [x] Add non-PIE build flags for QBE outputs (Linux/macOS/OpenBSD).

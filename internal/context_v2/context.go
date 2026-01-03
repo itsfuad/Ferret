@@ -177,6 +177,9 @@ type CompilerContext struct {
 
 	// Configuration
 	Config *Config
+
+	// CodegenOutput holds in-memory output for backends that emit bytes (e.g., wasm).
+	CodegenOutput []byte
 }
 
 // Config holds compiler configuration

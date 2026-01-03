@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"maps"
 	"compiler/internal/context_v2"
 	"compiler/internal/types"
 )
@@ -33,8 +34,6 @@ func StoreOptionalTypes(mod *context_v2.Module, optTypes map[string]types.SemTyp
 	}
 
 	copied := make(map[string]types.SemType, len(optTypes))
-	for k, v := range optTypes {
-		copied[k] = v
-	}
+	maps.Copy(copied, optTypes)
 	mod.Artifacts[optionalTypesKey] = copied
 }

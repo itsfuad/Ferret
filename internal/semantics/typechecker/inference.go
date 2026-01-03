@@ -29,9 +29,10 @@ func inferLiteralType(lit *ast.BasicLit, expected types.SemType) types.SemType {
 		expectedUnwrapped := types.UnwrapType(expected)
 		if !expected.Equals(types.TypeUnknown) && types.IsInteger(expectedUnwrapped) {
 			if _, ok := types.GetPrimitiveName(expectedUnwrapped); ok {
-				// Value must fit in expected type (fitness check happens in checkFitness)
-				// Return the expected type (which may be a NamedType) to preserve the type name
-				return expected
+				if fitsInType(lit.Value, expectedUnwrapped) {
+					// Return the expected type (which may be a NamedType) to preserve the type name
+					return expected
+				}
 			}
 		}
 
@@ -66,9 +67,10 @@ func inferLiteralType(lit *ast.BasicLit, expected types.SemType) types.SemType {
 		expectedUnwrapped := types.UnwrapType(expected)
 		if !expected.Equals(types.TypeUnknown) && types.IsFloat(expectedUnwrapped) {
 			if _, ok := types.GetPrimitiveName(expectedUnwrapped); ok {
-				// Value must fit in expected type (fitness check happens in checkFitness)
-				// Return the expected type (which may be a NamedType) to preserve the type name
-				return expected
+				if fitsInType(lit.Value, expectedUnwrapped) {
+					// Return the expected type (which may be a NamedType) to preserve the type name
+					return expected
+				}
 			}
 		}
 
@@ -183,7 +185,14 @@ func inferExprType(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr
 	case *ast.BasicLit:
 		// For pure inference (no context), return untyped types
 		// This allows contextualization in checkExpr when expected type is provided
-		return inferLiteralType(e, types.TypeUnknown)
+		switch e.Kind {
+		case ast.INT:
+			return types.TypeUntypedInt
+		case ast.FLOAT:
+			return types.TypeUntypedFloat
+		default:
+			return inferLiteralType(e, types.TypeUnknown)
+		}
 
 	case *ast.IdentifierExpr:
 		return inferIdentifierType(ctx, mod, e)

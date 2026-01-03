@@ -32,8 +32,8 @@ typedef long long ssize_t;
 #define PATH_SEP '/'
 #endif
 
-// Result layout: [8-byte union (value or error str)][4-byte tag]
-// Tag: 0 = Ok, 1 = Err
+// Result layout: [8-byte union (value or error str)][1-byte tag] (+ padding)
+// Tag: 1 = Ok, 0 = Err
 
 // FileInfo struct layout: { str path, i64 size, bool isDir, bool isFile, bool exists }
 // File struct layout: { i64 handle, str path, str mode }

@@ -1,8 +1,10 @@
 package typechecker
 
 import (
+	"compiler/internal/utils/numeric"
 	str "compiler/internal/utils/strings"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"compiler/internal/context_v2"
@@ -354,6 +356,10 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 					// Returning error: return "error message"!
 					returnedType := checkExpr(ctx, mod, n.Result, resultType.Err)
 
+					if ok := checkFitness(ctx, resultType.Err, n.Result, nil); !ok {
+						return
+					}
+
 					// Resolve untyped literals
 					if types.IsUntyped(returnedType) {
 						if lit, ok := n.Result.(*ast.BasicLit); ok {
@@ -378,6 +384,10 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 				} else {
 					// Returning success: return value
 					returnedType := checkExpr(ctx, mod, n.Result, resultType.Ok)
+
+					if ok := checkFitness(ctx, resultType.Ok, n.Result, nil); !ok {
+						return
+					}
 
 					// Resolve untyped literals
 					if types.IsUntyped(returnedType) {
@@ -410,6 +420,9 @@ func checkNode(ctx *context_v2.CompilerContext, mod *context_v2.Module, node ast
 				} else {
 					// Normal return type checking
 					returnedType := checkExpr(ctx, mod, n.Result, expectedReturnType)
+					if ok := checkFitness(ctx, expectedReturnType, n.Result, nil); !ok {
+						return
+					}
 					if !expectedReturnType.Equals(types.TypeUnknown) && !returnedType.Equals(types.TypeUnknown) {
 						compatibility := checkTypeCompatibility(returnedType, expectedReturnType)
 						if !isImplicitlyCompatible(compatibility) {
@@ -756,8 +769,16 @@ func checkVarDecl(ctx *context_v2.CompilerContext, mod *context_v2.Module, decl 
 
 			// If the RHS is UNTYPED, finalize it to a default type
 			if types.IsUntyped(rhsType) {
-				if lit, ok := item.Value.(*ast.BasicLit); ok {
-					rhsType = inferLiteralType(lit, types.TypeUnknown)
+				if resolved, ok := resolveUntypedNumericExpr(item.Value); ok {
+					rhsType = resolved
+					if rhsType.Equals(types.TypeUnknown) {
+						reportNumericConstTooLarge(ctx, item.Value)
+					}
+				} else {
+					rhsType = resolveType(rhsType, types.TypeUnknown)
+				}
+				if mod != nil {
+					mod.SetExprType(item.Value, rhsType)
 				}
 			}
 
@@ -878,7 +899,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 
 		// Both numeric - check for strict type match
 		if lhsNumericOrUntyped && rhsNumericOrUntyped {
-			// Allow untyped operands - they will be contextualized
+			// Allow untyped operands - literal fitness is checked earlier
 			if types.IsUntyped(lhsBase) || types.IsUntyped(rhsBase) {
 				return
 			}
@@ -906,7 +927,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		return
 
 	case tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN:
-		// Allow untyped operands - they will be contextualized
+		// Allow untyped operands - literal fitness is checked earlier
 		if types.IsUntyped(lhsBase) || types.IsUntyped(rhsBase) {
 			return
 		}
@@ -937,7 +958,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		}
 
 	case tokens.DOUBLE_EQUAL_TOKEN, tokens.NOT_EQUAL_TOKEN:
-		// Allow untyped operands for comparisons - they will be contextualized
+		// Allow untyped operands for comparisons - literal fitness is checked earlier
 		if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
 			return
 		}
@@ -971,7 +992,7 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 		}
 
 	case tokens.LESS_TOKEN, tokens.LESS_EQUAL_TOKEN, tokens.GREATER_TOKEN, tokens.GREATER_EQUAL_TOKEN:
-		// Allow untyped operands for ordering comparisons - they will be contextualized
+		// Allow untyped operands for ordering comparisons - literal fitness is checked earlier
 		if types.IsUntyped(lhsType) || types.IsUntyped(rhsType) {
 			return
 		}
@@ -998,6 +1019,60 @@ func checkBinaryExpr(ctx *context_v2.CompilerContext, _ *context_v2.Module, expr
 			)
 		}
 	}
+}
+
+func bindUntypedNumericLiteral(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast.Expression, exprType, otherType types.SemType, otherExpr ast.Expression) types.SemType {
+	if !types.IsUntyped(exprType) {
+		return exprType
+	}
+
+	if otherType == nil || otherType.Equals(types.TypeUnknown) || types.IsUntyped(otherType) {
+		return exprType
+	}
+
+	value, ok := evaluateNumericConst(expr)
+	if !ok {
+		return exprType
+	}
+
+	otherBase := dereferenceType(types.UnwrapType(otherType))
+	if !types.IsNumeric(otherBase) {
+		return exprType
+	}
+
+	if value.kind == ast.FLOAT && !types.IsFloat(otherBase) {
+		reportNumericLiteralTypeMismatch(ctx, expr, otherExpr, "float", otherType)
+		return types.TypeUnknown
+	}
+	if value.kind == ast.INT && !types.IsInteger(otherBase) {
+		reportNumericLiteralTypeMismatch(ctx, expr, otherExpr, "integer", otherType)
+		return types.TypeUnknown
+	}
+
+	if !checkFitness(ctx, otherType, expr, otherExpr) {
+		return types.TypeUnknown
+	}
+
+	if mod != nil {
+		mod.SetExprType(expr, otherType)
+	}
+	return otherType
+}
+
+func reportNumericLiteralTypeMismatch(ctx *context_v2.CompilerContext, literal ast.Expression, otherExpr ast.Expression, literalKind string, targetType types.SemType) {
+	if ctx == nil || literal == nil {
+		return
+	}
+
+	diag := diagnostics.NewError(fmt.Sprintf("cannot use %s literal as type '%s'", literalKind, targetType.String())).
+		WithCode(diagnostics.ErrTypeMismatch).
+		WithPrimaryLabel(literal.Loc(), fmt.Sprintf("%s literal", literalKind))
+
+	if otherExpr != nil {
+		diag = diag.WithSecondaryLabel(otherExpr.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
+	}
+
+	ctx.Diagnostics.Add(diag)
 }
 
 // checkCastExpr validates that a cast expression is valid
@@ -2332,8 +2407,11 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			}
 		}
 
-		// For non-'is' operators, check RHS normally
+		// For non-'is' operators, check RHS normally, then bind untyped literals to typed operands.
 		rhsType := checkExpr(ctx, mod, e.Y, types.TypeUnknown)
+
+		lhsType = bindUntypedNumericLiteral(ctx, mod, e.X, lhsType, rhsType, e.Y)
+		rhsType = bindUntypedNumericLiteral(ctx, mod, e.Y, rhsType, lhsType, e.X)
 		{
 			// Validate operand type compatibility for regular binary ops
 			checkBinaryExpr(ctx, mod, e, lhsType, rhsType)
@@ -2361,7 +2439,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			default:
 				resultType = types.TypeUnknown
 			}
-			mod.SetExprType(expr, resultType)
+			mod.SetExprType(expr, resolveNumericExprTypeForModule(ctx, expr, expected, resultType))
 			return resultType
 		}
 
@@ -2377,15 +2455,36 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 			}
 			mod.SetExprType(expr, refType)
 			return refType
-		} else {
-			// For other unary ops like -, return operand type
-			mod.SetExprType(expr, operandType)
-			return operandType
 		}
 
+		// For other unary ops like -, return operand type
+		mod.SetExprType(expr, resolveNumericExprTypeForModule(ctx, expr, expected, operandType))
+		return operandType
+
 	case *ast.BasicLit:
-		// Return the inferred literal type
-		litType := inferLiteralType(e, expected)
+		// Keep numeric literals untyped when there's no expected type,
+		// but still record a concrete type for codegen.
+		if expected.Equals(types.TypeUnknown) && (e.Kind == ast.INT || e.Kind == ast.FLOAT) {
+			var litType types.SemType
+			if e.Kind == ast.INT {
+				litType = types.TypeUntypedInt
+			} else {
+				litType = types.TypeUntypedFloat
+			}
+			if mod != nil {
+				mod.SetExprType(expr, inferLiteralType(e, types.TypeUnknown))
+			}
+			return litType
+		}
+
+		expectedForLit := expected
+		if e.Kind == ast.INT || e.Kind == ast.FLOAT {
+			expectedForLit = unwrapOptionalType(expected)
+		}
+		litType := inferLiteralType(e, expectedForLit)
+		if optType, ok := expected.(*types.OptionalType); ok && litType.Equals(optType.Inner) {
+			litType = expected
+		}
 		mod.SetExprType(expr, litType)
 		return litType
 	case *ast.PrefixExpr:
@@ -2423,7 +2522,7 @@ func checkExpr(ctx *context_v2.CompilerContext, mod *context_v2.Module, expr ast
 		// Check inner expression
 		innerType := checkExpr(ctx, mod, e.X, expected)
 		if mod != nil {
-			mod.SetExprType(expr, innerType)
+			mod.SetExprType(expr, resolveNumericExprTypeForModule(ctx, expr, expected, innerType))
 		}
 		return innerType
 
@@ -2704,40 +2803,381 @@ func formatValueDescription(typ types.SemType, expr ast.Expression) string {
 	return fmt.Sprintf("type '%s'", typ.String())
 }
 
+type numericConst struct {
+	kind     ast.LiteralKind
+	intVal   *big.Int
+	floatVal *big.Float
+}
+
+func evaluateNumericConst(expr ast.Expression) (numericConst, bool) {
+	if expr == nil {
+		return numericConst{}, false
+	}
+
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		switch e.Kind {
+		case ast.INT:
+			val, ok := parseIntLiteral(e.Value)
+			if !ok {
+				return numericConst{}, false
+			}
+			return numericConst{kind: ast.INT, intVal: val}, true
+		case ast.FLOAT:
+			val, ok := parseFloatLiteral(e.Value)
+			if !ok {
+				return numericConst{}, false
+			}
+			return numericConst{kind: ast.FLOAT, floatVal: val}, true
+		}
+
+	case *ast.UnaryExpr:
+		if e.Op.Kind != tokens.MINUS_TOKEN && e.Op.Kind != tokens.PLUS_TOKEN {
+			return numericConst{}, false
+		}
+		inner, ok := evaluateNumericConst(e.X)
+		if !ok {
+			return numericConst{}, false
+		}
+		switch inner.kind {
+		case ast.INT:
+			val := new(big.Int).Set(inner.intVal)
+			if e.Op.Kind == tokens.MINUS_TOKEN {
+				val.Neg(val)
+			}
+			return numericConst{kind: ast.INT, intVal: val}, true
+		case ast.FLOAT:
+			val := new(big.Float).SetPrec(256).Set(inner.floatVal)
+			if e.Op.Kind == tokens.MINUS_TOKEN {
+				val.Neg(val)
+			}
+			return numericConst{kind: ast.FLOAT, floatVal: val}, true
+		}
+
+	case *ast.BinaryExpr:
+		if !isNumericConstOp(e.Op.Kind) {
+			return numericConst{}, false
+		}
+		left, ok := evaluateNumericConst(e.X)
+		if !ok {
+			return numericConst{}, false
+		}
+		right, ok := evaluateNumericConst(e.Y)
+		if !ok {
+			return numericConst{}, false
+		}
+		kind := ast.INT
+		if left.kind == ast.FLOAT || right.kind == ast.FLOAT {
+			kind = ast.FLOAT
+		}
+		if kind == ast.FLOAT {
+			return evalFloatBinaryConst(left, right, e.Op.Kind)
+		}
+		return evalIntBinaryConst(left, right, e.Op.Kind)
+
+	case *ast.ParenExpr:
+		return evaluateNumericConst(e.X)
+	}
+
+	return numericConst{}, false
+}
+
+func isNumericConstOp(op tokens.TOKEN) bool {
+	switch op {
+	case tokens.PLUS_TOKEN, tokens.MINUS_TOKEN, tokens.MUL_TOKEN, tokens.DIV_TOKEN, tokens.MOD_TOKEN,
+		tokens.EXP_TOKEN, tokens.BIT_AND_TOKEN, tokens.BIT_OR_TOKEN, tokens.BIT_XOR_TOKEN:
+		return true
+	default:
+		return false
+	}
+}
+
+func evalIntBinaryConst(left, right numericConst, op tokens.TOKEN) (numericConst, bool) {
+	if left.intVal == nil || right.intVal == nil {
+		return numericConst{}, false
+	}
+	lhs := new(big.Int).Set(left.intVal)
+	rhs := new(big.Int).Set(right.intVal)
+
+	switch op {
+	case tokens.PLUS_TOKEN:
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Add(lhs, rhs)}, true
+	case tokens.MINUS_TOKEN:
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Sub(lhs, rhs)}, true
+	case tokens.MUL_TOKEN:
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Mul(lhs, rhs)}, true
+	case tokens.DIV_TOKEN:
+		if rhs.Sign() == 0 {
+			return numericConst{}, false
+		}
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Div(lhs, rhs)}, true
+	case tokens.MOD_TOKEN:
+		if rhs.Sign() == 0 {
+			return numericConst{}, false
+		}
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Mod(lhs, rhs)}, true
+	case tokens.EXP_TOKEN:
+		if rhs.Sign() < 0 {
+			return numericConst{}, false
+		}
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Exp(lhs, rhs, nil)}, true
+	case tokens.BIT_AND_TOKEN:
+		return numericConst{kind: ast.INT, intVal: new(big.Int).And(lhs, rhs)}, true
+	case tokens.BIT_OR_TOKEN:
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Or(lhs, rhs)}, true
+	case tokens.BIT_XOR_TOKEN:
+		return numericConst{kind: ast.INT, intVal: new(big.Int).Xor(lhs, rhs)}, true
+	default:
+		return numericConst{}, false
+	}
+}
+
+func evalFloatBinaryConst(left, right numericConst, op tokens.TOKEN) (numericConst, bool) {
+	lhs := numericConstToFloat(left)
+	rhs := numericConstToFloat(right)
+	if lhs == nil || rhs == nil {
+		return numericConst{}, false
+	}
+
+	switch op {
+	case tokens.PLUS_TOKEN:
+		return numericConst{kind: ast.FLOAT, floatVal: new(big.Float).SetPrec(256).Add(lhs, rhs)}, true
+	case tokens.MINUS_TOKEN:
+		return numericConst{kind: ast.FLOAT, floatVal: new(big.Float).SetPrec(256).Sub(lhs, rhs)}, true
+	case tokens.MUL_TOKEN:
+		return numericConst{kind: ast.FLOAT, floatVal: new(big.Float).SetPrec(256).Mul(lhs, rhs)}, true
+	case tokens.DIV_TOKEN:
+		if rhs.Sign() == 0 {
+			return numericConst{}, false
+		}
+		return numericConst{kind: ast.FLOAT, floatVal: new(big.Float).SetPrec(256).Quo(lhs, rhs)}, true
+	default:
+		return numericConst{}, false
+	}
+}
+
+func numericConstToFloat(value numericConst) *big.Float {
+	switch value.kind {
+	case ast.FLOAT:
+		return new(big.Float).SetPrec(256).Set(value.floatVal)
+	case ast.INT:
+		if value.intVal == nil {
+			return nil
+		}
+		return new(big.Float).SetPrec(256).SetInt(value.intVal)
+	default:
+		return nil
+	}
+}
+
+func parseIntLiteral(value string) (*big.Int, bool) {
+	sign := 1
+	if strings.HasPrefix(value, "+") {
+		value = value[1:]
+	} else if strings.HasPrefix(value, "-") {
+		sign = -1
+		value = value[1:]
+	}
+	if value == "" {
+		return nil, false
+	}
+	abs, err := numeric.StringToBigInt(value)
+	if err != nil {
+		return nil, false
+	}
+	if sign < 0 {
+		abs.Neg(abs)
+	}
+	return abs, true
+}
+
+func parseFloatLiteral(value string) (*big.Float, bool) {
+	cleaned := strings.ReplaceAll(value, "_", "")
+	val, _, err := big.ParseFloat(cleaned, 10, 256, big.ToNearestEven)
+	if err != nil {
+		return nil, false
+	}
+	return val, true
+}
+
+func numericConstValueString(value numericConst) string {
+	switch value.kind {
+	case ast.INT:
+		if value.intVal != nil {
+			return value.intVal.String()
+		}
+	case ast.FLOAT:
+		if value.floatVal != nil {
+			return value.floatVal.Text('g', -1)
+		}
+	}
+	return ""
+}
+
+func resolveUntypedNumericExpr(expr ast.Expression) (types.SemType, bool) {
+	value, ok := evaluateNumericConst(expr)
+	if !ok {
+		return types.TypeUnknown, false
+	}
+
+	litValue := numericConstValueString(value)
+	if litValue == "" {
+		return types.TypeUnknown, true
+	}
+
+	lit := &ast.BasicLit{
+		Kind:  value.kind,
+		Value: litValue,
+	}
+	return inferLiteralType(lit, types.TypeUnknown), true
+}
+
+func reportNumericConstTooLarge(ctx *context_v2.CompilerContext, expr ast.Expression) {
+	if ctx == nil || expr == nil {
+		return
+	}
+	value, ok := evaluateNumericConst(expr)
+	if !ok {
+		return
+	}
+	litValue := numericConstValueString(value)
+	if litValue == "" {
+		return
+	}
+	switch value.kind {
+	case ast.INT:
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("integer literal %s exceeds maximum supported integer size (256-bit)", litValue)).
+				WithPrimaryLabel(expr.Loc(), "too large value").
+				WithNote("maximum supported integer type is i256 (256-bit signed integer)").
+				WithHelp("consider using a string representation or splitting the value"),
+		)
+	case ast.FLOAT:
+		digits := countSignificantDigits(litValue)
+		ctx.Diagnostics.Add(
+			diagnostics.NewError(fmt.Sprintf("float literal has %d significant digits, exceeds maximum supported precision (f256, ~71 digits)", digits)).
+				WithPrimaryLabel(expr.Loc(), "too large value").
+				WithNote("maximum supported float type is f256 with ~71 significant digits").
+				WithHelp("consider reducing precision or using a different representation"),
+		)
+	}
+}
+
+func resolveNumericExprTypeForModule(ctx *context_v2.CompilerContext, expr ast.Expression, expected, resultType types.SemType) types.SemType {
+	if !types.IsUntyped(resultType) {
+		return resultType
+	}
+
+	expectedBase := unwrapOptionalType(expected)
+	expectedUnwrapped := dereferenceType(types.UnwrapType(expectedBase))
+	if !expected.Equals(types.TypeUnknown) && types.IsNumeric(expectedUnwrapped) {
+		if value, ok := evaluateNumericConst(expr); ok {
+			valueStr := numericConstValueString(value)
+			if valueStr != "" {
+				if value.kind == ast.INT && types.IsInteger(expectedUnwrapped) && fitsInType(valueStr, expectedUnwrapped) {
+					return expected
+				}
+				if value.kind == ast.FLOAT && types.IsFloat(expectedUnwrapped) && fitsInType(valueStr, expectedUnwrapped) {
+					return expected
+				}
+			}
+		}
+	}
+
+	if resolved, ok := resolveUntypedNumericExpr(expr); ok && !resolved.Equals(types.TypeUnknown) {
+		return resolved
+	}
+
+	return resultType
+}
+
+func formatIntegerTypeSuggestions(targetName types.TYPE_NAME, minUnsigned, minSigned types.TYPE_NAME) string {
+	var parts []string
+	if types.IsUnsigned(targetName) {
+		if minUnsigned != types.TYPE_UNKNOWN {
+			parts = append(parts, string(minUnsigned))
+		}
+	} else if types.IsSigned(targetName) {
+		if minUnsigned != types.TYPE_UNKNOWN {
+			parts = append(parts, string(minUnsigned))
+		}
+		if minSigned != types.TYPE_UNKNOWN {
+			parts = append(parts, string(minSigned))
+		}
+	} else {
+		if minUnsigned != types.TYPE_UNKNOWN {
+			parts = append(parts, string(minUnsigned))
+		}
+		if minSigned != types.TYPE_UNKNOWN {
+			parts = append(parts, string(minSigned))
+		}
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	
+	if len(parts) == 2 {
+		return fmt.Sprintf("%s or %s", parts[0], parts[1])
+	}
+	
+	// join the last part with 'or' and others with ','
+	if len(parts) > 2 {
+		return fmt.Sprintf("%s, or %s", strings.Join(parts[:len(parts)-1], ", "), parts[len(parts)-1])
+	}
+	
+	return parts[0]
+}
+
 func checkFitness(ctx *context_v2.CompilerContext, targetType types.SemType, valueExpr ast.Expression, typeNode ast.Node) bool {
+	value, ok := evaluateNumericConst(valueExpr)
+	if !ok {
+		return true
+	}
+	valueStr := numericConstValueString(value)
+	if valueStr == "" {
+		return true
+	}
+	targetBase := dereferenceType(types.UnwrapType(targetType))
+
 	// Check integer literal overflow
 	// Check literal directly (works for both untyped and already-resolved literals)
-	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.INT {
-		if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsIntegerTypeName(targetName) {
+	if value.kind == ast.INT {
+		if targetName, ok := types.GetPrimitiveName(targetBase); ok && types.IsIntegerTypeName(targetName) {
 			// Use big.Int for all range checking (simpler, consistent)
-			if !fitsInType(lit.Value, targetType) {
-				// Get minimum type that can hold this value
-				minType := getMinimumTypeForValue(lit.Value)
+			if !fitsInType(valueStr, targetBase) {
+				// Get minimum types that can hold this value
+				minUnsigned, minSigned := getMinimumTypeOptionsForValue(valueStr)
+				suggestions := formatIntegerTypeSuggestions(targetName, minUnsigned, minSigned)
+				hasSuggestion := len(suggestions) > 0
+				hasSigned := minSigned != types.TYPE_UNKNOWN
 
 				// Build error message
-				diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", lit.Value, targetType.String()))
+				diag := diagnostics.NewError(fmt.Sprintf("integer literal %s overflows %s", valueStr, targetType.String()))
 
 				if typeNode != nil {
 					// Show value location (primary) and type location (secondary)
-					if minType != "unknown" && minType != "too large for any supported type" {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required to store this value", minType)).
+					if hasSuggestion {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required to store this value", suggestions)).
 							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
-					} else if minType == "too large for any supported type" {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "exceeds maximum supported integer size (256-bit)").
+					} else if hasSigned {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "value is negative; requires signed integer type").
 							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 					} else {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "value too large for this type").
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "exceeds maximum supported integer size (256-bit)").
 							WithSecondaryLabel(typeNode.Loc(), fmt.Sprintf("type '%s'", targetType.String()))
 					}
 				} else {
-					if minType != "unknown" && minType != "too large for any supported type" {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required, got %s", minType, targetType.String()))
+					if hasSuggestion {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("at least %s required, got %s", suggestions, targetType.String()))
+					} else if hasSigned {
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value is negative; cannot use %s", targetType.String()))
 					} else {
-						diag = diag.WithPrimaryLabel(valueExpr.Loc(), fmt.Sprintf("value doesn't fit in %s", targetType.String()))
+						diag = diag.WithPrimaryLabel(valueExpr.Loc(), "exceeds maximum supported integer size (256-bit)")
 					}
 				}
 
-				diag = diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetType)))
+				diag = diag.WithNote(fmt.Sprintf("%s can hold values in range: %s", targetType.String(), getTypeRange(targetBase)))
 
 				ctx.Diagnostics.Add(diag)
 				return false
@@ -2747,11 +3187,11 @@ func checkFitness(ctx *context_v2.CompilerContext, targetType types.SemType, val
 
 	// Check float literal precision
 	// Check literal directly (works for both untyped and already-resolved literals)
-	if lit, ok := valueExpr.(*ast.BasicLit); ok && lit.Kind == ast.FLOAT {
-		if targetName, ok := types.GetPrimitiveName(targetType); ok && types.IsFloatTypeName(targetName) {
-			if !fitsInType(lit.Value, targetType) {
+	if value.kind == ast.FLOAT {
+		if targetName, ok := types.GetPrimitiveName(targetBase); ok && types.IsFloatTypeName(targetName) {
+			if !fitsInType(valueStr, targetBase) {
 				// Get minimum type that can hold this precision
-				digits := countSignificantDigits(lit.Value)
+				digits := countSignificantDigits(valueStr)
 				minType := getMinimumFloatTypeForDigits(digits)
 
 				// Build error message
@@ -3121,6 +3561,10 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 			}
 		}
 
+		if ok := checkFitness(ctx, param.Type, arg, nil); !ok {
+			continue
+		}
+
 		// Check compatibility (use WithContext to handle interfaces properly)
 		compatibility := checkTypeCompatibility(argType, param.Type)
 
@@ -3178,6 +3622,10 @@ func validateCallArgumentTypes(ctx *context_v2.CompilerContext, mod *context_v2.
 					)
 					continue
 				}
+			}
+
+			if ok := checkFitness(ctx, variadicElemType, arg, nil); !ok {
+				continue
 			}
 
 			// Check compatibility with variadic element type (use WithContext to handle interfaces properly)

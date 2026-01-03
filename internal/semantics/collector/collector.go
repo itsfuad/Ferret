@@ -374,12 +374,14 @@ func collectFuncDeclSignature(ctx *context_v2.CompilerContext, mod *context_v2.M
 					WithCode(diagnostics.ErrInvalidDeclaration).
 					WithPrimaryLabel(decl.Body.Loc(), "remove the body"),
 			)
-		} else if mod.ImportPath == context_v2.GlobalModuleImport {
-			sym.IsBuiltin = true
-			sym.BuiltinName = name
 		} else {
-			sym.IsNative = true
-			sym.NativeName = externNativeName(mod.ImportPath, name)
+			if mod.ImportPath == context_v2.GlobalModuleImport && isIntrinsicBuiltin(name) {
+				sym.IsBuiltin = true
+				sym.BuiltinName = name
+			} else {
+				sym.IsNative = true
+				sym.NativeName = externNativeName(mod.ImportPath, name)
+			}
 		}
 	}
 
@@ -417,6 +419,15 @@ func hasExternTag(doc *ast.CommentGroup) bool {
 		return false
 	}
 	return strings.Contains(doc.Text, "@extern")
+}
+
+func isIntrinsicBuiltin(name string) bool {
+	switch name {
+	case "len", "append":
+		return true
+	default:
+		return false
+	}
 }
 
 func externNativeName(importPath, name string) string {

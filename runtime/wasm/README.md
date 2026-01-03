@@ -1,0 +1,52 @@
+# Ferret WASM Runtime (Browser)
+
+This runtime provides the minimal JS imports the browser-only WASM backend expects.
+
+## Build the compiler (WASM)
+
+From the repo root:
+
+```bash
+scripts/build-playground-wasm.sh
+```
+
+On Windows:
+
+```bat
+scripts\\build-playground-wasm.bat
+```
+
+This builds `bin/ferret.wasm` and, if the website repo is a sibling, automatically
+copies it to `../website/public/ferret2.wasm`.
+
+### Manual build + copy
+
+```bash
+GOOS=js GOARCH=wasm go build -o bin/ferret.wasm main_wasm.go
+cp bin/ferret.wasm ../website/public/ferret2.wasm
+```
+
+Windows copy:
+
+```bat
+copy /Y bin\\ferret.wasm ..\\website\\public\\ferret2.wasm
+```
+
+Notes:
+- `ferret_libs` is embedded into the compiler wasm. Rebuild after updating libs.
+- The playground fetches `ferret2.wasm` by default.
+
+Usage (sketch):
+
+```js
+import { createFerretRuntime } from "./runtime.js";
+
+const rt = createFerretRuntime();
+const { instance } = await WebAssembly.instantiateStreaming(fetch("program.wasm"), rt.imports);
+rt.bind(instance);
+instance.exports.main();
+```
+
+Notes:
+- `ferret_alloc`, `ferret_array_*`, and `ferret_std_io_Print*` are implemented in JS.
+- `__data_end` is exported by the compiler to seed the JS heap pointer.

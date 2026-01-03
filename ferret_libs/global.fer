@@ -2,8 +2,10 @@
 // These are declarations only; implementations are compiler intrinsics.
 
 // @extern
-fn len(value: interface {}) -> i32;
+// Note: len borrows read-only (&). The compiler inserts the borrow for literals/values.
+fn len(value: &interface {}) -> i32;
 // @extern
-fn append(values: []interface {}, value: interface {}) -> bool;
+// Note: append borrows mutably (&') and requires an addressable target.
+fn append(values: &'[]interface {}, value: interface {}) -> bool;
 // @extern
 fn panic(msg: str) -> void;
