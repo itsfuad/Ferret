@@ -637,14 +637,14 @@ func fitsInType(valueStr string, t types.SemType) bool {
 	return false
 }
 
-// getMinimumTypeForValue returns the smallest type that can hold the given value.
-// For positive values, prefers signed types (more natural for integers).
+// getMinimumTypeOptionsForValue returns the smallest unsigned and signed types that can hold the value.
+// Unsigned is only returned for non-negative values.
 // Uses NumericValue interface which automatically chooses optimal representation.
-func getMinimumTypeForValue(valueStr string) types.TYPE_NAME {
+func getMinimumTypeOptionsForValue(valueStr string) (types.TYPE_NAME, types.TYPE_NAME) {
 	// Use NumericValue interface (automatically chooses int64 fast path or big.Int)
 	numValue, err := numeric.NewNumericValue(valueStr)
 	if err != nil {
-		return types.TYPE_UNKNOWN
+		return types.TYPE_UNKNOWN, types.TYPE_UNKNOWN
 	}
 
 	// Check signed types first if negative
@@ -663,28 +663,49 @@ func getMinimumTypeForValue(valueStr string) types.TYPE_NAME {
 
 		for _, t := range signedTypes {
 			if numValue.FitsInBitSize(t.bitSize, true) {
-				return t.name
+				return types.TYPE_UNKNOWN, t.name
 			}
 		}
-	} else {
-		// For positive values, prefer signed types (more natural)
-		// Use the next larger signed type to accommodate the value
-		types := []struct {
-			unsignedBit int
-			preferred   types.TYPE_NAME // Prefer signed type
-		}{
-			{8, types.TYPE_I16},    // 0-255 fits in i16
-			{16, types.TYPE_I32},   // 0-65535 fits in i32
-			{32, types.TYPE_I64},   // 0-4B fits in i64
-			{64, types.TYPE_I128},  // 0-18Q fits in i128
-			{128, types.TYPE_I256}, // 0-340U fits in i256
-			{256, types.TYPE_U256}, // No larger signed type exists
-		}
+		return types.TYPE_UNKNOWN, types.TYPE_UNKNOWN
+	}
 
-		for _, t := range types {
-			if numValue.FitsInBitSize(t.unsignedBit, false) {
-				return t.preferred
-			}
+	unsignedTypes := []struct {
+		name    types.TYPE_NAME
+		bitSize int
+	}{
+		{types.TYPE_U8, 8},
+		{types.TYPE_U16, 16},
+		{types.TYPE_U32, 32},
+		{types.TYPE_U64, 64},
+		{types.TYPE_U128, 128},
+		{types.TYPE_U256, 256},
+	}
+
+	for _, t := range unsignedTypes {
+		if numValue.FitsInBitSize(t.bitSize, false) {
+			return t.name, getMinimumSignedTypeForValue(numValue)
+		}
+	}
+
+	return types.TYPE_UNKNOWN, getMinimumSignedTypeForValue(numValue)
+}
+
+func getMinimumSignedTypeForValue(numValue numeric.NumericValue) types.TYPE_NAME {
+	signedTypes := []struct {
+		name    types.TYPE_NAME
+		bitSize int
+	}{
+		{types.TYPE_I8, 8},
+		{types.TYPE_I16, 16},
+		{types.TYPE_I32, 32},
+		{types.TYPE_I64, 64},
+		{types.TYPE_I128, 128},
+		{types.TYPE_I256, 256},
+	}
+
+	for _, t := range signedTypes {
+		if numValue.FitsInBitSize(t.bitSize, true) {
+			return t.name
 		}
 	}
 
