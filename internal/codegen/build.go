@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"slices"
 	"fmt"
 	"os"
 	"os/exec"
@@ -599,12 +600,7 @@ func firstExisting(dirs []string, name string) string {
 }
 
 func containsArg(args []string, value string) bool {
-	for _, arg := range args {
-		if arg == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(args, value)
 }
 
 func containsLibDir(flags []string, dir string) bool {
