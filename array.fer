@@ -11,5 +11,7 @@ fn main() {
     io::ReadUnsafe();
 
     let x := 12;
-    let y : i32 = x + 3325352353536346463426;
+    let y : i32 = io::ReadInt() catch err {
+        io::Println(err);
+    } 0 ;
 }

@@ -189,8 +189,8 @@ char* ferret_std_io_ReadUnsafe(void) {
     return line;
 }
 
-// Result type layout for str!str: [union: str (8 bytes)][tag: i32 (4 bytes)] = 12 bytes (+ padding)
-// Tag: 0 = Ok (value), 1 = Err (error)
+// Result type layout for str!str: [union: str (8 bytes)][1-byte tag] (+ padding)
+// Tag: 1 = Ok (value), 0 = Err (error) (matches QBE codegen)
 // The union holds the str pointer (8 bytes on 64-bit)
 
 // Read a line from stdin, returns str!str
@@ -201,14 +201,14 @@ void ferret_std_io_Read(void* out) {
     size_t len = 0;
     ssize_t read = getline(&line, &len, stdin);
     
-    // Result layout: [8-byte str pointer][4-byte tag]
+    // Result layout: [8-byte str pointer][1-byte tag]
     char** str_ptr = (char**)out;
-    int32_t* tag_ptr = (int32_t*)((char*)out + 8);
+    uint8_t* tag_ptr = (uint8_t*)((char*)out + 8);
     
     if (read == -1) {
         // Error case
         *str_ptr = "failed to read input";
-        *tag_ptr = 1;  // Err
+        *tag_ptr = 0;  // Err
         if (line) free(line);
     } else {
         // Remove trailing newline if present
@@ -216,7 +216,7 @@ void ferret_std_io_Read(void* out) {
             line[read - 1] = '\0';
         }
         *str_ptr = line;  // Caller owns this memory now
-        *tag_ptr = 0;  // Ok
+        *tag_ptr = 1;  // Ok
     }
 }
 
@@ -228,16 +228,15 @@ void ferret_std_io_ReadInt(void* out) {
     size_t len = 0;
     ssize_t read = getline(&line, &len, stdin);
     
-    // Result layout for str!i32: [4-byte i32][4-byte padding][4-byte tag] or similar
-    // Actually for i32, the union is max(sizeof(str), sizeof(i32)) = 8 bytes
-    // So layout is: [8-byte union][4-byte tag]
+    // Result layout for str!i32: [8-byte union][1-byte tag] (+ padding)
+    // For i32, the union is max(sizeof(str), sizeof(i32)) = 8 bytes
     int32_t* val_ptr = (int32_t*)out;
-    int32_t* tag_ptr = (int32_t*)((char*)out + 8);
+    uint8_t* tag_ptr = (uint8_t*)((char*)out + 8);
     
     if (read == -1) {
         // Store error string at the union location (as pointer)
         *(char**)out = "failed to read input";
-        *tag_ptr = 1;  // Err
+        *tag_ptr = 0;  // Err
     } else {
         char* endptr;
         long val = strtol(line, &endptr, 10);
@@ -245,13 +244,13 @@ void ferret_std_io_ReadInt(void* out) {
         // Check for conversion errors
         if (endptr == line || (*endptr != '\0' && *endptr != '\n')) {
             *(char**)out = "invalid integer format";
-            *tag_ptr = 1;  // Err
+            *tag_ptr = 0;  // Err
         } else if (val < INT32_MIN || val > INT32_MAX) {
             *(char**)out = "integer out of range";
-            *tag_ptr = 1;  // Err
+            *tag_ptr = 0;  // Err
         } else {
             *val_ptr = (int32_t)val;
-            *tag_ptr = 0;  // Ok
+            *tag_ptr = 1;  // Ok
         }
     }
     
@@ -266,13 +265,13 @@ void ferret_std_io_ReadFloat(void* out) {
     size_t len = 0;
     ssize_t read = getline(&line, &len, stdin);
     
-    // Result layout for str!f64: [8-byte f64/str][4-byte tag]
+    // Result layout for str!f64: [8-byte union][1-byte tag] (+ padding)
     double* val_ptr = (double*)out;
-    int32_t* tag_ptr = (int32_t*)((char*)out + 8);
+    uint8_t* tag_ptr = (uint8_t*)((char*)out + 8);
     
     if (read == -1) {
         *(char**)out = "failed to read input";
-        *tag_ptr = 1;  // Err
+        *tag_ptr = 0;  // Err
     } else {
         char* endptr;
         double val = strtod(line, &endptr);
@@ -280,10 +279,10 @@ void ferret_std_io_ReadFloat(void* out) {
         // Check for conversion errors
         if (endptr == line || (*endptr != '\0' && *endptr != '\n')) {
             *(char**)out = "invalid float format";
-            *tag_ptr = 1;  // Err
+            *tag_ptr = 0;  // Err
         } else {
             *val_ptr = val;
-            *tag_ptr = 0;  // Ok
+            *tag_ptr = 1;  // Ok
         }
     }
     
